@@ -8,23 +8,9 @@ const { loginSchema, registerSchema, changePasswordSchema } = require('../schema
 const AuthService = require('../services/auth.service');
 const supabase = require('../config/supabase'); // Still needed for some inline logic if any
 
-/**
- * GET /auth/me
- * Get current authenticated user from JWT cookie
- */
-router.get('/me', optionalAuth, async (req, res) => {
-    res.set('Cache-Control', 'no-store');
-    try {
-        if (!req.user) {
-            return res.json({ success: true, user: null });
-        }
-        const user = await AuthService.getUserProfile(req.user.userId);
-        res.json({ success: true, user });
-    } catch (error) {
-        logger.error({ err: error }, 'Get current user error');
-        res.status(error.status || 500).json({ error: error.message });
-    }
-});
+// NOTE: /auth/me endpoint REMOVED
+// Session initialization now uses supabase.auth.getSession() on frontend
+// /auth/refresh returns user data for state sync after token refresh
 
 /**
  * POST /auth/check-email
@@ -184,6 +170,8 @@ router.post('/verify-login-otp', validate(z.object({ email: z.string().email(), 
 
 /**
  * POST /auth/refresh
+ * Refresh access token using refresh token from cookies
+ * Returns new tokens AND user data for frontend state sync
  */
 router.post('/refresh', async (req, res) => {
     const refreshToken = req.cookies?.refresh_token;
@@ -193,7 +181,11 @@ router.post('/refresh', async (req, res) => {
     }
 
     try {
-        const tokens = await AuthService.refreshToken(refreshToken);
+        // Get new tokens from Supabase
+        const { tokens, userId } = await AuthService.refreshToken(refreshToken);
+
+        // Get user profile for frontend state sync
+        const user = await AuthService.getUserProfile(userId);
 
         res.cookie('access_token', tokens.access_token, {
             httpOnly: true,
@@ -211,7 +203,8 @@ router.post('/refresh', async (req, res) => {
             path: '/'
         });
 
-        res.json({ success: true, message: 'Token refreshed', tokens });
+        // Return user data along with tokens for frontend state sync
+        res.json({ success: true, message: 'Token refreshed', user, tokens });
 
     } catch (error) {
         logger.error({ err: error.message, stack: error.stack }, 'Refresh token error');

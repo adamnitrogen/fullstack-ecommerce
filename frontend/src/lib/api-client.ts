@@ -142,10 +142,7 @@ apiClient.interceptors.response.use(
                 return apiClient(originalRequest);
             } catch (error: unknown) {
                 const refreshError = error as AxiosError<ApiErrorResponse>;
-                // Refresh failed
-                if (originalRequest.url?.includes('/auth/me')) {
-                    return Promise.reject(refreshError);
-                }
+                // Refresh failed - notify app
 
                 if (!sessionExpiredHandled) {
                     sessionExpiredHandled = true;

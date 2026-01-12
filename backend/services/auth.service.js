@@ -358,9 +358,21 @@ class AuthService {
 
     /**
      * Refresh Token
+     * 
+     * CRITICAL: This method handles session persistence when access token expires.
+     * Called when frontend interceptor catches 401 and attempts refresh.
+     * Returns: new tokens + userId for fetching user profile
+     * 
+     * Flow:
+     * 1. Access token expired → frontend gets 401
+     * 2. Interceptor calls /auth/refresh with refresh_token cookie
+     * 3. This method uses Supabase to get new session
+     * 4. Route sets new cookies and returns user data
+     * 5. User remains logged in seamlessly
      */
     static async refreshToken(oldRefreshToken) {
         if (!oldRefreshToken) {
+            // WHY: No refresh token = user never logged in or cookies were cleared
             const error = new Error('Refresh token required');
             error.status = 401;
             throw error;
@@ -369,6 +381,7 @@ class AuthService {
         const { data: { session }, error } = await supabase.auth.refreshSession({ refresh_token: oldRefreshToken });
 
         if (error || !session) {
+            // WHY: Refresh token expired or revoked - user must re-login
             logger.warn({ err: error?.message }, '[AuthService] Supabase refreshSession failed');
             const err = new Error(error?.message || 'Invalid or expired refresh token');
             err.status = error?.status || 401;
@@ -376,8 +389,11 @@ class AuthService {
         }
 
         return {
-            access_token: session.access_token,
-            refresh_token: session.refresh_token
+            tokens: {
+                access_token: session.access_token,
+                refresh_token: session.refresh_token
+            },
+            userId: session.user.id
         };
     }
 

@@ -64,10 +64,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         logger.warn("Backend logout error (potentially already logged out):", err);
       }
 
-      // Force page reload to clear all in-memory state
-      if (typeof window !== 'undefined') {
-        window.location.href = '/';
-      }
+      // NOTE: Silent logout - no page refresh
+      // Navigation (if needed) should be handled by the calling component
+      logger.debug('[AuthStore] Logout completed silently');
     } catch (error) {
       logger.error("Logout error:", error);
     }
@@ -94,22 +93,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       };
       window.addEventListener('auth:session-expired', sessionExpiredHandler);
 
-      // 3. Get current user from backend via cookies
-      // We use apiClient here so that its interceptor handles any necessary refresh transparently
+      // 3. Check session via Supabase SDK (uses internal state)
+      // NOTE: /auth/me endpoint was removed - session init now uses Supabase directly
       try {
-        const response = await apiClient.get('/auth/me');
-        const userData = response.data.user;
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-        if (userData) {
+        if (sessionError) {
+          logger.debug('[AuthStore] Supabase getSession error:', sessionError);
+        }
+
+        if (session?.user) {
+          // User has valid Supabase session
+          const supabaseUser = session.user;
           const user: User = {
-            id: userData.id,
-            email: userData.email,
-            name: userData.name,
-            phone: userData.phone,
-            role: userData.role || 'customer',
-            emailVerified: userData.emailVerified,
-            phoneVerified: userData.phoneVerified,
-            mustChangePassword: userData.mustChangePassword,
+            id: supabaseUser.id,
+            email: supabaseUser.email || '',
+            name: supabaseUser.user_metadata?.name || '',
+            phone: supabaseUser.user_metadata?.phone || undefined,
+            role: supabaseUser.user_metadata?.role || 'customer',
+            emailVerified: supabaseUser.email_confirmed_at != null,
+            phoneVerified: false,
+            mustChangePassword: supabaseUser.user_metadata?.must_change_password || false,
             addresses: [],
           };
 
@@ -119,7 +123,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             isInitialized: true,
           });
 
-          logger.debug('[AuthStore] User initialized successfully');
+          logger.debug('[AuthStore] User initialized from Supabase session');
         } else {
           set({
             user: null,
@@ -129,13 +133,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           logger.debug('[AuthStore] No valid session found (guest)');
         }
       } catch (error: unknown) {
-        // If it's a 401, it means refresh also failed or no cookies exist
         set({
           user: null,
           isAuthenticated: false,
           isInitialized: true,
         });
-        logger.debug('[AuthStore] Auth check failed or guest user');
+        logger.debug('[AuthStore] Session check failed, treating as guest');
       }
 
       // 4. Set up Supabase listener (mainly for cross-tab debugging/sync)

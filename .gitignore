@@ -5,6 +5,10 @@ backend/node_modules/
 .pnp
 .pnp.js
 
+docs/
+id_ed25519_repo
+id_ed25519_repo.pub
+
 # Testing
 coverage/
 *.lcov

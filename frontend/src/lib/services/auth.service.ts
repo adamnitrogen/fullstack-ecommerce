@@ -62,6 +62,8 @@ export const loginWithGoogle = async (): Promise<void> => {
 };
 
 export const logoutUser = async (): Promise<void> => {
+  // NOTE: Tokens are stored ONLY in HTTP-only cookies
+  // No localStorage/sessionStorage cleanup needed
   try {
     const { error } = await supabase.auth.signOut();
     if (error) {
@@ -75,16 +77,12 @@ export const logoutUser = async (): Promise<void> => {
     logger.warn("Local signOut exception:", err);
   }
 
-  // Always attempt to clear backend cookies
+  // Clear backend cookies
   try {
     await apiClient.post('/auth/logout');
   } catch (err) {
     logger.warn("Backend logout error:", err);
   }
-
-  // Clear any potential local storage artifacts manually if needed
-  localStorage.removeItem('sb-access-token');
-  localStorage.removeItem('sb-refresh-token');
 };
 
 export const getCurrentUser = async (): Promise<User | null> => {
