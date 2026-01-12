@@ -1,0 +1,396 @@
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Separator } from "@/components/ui/separator";
+import { useAuthStore } from "@/store/authStore";
+import { toast } from "@/hooks/use-toast";
+import { User, Mail, Phone, Edit, Trash2 } from "lucide-react";
+import { AddressBook } from "./AddressBook";
+import { DeleteAccountDialog } from "./DeleteAccountDialog";
+
+export function ProfileSettings() {
+  const { t } = useTranslation();
+  const { user, updateUser, logout } = useAuthStore();
+  const navigate = useNavigate();
+  const [editingPersonalInfo, setEditingPersonalInfo] = useState(false);
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [editingPhone, setEditingPhone] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  const [personalInfo, setPersonalInfo] = useState({
+    firstName: user?.firstName || "",
+    lastName: user?.lastName || "",
+    gender: user?.gender || "male",
+  });
+
+  const [email, setEmail] = useState(user?.email || "");
+  const [phone, setPhone] = useState(user?.phone || "");
+
+  const handleSavePersonalInfo = async () => {
+    try {
+      const { profileService } = await import("@/services/profile.service");
+      await profileService.updateProfile({
+        firstName: personalInfo.firstName,
+        lastName: personalInfo.lastName,
+        gender: personalInfo.gender as "male" | "female" | "other",
+      });
+
+      updateUser({
+        firstName: personalInfo.firstName,
+        lastName: personalInfo.lastName,
+        gender: personalInfo.gender as "male" | "female" | "other",
+        name: `${personalInfo.firstName} ${personalInfo.lastName}`,
+      });
+      setEditingPersonalInfo(false);
+      toast({
+        title: t("profile.updateSuccess"),
+        description: "Personal information updated successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update profile",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSaveEmail = () => {
+    updateUser({ email });
+    setEditingEmail(false);
+    toast({
+      title: t("profile.updateSuccess"),
+      description: "Email updated successfully",
+    });
+  };
+
+  const handleSavePhone = () => {
+    if (!phone || phone.trim() === "") {
+      toast({
+        title: "Error",
+        description: "Phone number is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    updateUser({ phone });
+    setEditingPhone(false);
+    toast({
+      title: t("profile.updateSuccess"),
+      description: "Phone number updated successfully",
+    });
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      const { profileService } = await import("@/services/profile.service");
+
+      if (user) {
+        // Mark account as deleted and deactivate
+        await profileService.deleteAccount();
+
+        // Log out the user
+        logout();
+
+        // Show success message
+        toast({
+          title: "Account Deleted",
+          description: "Your account has been permanently deleted.",
+        });
+
+        // Redirect to home page
+        navigate("/");
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete account. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <User className="h-5 w-5" />
+            {t("profile.accountSettings")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-8">
+          {/* Personal Information Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Personal Information</h3>
+              <Button
+                variant="link"
+                size="sm"
+                className="text-primary"
+                onClick={() => setEditingPersonalInfo(!editingPersonalInfo)}
+              >
+                Edit
+              </Button>
+            </div>
+
+            {editingPersonalInfo ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input
+                    placeholder="First Name"
+                    value={personalInfo.firstName}
+                    onChange={(e) =>
+                      setPersonalInfo({
+                        ...personalInfo,
+                        firstName: e.target.value,
+                      })
+                    }
+                    className="bg-muted"
+                  />
+                  <Input
+                    placeholder="Last Name"
+                    value={personalInfo.lastName}
+                    onChange={(e) =>
+                      setPersonalInfo({
+                        ...personalInfo,
+                        lastName: e.target.value,
+                      })
+                    }
+                    className="bg-muted"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm">Your Gender</Label>
+                  <RadioGroup
+                    value={personalInfo.gender}
+                    onValueChange={(value) =>
+                      setPersonalInfo({ ...personalInfo, gender: value as "male" | "female" | "other" })
+                    }
+                    className="flex gap-6"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="male" id="edit-male" />
+                      <Label
+                        htmlFor="edit-male"
+                        className="font-normal cursor-pointer"
+                      >
+                        Male
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="female" id="edit-female" />
+                      <Label
+                        htmlFor="edit-female"
+                        className="font-normal cursor-pointer"
+                      >
+                        Female
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button onClick={handleSavePersonalInfo} size="sm">
+                    Save
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setPersonalInfo({
+                        firstName: user?.firstName || "",
+                        lastName: user?.lastName || "",
+                        gender: user?.gender || "male",
+                      });
+                      setEditingPersonalInfo(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-3 bg-muted rounded-md">
+                    <p className="text-sm text-muted-foreground">
+                      {personalInfo.firstName || "First Name"}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-muted rounded-md">
+                    <p className="text-sm text-muted-foreground">
+                      {personalInfo.lastName || "Last Name"}
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Your Gender</Label>
+                  <RadioGroup
+                    value={personalInfo.gender}
+                    disabled
+                    className="flex gap-6"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="male" id="view-male" />
+                      <Label htmlFor="view-male" className="font-normal">
+                        Male
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="female" id="view-female" />
+                      <Label htmlFor="view-female" className="font-normal">
+                        Female
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* Email Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Email Address</h3>
+              <Button
+                variant="link"
+                size="sm"
+                className="text-primary"
+                onClick={() => setEditingEmail(!editingEmail)}
+              >
+                Edit
+              </Button>
+            </div>
+
+            {editingEmail ? (
+              <div className="space-y-4">
+                <Input
+                  type="email"
+                  placeholder="Email Address"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="bg-muted max-w-md"
+                />
+                <div className="flex gap-2">
+                  <Button onClick={handleSaveEmail} size="sm">
+                    Save
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setEmail(user?.email || "");
+                      setEditingEmail(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 bg-muted rounded-md max-w-md">
+                <p className="text-sm text-muted-foreground">{email}</p>
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* Phone Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Mobile Number</h3>
+              <Button
+                variant="link"
+                size="sm"
+                className="text-primary"
+                onClick={() => setEditingPhone(!editingPhone)}
+              >
+                Edit
+              </Button>
+            </div>
+
+            {editingPhone ? (
+              <div className="space-y-4">
+                <Input
+                  type="tel"
+                  placeholder="Mobile Number"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="bg-muted max-w-md"
+                />
+                <div className="flex gap-2">
+                  <Button onClick={handleSavePhone} size="sm">
+                    Save
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setPhone(user?.phone || "");
+                      setEditingPhone(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 bg-muted rounded-md max-w-md">
+                <p className="text-sm text-muted-foreground">{phone}</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Address Book Section */}
+      <div className="mt-6">
+        <AddressBook />
+      </div>
+
+      {/* Danger Zone - Delete Account */}
+      <Card className="mt-6 border-destructive">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-destructive">
+            <Trash2 className="h-5 w-5" />
+            Danger Zone
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold mb-2">Delete Account</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Once you delete your account, there is no going back. Please be
+              certain. This action will permanently delete all your data.
+            </p>
+            <Button
+              variant="destructive"
+              onClick={() => setDeleteDialogOpen(true)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete My Account
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Delete Account Dialog */}
+      <DeleteAccountDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteAccount}
+        userEmail={user?.email || ""}
+      />
+    </>
+  );
+}

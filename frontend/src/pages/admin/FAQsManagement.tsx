@@ -1,0 +1,450 @@
+import { logger } from "@/lib/logger";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Plus,
+  Search,
+  Edit,
+  Trash2,
+  HelpCircle,
+  Download,
+  Eye,
+  EyeOff,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import { FAQDialog } from "@/components/admin/FAQDialog";
+import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
+import { toast } from "@/hooks/use-toast";
+import { getErrorMessage } from "@/lib/errorUtils";
+import { downloadCSV, flattenObject } from "@/lib/exportUtils";
+import { faqService, type FAQWithCategory } from "@/services/faq.service";
+import { categoryService, type Category } from "@/services/category.service";
+
+const ITEMS_PER_PAGE = 10;
+
+export default function FAQsManagement() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [faqDialogOpen, setFaqDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedFaq, setSelectedFaq] = useState<FAQWithCategory | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const queryClient = useQueryClient();
+
+  const { data: faqs = [], isLoading } = useQuery({
+    queryKey: ["admin-faqs"],
+    queryFn: async () => {
+      try {
+        const data = await faqService.getAll(true);
+        logger.debug('Admin FAQs loaded:', { count: data?.length || 0 });
+        return data;
+      } catch (error) {
+        logger.error('Error loading admin FAQs:', error);
+        toast({
+          title: "Error Loading FAQs",
+          description: getErrorMessage(error, "Unable to load FAQs from the database. Please check your connection and try again."),
+          variant: "destructive",
+        });
+        throw error;
+      }
+    },
+  });
+
+  // Client-side filtering
+  const filteredFaqs = faqs.filter((faq) => {
+    const matchesCategory = categoryFilter === "all" || faq.category_id === categoryFilter;
+    const matchesSearch = !searchQuery ||
+      faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      faq.answer.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+
+  // Calculate pagination
+  const totalPages = Math.ceil((filteredFaqs?.length || 0) / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedFaqs = filteredFaqs.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  };
+
+  const handleCategoryChange = (value: string) => {
+    setCategoryFilter(value);
+    setCurrentPage(1);
+  };
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ["faq-categories"],
+    queryFn: async () => {
+      return await categoryService.getAll('faq');
+    },
+  });
+
+  const faqMutation = useMutation({
+    mutationFn: async (faq: {
+      id?: string;
+      question: string;
+      answer: string;
+      category_id: string;
+      display_order?: number;
+      is_active?: boolean;
+    }) => {
+      if (faq.id) {
+        return await faqService.update(faq.id, {
+          question: faq.question,
+          answer: faq.answer,
+          category_id: faq.category_id,
+          display_order: faq.display_order,
+          is_active: faq.is_active,
+        });
+      } else {
+        return await faqService.create({
+          question: faq.question,
+          answer: faq.answer,
+          category_id: faq.category_id,
+          display_order: faq.display_order,
+          is_active: faq.is_active,
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-faqs"] });
+      toast({
+        title: "Success",
+        description: selectedFaq
+          ? "FAQ updated successfully"
+          : "FAQ created successfully",
+      });
+      setFaqDialogOpen(false);
+      setSelectedFaq(null);
+    },
+    onError: (error: unknown) => {
+      toast({
+        title: "Error",
+        description: getErrorMessage(error, "Failed to save FAQ"),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await faqService.delete(id);
+      return id;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-faqs"] });
+      toast({
+        title: "Success",
+        description: "FAQ deleted successfully",
+      });
+      setDeleteDialogOpen(false);
+      setSelectedFaq(null);
+    },
+    onError: (error: unknown) => {
+      toast({
+        title: "Error",
+        description: getErrorMessage(error, "Failed to delete FAQ"),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await faqService.toggleActive(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-faqs"] });
+      toast({
+        title: "Success",
+        description: "FAQ status updated successfully",
+      });
+    },
+    onError: (error: unknown) => {
+      toast({
+        title: "Error",
+        description: getErrorMessage(error, "Failed to update FAQ status"),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAddFaq = () => {
+    setSelectedFaq(null);
+    setFaqDialogOpen(true);
+  };
+
+  const handleEditFaq = (faq: FAQWithCategory) => {
+    setSelectedFaq(faq);
+    setFaqDialogOpen(true);
+  };
+
+  const handleDelete = (faq: FAQWithCategory) => {
+    setSelectedFaq(faq);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleToggleActive = (faq: FAQWithCategory) => {
+    toggleActiveMutation.mutate(faq.id);
+  };
+
+  const handleExport = () => {
+    const exportData = faqs.map((faq) => flattenObject(faq as unknown as Record<string, unknown>));
+    downloadCSV(exportData, "faqs");
+    toast({
+      title: "Success",
+      description: "FAQs exported successfully",
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">FAQ Management</h1>
+          <p className="text-muted-foreground">
+            Manage frequently asked questions and categories
+          </p>
+        </div>
+        <Button onClick={handleAddFaq}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add FAQ
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <HelpCircle className="h-5 w-5" />
+            FAQs
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* Filters */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="faq-search"
+                  name="search"
+                  placeholder="Search FAQs..."
+                  value={searchQuery}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Select
+                value={categoryFilter}
+                onValueChange={handleCategoryChange}
+              >
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectValue placeholder="All Categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" onClick={handleExport}>
+                <Download className="mr-2 h-4 w-4" />
+                Export
+              </Button>
+            </div>
+
+            {/* Table */}
+            {isLoading ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Loading FAQs...
+              </div>
+            ) : faqs.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No FAQs found. Add your first FAQ to get started.
+              </div>
+            ) : (
+              <div className="border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Question</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedFaqs.map((faq) => (
+                      <TableRow key={faq.id}>
+                        <TableCell className="max-w-md">
+                          <div className="space-y-1">
+                            <p className="font-medium line-clamp-2">
+                              {faq.question}
+                            </p>
+                            <p className="text-sm text-muted-foreground line-clamp-2">
+                              {faq.answer}
+                            </p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{faq.category.name}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={faq.is_active ? "default" : "secondary"}
+                          >
+                            {faq.is_active ? "Active" : "Inactive"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(faq.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleToggleActive(faq)}
+                              title={faq.is_active ? "Hide FAQ" : "Show FAQ"}
+                            >
+                              {faq.is_active ? (
+                                <EyeOff className="h-4 w-4" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEditFaq(faq)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(faq)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            {/* Pagination & Stats */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                <p>
+                  Showing {filteredFaqs.length > 0 ? startIndex + 1 : 0} to{" "}
+                  {Math.min(endIndex, filteredFaqs.length)} of {filteredFaqs.length} FAQ
+                  {filteredFaqs.length !== 1 ? "s" : ""}
+                </p>
+                <p className="mt-1">
+                  Active: {filteredFaqs.filter((f) => f.is_active).length} | Inactive:{" "}
+                  {filteredFaqs.filter((f) => !f.is_active).length}
+                </p>
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.max(1, prev - 1))
+                    }
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                      (page) => (
+                        <Button
+                          key={page}
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(page)}
+                          className="w-9"
+                        >
+                          {page}
+                        </Button>
+                      )
+                    )}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                    }
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <FAQDialog
+        open={faqDialogOpen}
+        onOpenChange={setFaqDialogOpen}
+        onSave={(faq) => faqMutation.mutate(faq)}
+        faq={selectedFaq}
+        categories={categories}
+      />
+
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={() => selectedFaq && deleteMutation.mutate(selectedFaq.id)}
+        title="Delete FAQ"
+        description={`Are you sure you want to delete "${selectedFaq?.question}"? This action cannot be undone.`}
+      />
+    </div>
+  );
+}

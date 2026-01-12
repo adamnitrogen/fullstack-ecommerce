@@ -1,0 +1,64 @@
+import { Testimonial } from "@/types";
+import { UserAvatar } from "./TestimonialModal";
+
+interface TestimonialCardProps {
+  testimonial: Testimonial;
+  onClick: () => void;
+}
+
+// Reusable compact star rating for cards
+function CompactStarRating({ rating }: { rating: number }) {
+  return (
+    <div className="flex gap-1">
+      {[...Array(5)].map((_, i) => (
+        <svg
+          key={i}
+          className={`h-4 w-4 ${
+            i < rating ? "text-accent fill-accent" : "text-muted fill-muted"
+          }`}
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+        >
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+        </svg>
+      ))}
+    </div>
+  );
+}
+
+export function TestimonialCard({
+  testimonial,
+  onClick,
+}: TestimonialCardProps) {
+  return (
+    <div
+      className="flex-shrink-0 w-[380px] h-[280px] bg-card p-6 rounded-lg shadow-soft hover:shadow-elevated transition-all cursor-pointer flex flex-col"
+      onClick={onClick}
+    >
+      <div className="flex items-center gap-4 mb-4">
+        <UserAvatar
+          name={testimonial.name}
+          image={testimonial.image}
+          size="sm"
+        />
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-foreground truncate">
+            {testimonial.name}
+          </h3>
+          {testimonial.role && (
+            <p className="text-sm text-muted-foreground truncate">
+              {testimonial.role}
+            </p>
+          )}
+        </div>
+      </div>
+      <div className="mb-3">
+        <CompactStarRating rating={testimonial.rating} />
+      </div>
+      <p className="text-muted-foreground leading-relaxed break-words line-clamp-6 flex-1 overflow-hidden">
+        &ldquo;{testimonial.content}&rdquo;
+      </p>
+    </div>
+  );
+}

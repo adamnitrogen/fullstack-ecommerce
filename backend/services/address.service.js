@@ -1,0 +1,348 @@
+const supabase = require('../config/supabase');
+const logger = require('../utils/logger');
+
+/**
+ * Address Service
+ * Handles CRUD operations for user addresses
+ */
+
+// Get all addresses for a user
+const getUserAddresses = async (userId) => {
+    const { data, error } = await supabase
+        .from('addresses')
+        .select(`
+            *,
+            phone_numbers (
+                phone_number
+            )
+        `)
+        .eq('user_id', userId)
+        .order('is_primary', { ascending: false })
+        .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Map to include phone property directly
+    return data.map(addr => ({
+        ...addr,
+        phone: addr.phone_numbers?.phone_number
+    }));
+};
+
+// Get specific address
+const getAddressById = async (id, userId) => {
+    const { data, error } = await supabase
+        .from('addresses')
+        .select('*')
+        .eq('id', id)
+        .eq('user_id', userId)
+        .single();
+
+    if (error) throw error;
+    return data;
+};
+
+// Create new address
+const createAddress = async (userId, addressData) => {
+    logger.info({ data: { userId, addressData } }, 'createAddress called with:');
+    // Validate required fields
+    const required = ['full_name', 'phone', 'address_line1', 'city', 'state', 'postal_code', 'type'];
+    for (const field of required) {
+        if (!addressData[field]) {
+            throw new Error(`${field} is required`);
+        }
+    }
+
+    // Phone validation using Abstract API
+    const phoneValidator = require('../utils/phone-validator');
+    logger.info({ phone: addressData.phone }, 'Calling phone validator from createAddress');
+    const validationResult = await phoneValidator.validate(addressData.phone);
+    if (!validationResult.isValid) {
+        throw new Error(validationResult.error);
+    }
+
+    // 1. Handle Phone Number
+    let phoneNumberId;
+
+    // Check if phone number already exists for this user
+    const { data: existingPhone } = await supabase
+        .from('phone_numbers')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('phone_number', addressData.phone)
+        .single();
+
+    if (existingPhone) {
+        phoneNumberId = existingPhone.id;
+    } else {
+        // Create new phone number
+        const { data: newPhone, error: createPhoneError } = await supabase
+            .from('phone_numbers')
+            .insert([{
+                user_id: userId,
+                phone_number: addressData.phone,
+                label: 'Mobile',
+                is_primary: false
+            }])
+            .select()
+            .single();
+
+        if (createPhoneError) throw createPhoneError;
+        phoneNumberId = newPhone.id;
+    }
+
+    // 2. If this address is being set as primary, unset all other primary addresses first
+    if (addressData.is_primary) {
+        await supabase
+            .from('addresses')
+            .update({ is_primary: false })
+            .eq('user_id', userId);
+    }
+
+    // 3. Create Address - Map field names to DB column names
+    const { phone, address_line1, address_line2, postal_code, full_name, ...otherFields } = addressData;
+
+    const { data, error } = await supabase
+        .from('addresses')
+        .insert([{
+            user_id: userId,
+            phone_number_id: phoneNumberId,
+            street_address: address_line1,        // DB column name
+            apartment: address_line2 || null,     // DB column name  
+            postal_code: postal_code,             // DB column name
+            is_primary: addressData.is_primary,   // DB column name & fix variable ref
+            label: full_name,                     // DB column name
+            ...otherFields  // city, state, country, type
+        }])
+        .select(`
+            *,
+            phone_numbers (
+                phone_number
+            )
+        `)
+        .single();
+
+    if (error) throw error;
+
+    // Flatten the response to include phone directly
+    return {
+        ...data,
+        phone: data.phone_numbers?.phone_number
+    };
+};
+
+// Update address
+const updateAddress = async (id, userId, updates) => {
+    logger.info({ data: { id, userId, updates } }, 'updateAddress called with:');
+
+    // 1. Extract and map field names
+    const { phone, address_line1, address_line2, postal_code, is_primary, ...otherUpdates } = updates;
+    let dbUpdates = { ...otherUpdates };  // city, state, country, type, etc.
+
+    // Map field names to database column names
+    if (address_line1) dbUpdates.street_address = address_line1;
+    if (address_line2 !== undefined) dbUpdates.apartment = address_line2 || null;
+    if (postal_code) dbUpdates.postal_code = postal_code;
+    if (is_primary !== undefined) dbUpdates.is_primary = is_primary;
+
+    // If setting this address as primary, unset all other primary addresses first
+    if (is_primary === true) {
+        await supabase
+            .from('addresses')
+            .update({ is_primary: false })
+            .eq('user_id', userId)
+            .neq('id', id);
+    }
+
+    // 2. Handle Phone Number if present
+    if (phone) {
+        const phoneValidator = require('../utils/phone-validator');
+        logger.info({ phone }, 'Calling phone validator from updateAddress');
+        const validationResult = await phoneValidator.validate(phone);
+        if (!validationResult.isValid) {
+            throw new Error(validationResult.error);
+        }
+
+        const { data: existingPhone } = await supabase
+            .from('phone_numbers')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('phone_number', phone)
+            .single();
+
+        if (existingPhone) {
+            dbUpdates.phone_number_id = existingPhone.id;
+        } else {
+            // Create new phone number
+            const { data: newPhone, error: createPhoneError } = await supabase
+                .from('phone_numbers')
+                .insert([{
+                    user_id: userId,
+                    phone_number: phone,
+                    label: 'Mobile',
+                    is_primary: false
+                }])
+                .select()
+                .single();
+
+            if (createPhoneError) throw createPhoneError;
+            dbUpdates.phone_number_id = newPhone.id;
+        }
+    }
+
+    // 3. Update the address
+    const { data, error } = await supabase
+        .from('addresses')
+        .update({
+            ...dbUpdates,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .eq('user_id', userId)
+        .select(`
+            *,
+            phone_numbers (
+                phone_number
+            )
+        `)
+        .single();
+
+    if (error) throw error;
+
+    // Flatten response
+    return {
+        ...data,
+        phone: data.phone_numbers?.phone_number
+    };
+};
+
+// Delete address
+const deleteAddress = async (id, userId) => {
+    const { error } = await supabase
+        .from('addresses')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', userId);
+
+    if (error) throw error;
+    return { success: true };
+};
+
+// Set address as primary
+const setPrimaryAddress = async (id, userId, type) => {
+    // First, remove primary from all addresses of this type
+    await supabase
+        .from('addresses')
+        .update({ is_primary: false })
+        .eq('user_id', userId)
+        .eq('type', type);
+
+    // Then set the specified address as primary
+    const { data, error } = await supabase
+        .from('addresses')
+        .update({ is_primary: true, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .eq('user_id', userId)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+};
+
+// Get primary address of a specific type
+const getPrimaryAddress = async (userId, type) => {
+    const { data, error } = await supabase
+        .from('addresses')
+        .select(`
+            *,
+            phone_numbers (
+                phone_number
+            )
+        `)
+        .eq('user_id', userId)
+        .eq('type', type)
+        .eq('is_primary', true)
+        .single();
+
+    // If no primary found, return null (not an error)
+    if (error && error.code === 'PGRST116') return null;
+    if (error) throw error;
+
+    // Map to include phone property and map field names for frontend
+    if (data) {
+        return {
+            ...data,
+            phone: data.phone_numbers?.phone_number,
+            full_name: data.label,
+            address_line1: data.street_address,
+            address_line2: data.apartment
+        };
+    }
+    return data;
+};
+
+// Get latest address (optional type filter)
+const getLatestAddress = async (userId, type = null) => {
+    const { data, error } = await supabase
+        .from('addresses')
+        .select(`
+            *,
+            phone_numbers (
+                phone_number
+            )
+        `)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    if (!data || data.length === 0) return null;
+
+    let result;
+    if (type) {
+        // Return first matching type
+        result = data.find(addr => addr.type === type || addr.type === 'both') || null;
+    } else {
+        // Return latest of any type
+        result = data[0];
+    }
+
+    // Map to include phone property and map field names for frontend
+    if (result) {
+        return {
+            ...result,
+            phone: result.phone_numbers?.phone_number,
+            full_name: result.label,
+            address_line1: result.street_address,
+            address_line2: result.apartment
+        };
+    }
+    return null;
+};
+
+// Helper to format DB address to frontend structure
+const formatAddress = (addr) => {
+    if (!addr) return null;
+    // If it's already a snapshot with mapped fields, return as is (but ensure phone is present)
+    if (addr.phone && addr.full_name) return addr;
+
+    return {
+        ...addr,
+        phone: addr.phone_numbers?.phone_number || addr.phone,
+        full_name: addr.label || addr.full_name,
+        address_line1: addr.street_address || addr.address_line1,
+        address_line2: addr.apartment || addr.address_line2
+    };
+};
+
+module.exports = {
+    getUserAddresses,
+    getAddressById,
+    createAddress,
+    updateAddress,
+    deleteAddress,
+    setPrimaryAddress,
+    getPrimaryAddress,
+    getLatestAddress,
+    formatAddress
+};

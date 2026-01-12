@@ -1,0 +1,444 @@
+﻿const express = require('express');
+const logger = require('../utils/logger');
+const router = express.Router();
+const supabase = require('../config/supabase');
+const { authenticateToken } = require('../middleware/auth.middleware');
+const multer = require('multer');
+const sharp = require('sharp');
+const { v4: uuidv4 } = require('uuid');
+
+// Configure multer for memory storage (we'll process before uploading)
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB limit
+    },
+    fileFilter: (req, file, cb) => {
+        // Accept only images
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only image files are allowed'), false);
+        }
+    },
+});
+
+/**
+ * GET /api/profile
+ * Get current user's profile with addresses
+ */
+router.get('/', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        logger.debug(`[ProfileRoutes] Fetching profile for user ${userId}`);
+
+        // Get profile with role
+        const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select(`
+        *,
+        roles (name)
+    `)
+            .eq('id', userId)
+            .eq('is_deleted', false)
+            .single();
+
+        if (profileError) throw profileError;
+
+        if (!profile) {
+            return res.status(404).json({ error: 'Profile not found' });
+        }
+
+        // Get the latest phone number from phone_numbers table
+        const { data: latestPhone } = await supabase
+            .from('phone_numbers')
+            .select('phone_number')
+            .eq('user_id', userId)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        // Get user's addresses using service (includes phone numbers)
+        const { getUserAddresses } = require('../services/address.service');
+        logger.debug(`[ProfileRoutes] Fetching addresses for user ${userId}`);
+        const addresses = await getUserAddresses(userId);
+
+        // Transform addresses to camelCase
+        const transformedAddresses = (addresses || []).map(address => ({
+            id: address.id,
+            userId: address.user_id,
+            type: address.type,
+            isPrimary: address.is_primary,
+            streetAddress: address.street_address,
+            apartment: address.apartment,
+            city: address.city,
+            state: address.state,
+            postalCode: address.postal_code,
+            country: address.country,
+            label: address.label,
+            phone: address.phone,  // Now included from service
+            createdAt: address.created_at,
+            updatedAt: address.updated_at
+        }));
+
+        logger.debug(`[ProfileRoutes] Successfully fetched profile for user ${userId}`);
+
+        res.json({
+            id: profile.id,
+            email: profile.email,
+            firstName: profile.first_name,
+            lastName: profile.last_name,
+            name: `${profile.first_name}${profile.last_name ? ' ' + profile.last_name : ''}`,
+            phone: latestPhone?.phone_number || profile.phone || null, // Use latest from phone_numbers table
+            gender: profile.gender,
+            avatarUrl: profile.avatar_url,
+            role: profile.roles?.name || 'customer',
+            emailVerified: profile.email_verified,
+            phoneVerified: profile.phone_verified,
+            addresses: transformedAddresses
+        });
+    } catch (error) {
+        logger.error({ err: error }, 'Error fetching profile:');
+        res.status(500).json({ error: 'Failed to fetch profile' });
+    }
+});
+
+/**
+ * PUT /api/profile
+ * Update user's personal information
+ */
+router.put('/', authenticateToken, async (req, res) => {
+    logger.info({ body: req.body, userId: req.user.userId }, 'Profile Update Request Received');
+    try {
+        const userId = req.user.userId;
+        const { firstName, lastName, gender, phone } = req.body;
+
+        // Validation
+        if (!firstName || firstName.trim().length === 0) {
+            return res.status(400).json({ error: 'First name is required' });
+        }
+
+        if (gender && !['male', 'female', 'other', 'prefer_not_to_say'].includes(gender)) {
+            return res.status(400).json({ error: 'Invalid gender value' });
+        }
+
+        // Phone validation (basic format)
+        if (phone && phone.trim().length > 0) {
+            // Allow optional + at start, then digits. Allow spaces/dashes/parentheses in input but strip them for check.
+            const sanitizedPhone = phone.replace(/[\s\-\(\)]/g, '');
+            const phoneRegex = /^\+?[0-9]{10,15}$/;
+
+            if (!phoneRegex.test(sanitizedPhone)) {
+                return res.status(400).json({ error: 'Invalid phone number format' });
+            }
+
+            // Abstract API validation
+            const phoneValidator = require('../utils/phone-validator');
+            logger.info({ phone }, 'Calling phone validator service from profile route');
+            const validationResult = await phoneValidator.validate(phone);
+            if (!validationResult.isValid) {
+                return res.status(400).json({ error: validationResult.error });
+            }
+        }
+
+        // Handle phone number update - save to phone_numbers table
+        if (phone && phone.trim().length > 0) {
+            // Check if this phone number already exists for this user
+            const { data: existingPhone } = await supabase
+                .from('phone_numbers')
+                .select('id')
+                .eq('user_id', userId)
+                .eq('phone_number', phone.trim())
+                .single();
+
+            if (existingPhone) {
+                // Update the existing entry to mark it as latest
+                await supabase
+                    .from('phone_numbers')
+                    .update({ updated_at: new Date().toISOString() })
+                    .eq('id', existingPhone.id);
+            } else {
+                // Create new phone number entry
+                await supabase
+                    .from('phone_numbers')
+                    .insert([{
+                        user_id: userId,
+                        phone_number: phone.trim(),
+                        label: 'Mobile',
+                        is_primary: true
+                    }]);
+            }
+        }
+
+        // Update profile (keeping phone in profiles table for backward compatibility)
+        const { data, error } = await supabase
+            .from('profiles')
+            .update({
+                first_name: firstName.trim(),
+                last_name: lastName ? lastName.trim() : null,
+                gender: gender || null,
+                phone: phone ? phone.trim() : null,
+                name: `${firstName.trim()}${lastName ? ' ' + lastName.trim() : ''}`, // Keep name field in sync
+            })
+            .eq('id', userId)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        res.json({
+            message: 'Profile updated successfully',
+            profile: {
+                firstName: data.first_name,
+                lastName: data.last_name,
+                gender: data.gender,
+                phone: data.phone
+            }
+        });
+    } catch (error) {
+        logger.error({ err: error }, 'Error updating profile:');
+        res.status(500).json({ error: 'Failed to update profile' });
+    }
+});
+
+/**
+ * POST /api/profile/avatar
+ * Upload and update user's profile avatar
+ */
+router.post('/avatar', authenticateToken, upload.single('avatar'), async (req, res) => {
+    try {
+        const userId = req.user.userId;
+
+        if (!req.file) {
+            return res.status(400).json({ error: 'No image file provided' });
+        }
+
+        // Process image: resize, optimize, convert to JPEG
+        const processedImage = await sharp(req.file.buffer)
+            .resize(400, 400, {
+                fit: 'cover',
+                position: 'center'
+            })
+            .jpeg({ quality: 85 })
+            .toBuffer();
+
+        // Generate unique filename
+        const filename = `${userId}-${uuidv4()}.jpg`;
+        const filepath = `avatars/${filename}`;
+
+        // Upload to Supabase Storage
+        const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('profile-images')
+            .upload(filepath, processedImage, {
+                contentType: 'image/jpeg',
+                upsert: false
+            });
+
+        if (uploadError) throw uploadError;
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+            .from('profile-images')
+            .getPublicUrl(filepath);
+
+        // Delete old avatar if exists
+        const { data: currentProfile } = await supabase
+            .from('profiles')
+            .select('avatar_url')
+            .eq('id', userId)
+            .single();
+
+        if (currentProfile?.avatar_url) {
+            const oldPath = currentProfile.avatar_url.split('/').pop();
+            const oldFilepath = `avatars/${oldPath}`;
+            await supabase.storage
+                .from('profile-images')
+                .remove([oldFilepath]);
+        }
+
+        // Update profile with new avatar URL
+        const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ avatar_url: publicUrl })
+            .eq('id', userId);
+
+        if (updateError) throw updateError;
+
+        res.json({
+            message: 'Avatar uploaded successfully',
+            avatarUrl: publicUrl
+        });
+    } catch (error) {
+        logger.error({ err: error }, 'Error uploading avatar:');
+        res.status(500).json({ error: 'Failed to upload avatar' });
+    }
+});
+
+/**
+ * DELETE /api/profile/avatar
+ * Remove user's profile avatar
+ */
+router.delete('/avatar', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.userId;
+
+        // Get current profile to check for avatar
+        const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('avatar_url')
+            .eq('id', userId)
+            .single();
+
+        if (profileError) throw profileError;
+
+        if (!profile || !profile.avatar_url) {
+            return res.status(404).json({ error: 'No avatar found to delete' });
+        }
+
+        // Extract filename from URL
+        const filename = profile.avatar_url.split('/').pop();
+        const filepath = `avatars/${filename}`;
+
+        // Delete from Supabase Storage
+        const { error: deleteError } = await supabase.storage
+            .from('profile-images')
+            .remove([filepath]);
+
+        if (deleteError) throw deleteError;
+
+        // Update profile to remove avatar URL
+        const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ avatar_url: null })
+            .eq('id', userId);
+
+        if (updateError) throw updateError;
+
+        res.json({ message: 'Avatar deleted successfully' });
+    } catch (error) {
+        logger.error({ err: error }, 'Error deleting avatar:');
+        res.status(500).json({ error: 'Failed to delete avatar' });
+    }
+});
+
+/**
+ * POST /api/profile/delete-account
+ * Completely delete user account and personal data
+ * Preserves only name and email for public contributions (comments, reviews, testimonials)
+ */
+router.post('/delete-account', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.userId;
+
+        // Get current profile to access avatar and name
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('avatar_url, first_name, last_name, name, email')
+            .eq('id', userId)
+            .single();
+
+        // 1. Delete avatar from storage if exists
+        if (profile?.avatar_url) {
+            const filename = profile.avatar_url.split('/').pop();
+            const filepath = `avatars/${filename}`;
+            await supabase.storage
+                .from('profile-images')
+                .remove([filepath]);
+        }
+
+        // 2. Delete all addresses
+        await supabase
+            .from('addresses')
+            .delete()
+            .eq('user_id', userId);
+
+        // 3. Clear personal data from profile, keeping only what's needed for public contributions
+        const { error: profileError } = await supabase
+            .from('profiles')
+            .update({
+                // Keep for foreign key integrity and public display
+                name: profile?.name || `${profile?.first_name || 'Deleted'} ${profile?.last_name || 'User'}`,
+                email: profile?.email, // Keep email for uniqueness constraint
+                first_name: profile?.first_name || 'Deleted', // Keep or set placeholder (NOT NULL constraint)
+                last_name: profile?.last_name, // Keep last name
+
+                // Clear all other personal information
+                phone: null,
+                gender: null,
+                avatar_url: null,
+                email_verified: false,
+                phone_verified: false,
+
+                // Mark as deleted
+                is_deleted: true,
+                deleted_at: new Date().toISOString()
+            })
+            .eq('id', userId);
+
+        if (profileError) throw profileError;
+
+        // 4. Remove from newsletter subscribers
+        await supabase
+            .from('newsletter_subscribers')
+            .delete()
+            .eq('email', profile?.email);
+
+        // 5. Invalidate all refresh tokens
+        await supabase
+            .from('refresh_tokens')
+            .delete()
+            .eq('user_id', userId);
+
+        // 6. Clear cookies
+        res.clearCookie('access_token');
+        res.clearCookie('refresh_token');
+
+        res.json({
+            message: 'Account deleted successfully',
+            note: 'All your personal data has been removed. Your public contributions (comments, reviews) will remain visible with your name for community integrity.'
+        });
+    } catch (error) {
+        logger.error({ err: error }, 'Error deleting account:');
+        res.status(500).json({ error: 'Failed to delete account' });
+    }
+});
+
+/**
+ * POST /api/profile/change-password
+ * Change current user's password
+ */
+router.post('/change-password', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const { newPassword } = req.body;
+
+        if (!newPassword || newPassword.length < 6) {
+            return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+        }
+
+        // 1. Update password in Supabase Auth
+        const { error: authError } = await supabase.auth.admin.updateUserById(userId, {
+            password: newPassword
+        });
+
+        if (authError) throw authError;
+
+        // 2. Update profile to clear must_change_password flag
+        const { error: profileError } = await supabase
+            .from('profiles')
+            .update({ must_change_password: false })
+            .eq('id', userId);
+
+        if (profileError) {
+            logger.error({ err: profileError }, 'Failed to clear must_change_password flag');
+            // Don't fail request as password *was* changed
+        }
+
+        res.json({ message: 'Password updated successfully' });
+    } catch (error) {
+        logger.error({ err: error }, 'Error changing password:');
+        res.status(500).json({ error: 'Failed to update password' });
+    }
+});
+
+module.exports = router;
