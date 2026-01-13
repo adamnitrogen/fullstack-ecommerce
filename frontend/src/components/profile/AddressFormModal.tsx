@@ -259,268 +259,281 @@ export default function AddressFormModal({
 
     return (
         <Dialog open={open} onOpenChange={onClose}>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>
-                        {initialData ? 'Edit Address' : 'Add New Address'}
-                    </DialogTitle>
-                    <DialogDescription>
-                        {initialData ? 'Update your address details' : 'Add a new delivery address'}
-                    </DialogDescription>
-                </DialogHeader>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-[2.5rem] border-none shadow-elevated p-0">
+                <div className="bg-muted/30 p-8 border-b border-border/40">
+                    <DialogHeader>
+                        <DialogTitle className="text-2xl font-playfair text-[#2C1810]">
+                            {initialData ? 'Refine Sanctuary' : 'Establish New Sanctuary'}
+                        </DialogTitle>
+                        <DialogDescription className="text-sm italic">
+                            {initialData ? 'Update your sacred location details' : 'Define a new path for delivery'}
+                        </DialogDescription>
+                    </DialogHeader>
+                </div>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    {errors.general && (
-                        <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded">
-                            {errors.general}
-                        </div>
-                    )}
-
-                    {(apiError || locationError) && (
-                        <Alert variant="destructive">
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertDescription>{apiError || locationError}</AlertDescription>
-                        </Alert>
-                    )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Type */}
-                        <div className="space-y-2">
-                            <Label htmlFor="type">
-                                Address Type <span className="text-destructive">*</span>
-                            </Label>
-                            <Select
-                                value={formData.type}
-                                onValueChange={(value: 'home' | 'work' | 'other' | 'shipping' | 'billing' | 'both') =>
-                                    setFormData({ ...formData, type: value })
-                                }
-                                disabled={initialData?.type !== 'other' && !!initialData}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {availableTypes.includes('home') && (
-                                        <SelectItem value="home">Home</SelectItem>
-                                    )}
-                                    {availableTypes.includes('work') && (
-                                        <SelectItem value="work">Work</SelectItem>
-                                    )}
-                                    <SelectItem value="other">Other</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            {formData.type !== 'other' && !availableTypes.includes(formData.type) && initialData && (
-                                <p className="text-xs text-muted-foreground">
-                                    Type cannot be changed for home/work addresses
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Full Name (Label) */}
-                        <div className="space-y-2">
-                            <Label htmlFor="full_name">Full Name / Label</Label>
-                            <Input
-                                id="full_name"
-                                value={formData.full_name}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, full_name: e.target.value })
-                                }
-                                placeholder="e.g., Mom's House, Office"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Phone */}
-                    <div className="space-y-2">
-                        <Label htmlFor="phone">
-                            Phone Number <span className="text-destructive">*</span>
-                        </Label>
-                        <PhoneInput
-                            id="phone"
-                            value={formData.phone}
-                            onChange={(value) =>
-                                setFormData({ ...formData, phone: value as string })
-                            }
-                            placeholder="Enter phone number"
-                            className={errors.phone ? 'border-destructive' : ''}
-                        />
-                        {errors.phone && (
-                            <p className="text-sm text-destructive">{errors.phone}</p>
+                <div className="p-8">
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        {errors.general && (
+                            <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded">
+                                {errors.general}
+                            </div>
                         )}
-                    </div>
 
-                    {/* Street Address */}
-                    <div className="space-y-2">
-                        <Label htmlFor="address_line1">
-                            Street Address <span className="text-destructive">*</span>
-                        </Label>
-                        <Input
-                            id="address_line1"
-                            value={formData.address_line1}
-                            onChange={(e) =>
-                                setFormData({ ...formData, address_line1: e.target.value })
-                            }
-                            placeholder="Enter street address"
-                            className={errors.address_line1 ? 'border-destructive' : ''}
-                        />
-                        {errors.address_line1 && (
-                            <p className="text-sm text-destructive">{errors.address_line1}</p>
+                        {(apiError || locationError) && (
+                            <Alert variant="destructive">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription>{apiError || locationError}</AlertDescription>
+                            </Alert>
                         )}
-                    </div>
 
-                    {/* Apartment */}
-                    <div className="space-y-2">
-                        <Label htmlFor="address_line2">Apartment, Suite, etc.</Label>
-                        <Input
-                            id="address_line2"
-                            value={formData.address_line2 || ''}
-                            onChange={(e) =>
-                                setFormData({ ...formData, address_line2: e.target.value })
-                            }
-                            placeholder="Optional"
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Country */}
-                        <div className="space-y-2">
-                            <Label htmlFor="country">
-                                Country <span className="text-destructive">*</span>
-                            </Label>
-                            <Select
-                                value={formData.country}
-                                onValueChange={handleCountryChange}
-                                disabled={isLoadingCountries}
-                            >
-                                <SelectTrigger className={errors.country ? 'border-destructive' : ''}>
-                                    <SelectValue placeholder={isLoadingCountries ? "Loading countries..." : "Select Country"} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {countries.map((country) => (
-                                        <SelectItem key={country.country} value={country.country}>
-                                            {country.country} {country.phone_code ? `(${country.phone_code})` : ''}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            {errors.country && (
-                                <p className="text-sm text-destructive">{errors.country}</p>
-                            )}
-                        </div>
-
-                        {/* State */}
-                        <div className="space-y-2">
-                            <Label htmlFor="state">
-                                State <span className="text-destructive">*</span>
-                            </Label>
-                            {currentStates.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Type */}
+                            <div className="space-y-2">
+                                <Label htmlFor="type">
+                                    Address Type <span className="text-destructive">*</span>
+                                </Label>
                                 <Select
-                                    value={formData.state}
-                                    onValueChange={(value) =>
-                                        setFormData({ ...formData, state: value })
+                                    value={formData.type}
+                                    onValueChange={(value: 'home' | 'work' | 'other' | 'shipping' | 'billing' | 'both') =>
+                                        setFormData({ ...formData, type: value })
                                     }
-                                    disabled={!formData.country || isStatesLoading}
+                                    disabled={initialData?.type !== 'other' && !!initialData}
                                 >
-                                    <SelectTrigger className={errors.state ? 'border-destructive' : ''}>
-                                        <SelectValue placeholder={isStatesLoading ? "Loading states..." : "Select State"} />
+                                    <SelectTrigger>
+                                        <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {currentStates.map((state) => (
-                                            <SelectItem key={state.name} value={state.name}>
-                                                {state.name}
+                                        {availableTypes.includes('home') && (
+                                            <SelectItem value="home">Home</SelectItem>
+                                        )}
+                                        {availableTypes.includes('work') && (
+                                            <SelectItem value="work">Work</SelectItem>
+                                        )}
+                                        <SelectItem value="other">Other</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                {formData.type !== 'other' && !availableTypes.includes(formData.type) && initialData && (
+                                    <p className="text-xs text-muted-foreground">
+                                        Type cannot be changed for home/work addresses
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Full Name (Label) */}
+                            <div className="space-y-2">
+                                <Label htmlFor="full_name">Full Name / Label</Label>
+                                <Input
+                                    id="full_name"
+                                    value={formData.full_name}
+                                    onChange={(e) =>
+                                        setFormData({ ...formData, full_name: e.target.value })
+                                    }
+                                    placeholder="e.g., Mom's House, Office"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Phone */}
+                        <div className="space-y-2">
+                            <Label htmlFor="phone">
+                                Phone Number <span className="text-destructive">*</span>
+                            </Label>
+                            <PhoneInput
+                                id="phone"
+                                value={formData.phone}
+                                onChange={(value) =>
+                                    setFormData({ ...formData, phone: value as string })
+                                }
+                                placeholder="Enter phone number"
+                                className={errors.phone ? 'border-destructive' : ''}
+                            />
+                            {errors.phone && (
+                                <p className="text-sm text-destructive">{errors.phone}</p>
+                            )}
+                        </div>
+
+                        {/* Street Address */}
+                        <div className="space-y-2">
+                            <Label htmlFor="address_line1">
+                                Street Address <span className="text-destructive">*</span>
+                            </Label>
+                            <Input
+                                id="address_line1"
+                                value={formData.address_line1}
+                                onChange={(e) =>
+                                    setFormData({ ...formData, address_line1: e.target.value })
+                                }
+                                placeholder="Enter street address"
+                                className={errors.address_line1 ? 'border-destructive' : ''}
+                            />
+                            {errors.address_line1 && (
+                                <p className="text-sm text-destructive">{errors.address_line1}</p>
+                            )}
+                        </div>
+
+                        {/* Apartment */}
+                        <div className="space-y-2">
+                            <Label htmlFor="address_line2">Apartment, Suite, etc.</Label>
+                            <Input
+                                id="address_line2"
+                                value={formData.address_line2 || ''}
+                                onChange={(e) =>
+                                    setFormData({ ...formData, address_line2: e.target.value })
+                                }
+                                placeholder="Optional"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Country */}
+                            <div className="space-y-2">
+                                <Label htmlFor="country">
+                                    Country <span className="text-destructive">*</span>
+                                </Label>
+                                <Select
+                                    value={formData.country}
+                                    onValueChange={handleCountryChange}
+                                    disabled={isLoadingCountries}
+                                >
+                                    <SelectTrigger className={errors.country ? 'border-destructive' : ''}>
+                                        <SelectValue placeholder={isLoadingCountries ? "Loading countries..." : "Select Country"} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {countries.map((country) => (
+                                            <SelectItem key={country.country} value={country.country}>
+                                                {country.country} {country.phone_code ? `(${country.phone_code})` : ''}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
-                            ) : (
-                                <Input
-                                    id="state"
-                                    value={formData.state}
-                                    onChange={(e) =>
-                                        setFormData({ ...formData, state: e.target.value })
-                                    }
-                                    placeholder={!formData.country ? "Select country first" : "Enter state"}
-                                    disabled={!formData.country}
-                                    className={errors.state ? 'border-destructive' : ''}
-                                />
-                            )}
-                            {errors.state && (
-                                <p className="text-sm text-destructive">{errors.state}</p>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Postal Code */}
-                        <div className="space-y-2">
-                            <Label htmlFor="postal_code">
-                                Postal Code <span className="text-destructive">*</span>
-                            </Label>
-                            <div className="relative">
-                                <Input
-                                    id="postal_code"
-                                    value={formData.postal_code}
-                                    onChange={(e) =>
-                                        setFormData({ ...formData, postal_code: e.target.value })
-                                    }
-                                    placeholder="Enter postal code"
-                                    className={errors.postal_code ? 'border-destructive pr-8' : 'pr-8'}
-                                />
-                                {isValidatingPostalCode && (
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                    </div>
+                                {errors.country && (
+                                    <p className="text-sm text-destructive">{errors.country}</p>
                                 )}
                             </div>
-                            {errors.postal_code && (
-                                <p className="text-sm text-destructive">{errors.postal_code}</p>
-                            )}
+
+                            {/* State */}
+                            <div className="space-y-2">
+                                <Label htmlFor="state">
+                                    State <span className="text-destructive">*</span>
+                                </Label>
+                                {currentStates.length > 0 ? (
+                                    <Select
+                                        value={formData.state}
+                                        onValueChange={(value) =>
+                                            setFormData({ ...formData, state: value })
+                                        }
+                                        disabled={!formData.country || isStatesLoading}
+                                    >
+                                        <SelectTrigger className={errors.state ? 'border-destructive' : ''}>
+                                            <SelectValue placeholder={isStatesLoading ? "Loading states..." : "Select State"} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {currentStates.map((state) => (
+                                                <SelectItem key={state.name} value={state.name}>
+                                                    {state.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                ) : (
+                                    <Input
+                                        id="state"
+                                        value={formData.state}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, state: e.target.value })
+                                        }
+                                        placeholder={!formData.country ? "Select country first" : "Enter state"}
+                                        disabled={!formData.country}
+                                        className={errors.state ? 'border-destructive' : ''}
+                                    />
+                                )}
+                                {errors.state && (
+                                    <p className="text-sm text-destructive">{errors.state}</p>
+                                )}
+                            </div>
                         </div>
 
-                        {/* City */}
-                        <div className="space-y-2">
-                            <Label htmlFor="city">
-                                City <span className="text-destructive">*</span>
-                            </Label>
-                            <Input
-                                id="city"
-                                value={formData.city}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, city: e.target.value })
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Postal Code */}
+                            <div className="space-y-2">
+                                <Label htmlFor="postal_code">
+                                    Postal Code <span className="text-destructive">*</span>
+                                </Label>
+                                <div className="relative">
+                                    <Input
+                                        id="postal_code"
+                                        value={formData.postal_code}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, postal_code: e.target.value })
+                                        }
+                                        placeholder="Enter postal code"
+                                        className={errors.postal_code ? 'border-destructive pr-8' : 'pr-8'}
+                                    />
+                                    {isValidatingPostalCode && (
+                                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                        </div>
+                                    )}
+                                </div>
+                                {errors.postal_code && (
+                                    <p className="text-sm text-destructive">{errors.postal_code}</p>
+                                )}
+                            </div>
+
+                            {/* City */}
+                            <div className="space-y-2">
+                                <Label htmlFor="city">
+                                    City <span className="text-destructive">*</span>
+                                </Label>
+                                <Input
+                                    id="city"
+                                    value={formData.city}
+                                    onChange={(e) =>
+                                        setFormData({ ...formData, city: e.target.value })
+                                    }
+                                    placeholder="Enter city"
+                                    className={errors.city ? 'border-destructive' : ''}
+                                />
+                                {errors.city && (
+                                    <p className="text-sm text-destructive">{errors.city}</p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Set as Primary */}
+                        <div className="flex items-center space-x-2">
+                            <Checkbox
+                                id="is_primary"
+                                checked={formData.is_primary}
+                                onCheckedChange={(checked) =>
+                                    setFormData({ ...formData, is_primary: checked as boolean })
                                 }
-                                placeholder="Enter city"
-                                className={errors.city ? 'border-destructive' : ''}
                             />
-                            {errors.city && (
-                                <p className="text-sm text-destructive">{errors.city}</p>
-                            )}
+                            <Label htmlFor="is_primary" className="cursor-pointer">
+                                Set as primary address
+                            </Label>
                         </div>
-                    </div>
 
-                    {/* Set as Primary */}
-                    <div className="flex items-center space-x-2">
-                        <Checkbox
-                            id="is_primary"
-                            checked={formData.is_primary}
-                            onCheckedChange={(checked) =>
-                                setFormData({ ...formData, is_primary: checked as boolean })
-                            }
-                        />
-                        <Label htmlFor="is_primary" className="cursor-pointer">
-                            Set as primary address
-                        </Label>
-                    </div>
-
-                    <DialogFooter>
-                        <Button type="button" variant="outline" onClick={onClose}>
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={loading}>
-                            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {initialData ? 'Update Address' : 'Add Address'}
-                        </Button>
-                    </DialogFooter>
-                </form>
+                        <DialogFooter className="pt-6 border-t border-dashed border-border/60">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={onClose}
+                                className="rounded-full px-8 font-bold text-xs uppercase tracking-widest"
+                            >
+                                Retreat
+                            </Button>
+                            <Button
+                                type="submit"
+                                disabled={loading}
+                                className="rounded-full bg-[#2C1810] hover:bg-[#B85C3C] text-white px-10 font-bold text-xs uppercase tracking-widest shadow-lg transition-all"
+                            >
+                                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {initialData ? 'Confirm Change' : 'Establish Path'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </div>
             </DialogContent>
         </Dialog>
     );

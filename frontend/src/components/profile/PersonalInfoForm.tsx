@@ -15,7 +15,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import { Loader2, User, Mail, Phone, Shield, Lock, ChevronRight, UserCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PhoneInput } from "@/components/ui/phone-input";
 
@@ -99,19 +99,24 @@ export default function PersonalInfoForm({
     };
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Personal Information</CardTitle>
-                <CardDescription>
-                    Update your personal details here. Email address cannot be changed.
-                </CardDescription>
+        <Card className="rounded-[2rem] border-none shadow-elevated overflow-hidden bg-white/50 backdrop-blur-sm">
+            <CardHeader className="bg-muted/30 pb-8">
+                <div className="flex items-center gap-3 text-[#2C1810]">
+                    <div className="p-2.5 bg-white rounded-2xl shadow-sm">
+                        <User className="h-5 w-5 text-[#B85C3C]" />
+                    </div>
+                    <div>
+                        <CardTitle className="text-xl font-playfair">Personal Details</CardTitle>
+                        <CardDescription>Refine your identity and contact information</CardDescription>
+                    </div>
+                </div>
             </CardHeader>
-            <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="firstName">
-                                First Name <span className="text-destructive">*</span>
+            <CardContent className="pt-8 px-6 md:px-8">
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2.5">
+                            <Label htmlFor="firstName" className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                                <UserCircle className="h-3.5 w-3.5" /> First Name <span className="text-red-500">*</span>
                             </Label>
                             <Input
                                 id="firstName"
@@ -120,14 +125,16 @@ export default function PersonalInfoForm({
                                     setFormData({ ...formData, firstName: e.target.value })
                                 }
                                 autoComplete="given-name"
-                                className={errors.firstName ? 'border-destructive' : ''}
+                                className={`rounded-xl border-border/60 bg-white/80 focus:ring-[#B85C3C]/20 focus:border-[#B85C3C] h-11 ${errors.firstName ? 'border-red-400' : ''}`}
                             />
                             {errors.firstName && (
-                                <p className="text-sm text-destructive">{errors.firstName}</p>
+                                <p className="text-[10px] font-bold text-red-500 uppercase tracking-tighter">{errors.firstName}</p>
                             )}
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="lastName">Last Name (Optional)</Label>
+                        <div className="space-y-2.5">
+                            <Label htmlFor="lastName" className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                                <UserCircle className="h-3.5 w-3.5" /> Last Name
+                            </Label>
                             <Input
                                 id="lastName"
                                 value={formData.lastName}
@@ -136,38 +143,48 @@ export default function PersonalInfoForm({
                                     setFormData({ ...formData, lastName: e.target.value })
                                 }
                                 autoComplete="family-name"
+                                className="rounded-xl border-border/60 bg-white/80 focus:ring-[#B85C3C]/20 focus:border-[#B85C3C] h-11"
                             />
                         </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="email">Email Address</Label>
-                        <Input
-                            id="email"
-                            value={initialData.email}
-                            disabled
-                            autoComplete="email"
-                            className="bg-muted"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                            Contact support to change your email address
+                    <div className="space-y-2.5">
+                        <Label htmlFor="email" className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                            <Mail className="h-3.5 w-3.5" /> Email Address
+                        </Label>
+                        <div className="relative">
+                            <Input
+                                id="email"
+                                value={initialData.email}
+                                disabled
+                                autoComplete="email"
+                                className="rounded-xl border-border/40 bg-muted/20 h-11 pr-10 cursor-not-allowed opacity-70"
+                            />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                <Shield className="h-4 w-4 text-muted-foreground/40" />
+                            </div>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground flex items-center gap-1.5 ml-1 italic">
+                            <Shield className="h-3 w-3" /> To change your email, please contact our sacred support team.
                         </p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Gender */}
-                        <div className="space-y-2">
-                            <Label htmlFor="gender">Gender</Label>
+                        <div className="space-y-2.5">
+                            <Label htmlFor="gender" className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                                <ChevronRight className="h-3.5 w-3.5" /> Gender
+                            </Label>
                             <Select
                                 value={formData.gender}
                                 onValueChange={(value) =>
                                     setFormData({ ...formData, gender: value })
                                 }
                             >
-                                <SelectTrigger>
+                                <SelectTrigger className="rounded-xl border-border/60 bg-white/80 focus:ring-[#B85C3C]/20 focus:border-[#B85C3C] h-11">
                                     <SelectValue placeholder="Select gender" />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent className="rounded-2xl border-none shadow-elevated">
                                     <SelectItem value="male">Male</SelectItem>
                                     <SelectItem value="female">Female</SelectItem>
                                     <SelectItem value="other">Other</SelectItem>
@@ -179,9 +196,9 @@ export default function PersonalInfoForm({
                         </div>
 
                         {/* Phone */}
-                        <div className="space-y-2">
-                            <Label htmlFor="phone">
-                                Mobile Number <span className="text-destructive">*</span>
+                        <div className="space-y-2.5">
+                            <Label htmlFor="phone" className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                                <Phone className="h-3.5 w-3.5" /> Mobile Number <span className="text-red-500">*</span>
                             </Label>
                             <PhoneInput
                                 id="phone"
@@ -189,23 +206,33 @@ export default function PersonalInfoForm({
                                 onChange={(val) => setFormData({ ...formData, phone: val })}
                                 error={errors.phone}
                                 required={true}
+                                className="rounded-xl"
                             />
                         </div>
                     </div>
 
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-dashed border-border/60">
                         <Button
                             type="button"
-                            variant="outline"
+                            variant="ghost"
                             onClick={onChangePassword}
+                            className="w-full sm:w-auto text-[#B85C3C] hover:bg-[#B85C3C]/10 rounded-full font-bold text-xs uppercase tracking-widest px-6"
                         >
-                            Change Password
+                            <Lock className="h-3.5 w-3.5 mr-2" /> Change Password
                         </Button>
 
                         {hasChanges() && (
-                            <Button type="submit" disabled={loading}>
-                                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Save Changes
+                            <Button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full sm:w-auto bg-[#2C1810] hover:bg-[#B85C3C] text-white rounded-full font-bold text-xs uppercase tracking-widest px-10 h-11 shadow-lg shadow-black/10 transition-all active:scale-95"
+                            >
+                                {loading ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                    <ChevronRight className="mr-1 h-4 w-4" />
+                                )}
+                                Save Information
                             </Button>
                         )}
                     </div>

@@ -74,7 +74,7 @@ export function Footer() {
     state: "Delhi",
     pincode: "110001"
   };
-  const generalBankAccount = bankDetails.find(b => b.type === 'general' && b.is_active) || bankDetails[0];
+  const donationBankAccount = bankDetails.find(b => b.type === 'donation' && b.is_active) || bankDetails[0];
 
   const fallbackSocials = [
     { id: 'fb', platform: 'facebook', url: 'https://facebook.com' },
@@ -212,19 +212,21 @@ export function Footer() {
 
           {/* Bank Details & Bottom Bar - More Compact */}
           <div className="pt-6 border-t border-white/5 flex flex-col gap-6">
-            {generalBankAccount && (
+            {donationBankAccount && (
               <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-white/[0.02] rounded-2xl p-3 md:px-5 border border-white/5">
                 <div className="flex flex-col items-center md:items-start text-center md:text-left">
                   <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-[#D4AF37] mb-0.5">Support our Heritage</h4>
                   <p className="text-[10px] text-[#E6D5AC]/50 italic font-light tracking-wide">Direct bank donations for Gau Seva</p>
                 </div>
 
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-x-10 w-full md:w-auto">
+                <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 md:gap-x-10 w-full md:w-auto">
                   {[
-                    { label: "Bank", value: generalBankAccount.bank_name },
-                    { label: "Account", value: generalBankAccount.account_number },
-                    { label: "IFSC", value: generalBankAccount.ifsc_code },
-                    { label: "UPI ID", value: generalBankAccount.upi_id, color: "text-[#D4AF37]" }
+                    { label: "Name", value: donationBankAccount.account_name },
+                    { label: "Bank Name", value: donationBankAccount.bank_name },
+                    { label: "Branch", value: donationBankAccount.branch_name },
+                    { label: "Account", value: donationBankAccount.account_number },
+                    { label: "IFSC", value: donationBankAccount.ifsc_code },
+                    { label: "UPI ID", value: donationBankAccount.upi_id, color: "text-[#D4AF37]" }
                   ].map((item, idx) => item.value ? (
                     <div key={idx} className="space-y-0.5">
                       <p className="text-[8px] font-black uppercase text-white/50 tracking-widest">{item.label}</p>

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Loader2, ShieldCheck, Zap } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { donationService } from "@/services/donation.service";
+import { bankDetailsService } from "@/services/bank-details.service";
 
 const QrCodeDisplay = () => {
     const { data, isLoading, error } = useQuery({
@@ -40,6 +41,38 @@ const QrCodeDisplay = () => {
     );
 };
 
+const UpiIdDisplay = () => {
+    const { data: bankDetails, isLoading } = useQuery({
+        queryKey: ['bankDetails'],
+        queryFn: () => bankDetailsService.getAll(),
+        staleTime: 1000 * 60 * 60,
+    });
+
+    const donationAccount = bankDetails?.find(b => b.type === 'donation' && b.is_active);
+    const upiId = donationAccount?.upi_id;
+
+    if (isLoading) {
+        return (
+            <div className="w-full h-12 flex items-center justify-center bg-background/50 animate-pulse rounded-lg border border-border/50">
+                <Loader2 className="w-4 h-4 animate-spin text-primary/40" />
+            </div>
+        );
+    }
+
+    if (!upiId) return null;
+
+    return (
+        <div className="w-full bg-background/50 backdrop-blur-sm rounded-lg p-3 border border-border/50 text-center">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
+                UPI ID
+            </p>
+            <p className="font-mono text-sm select-all cursor-pointer hover:text-primary transition-colors">
+                {upiId}
+            </p>
+        </div>
+    );
+};
+
 export const AnonymousDonation = () => {
     return (
         <div className="space-y-6 animate-in slide-in-from-right-4 duration-700 delay-200">
@@ -49,7 +82,7 @@ export const AnonymousDonation = () => {
                 <CardHeader className="text-center pb-2 relative z-10">
                     <CardTitle className="text-xl font-playfair flex items-center justify-center gap-2">
                         <Zap className="w-5 h-5 text-amber-500 fill-amber-500" />
-                        Quick Donation
+                        Anonymous Donation
                     </CardTitle>
                     <p className="text-sm text-balance text-muted-foreground">
                         Instant anonymous transfer via UPI
@@ -68,14 +101,7 @@ export const AnonymousDonation = () => {
                         </p>
                     </div>
 
-                    <div className="w-full bg-background/50 backdrop-blur-sm rounded-lg p-3 border border-border/50 text-center">
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
-                            Generic UPI ID
-                        </p>
-                        <p className="font-mono text-sm select-all cursor-pointer hover:text-primary transition-colors">
-                            upi@merigaumata.org
-                        </p>
-                    </div>
+                    <UpiIdDisplay />
                 </CardContent>
             </Card>
 

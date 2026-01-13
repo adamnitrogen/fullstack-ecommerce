@@ -15,6 +15,7 @@ import { useLocationStore } from "@/store/locationStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ForceChangePasswordDialog } from "@/components/auth/ForceChangePasswordDialog";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 
 // Lazy load pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
@@ -112,11 +113,7 @@ const App = () => {
             <ScrollToTop />
             <CookieConsent />
             <ForceChangePasswordDialog />
-            <Suspense fallback={
-              <div className="flex items-center justify-center h-screen w-full bg-background">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-              </div>
-            }>
+            <Suspense fallback={<LoadingOverlay isLoading={true} message="Loading..." />}>
               <Routes>
                 <Route element={<MainLayout />}>
                   <Route path="/" element={<Index />} />

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { profileService, ProfileData } from "@/services/profile.service";
+import { profileService, ProfileData, UpdateProfileData } from "@/services/profile.service";
 import { donationService } from "@/services/donation.service";
 import { eventRegistrationService, EventRegistration } from "@/services/event-registration.service";
 import { addressService } from "@/services/address.service";
@@ -17,12 +17,13 @@ import { UpdatePasswordDialog } from "@/components/profile/UpdatePasswordDialog"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import { useAuthStore } from "@/store/authStore";
-import { useNavigate } from "react-router-dom";
-import { Loader2, Heart, Calendar, ExternalLink } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
+import { Loader2, Heart, Calendar, ExternalLink, User, Sparkles, UserCircle } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,20 +34,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useTranslation } from "react-i18next";
 
 export default function Profile() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user, logout } = useAuthStore();
   const [activeTab, setActiveTab] = useState("account");
   const [selectedRegId, setSelectedRegId] = useState<string | null>(null);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Fetch profile data
   const { data: profile, isLoading } = useQuery<ProfileData>({
     queryKey: ["profile"],
     queryFn: profileService.getProfile,
-    enabled: !!user, // Only fetch if user is logged in
+    enabled: !!user,
   });
 
   // Fetch event registrations
@@ -62,7 +66,7 @@ export default function Profile() {
     queryFn: donationService.getSubscriptions,
     enabled: !!user,
   });
-  const hasSubscriptions = subscriptionsData?.subscriptions?.length > 0;
+  const hasSubscriptions = (subscriptionsData?.subscriptions?.length ?? 0) > 0;
 
   // Cancel registration mutation
   const cancelRegistrationMutation = useMutation({
@@ -242,11 +246,7 @@ export default function Profile() {
   });
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <LoadingOverlay isLoading={true} message="Loading your profile..." />;
   }
 
   if (!profile) {
@@ -257,227 +257,293 @@ export default function Profile() {
     );
   }
 
+  // Helper functions for mutations to match the new structure's expectations
+  const handleAvatarUpdate = (file: File) => uploadAvatarMutation.mutate(file);
+  const handleAvatarDelete = () => deleteAvatarMutation.mutate();
+  const handleUpdateProfile = (data: UpdateProfileData) => updateProfileMutation.mutateAsync(data);
+  const setShowPasswordDialog = (open: boolean) => setPasswordDialogOpen(open);
+
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">My Profile</h1>
-          <p className="text-muted-foreground">
-            Manage your account settings and preferences
-          </p>
+    <div className="min-h-screen bg-background text-foreground">
+      <LoadingOverlay isLoading={false} message="Loading your profile..." />
+
+      {/* Premium Compact Hero Section */}
+      <section className="bg-[#2C1810] text-white py-12 md:py-16 relative overflow-hidden shadow-2xl">
+        <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
+          <UserCircle className="h-48 w-48 text-[#B85C3C]" />
         </div>
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-[0.2em] mb-2">
+                <Sparkles className="h-3 w-3" /> {t("profile.dashboard", "User Dashboard")}
+              </div>
+              <h1 className="text-3xl md:text-5xl font-bold font-playfair">
+                My <span className="text-[#B85C3C]">{t("profile.profile", "Profile")}</span>
+              </h1>
+            </div>
+            <div className="flex items-center gap-2 text-white/50 text-sm font-light border-l border-[#B85C3C]/30 pl-6 hidden md:flex">
+              <Link to="/" className="hover:text-white transition-colors">Home</Link>
+              <span>/</span>
+              <span className="text-white">Profile</span>
+            </div>
+          </div>
+        </div>
+      </section>
 
-        <ProfileHeader
-          name={profile.name}
-          email={profile.email}
-          phone={profile.phone}
-          avatarUrl={profile.avatarUrl}
-          onAvatarUpdate={(file) => uploadAvatarMutation.mutate(file)}
-          onAvatarDelete={() => deleteAvatarMutation.mutate()}
-        />
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-1 md:grid-cols-4 lg:w-auto h-auto">
-            <TabsTrigger value="account">Account Settings</TabsTrigger>
-            <TabsTrigger value="events">Event Registrations</TabsTrigger>
-            {hasSubscriptions && (
-              <TabsTrigger value="donations">Donations</TabsTrigger>
-            )}
-          </TabsList>
-
-          <TabsContent value="account" className="space-y-6 mt-6">
-            <PersonalInfoForm
-              initialData={{
-                firstName: profile.firstName,
-                lastName: profile.lastName,
-                gender: profile.gender,
-                email: profile.email,
-                phone: profile.phone,
-              }}
-              onSave={(data) => updateProfileMutation.mutateAsync(data)}
-              loading={updateProfileMutation.isPending}
-              onChangePassword={() => setPasswordDialogOpen(true)}
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-20 pb-20">
+        <div className="space-y-8">
+          <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <ProfileHeader
+              name={`${profile.firstName} ${profile.lastName || ""}`}
+              email={profile.email}
+              phone={profile.phone}
+              avatarUrl={profile.avatarUrl}
+              isEmailVerified={profile.emailVerified}
+              onAvatarUpdate={handleAvatarUpdate}
+              onAvatarDelete={handleAvatarDelete}
             />
+          </section>
 
-            <UpdatePasswordDialog
-              open={passwordDialogOpen}
-              onOpenChange={setPasswordDialogOpen}
-            />
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <div className="flex justify-start mb-8 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
+              <TabsList className="h-14 rounded-full bg-white shadow-elevated p-1.5 border border-border/50">
+                <TabsTrigger value="account" className="rounded-full px-8 data-[state=active]:bg-[#2C1810] data-[state=active]:text-white transition-all font-bold text-xs uppercase tracking-[0.15em]">
+                  Account Settings
+                </TabsTrigger>
+                <TabsTrigger value="events" className="rounded-full px-8 data-[state=active]:bg-[#2C1810] data-[state=active]:text-white transition-all font-bold text-xs uppercase tracking-[0.15em]">
+                  Events
+                </TabsTrigger>
+                {hasSubscriptions && (
+                  <TabsTrigger value="donations" className="rounded-full px-8 data-[state=active]:bg-[#2C1810] data-[state=active]:text-white transition-all font-bold text-xs uppercase tracking-[0.15em]">
+                    Donations
+                  </TabsTrigger>
+                )}
+              </TabsList>
+            </div>
 
-            <AddressManager
-              addresses={profile.addresses}
-              onAdd={(data) => addAddressMutation.mutateAsync(data)}
-              onUpdate={(id, data) =>
-                updateAddressMutation.mutateAsync({ id, data })
-              }
-              onDelete={(id) => deleteAddressMutation.mutateAsync(id)}
-              onSetPrimary={(id) => setPrimaryMutation.mutateAsync(id)}
-            />
+            <TabsContent value="account" className="animate-in fade-in-0 zoom-in-95 duration-300">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                <div className="lg:col-span-2 space-y-8">
+                  <PersonalInfoForm
+                    initialData={{
+                      firstName: profile.firstName || "",
+                      lastName: profile.lastName || "",
+                      gender: profile.gender,
+                      email: profile.email,
+                      phone: profile.phone,
+                    }}
+                    onSave={handleUpdateProfile}
+                    onChangePassword={() => setPasswordDialogOpen(true)}
+                    loading={updateProfileMutation.isPending}
+                  />
 
-            <DeleteAccountSection
-              onDelete={() => deleteAccountMutation.mutateAsync()}
-            />
-          </TabsContent>
-
-
-
-          <TabsContent value="events" className="space-y-6 mt-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  <CardTitle>My Event Registrations</CardTitle>
+                  <AddressManager
+                    addresses={profile.addresses}
+                    onAdd={async (data) => {
+                      await addAddressMutation.mutateAsync(data);
+                    }}
+                    onUpdate={async (id, data) => {
+                      await updateAddressMutation.mutateAsync({ id, data });
+                    }}
+                    onDelete={async (id) => {
+                      await deleteAddressMutation.mutateAsync(id);
+                    }}
+                    onSetPrimary={async (id) => {
+                      await setPrimaryMutation.mutateAsync(id);
+                    }}
+                  />
                 </div>
-                <CardDescription>
-                  View your registered events and payment history
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {registrationsLoading ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+
+                <div className="space-y-8">
+                  <DeleteAccountSection
+                    onDelete={async () => setShowDeleteDialog(true)}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="events" className="animate-in fade-in-0 zoom-in-95 duration-300">
+              <Card className="shadow-elevated border-none rounded-[2rem] overflow-hidden">
+                <CardHeader className="bg-muted/30 pb-6">
+                  <div className="flex items-center gap-3 text-[#2C1810]">
+                    <div className="p-2.5 bg-white rounded-2xl shadow-sm">
+                      <Calendar className="h-5 w-5 text-[#B85C3C]" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-xl font-playfair">Event Registrations</CardTitle>
+                      <CardDescription>View your upcoming and past sacred gatherings</CardDescription>
+                    </div>
                   </div>
-                ) : eventRegistrations.length > 0 ? (
-                  <div className="space-y-4">
-                    {eventRegistrations.map((reg: EventRegistration) => (
-                      <div
-                        key={reg.id}
-                        className="flex flex-col md:flex-row gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-                        onClick={() => navigate(`/event/${reg.event_id}`)}
-                      >
-                        {/* Event Image */}
-                        <div className="w-full md:w-32 h-24 bg-muted rounded-lg overflow-hidden flex-shrink-0">
-                          {reg.events?.image ? (
-                            <img
-                              src={reg.events.image}
-                              alt={reg.events.title}
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Calendar className="h-8 w-8 text-muted-foreground" />
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Event Details */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <h3 className="font-semibold text-lg truncate">
-                                {reg.events?.title || 'Event'}
-                              </h3>
-                              <p className="text-sm text-muted-foreground">
-                                {reg.events?.start_date
-                                  ? format(new Date(reg.events.start_date), 'PPP')
-                                  : 'Date TBD'}
-                              </p>
-                            </div>
-                            <div className="flex flex-col items-end gap-1">
-                              <Badge
-                                variant={
-                                  reg.status === 'cancelled' ? 'destructive' :
-                                    reg.payment_status === 'paid' ? 'default' :
-                                      reg.payment_status === 'free' ? 'secondary' : 'outline'
-                                }
-                              >
-                                {reg.status === 'cancelled' ? 'CANCELLED' :
-                                  reg.payment_status === 'paid'
-                                    ? `₹${reg.amount} Paid`
-                                    : reg.payment_status === 'free'
-                                      ? 'Free Entry'
-                                      : 'Pending'}
-                              </Badge>
-                              <Badge variant="outline" className="font-mono text-xs">
-                                {reg.registration_number}
-                              </Badge>
-                            </div>
-                          </div>
-                          <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
-                            <span>Registered: {format(new Date(reg.created_at), 'PP')}</span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-auto p-0 text-primary hover:text-primary"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/event/${reg.event_id}`);
-                              }}
-                            >
-                              View Event <ExternalLink className="ml-1 h-3 w-3" />
-                            </Button>
-
-                            {/* Only show cancel for free/unpaid events that aren't already cancelled */}
-                            {reg.status !== 'cancelled' && reg.status !== 'completed' && reg.payment_status !== 'paid' && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-auto p-0 text-destructive hover:text-destructive ml-2"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedRegId(reg.id);
-                                }}
-                              >
-                                Cancel Registration
-                              </Button>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  {registrationsLoading ? (
+                    <div className="flex justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-[#B85C3C]" />
+                    </div>
+                  ) : eventRegistrations.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {eventRegistrations.map((reg: EventRegistration) => (
+                        <div
+                          key={reg.id}
+                          className="group flex flex-col sm:flex-row gap-4 p-5 border border-border/50 rounded-3xl hover:bg-[#FDFBF9] hover:border-[#B85C3C]/30 transition-all duration-300 cursor-pointer shadow-sm hover:shadow-md"
+                          onClick={() => navigate(`/event/${reg.event_id}`)}
+                        >
+                          {/* Event Image */}
+                          <div className="w-full sm:w-28 h-28 bg-muted rounded-2xl overflow-hidden flex-shrink-0 shadow-inner">
+                            {reg.events?.image ? (
+                              <img
+                                src={reg.events.image}
+                                alt={reg.events.title}
+                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center bg-muted/50">
+                                <Calendar className="h-10 w-10 text-muted-foreground/30" />
+                              </div>
                             )}
                           </div>
 
-                          {reg.status === 'cancelled' && (
-                            <div className="mt-1 text-xs text-destructive font-medium">
-                              Cancelled
+                          {/* Event Details */}
+                          <div className="flex-1 min-w-0 space-y-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <h3 className="font-bold text-[#2C1810] line-clamp-1 group-hover:text-[#B85C3C] transition-colors">
+                                  {reg.events?.title || 'Sacred Gathering'}
+                                </h3>
+                                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                                  <Calendar className="h-3 w-3" />
+                                  {reg.events?.start_date
+                                    ? format(new Date(reg.events.start_date), 'PPP')
+                                    : 'Date TBD'}
+                                </p>
+                              </div>
                             </div>
-                          )}
+
+                            <div className="flex flex-wrap items-center gap-2 mt-2">
+                              <Badge
+                                variant="outline"
+                                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border-none shadow-sm ${reg.status === 'cancelled' ? 'bg-red-50 text-red-600' :
+                                  reg.payment_status === 'paid' ? 'bg-green-50 text-green-700' :
+                                    reg.payment_status === 'free' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'
+                                  }`}
+                              >
+                                {reg.status === 'cancelled' ? 'CANCELLED' :
+                                  reg.payment_status === 'paid'
+                                    ? `₹${reg.amount} PAID`
+                                    : reg.payment_status === 'free'
+                                      ? 'COMPLIMENTARY'
+                                      : 'PENDING'}
+                              </Badge>
+                              <Badge variant="secondary" className="text-[10px] font-mono bg-muted/50 text-muted-foreground">
+                                #{reg.registration_number}
+                              </Badge>
+                            </div>
+
+                            <div className="flex items-center gap-3 pt-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-0 text-[11px] font-bold uppercase tracking-wider text-[#B85C3C] hover:bg-transparent hover:text-[#2C1810]"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/event/${reg.event_id}`);
+                                }}
+                              >
+                                Details
+                              </Button>
+
+                              {reg.status !== 'cancelled' && reg.status !== 'completed' && reg.payment_status !== 'paid' && (
+                                <button
+                                  className="text-[11px] font-bold uppercase tracking-wider text-red-500 hover:text-red-700 transition-colors"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedRegId(reg.id);
+                                  }}
+                                >
+                                  Cancel
+                                </button>
+                              )}
+                            </div>
+                          </div>
                         </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-20 bg-[#FDFBF9] rounded-[2rem] border-2 border-dashed border-border/50">
+                      <div className="bg-white w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                        <Calendar className="h-8 w-8 text-muted-foreground opacity-30" />
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Calendar className="mx-auto h-16 w-16 mb-4 opacity-50" />
-                    <p className="text-lg font-medium mb-2">
-                      No Event Registrations Yet
-                    </p>
-                    <p className="text-sm mb-4">
-                      You haven't registered for any events yet
-                    </p>
-                    <Button onClick={() => navigate('/events')}>Browse Events</Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <AlertDialog open={!!selectedRegId} onOpenChange={(open) => !open && setSelectedRegId(null)}>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Cancel Event Registration?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to cancel your registration for this event?
-                    This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Keep Registration</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={confirmCancelRegistration}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    {cancelRegistrationMutation.isPending ? 'Cancelling...' : 'Yes, Cancel'}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </TabsContent>
-
-
-          {hasSubscriptions && (
-            <TabsContent value="donations" className="mt-6">
-              <DonationManager />
+                      <h3 className="text-[#2C1810] font-bold text-lg">No Registrations Found</h3>
+                      <p className="text-muted-foreground text-sm max-w-xs mx-auto mt-1 mb-6">
+                        You haven't joined any sacred events yet. Discover upcoming spiritual gatherings.
+                      </p>
+                      <Button
+                        onClick={() => navigate('/events')}
+                        className="rounded-full px-8 bg-[#2C1810] hover:bg-[#B85C3C] transition-all"
+                      >
+                        Explore Events
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </TabsContent>
-          )}
-        </Tabs>
+
+            {hasSubscriptions && (
+              <TabsContent value="donations" className="animate-in fade-in-0 zoom-in-95 duration-300">
+                <DonationManager />
+              </TabsContent>
+            )}
+          </Tabs>
+        </div>
       </div>
+
+      <UpdatePasswordDialog
+        open={passwordDialogOpen}
+        onOpenChange={setPasswordDialogOpen}
+      />
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="rounded-[2rem] border-none shadow-elevated p-8">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl font-playfair text-[#2C1810]">Delete Account Permanently?</AlertDialogTitle>
+            <AlertDialogDescription className="text-base pt-2">
+              This action cannot be undone. All your orders, donations, and personal data will be permanently removed from our records.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="pt-6">
+            <AlertDialogCancel className="rounded-full px-8">Return Safely</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteAccountMutation.mutate()}
+              className="bg-red-600 text-white hover:bg-red-700 rounded-full px-8"
+            >
+              {deleteAccountMutation.isPending ? "Removing..." : "Delete Permanently"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!selectedRegId} onOpenChange={(open) => !open && setSelectedRegId(null)}>
+        <AlertDialogContent className="rounded-[2rem] border-none shadow-elevated p-8">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl font-playfair text-[#2C1810]">Cancel Registration?</AlertDialogTitle>
+            <AlertDialogDescription className="text-base pt-2">
+              Are you sure you want to cancel your attendance? This will free up space for another seeker.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="pt-6">
+            <AlertDialogCancel className="rounded-full px-8">Stay Registered</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmCancelRegistration}
+              className="bg-[#2C1810] text-white hover:bg-[#B85C3C] rounded-full px-8"
+            >
+              {cancelRegistrationMutation.isPending ? 'Processing...' : 'Yes, Cancel'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -36,6 +36,7 @@ export const DonationForm = () => {
         email: "",
         phone: ""
     });
+    const [recurringConsent, setRecurringConsent] = useState(false);
 
     const [loading, setLoading] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState("");
@@ -76,11 +77,21 @@ export const DonationForm = () => {
 
     const handleDonate = async () => {
         const finalAmount = parseInt(amount);
-        if (!finalAmount || finalAmount < 1) {
+        if (!finalAmount || finalAmount < 100) {
             setStatusDialog({
                 open: true,
-                title: "Invalid Amount",
-                message: "Please enter a valid donation amount.",
+                title: "Minimum Donation",
+                message: "Minimum donation amount is ₹100. Please enter a valid amount.",
+                type: "error"
+            });
+            return;
+        }
+
+        if (donationType === "monthly" && !recurringConsent) {
+            setStatusDialog({
+                open: true,
+                title: "Consent Required",
+                message: "Please agree to the monthly recurring donation terms to proceed.",
                 type: "error"
             });
             return;
@@ -360,12 +371,28 @@ export const DonationForm = () => {
                         </div>
                     </div>
 
+                    {donationType === "monthly" && (
+                        <div className="pt-2">
+                            <label className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20 cursor-pointer group hover:bg-primary/10 transition-colors">
+                                <input
+                                    type="checkbox"
+                                    className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                                    checked={recurringConsent}
+                                    onChange={(e) => setRecurringConsent(e.target.checked)}
+                                />
+                                <span className="text-sm leading-snug text-muted-foreground group-hover:text-foreground transition-colors">
+                                    I would like to automatically donate rupees <span className="font-bold text-primary">₹{amount || "0"}</span> once a month until I cancel or pause for monthly recurring payments.
+                                </span>
+                            </label>
+                        </div>
+                    )}
+
                     <div className="space-y-4 pt-4">
                         <Button
                             size="lg"
                             className="w-full text-lg h-14 font-bold shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all hover:-translate-y-0.5"
                             onClick={handleDonate}
-                            disabled={loading}
+                            disabled={loading || (donationType === "monthly" && !recurringConsent)}
                         >
                             {loading ? "Processing..." : `Donate ₹${amount || "0"} Now`}
                         </Button>
@@ -380,8 +407,6 @@ export const DonationForm = () => {
                                 <Lock className="w-3.5 h-3.5 text-blue-600" />
                                 <span>256-bit SSL Encrypted</span>
                             </div>
-                            <span className="hidden sm:inline text-border">|</span>
-                            <span>Tax Benefit under 80G</span>
                         </div>
                     </div>
                 </CardContent>

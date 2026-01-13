@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Product, Testimonial } from "@/types";
 import { galleryFolderService } from "@/services/gallery-folder.service";
 import { galleryItemService, GalleryItem } from "@/services/gallery-item.service";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import {
   Milk,
   Leaf,
@@ -33,7 +34,7 @@ const Index = () => {
   const [selectedTestimonial, setSelectedTestimonial] =
     useState<Testimonial | null>(null);
 
-  const { data: productsData } = useQuery({
+  const { data: productsData, isLoading: productsLoading } = useQuery({
     queryKey: ["products", "featured"],
     queryFn: async () => {
       const { productService } = await import("@/services/product.service");
@@ -46,7 +47,7 @@ const Index = () => {
     },
   });
 
-  const { data: eventsData } = useQuery({
+  const { data: eventsData, isLoading: eventsLoading } = useQuery({
     queryKey: ["events", "upcoming"],
     queryFn: async () => {
       const { eventService } = await import("@/services/event.service");
@@ -68,7 +69,7 @@ const Index = () => {
     },
   });
 
-  const { data: blogsData } = useQuery({
+  const { data: blogsData, isLoading: blogsLoading } = useQuery({
     queryKey: ["blogs", "latest"],
     queryFn: async () => {
       const { blogService } = await import("@/services/blog.service");
@@ -81,7 +82,7 @@ const Index = () => {
     },
   });
 
-  const { data: testimonialsData } = useQuery({
+  const { data: testimonialsData, isLoading: testimonialsLoading } = useQuery({
     queryKey: ["testimonials"],
     queryFn: async () => {
       const { testimonialService } = await import("@/services/testimonial.service");
@@ -90,10 +91,12 @@ const Index = () => {
     },
   });
 
-  const { data: galleryItems = [] } = useQuery<GalleryItem[]>({
+  const { data: galleryItems = [], isLoading: galleryLoading } = useQuery<GalleryItem[]>({
     queryKey: ["gallery-items-homepage"],
     queryFn: () => galleryItemService.getAll(),
   });
+
+  const isLoading = productsLoading || eventsLoading || blogsLoading || testimonialsLoading || galleryLoading;
 
   const featuredProducts = productsData?.data.slice(0, 8) || [];
   const upcomingEvents = eventsData?.data.slice(0, 8) || [];
@@ -161,6 +164,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen">
+      <LoadingOverlay isLoading={isLoading} message="Loading..." />
       <ProductQuickView
         product={quickViewProduct}
         open={quickViewProduct !== null}

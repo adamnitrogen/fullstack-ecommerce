@@ -1,0 +1,2 @@
+src/pages/Profile.tsx(263,38): error TS2304: Cannot find name 'UpdateProfileData'.
+src/pages/Profile.tsx(360,37): error TS2322: Type 'void' is not assignable to type 'Promise<void>'.

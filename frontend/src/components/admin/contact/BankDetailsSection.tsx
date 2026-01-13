@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Save, X, QrCode, Building2, Upload, ToggleLeft, ToggleRight } from "lucide-react";
+import { Plus, Trash2, Save, X, Building2 } from "lucide-react";
 import { bankDetailsService, type BankDetails } from "@/services/bank-details.service";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errorUtils";
@@ -71,29 +71,6 @@ export function BankDetailsSection({
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, "Failed to delete bank details"));
-    },
-  });
-
-  // Upload manual QR mutation
-  const uploadQRMutation = useMutation({
-    mutationFn: ({ id, file }: { id: string; file: File }) =>
-      bankDetailsService.uploadManualQR(id, file),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bank-details"] });
-      toast.success("QR code uploaded");
-    },
-    onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, "Failed to upload QR code"));
-    },
-  });
-
-  // Toggle QR mode mutation
-  const toggleQRMutation = useMutation({
-    mutationFn: ({ id, useManual }: { id: string; useManual: boolean }) =>
-      bankDetailsService.toggleQRMode(id, useManual),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bank-details"] });
-      toast.success("QR mode updated");
     },
   });
 
@@ -169,36 +146,13 @@ export function BankDetailsSection({
     setEditData(detail);
   };
 
-  const handleQRUpload = (id: string, event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        toast.error("Please upload an image file");
-        return;
-      }
-
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error("File size must be less than 5MB");
-        return;
-      }
-
-      uploadQRMutation.mutate({ id, file });
-    }
-  };
-
-  const getActiveQRUrl = (detail: BankDetails): string | undefined => {
-    return bankDetailsService.getActiveQRUrl(detail);
-  };
-
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Building2 className="h-5 w-5" />
-            Bank Details & QR Codes
+            Bank Details
           </CardTitle>
           <Button onClick={() => setIsAdding(true)} size="sm">
             <Plus className="h-4 w-4 mr-2" />
@@ -232,20 +186,20 @@ export function BankDetailsSection({
                     value="general"
                     disabled={bankDetails.some(b => b.type === 'general' && b.is_active)}
                   >
-                    General (Footer) {bankDetails.some(b => b.type === 'general' && b.is_active) && '✓ Already exists'}
+                    General {bankDetails.some(b => b.type === 'general' && b.is_active) && '✓ Already exists'}
                   </SelectItem>
                   <SelectItem
                     value="donation"
                     disabled={bankDetails.some(b => b.type === 'donation' && b.is_active)}
                   >
-                    Donation (Donate Page) {bankDetails.some(b => b.type === 'donation' && b.is_active) && '✓ Already exists'}
+                    Donation (Footer) {bankDetails.some(b => b.type === 'donation' && b.is_active) && '✓ Already exists'}
                   </SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-sm text-muted-foreground">
-                {newDetails.type === "general"
-                  ? "Will be displayed in footer with QR code"
-                  : "Will be displayed on donation page with QR code"}
+                {newDetails.type === "donation"
+                  ? "Will be displayed in the footer"
+                  : "Internal use account"}
               </p>
               {bankDetails.some(b => b.type === newDetails.type && b.is_active) && (
                 <p className="text-xs text-destructive">
@@ -334,9 +288,6 @@ export function BankDetailsSection({
                   }
                   placeholder="example@upi"
                 />
-                <p className="text-xs text-muted-foreground">
-                  If provided, UPI QR will be auto-generated
-                </p>
               </div>
             </div>
 
@@ -373,7 +324,7 @@ export function BankDetailsSection({
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <QrCode className="h-8 w-8 text-primary" />
+                    <Building2 className="h-8 w-8 text-primary" />
                     <div>
                       <div className="flex items-center gap-2">
                         <p className="font-semibold">{detail.account_name}</p>
@@ -417,7 +368,6 @@ export function BankDetailsSection({
 
                 {editingId === detail.id ? (
                   <div className="space-y-4 pt-2 border-t">
-                    {/* Edit form - similar to add form but with editData */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Account Name</Label>
@@ -508,81 +458,21 @@ export function BankDetailsSection({
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="text-muted-foreground">Account Number</p>
-                        <p className="font-mono">{detail.account_number}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">IFSC Code</p>
-                        <p className="font-mono">{detail.ifsc_code}</p>
-                      </div>
-                      {detail.upi_id && (
-                        <div>
-                          <p className="text-muted-foreground">UPI ID</p>
-                          <p className="font-mono">{detail.upi_id}</p>
-                        </div>
-                      )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Account Number</p>
+                      <p className="font-mono">{detail.account_number}</p>
                     </div>
-
-                    {/* QR Code Section */}
-                    <div className="border-t pt-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <Label>QR Code</Label>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">
-                            {detail.use_manual_qr ? "Manual" : "Auto-generated"}
-                          </span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              toggleQRMutation.mutate({
-                                id: detail.id,
-                                useManual: !detail.use_manual_qr,
-                              })
-                            }
-                            disabled={!detail.qr_code_manual_url}
-                          >
-                            {detail.use_manual_qr ? <ToggleRight className="h-4 w-4" /> : <ToggleLeft className="h-4 w-4" />}
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-4">
-                        {getActiveQRUrl(detail) && (
-                          <div>
-                            <img
-                              src={getActiveQRUrl(detail)}
-                              alt="Payment QR Code"
-                              className="w-32 h-32 border rounded"
-                            />
-                          </div>
-                        )}
-
-                        <div className="flex-1 space-y-2">
-                          <Label htmlFor={`qr-upload-${detail.id}`} className="cursor-pointer">
-                            <Button variant="outline" size="sm" asChild>
-                              <span>
-                                <Upload className="h-4 w-4 mr-2" />
-                                Upload Manual QR
-                              </span>
-                            </Button>
-                          </Label>
-                          <input
-                            id={`qr-upload-${detail.id}`}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => handleQRUpload(detail.id, e)}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Auto QR generated from {detail.upi_id ? "UPI ID" : "bank details"}
-                          </p>
-                        </div>
-                      </div>
+                    <div>
+                      <p className="text-muted-foreground">IFSC Code</p>
+                      <p className="font-mono">{detail.ifsc_code}</p>
                     </div>
+                    {detail.upi_id && (
+                      <div>
+                        <p className="text-muted-foreground">UPI ID</p>
+                        <p className="font-mono">{detail.upi_id}</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

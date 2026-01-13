@@ -1,7 +1,6 @@
 import { DonationForm } from "@/components/donation/DonationForm";
 import { DonationImpact } from "@/components/donation/DonationImpact";
 import { AnonymousDonation } from "@/components/donation/AnonymousDonation";
-import { TaxBenefitsCard } from "@/components/donation/TaxBenefitsCard";
 import { useTranslation } from "react-i18next";
 import { HandHeart } from "lucide-react";
 
@@ -47,7 +46,6 @@ const Donate = () => {
               {/* Main Donation Form */}
               <div className="relative z-10 -mt-20 lg:mt-0 space-y-6">
                 <DonationForm />
-                <TaxBenefitsCard />
               </div>
 
               {/* Impact Section Mobile (Hidden on Desktop, shown below form on mobile) */}

@@ -7,7 +7,7 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Star, Plus, Pencil, Trash2, Truck, CreditCard, Package } from "lucide-react";
+import { MapPin, Star, Plus, Pencil, Trash2, Truck, CreditCard, Package, ChevronRight, Home, Briefcase, Globe, Phone } from "lucide-react";
 import type { CheckoutAddress, CreateAddressDto } from "@/types";
 import { useState } from "react";
 import AddressFormModal from "./AddressFormModal";
@@ -44,24 +44,19 @@ export default function AddressManager({
     const getTypeIcon = (type: string) => {
         switch (type) {
             case 'home':
-                return <MapPin className="h-4 w-4" />;
+                return <Home className="h-4 w-4" />;
             case 'work':
-                return <CreditCard className="h-4 w-4" />;
-            case 'other':
-                return <Package className="h-4 w-4" />;
+                return <Briefcase className="h-4 w-4" />;
             case 'shipping':
                 return <Truck className="h-4 w-4" />;
             case 'billing':
                 return <CreditCard className="h-4 w-4" />;
-            case 'both':
-                return <Package className="h-4 w-4" />;
             default:
-                return <MapPin className="h-4 w-4" />;
+                return <Globe className="h-4 w-4" />;
         }
     };
 
     const getAvailableTypes = (): Array<'home' | 'work' | 'other' | 'shipping' | 'billing' | 'both'> => {
-        // Allow all profile types
         return ['home', 'work', 'other'];
     };
 
@@ -77,48 +72,59 @@ export default function AddressManager({
 
     return (
         <>
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <CardTitle>Addresses</CardTitle>
-                            <CardDescription>
-                                Manage your delivery and billing addresses
-                            </CardDescription>
+            <Card className="rounded-[2rem] border-none shadow-elevated overflow-hidden bg-white/50 backdrop-blur-sm mt-8">
+                <CardHeader className="bg-muted/30 pb-6">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 text-[#2C1810]">
+                            <div className="p-2.5 bg-white rounded-2xl shadow-sm">
+                                <MapPin className="h-5 w-5 text-[#B85C3C]" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-xl font-playfair">Address Books</CardTitle>
+                                <CardDescription>Your essential sanctuary locations</CardDescription>
+                            </div>
                         </div>
-                        <Button onClick={() => setShowForm(true)}>
+                        <Button
+                            onClick={() => setShowForm(true)}
+                            className="w-full sm:w-auto rounded-full bg-[#2C1810] hover:bg-[#B85C3C] text-white font-bold text-xs uppercase tracking-widest px-6"
+                        >
                             <Plus className="mr-2 h-4 w-4" />
-                            Add Address
+                            Secure New Location
                         </Button>
                     </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-8 px-6 md:px-8">
                     {addresses.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                            <MapPin className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                            <p>No addresses added yet</p>
+                        <div className="text-center py-16 bg-[#FDFBF9] rounded-[2rem] border-2 border-dashed border-border/50">
+                            <div className="bg-white w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-soft">
+                                <MapPin className="h-10 w-10 text-[#B85C3C] opacity-30" />
+                            </div>
+                            <h3 className="text-[#2C1810] font-bold text-lg">No Sanctuaries Found</h3>
+                            <p className="text-muted-foreground text-sm max-w-xs mx-auto mt-2 mb-8 italic">
+                                Map your delivery path to receive sacred offerings directly at your doorstep.
+                            </p>
                             <Button
                                 variant="outline"
-                                className="mt-4"
+                                className="rounded-full border-[#B85C3C] text-[#B85C3C] hover:bg-[#B85C3C]/5 font-bold text-xs uppercase tracking-widest px-8"
                                 onClick={() => setShowForm(true)}
                             >
-                                Add Your First Address
+                                <Plus className="mr-2 h-4 w-4" /> Add Your First Sanctuary
                             </Button>
                         </div>
                     ) : (
-                        <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {addresses.map((address) => (
                                 <div
                                     key={address.id}
-                                    className={`border rounded-lg p-4 relative ${address.is_primary ? 'border-green-600 bg-green-50 dark:bg-green-950/20' : ''
+                                    className={`group border border-border/60 rounded-[2rem] p-6 relative transition-all duration-300 shadow-soft hover:shadow-elevated hover:bg-white/80 ${address.is_primary ? 'ring-2 ring-[#B85C3C]/20 border-[#B85C3C]/40 bg-white shadow-md' : 'bg-white/60'
                                         }`}
                                 >
                                     {/* Action buttons in top-right corner */}
-                                    <div className="absolute top-3 right-3 flex gap-2">
+                                    <div className="absolute top-4 right-4 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="h-8 w-8"
+                                            className="h-9 w-9 rounded-full bg-white/80 border border-border/40 hover:bg-[#B85C3C] hover:text-white transition-all shadow-sm"
                                             onClick={() => handleEdit(address)}
                                         >
                                             <Pencil className="h-4 w-4" />
@@ -126,7 +132,7 @@ export default function AddressManager({
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="h-8 w-8"
+                                            className="h-9 w-9 rounded-full bg-white/80 border border-border/40 hover:bg-red-500 hover:text-white transition-all shadow-sm"
                                             onClick={() => setDeletingId(address.id)}
                                         >
                                             <Trash2 className="h-4 w-4" />
@@ -134,43 +140,58 @@ export default function AddressManager({
                                     </div>
 
                                     {/* Address header with type */}
-                                    <div className="flex items-center gap-2 mb-3 pr-20">
-                                        {getTypeIcon(address.type)}
-                                        <span className="font-semibold text-lg capitalize">
-                                            {address.full_name}
-                                        </span>
-                                        {address.is_primary && (
-                                            <Badge variant="default" className="text-xs">
-                                                Primary
-                                            </Badge>
-                                        )}
-                                        <Badge variant="outline" className="capitalize ml-auto mr-16">
-                                            {address.type}
-                                        </Badge>
+                                    <div className="flex items-center gap-3 mb-4 pr-16">
+                                        <div className={`p-2 rounded-xl ${address.is_primary ? 'bg-[#B85C3C] text-white' : 'bg-[#2C1810]/5 text-[#2C1810]'}`}>
+                                            {getTypeIcon(address.type)}
+                                        </div>
+                                        <div>
+                                            <span className="font-bold text-[#2C1810] capitalize line-clamp-1 block">
+                                                {address.full_name}
+                                            </span>
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                <Badge variant="outline" className="capitalize text-[9px] font-bold tracking-widest py-0 px-2 rounded-full border-muted-foreground/30 text-muted-foreground">
+                                                    {address.type}
+                                                </Badge>
+                                                {address.is_primary && (
+                                                    <Badge className="bg-[#B85C3C] text-white hover:bg-[#B85C3C] text-[9px] font-bold tracking-widest py-0 px-2 rounded-full">
+                                                        PRIMARY
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
 
                                     {/* Address details */}
-                                    <div className="text-sm space-y-1 mb-3">
-                                        <p className="font-medium">{address.address_line1}</p>
-                                        {address.address_line2 && <p className="text-muted-foreground">{address.address_line2}</p>}
-                                        <p className="text-muted-foreground">
+                                    <div className="text-xs space-y-1.5 mb-6 text-muted-foreground leading-relaxed h-[80px]">
+                                        <p className="font-bold text-[#2C1810] line-clamp-1">{address.address_line1}</p>
+                                        {address.address_line2 && <p className="line-clamp-1">{address.address_line2}</p>}
+                                        <p className="line-clamp-1">
                                             {address.city}, {address.state} {address.postal_code}
                                         </p>
-                                        <p className="text-muted-foreground">{address.country}</p>
-                                        <p className="text-muted-foreground mt-1">Phone: {address.phone}</p>
+                                        <div className="flex items-center gap-1.5 font-medium text-[#2C1810]/70 mt-2">
+                                            <Phone className="h-3 w-3" /> {address.phone}
+                                        </div>
                                     </div>
 
                                     {/* Set as primary button */}
                                     {!address.is_primary && (
                                         <Button
-                                            variant="outline"
+                                            variant="ghost"
                                             size="sm"
-                                            className="gap-2"
+                                            className="w-full justify-between items-center rounded-2xl bg-[#2C1810]/5 hover:bg-[#B85C3C] hover:text-white group/btn transition-all font-bold text-[10px] uppercase tracking-widest h-10 px-4"
                                             onClick={() => onSetPrimary(address.id)}
                                         >
-                                            <Star className="h-4 w-4" />
-                                            Set as Primary
+                                            <div className="flex items-center gap-2">
+                                                <Star className="h-3.5 w-3.5 group-hover/btn:fill-current" />
+                                                Set as Primary
+                                            </div>
+                                            <ChevronRight className="h-3.5 w-3.5" />
                                         </Button>
+                                    )}
+                                    {address.is_primary && (
+                                        <div className="flex items-center justify-center gap-2 w-full h-10 rounded-2xl bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-widest">
+                                            <Truck className="h-4 w-4" /> Default Haven
+                                        </div>
                                     )}
                                 </div>
                             ))}
@@ -188,15 +209,15 @@ export default function AddressManager({
             />
 
             <AlertDialog open={!!deletingId} onOpenChange={() => setDeletingId(null)}>
-                <AlertDialogContent>
+                <AlertDialogContent className="rounded-[2.5rem] border-none shadow-elevated p-8 max-w-md">
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Address</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Are you sure you want to delete this address? This action cannot be undone.
+                        <AlertDialogTitle className="text-2xl font-playfair text-[#2C1810]">Abolish Location?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-base pt-2">
+                            Are you certain you wish to remove this address from your sacred records? This path cannot be retraced.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogFooter className="pt-8">
+                        <AlertDialogCancel className="rounded-full px-8">Remain</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={() => {
                                 if (deletingId) {
@@ -204,9 +225,9 @@ export default function AddressManager({
                                     setDeletingId(null);
                                 }
                             }}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            className="bg-red-600 text-white hover:bg-red-700 rounded-full px-8"
                         >
-                            Delete
+                            Abolish
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
