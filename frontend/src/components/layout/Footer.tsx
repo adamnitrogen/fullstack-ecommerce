@@ -14,7 +14,7 @@ import {
   Link as LinkIcon,
   Send as SendIcon,
 } from "lucide-react";
-import { PolicyDialog } from "@/components/PolicyDialog";
+
 import { socialMediaService } from "@/services/social-media.service";
 import { contactInfoService } from "@/services/contact-info.service";
 import { bankDetailsService } from "@/services/bank-details.service";
@@ -43,9 +43,6 @@ const getSocialIcon = (platform: string) => {
 };
 
 export function Footer() {
-  const [policyDialog, setPolicyDialog] = useState<
-    "privacy" | "terms" | "refund" | null
-  >(null);
   const { t } = useTranslation();
 
   const { data: socialMediaLinks } = useQuery({
@@ -89,11 +86,6 @@ export function Footer() {
 
   return (
     <>
-      <PolicyDialog
-        open={policyDialog !== null}
-        onOpenChange={(open) => !open && setPolicyDialog(null)}
-        type={policyDialog || "privacy"}
-      />
       <footer className="bg-[#1A0E09] text-[#E6D5AC] pt-12 pb-6 relative overflow-hidden border-t border-[#B85C3C]/10">
         {/* Abstract Background Decoration */}
         <div className="absolute top-0 right-0 w-96 h-96 bg-[#B85C3C]/5 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/2" />
@@ -177,18 +169,18 @@ export function Footer() {
                   </Link>
                 </li>
                 {[
-                  { label: "Shipping Policy", action: () => setPolicyDialog("privacy") },
-                  { label: "Returns & Refunds", action: () => setPolicyDialog("refund") },
-                  { label: "Privacy Sanctuary", action: () => setPolicyDialog("privacy") },
-                  { label: "Terms & Conditions", action: () => setPolicyDialog("terms") }
+                  { label: "Shipping Policy", to: "/refund" },
+                  { label: "Returns & Refunds", to: "/refund" },
+                  { label: "Privacy Sanctuary", to: "/privacy" },
+                  { label: "Terms & Conditions", to: "/terms" }
                 ].map((item, idx) => (
                   <li key={idx}>
-                    <button
-                      onClick={item.action}
+                    <Link
+                      to={item.to}
                       className="text-[13px] font-light text-[#E6D5AC]/70 hover:text-[#D4AF37] transition-all duration-300 inline-block text-left"
                     >
                       {item.label}
-                    </button>
+                    </Link>
                   </li>
                 ))}
               </ul>

@@ -2,169 +2,150 @@ export default function Terms() {
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-4xl font-bold mb-8">Terms of Service</h1>
-        
-        <div className="prose prose-lg max-w-none space-y-6">
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">Agreement to Terms</h2>
-            <p className="text-muted-foreground leading-relaxed">
-              By accessing and using the Gaushala website and services, you agree to be bound by these Terms of Service 
-              and all applicable laws and regulations. If you do not agree with any of these terms, you are prohibited 
-              from using or accessing this site.
-            </p>
-          </section>
+        <h1 className="text-4xl font-bold mb-8">Terms and Conditions</h1>
+        <p className="text-muted-foreground mb-8">Effective Date: January 2026</p>
+
+        <div className="prose prose-lg max-w-none space-y-8">
+          <p className="text-muted-foreground leading-relaxed">
+            Welcome to MeriGauMata. By accessing our website and using our services, you agree to comply with and be bound by the following terms.
+          </p>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">Use License</h2>
-            <p className="text-muted-foreground leading-relaxed mb-3">
-              Permission is granted to temporarily access the materials on Gaushala's website for personal, 
-              non-commercial transitory viewing only. This is the grant of a license, not a transfer of title, 
-              and under this license you may not:
-            </p>
-            <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
-              <li>Modify or copy the materials</li>
-              <li>Use the materials for any commercial purpose or public display</li>
-              <li>Attempt to decompile or reverse engineer any software on the website</li>
-              <li>Remove any copyright or proprietary notations from the materials</li>
-              <li>Transfer the materials to another person or mirror the materials on any other server</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">Product Information and Availability</h2>
-            <p className="text-muted-foreground leading-relaxed">
-              We strive to provide accurate product descriptions and pricing. However, we do not warrant that product 
-              descriptions, pricing, or other content on our website is accurate, complete, reliable, current, or 
-              error-free. We reserve the right to correct any errors, inaccuracies, or omissions and to change or 
-              update information at any time without prior notice.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">Orders and Payment</h2>
-            <p className="text-muted-foreground leading-relaxed mb-3">
-              By placing an order, you agree to the following:
-            </p>
-            <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
-              <li>You are legally capable of entering into binding contracts</li>
-              <li>All information you provide is accurate and complete</li>
-              <li>You will pay all charges at the prices in effect when incurred</li>
-              <li>We reserve the right to refuse or cancel any order</li>
-              <li>Payment must be received before order processing</li>
-              <li>All prices are in Indian Rupees (INR) unless otherwise stated</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">Shipping and Delivery</h2>
-            <p className="text-muted-foreground leading-relaxed">
-              We will make reasonable efforts to deliver products within the estimated delivery time. However, delivery 
-              times are estimates and not guaranteed. We are not liable for any delays in delivery caused by factors 
-              beyond our control, including but not limited to natural disasters, strikes, or transportation issues.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">User Accounts</h2>
-            <p className="text-muted-foreground leading-relaxed mb-3">
-              When you create an account with us, you must:
-            </p>
-            <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
-              <li>Provide accurate and complete information</li>
-              <li>Maintain the security of your password</li>
-              <li>Notify us immediately of any unauthorized use of your account</li>
-              <li>Accept responsibility for all activities that occur under your account</li>
-              <li>Not share your account credentials with others</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">Prohibited Activities</h2>
-            <p className="text-muted-foreground leading-relaxed mb-3">
-              You may not use our website for any unlawful purpose or to:
-            </p>
-            <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
-              <li>Violate any local, state, national, or international law</li>
-              <li>Infringe upon or violate our intellectual property rights</li>
-              <li>Harass, abuse, or harm another person</li>
-              <li>Submit false or misleading information</li>
-              <li>Upload viruses or malicious code</li>
-              <li>Spam or send unsolicited messages</li>
-              <li>Engage in any automated use of the system</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">Intellectual Property</h2>
-            <p className="text-muted-foreground leading-relaxed">
-              All content on this website, including text, graphics, logos, images, and software, is the property of 
-              Gaushala or its content suppliers and is protected by Indian and international copyright laws. 
-              Unauthorized use of any materials may violate copyright, trademark, and other laws.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">Limitation of Liability</h2>
-            <p className="text-muted-foreground leading-relaxed">
-              To the fullest extent permitted by law, Gaushala shall not be liable for any indirect, incidental, 
-              special, consequential, or punitive damages, or any loss of profits or revenues, whether incurred 
-              directly or indirectly, or any loss of data, use, goodwill, or other intangible losses.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">Indemnification</h2>
-            <p className="text-muted-foreground leading-relaxed">
-              You agree to defend, indemnify, and hold harmless Gaushala and its affiliates from and against any 
-              claims, damages, obligations, losses, liabilities, costs, or debt arising from your use of the website 
-              or violation of these Terms of Service.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">Termination</h2>
-            <p className="text-muted-foreground leading-relaxed">
-              We reserve the right to terminate or suspend your account and access to our services immediately, 
-              without prior notice or liability, for any reason, including breach of these Terms of Service.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">Governing Law</h2>
-            <p className="text-muted-foreground leading-relaxed">
-              These Terms of Service shall be governed by and construed in accordance with the laws of India. 
-              Any disputes arising from these terms shall be subject to the exclusive jurisdiction of the courts 
-              in [Your District/State], India.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">Changes to Terms</h2>
-            <p className="text-muted-foreground leading-relaxed">
-              We reserve the right to modify or replace these Terms of Service at any time. If a revision is material, 
-              we will provide at least 30 days' notice prior to any new terms taking effect. Continued use of our 
-              services after changes become effective constitutes acceptance of the revised terms.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">Contact Information</h2>
-            <p className="text-muted-foreground leading-relaxed">
-              If you have any questions about these Terms of Service, please contact us at:
-            </p>
-            <div className="mt-4 p-4 bg-muted rounded-lg">
-              <p className="font-medium">Gaushala Trust</p>
-              <p className="text-muted-foreground">Email: info@gaushala.org</p>
-              <p className="text-muted-foreground">Phone: +91 98765 43210</p>
-              <p className="text-muted-foreground">Address: Village Road, District State, India - 123456</p>
+            <h2 className="text-2xl font-semibold mb-4">1. General Terms</h2>
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-medium text-lg mb-2">Eligibility</h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  By using this site, you represent that you are at least the age of majority in your jurisdiction.
+                </p>
+              </div>
+              <div>
+                <h3 className="font-medium text-lg mb-2">Account Responsibility</h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  If you create an account, you are responsible for maintaining the confidentiality of your login credentials.
+                </p>
+              </div>
             </div>
           </section>
 
-          <div className="mt-8 pt-8 border-t border-border">
-            <p className="text-sm text-muted-foreground">
-              <strong>Last Updated:</strong> January 2025
+          <section>
+            <h2 className="text-2xl font-semibold mb-4">2. Product Sales & E-Commerce</h2>
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-medium text-lg mb-2">Pricing</h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  All prices are subject to change without notice. We reserve the right to modify or discontinue a product at any time.
+                </p>
+              </div>
+              <div>
+                <h3 className="font-medium text-lg mb-2">Shipping</h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  Delivery timelines are estimates and not guarantees. We are not responsible for delays caused by third-party courier services.
+                </p>
+              </div>
+              <div>
+                <h3 className="font-medium text-lg mb-2">Returns & Refunds</h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  Items can be returned within 7 days of delivery in original packaging. Please review our full Refund Policy for detailed information.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold mb-4">3. Event Registration</h2>
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-medium text-lg mb-2">Accuracy of Info</h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  You must provide accurate information during registration.
+                </p>
+              </div>
+              <div>
+                <h3 className="font-medium text-lg mb-2">Cancellations</h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  Event tickets are non-refundable unless otherwise stated for a specific event. Cancellations made 48 hours prior may be eligible for a partial refund at our discretion.
+                </p>
+              </div>
+              <div>
+                <h3 className="font-medium text-lg mb-2">Event Changes</h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  We reserve the right to change event dates, venues, or speakers due to unforeseen circumstances.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold mb-4">4. Donations</h2>
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-medium text-lg mb-2">No Tax Benefit</h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  You acknowledge that MeriGauMata is not registered under Section 80G of the Income Tax Act. Donations made here are voluntary contributions and are not tax-deductible.
+                </p>
+              </div>
+              <div>
+                <h3 className="font-medium text-lg mb-2">Finality</h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  All donations are final and non-refundable unless a technical error resulted in a duplicate charge.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold mb-4">5. Blog & User-Generated Content</h2>
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-medium text-lg mb-2">Intellectual Property</h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  All content on the blog and Gallery (text, images, logos) is the property of MeriGauMata unless otherwise stated.
+                </p>
+              </div>
+              <div>
+                <h3 className="font-medium text-lg mb-2">User Conduct</h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  If you comment on blogs, you agree not to post defamatory, obscene, or illegal content. We reserve the right to remove any comments at our discretion.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold mb-4">6. Gallery & Media Use</h2>
+            <p className="text-muted-foreground leading-relaxed">
+              The images in our Gallery are for viewing purposes only. You may not download, reproduce, or use these images for commercial purposes without explicit written permission.
             </p>
-          </div>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold mb-4">7. Limitation of Liability</h2>
+            <p className="text-muted-foreground leading-relaxed">
+              MeriGauMata and its team shall not be liable for any indirect, incidental, or consequential damages resulting from the use of our products, attendance at our events, or reliance on blog information. All information is provided "as is."
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold mb-4">8. Payments</h2>
+            <p className="text-muted-foreground leading-relaxed">
+              We use third-party payment gateways to process payments for products, events, and donations. By using these, you also agree to be bound by the terms of those specific processors (e.g., Razorpay, Stripe).
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold mb-4">9. Governing Law</h2>
+            <p className="text-muted-foreground leading-relaxed">
+              These terms are governed by the laws of India. Any disputes shall be subject to the exclusive jurisdiction of the courts in India.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold mb-4">10. Changes to Terms</h2>
+            <p className="text-muted-foreground leading-relaxed">
+              We reserve the right to update these Terms and Conditions at any time. Your continued use of the site following updates constitutes acceptance of the new terms.
+            </p>
+          </section>
         </div>
       </div>
     </div>

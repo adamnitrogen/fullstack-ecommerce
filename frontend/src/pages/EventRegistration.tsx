@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { eventService } from "@/services/event.service";
 import { useAuthStore } from "@/store/authStore";
-import { PolicyDialog } from "@/components/PolicyDialog";
+
 import { apiClient } from "@/lib/api-client";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { getErrorMessage } from "@/lib/errorUtils";
@@ -47,7 +47,7 @@ const EventRegistration = () => {
   });
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [showTermsDialog, setShowTermsDialog] = useState(false);
+
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [statusDialog, setStatusDialog] = useState<{
@@ -460,13 +460,14 @@ const EventRegistration = () => {
                   />
                   <Label htmlFor="terms" className="text-sm cursor-pointer">
                     I agree to the{" "}
-                    <button
-                      type="button"
-                      className="text-primary hover:underline"
-                      onClick={() => setShowTermsDialog(true)}
+                    <a
+                      href="/terms"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline font-medium"
                     >
                       terms & conditions
-                    </button>
+                    </a>
                   </Label>
                 </div>
                 {errors.terms && (
@@ -669,12 +670,7 @@ const EventRegistration = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Terms and Conditions Dialog */}
-      <PolicyDialog
-        type="terms"
-        open={showTermsDialog}
-        onOpenChange={setShowTermsDialog}
-      />
+
     </div>
   );
 };
