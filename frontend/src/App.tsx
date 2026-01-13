@@ -36,7 +36,7 @@ const Blog = lazy(() => import("./pages/Blog"));
 const BlogPost = lazy(() => import("./pages/BlogPost"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
-const Refund = lazy(() => import("./pages/Refund"));
+const ShippingAndRefund = lazy(() => import("./pages/ShippingAndRefund"));
 const FAQ = lazy(() => import("./pages/FAQ"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
@@ -62,6 +62,7 @@ const ContactManagement = lazy(() => import("./pages/admin/ContactManagement"));
 const ContactMessages = lazy(() => import("./pages/admin/ContactMessages"));
 const ContactMessageDetail = lazy(() => import("./pages/admin/ContactMessageDetail"));
 const AboutUsManagement = lazy(() => import("./pages/admin/AboutUsManagement"));
+const PolicyManagement = lazy(() => import("./pages/admin/PolicyManagement"));
 
 const OrdersManagement = lazy(() => import("./pages/admin/OrdersManagement"));
 const OrderDetail = lazy(() => import("./pages/admin/OrderDetail"));
@@ -170,9 +171,9 @@ const App = () => {
                   <Route path="/about" element={<About />} />
                   <Route path="/blog" element={<Blog />} />
                   <Route path="/blog/:postId" element={<BlogPost />} />
-                  <Route path="/privacy" element={<Privacy />} />
-                  <Route path="/terms" element={<Terms />} />
-                  <Route path="/refund" element={<Refund />} />
+                  <Route path="/privacy-policy" element={<Privacy />} />
+                  <Route path="/terms-and-conditions" element={<Terms />} />
+                  <Route path="/shipping-and-refund-policy" element={<ShippingAndRefund />} />
                   <Route path="/faq" element={<FAQ />} />
                   <Route path="/auth/callback" element={<AuthCallback />} />
                   <Route path="/verify-email" element={<VerifyEmail />} />
@@ -227,6 +228,7 @@ const App = () => {
                   <Route path="contact-messages" element={<ContactMessages />} />
                   <Route path="contact-messages/:id" element={<ContactMessageDetail />} />
                   <Route path="about-us" element={<AboutUsManagement />} />
+                  <Route path="policies" element={<PolicyManagement />} />
 
                   <Route path="settings" element={<SettingsManagement />} />
                 </Route>

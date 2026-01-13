@@ -169,10 +169,9 @@ export function Footer() {
                   </Link>
                 </li>
                 {[
-                  { label: "Shipping Policy", to: "/refund" },
-                  { label: "Returns & Refunds", to: "/refund" },
-                  { label: "Privacy Sanctuary", to: "/privacy" },
-                  { label: "Terms & Conditions", to: "/terms" }
+                  { label: "Shipping & Returns", to: "/shipping-and-refund-policy" },
+                  { label: "Privacy Sanctuary", to: "/privacy-policy" },
+                  { label: "Terms & Conditions", to: "/terms-and-conditions" }
                 ].map((item, idx) => (
                   <li key={idx}>
                     <Link

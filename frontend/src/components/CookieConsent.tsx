@@ -65,7 +65,7 @@ export function CookieConsent() {
 
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
               <Link
-                to="/privacy"
+                to="/privacy-policy"
                 className="text-primary hover:underline text-sm font-medium transition-colors"
                 onClick={() => setShowBanner(false)} // Close banner when navigating to policy
               >

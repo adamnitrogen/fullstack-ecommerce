@@ -24,6 +24,7 @@ import {
   Star,
   Flag,
   Settings,
+  Shield,
 } from "lucide-react";
 import { LogoutConfirmDialog } from "@/components/LogoutConfirmDialog";
 import { useManagerPermissions } from "@/hooks/useManagerPermissions";
@@ -149,6 +150,12 @@ export function AdminSidebar({
     //   path: "/admin/coupons",
     //   show: isAdmin // Only admins can manage coupons
     // },
+    {
+      icon: Shield,
+      label: "Policy Management",
+      path: "/admin/policies",
+      show: isAdmin || hasPermission("can_manage_about_us") // Assuming generic permission or admin for now, user didn't specify strict permission but implied Admin
+    },
     {
       icon: Settings,
       label: "Settings",

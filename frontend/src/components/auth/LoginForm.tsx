@@ -253,7 +253,7 @@ export function LoginForm({
             <button
               type="button"
               className="text-[#B85C3C] hover:underline font-medium"
-              onClick={() => window.open("/terms", "_blank")}
+              onClick={() => window.open("/terms-and-conditions", "_blank")}
             >
               Terms of Use
             </button>{" "}
@@ -261,7 +261,7 @@ export function LoginForm({
             <button
               type="button"
               className="text-[#B85C3C] hover:underline font-medium"
-              onClick={() => window.open("/privacy", "_blank")}
+              onClick={() => window.open("/privacy-policy", "_blank")}
             >
               Privacy Policy
             </button>

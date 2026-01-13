@@ -461,7 +461,7 @@ const EventRegistration = () => {
                   <Label htmlFor="terms" className="text-sm cursor-pointer">
                     I agree to the{" "}
                     <a
-                      href="/terms"
+                      href="/terms-and-conditions"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-primary hover:underline font-medium"
