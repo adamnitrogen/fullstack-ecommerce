@@ -51,21 +51,21 @@ export const profileService = {
 
         // Transform addresses to match CheckoutAddress type
         if (data.addresses && Array.isArray(data.addresses)) {
-            data.addresses = data.addresses.map((addr: BackendAddress) => ({
+            data.addresses = data.addresses.map((addr: any) => ({
                 id: addr.id,
-                user_id: addr.userId,
-                type: addr.type || 'other', // Preserve actual backend type
-                is_primary: addr.isPrimary,
-                full_name: addr.label || 'User',
-                phone: addr.phone || '', // Now retrieved from backend
-                address_line1: addr.streetAddress,
-                address_line2: addr.apartment,
+                user_id: addr.user_id || addr.userId,
+                type: addr.type || 'other',
+                is_primary: addr.is_primary !== undefined ? addr.is_primary : addr.isPrimary,
+                full_name: addr.full_name || addr.label || 'User',
+                phone: addr.phone || '',
+                address_line1: addr.address_line1 || addr.street_address || addr.streetAddress,
+                address_line2: addr.address_line2 || addr.apartment,
                 city: addr.city,
                 state: addr.state,
-                postal_code: addr.postalCode,
+                postal_code: addr.postal_code || addr.postalCode,
                 country: addr.country,
-                created_at: addr.createdAt,
-                updated_at: addr.updatedAt
+                created_at: addr.created_at || addr.createdAt,
+                updated_at: addr.updated_at || addr.updatedAt
             }));
         }
 

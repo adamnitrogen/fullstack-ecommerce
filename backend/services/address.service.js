@@ -22,10 +22,12 @@ const getUserAddresses = async (userId) => {
 
     if (error) throw error;
 
-    // Map to include phone property directly
+    // Map to include phone property directly, handling both object and array responses from Supabase joins
     return data.map(addr => ({
         ...addr,
-        phone: addr.phone_numbers?.phone_number
+        phone: Array.isArray(addr.phone_numbers)
+            ? addr.phone_numbers[0]?.phone_number
+            : addr.phone_numbers?.phone_number
     }));
 };
 
@@ -127,7 +129,9 @@ const createAddress = async (userId, addressData) => {
     // Flatten the response to include phone directly
     return {
         ...data,
-        phone: data.phone_numbers?.phone_number
+        phone: Array.isArray(data.phone_numbers)
+            ? data.phone_numbers[0]?.phone_number
+            : data.phone_numbers?.phone_number
     };
 };
 
@@ -212,7 +216,9 @@ const updateAddress = async (id, userId, updates) => {
     // Flatten response
     return {
         ...data,
-        phone: data.phone_numbers?.phone_number
+        phone: Array.isArray(data.phone_numbers)
+            ? data.phone_numbers[0]?.phone_number
+            : data.phone_numbers?.phone_number
     };
 };
 
@@ -228,25 +234,62 @@ const deleteAddress = async (id, userId) => {
     return { success: true };
 };
 
-// Set address as primary
-const setPrimaryAddress = async (id, userId, type) => {
-    // First, remove primary from all addresses of this type
-    await supabase
-        .from('addresses')
-        .update({ is_primary: false })
-        .eq('user_id', userId)
-        .eq('type', type);
+// Set address as primary (Atomic via RPC with manual fallback)
+const setPrimaryAddress = async (id, userId, type, correlationId = null) => {
+    logger.info({ id, userId, type, correlationId }, 'Setting primary address via RPC');
 
-    // Then set the specified address as primary
-    const { data, error } = await supabase
+    const { error } = await supabase.rpc('set_primary_address', {
+        p_address_id: id,
+        p_user_id: userId,
+        p_address_type: type,
+        p_correlation_id: correlationId || require('crypto').randomUUID()
+    });
+
+    if (error) {
+        // Fallback: If RPC is missing (PGRST202), perform manual update
+        if (error.code === 'PGRST202') {
+            logger.warn({ id, userId, type }, 'RPC set_primary_address missing, performing manual fallback update');
+
+            // 1. Unset existing primary for this type
+            const { error: unsetError } = await supabase
+                .from('addresses')
+                .update({ is_primary: false, updated_at: new Date().toISOString() })
+                .eq('user_id', userId)
+                .eq('type', type)
+                .eq('is_primary', true);
+
+            if (unsetError) {
+                logger.error({ err: unsetError, userId, type }, 'Manual fallback: Failed to unset existing primary');
+                throw unsetError;
+            }
+
+            // 2. Set new primary
+            const { error: setError } = await supabase
+                .from('addresses')
+                .update({ is_primary: true, updated_at: new Date().toISOString() })
+                .eq('id', id)
+                .eq('user_id', userId);
+
+            if (setError) {
+                logger.error({ err: setError, id, userId }, 'Manual fallback: Failed to set new primary');
+                throw setError;
+            }
+
+            logger.info({ id, userId, type }, 'Manual fallback update successful');
+        } else {
+            logger.error({ err: error, id, userId }, 'Failed to set primary address via RPC');
+            throw error;
+        }
+    }
+
+    // Fetch the updated address to return
+    const { data, error: fetchError } = await supabase
         .from('addresses')
-        .update({ is_primary: true, updated_at: new Date().toISOString() })
+        .select('*')
         .eq('id', id)
-        .eq('user_id', userId)
-        .select()
         .single();
 
-    if (error) throw error;
+    if (fetchError) throw fetchError;
     return data;
 };
 
@@ -323,12 +366,13 @@ const getLatestAddress = async (userId, type = null) => {
 // Helper to format DB address to frontend structure
 const formatAddress = (addr) => {
     if (!addr) return null;
-    // If it's already a snapshot with mapped fields, return as is (but ensure phone is present)
-    if (addr.phone && addr.full_name) return addr;
+    const phone = Array.isArray(addr.phone_numbers)
+        ? addr.phone_numbers[0]?.phone_number
+        : addr.phone_numbers?.phone_number;
 
     return {
         ...addr,
-        phone: addr.phone_numbers?.phone_number || addr.phone,
+        phone: phone || addr.phone,
         full_name: addr.label || addr.full_name,
         address_line1: addr.street_address || addr.address_line1,
         address_line2: addr.apartment || addr.address_line2

@@ -1,10 +1,9 @@
-import { logger } from "@/lib/logger";
 import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Plus, MapPin, Pencil, Trash2 } from "lucide-react";
+import { Plus, MapPin, Pencil, Trash2, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import AddressFormModal from "@/components/profile/AddressFormModal";
 import { addressService } from "@/services/address.service";
@@ -21,6 +20,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { logger } from "@/lib/logger";
 
 interface AddressSelectorProps {
     type: 'shipping' | 'billing';
@@ -29,92 +29,80 @@ interface AddressSelectorProps {
 }
 
 export function AddressSelector({ type, selectedAddressId, onSelect }: AddressSelectorProps) {
-    const [addresses, setAddresses] = useState<CheckoutAddress[]>([]);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
     const [dialogOpen, setDialogOpen] = useState(false);
-    const [saving, setSaving] = useState(false);
     const [editingAddress, setEditingAddress] = useState<CheckoutAddress | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
+    const { data: addresses = [], isLoading } = useQuery({
+        queryKey: ["addresses"],
+        queryFn: addressService.getAddresses,
+    });
+
+    // Auto-select primary address only if no address is currently selected
     useEffect(() => {
-        fetchAddresses();
-    }, [type]);
-
-    const fetchAddresses = async () => {
-        try {
-            setLoading(true);
-            const data = await addressService.getAddresses();
-
-            // For checkout, show ALL addresses regardless of backend type
-            // User can use any address for shipping or billing
-            let filtered = data;
-
-            // Also ensure selected address is included if it exists
-            if (selectedAddressId) {
-                const selectedExists = filtered.find(a => a.id === selectedAddressId);
-                if (!selectedExists) {
-                    const selectedInData = data.find(a => a.id === selectedAddressId);
-                    if (selectedInData) {
-                        filtered = [...filtered, selectedInData];
-                    }
-                }
-            }
-
-            setAddresses(filtered);
-
-            // Auto-select primary address
-            const primary = filtered.find((addr) => addr.is_primary);
-            if (primary && !selectedAddressId) {
+        if (!isLoading && addresses.length > 0 && !selectedAddressId) {
+            const primary = addresses.find((addr) => addr.is_primary);
+            if (primary) {
                 onSelect(primary);
+            } else if (addresses.length > 0) {
+                onSelect(addresses[0]);
             }
-        } catch (error: unknown) {
-            logger.error("Address fetch error:", error);
-            toast.error(getErrorMessage(error, "Failed to load addresses"));
-        } finally {
-            setLoading(false);
         }
-    };
+    }, [isLoading, addresses, selectedAddressId, onSelect]);
 
-    const handleSubmit = async (data: CreateAddressDto) => {
-        try {
-            setSaving(true);
-            let newAddress;
-            if (editingAddress) {
-                newAddress = await addressService.updateAddress(editingAddress.id, data);
-                toast.success("Address updated successfully");
-            } else {
-                newAddress = await addressService.createAddress(data);
-                toast.success("Address added successfully");
-            }
-            await fetchAddresses();
+    const createMutation = useMutation({
+        mutationFn: addressService.createAddress,
+        onSuccess: (newAddress) => {
+            queryClient.invalidateQueries({ queryKey: ["addresses"] });
+            toast.success("Address added successfully");
             onSelect(newAddress);
             handleCloseDialog();
-        } catch (error: unknown) {
-            toast.error(getErrorMessage(error, editingAddress ? "Failed to update address" : "Failed to add address"));
-        } finally {
-            setSaving(false);
+        },
+        onError: (error) => toast.error(getErrorMessage(error, "Failed to add address")),
+    });
+
+    const updateMutation = useMutation({
+        mutationFn: ({ id, data }: { id: string; data: CreateAddressDto }) =>
+            addressService.updateAddress(id, data),
+        onSuccess: (updatedAddress) => {
+            queryClient.invalidateQueries({ queryKey: ["addresses"] });
+            toast.success("Address updated successfully");
+            onSelect(updatedAddress);
+            handleCloseDialog();
+        },
+        onError: (error) => toast.error(getErrorMessage(error, "Failed to update address")),
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: addressService.deleteAddress,
+        onSuccess: (_, deletedId) => {
+            queryClient.invalidateQueries({ queryKey: ["addresses"] });
+            toast.success("Address deleted successfully");
+            if (selectedAddressId === deletedId) {
+                const remaining = addresses.filter(a => a.id !== deletedId);
+                if (remaining.length > 0) onSelect(remaining[0]);
+            }
+        },
+        onError: () => toast.error("Failed to delete address"),
+        onSettled: () => setDeletingId(null),
+    });
+
+    const handleSubmit = async (data: CreateAddressDto) => {
+        if (editingAddress) {
+            updateMutation.mutate({ id: editingAddress.id, data });
+        } else {
+            createMutation.mutate(data);
         }
     };
 
     const handleDelete = async (id: string) => {
-        try {
-            await addressService.deleteAddress(id);
-            toast.success("Address deleted successfully");
+        deleteMutation.mutate(id);
+    };
 
-            // If deleted address was selected, clear selection or select another
-            if (selectedAddressId === id) {
-                const remaining = addresses.filter(a => a.id !== id);
-                if (remaining.length > 0) {
-                    onSelect(remaining[0]);
-                }
-            }
-
-            await fetchAddresses();
-        } catch (error) {
-            toast.error("Failed to delete address");
-        } finally {
-            setDeletingId(null);
-        }
+    const handleCloseDialog = () => {
+        setDialogOpen(false);
+        setEditingAddress(null);
     };
 
     const handleEdit = (address: CheckoutAddress, e: React.MouseEvent) => {
@@ -128,14 +116,11 @@ export function AddressSelector({ type, selectedAddressId, onSelect }: AddressSe
         setDeletingId(id);
     };
 
-    const handleCloseDialog = () => {
-        setDialogOpen(false);
-        setEditingAddress(null);
-    };
-
-    if (loading) {
+    if (isLoading) {
         return <div className="text-center py-8">Loading addresses...</div>;
     }
+
+    const saving = createMutation.isPending || updateMutation.isPending;
 
     return (
         <div className="space-y-4">

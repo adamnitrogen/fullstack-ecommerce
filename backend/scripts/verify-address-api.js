@@ -1,9 +1,7 @@
-require('dotenv').config();
 const axios = require('axios');
-const { generateAccessToken } = require('./services/jwt.service');
-const supabase = require('./config/supabase');
+const supabase = require('../config/supabase');
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 const API_URL = `http://localhost:${PORT}/api`;
 
 console.log('JWT_SECRET length:', process.env.JWT_SECRET ? process.env.JWT_SECRET.length : 'undefined');
@@ -27,10 +25,10 @@ async function runVerification() {
         const user = users[0];
         console.log(`Using user: ${user.email} (${user.id})`);
 
-        // 2. Generate Token
-        const token = generateAccessToken(user.id, user.email, user.role);
+        // 2. Mock Headers
         const headers = {
-            Cookie: `access_token=${token}`
+            'Content-Type': 'application/json',
+            'x-user-id': user.id // Some of our middleware might support this for testing
         };
 
         // 3. Get Addresses (Initial)
@@ -100,7 +98,11 @@ async function runVerification() {
         console.error('\n❌ Verification Failed:', error.message);
         if (error.response) {
             console.error('Response Status:', error.response.status);
-            console.error('Response Data:', error.response.data);
+            console.error('Response Data:', JSON.stringify(error.response.data, null, 2));
+        } else if (error.request) {
+            console.error('No response received from server');
+        } else {
+            console.error('Error', error);
         }
         process.exit(1);
     }

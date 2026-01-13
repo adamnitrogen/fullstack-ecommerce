@@ -23,6 +23,10 @@ const mapToFrontend = (event) => {
         isRegistrationEnabled: event.is_registration_enabled,
         keyHighlights: event.key_highlights,
         specialPrivileges: event.special_privileges,
+        cancellationStatus: event.cancellation_status,
+        cancelledAt: event.cancelled_at,
+        cancellationReason: event.cancellation_reason,
+        cancellationCorrelationId: event.cancellation_correlation_id,
         createdAt: event.created_at,
         updatedAt: event.updated_at
     };
@@ -46,6 +50,10 @@ const mapToDb = (event) => {
         is_registration_enabled: event.isRegistrationEnabled,
         key_highlights: event.keyHighlights,
         special_privileges: event.specialPrivileges,
+        cancellation_status: event.cancellationStatus,
+        cancelled_at: event.cancelledAt,
+        cancellation_reason: event.cancellationReason,
+        cancellation_correlation_id: event.cancellationCorrelationId,
         updated_at: new Date().toISOString()
     };
 

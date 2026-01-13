@@ -71,5 +71,6 @@ ALTER TABLE event_cancellation_jobs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Admins can see cancellation jobs" ON event_cancellation_jobs
     FOR SELECT USING (EXISTS (
         SELECT 1 FROM profiles 
-        WHERE id = auth.uid() AND role IN ('admin', 'manager')
+        JOIN roles ON profiles.role_id = roles.id
+        WHERE profiles.id = auth.uid() AND roles.name IN ('admin', 'manager')
     ));

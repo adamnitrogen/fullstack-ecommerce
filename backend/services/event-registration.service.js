@@ -80,12 +80,17 @@ class EventRegistrationService {
 
         const { data: event, error: eventError } = await supabase
             .from('events')
-            .select('id, title, registration_amount, start_date, location, description, event_code')
+            .select('id, title, registration_amount, start_date, location, description, event_code, status, cancellation_status')
             .eq('id', eventId)
             .single();
 
         if (eventError || !event) {
             throw new Error('Event not found');
+        }
+
+        // Check if event is cancelled
+        if (event.status === 'cancelled' || event.cancellation_status === 'CANCELLED' || event.cancellation_status === 'CANCELLATION_PENDING') {
+            throw new Error('This event has been cancelled and is no longer accepting registrations.');
         }
 
         // Generate Registration Number
@@ -386,8 +391,16 @@ class EventRegistrationService {
     /**
      * Cancel Registration
      */
-    static async cancelRegistration(userId, registrationId) {
+    static async cancelRegistration(userId, registrationId, reason = 'User requested cancellation') {
         if (!registrationId) throw new Error('Registration ID is required');
+
+        logger.info({
+            module: 'EventRegistration',
+            operation: 'CANCEL_USER',
+            userId,
+            registrationId,
+            reason
+        }, 'User initiated registration cancellation');
 
         // 1. Verify ownership
         const { data: registration, error: fetchError } = await supabase
@@ -401,7 +414,7 @@ class EventRegistrationService {
         if (registration.status === 'cancelled') throw new Error('Registration is already cancelled');
 
         // Block cancellation for paid events (Backend Policy)
-        if (registration.payment_status === 'paid') {
+        if (registration.payment_status === 'paid' || registration.payment_status === 'captured') {
             throw new Error('Paid event registrations cannot be cancelled online. Please contact support for refund requests.');
         }
 
@@ -410,6 +423,8 @@ class EventRegistrationService {
             .from('event_registrations')
             .update({
                 status: 'cancelled',
+                cancellation_reason: reason,
+                cancelled_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
             })
             .eq('id', registrationId);
@@ -417,7 +432,7 @@ class EventRegistrationService {
         if (updateError) throw updateError;
 
         // 3. Send cancellation email
-        const refundDetails = registration.payment_status === 'paid' ? {
+        const refundDetails = (registration.payment_status === 'paid' || registration.payment_status === 'captured') ? {
             amount: registration.amount || 0,
             isRefunded: false
         } : null;
@@ -429,7 +444,8 @@ class EventRegistrationService {
                     id: registration.events?.id,
                     title: registration.events?.title || 'Event',
                     startDate: registration.events?.start_date,
-                    location: registration.events?.location
+                    location: registration.events?.location,
+                    cancellationReason: reason
                 },
                 registration: { id: registration.id, registrationNumber: registration.registration_number },
                 attendeeName: registration.full_name,
@@ -444,20 +460,27 @@ class EventRegistrationService {
     /**
      * Get User Registrations
      */
-    static async getUserRegistrations(userId) {
-        // console.log(`[EventRegistration] Fetching registrations for user: ${userId}`);
-        const { data, error } = await supabase
+    static async getUserRegistrations(userId, { page = 1, limit = 5 } = {}) {
+        // console.log(`[EventRegistration] Fetching registrations for user: ${userId} page: ${page}`);
+        const offset = (page - 1) * limit;
+
+        const { data, error, count } = await supabase
             .from('event_registrations')
-            .select(`*, events (id, title, start_date, end_date, location, image)`)
+            .select(`*, events (id, title, start_date, end_date, location, image)`, { count: 'exact' })
             .eq('user_id', userId)
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .range(offset, offset + limit - 1);
 
         if (error) {
             logger.error({ userId, error }, '[EventRegistration] Error fetching user registrations');
             throw error;
         }
         logger.info({ userId, count: data?.length || 0 }, '[EventRegistration] User registrations fetched');
-        return data || [];
+
+        return {
+            registrations: data || [],
+            total: count || 0
+        };
     }
 
     /**

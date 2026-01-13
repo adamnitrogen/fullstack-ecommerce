@@ -107,9 +107,9 @@ export function AddressBook() {
     }
   };
 
-  const handleSetDefault = async (addressId: string) => {
+  const handleSetDefault = async (addressId: string, type: 'home' | 'work' | 'other') => {
     try {
-      await addressService.setPrimary(addressId);
+      await addressService.setPrimary(addressId, type);
       toast.success("Primary address updated");
       fetchAddresses();
     } catch (error) {
@@ -197,7 +197,7 @@ export function AddressBook() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleSetDefault(address.id)}
+                      onClick={() => handleSetDefault(address.id, address.type as 'home' | 'work' | 'other')}
                       className="w-full"
                     >
                       Set as Default

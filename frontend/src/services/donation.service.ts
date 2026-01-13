@@ -37,7 +37,7 @@ export const donationService = {
         return response.data;
     },
 
-    getSubscriptions: async () => {
+    getSubscriptions: async (): Promise<{ subscriptions: any[] }> => {
         const response = await apiClient.get('/donations/subscriptions');
         return response.data;
     },

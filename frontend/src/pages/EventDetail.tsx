@@ -12,6 +12,9 @@ import {
   Gift,
   CheckCircle2,
   Shield,
+  AlertTriangle,
+  Info,
+  XCircle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -69,6 +72,8 @@ const EventDetail = () => {
         return "success" as const;
       case "completed":
         return "default" as const;
+      case "cancelled":
+        return "destructive" as const;
       default:
         return "default" as const;
     }
@@ -97,7 +102,7 @@ const EventDetail = () => {
                     </Tag>
                   )}
                   <Tag variant={getStatusVariant(eventData.status)} size="sm" className="font-bold uppercase tracking-widest text-[10px]">
-                    {t(`events.${eventData.status}`)}
+                    {eventData.status === 'cancelled' ? 'CANCELLED' : t(`events.${eventData.status}`)}
                   </Tag>
                 </div>
                 <h1 className="text-4xl md:text-6xl font-bold font-playfair leading-tight animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
@@ -107,6 +112,18 @@ const EventDetail = () => {
                   <p className="text-[#D4AF37] text-lg font-medium italic flex items-center gap-2 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
                     <User size={18} /> Katha Vachak: {eventData.kathaVachak}
                   </p>
+                )}
+
+                {eventData.status === 'cancelled' && eventData.cancellationReason && (
+                  <div className="mt-6 flex items-start gap-4 p-5 rounded-2xl bg-red-500/10 border border-red-500/20 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-300">
+                    <AlertTriangle className="h-6 w-6 text-red-400 flex-shrink-0" />
+                    <div className="space-y-1">
+                      <p className="text-red-400 font-bold uppercase tracking-widest text-xs">Event Cancelled</p>
+                      <p className="text-white/90 text-sm font-light leading-relaxed">
+                        Reason: {eventData.cancellationReason}
+                      </p>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -273,7 +290,7 @@ const EventDetail = () => {
                   </div>
 
                   {/* Register Button */}
-                  {showRegistration && eventData.status !== "completed" && (
+                  {showRegistration && (eventData.status === "upcoming" || eventData.status === "ongoing") && (
                     <Button
                       onClick={handleRegister}
                       className="w-full rounded-2xl py-8 text-lg font-bold bg-[#B85C3C] hover:bg-[#2C1810] transition-all duration-500 shadow-xl shadow-[#B85C3C]/20 hover:shadow-[#2C1810]/20 h-auto"
@@ -283,9 +300,34 @@ const EventDetail = () => {
                     </Button>
                   )}
 
+                  {eventData.status === 'cancelled' && (
+                    <div className="space-y-4">
+                      <div className="p-6 rounded-3xl bg-red-50 border border-red-100 text-center">
+                        <XCircle className="h-10 w-10 text-red-500 mx-auto mb-3" />
+                        <h4 className="text-red-900 font-bold">Booking Unavailable</h4>
+                        <p className="text-red-700 text-xs mt-2 font-medium">This gathering has been cancelled.</p>
+                      </div>
+
+                      {!isFree && (
+                        <div className="p-4 rounded-2xl bg-blue-50 border border-blue-100 flex gap-3 items-start">
+                          <Info className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                          <div className="space-y-1">
+                            <p className="text-blue-900 text-xs font-bold uppercase">Refund Policy</p>
+                            <p className="text-blue-700 text-[10px] leading-relaxed">
+                              All registered participants will receive a full refund.
+                              Refunds are processed within 5-7 business days to your original payment method.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {eventData.status === "completed" && (
-                    <div className="p-4 rounded-2xl bg-muted/50 text-center text-muted-foreground font-bold uppercase tracking-widest text-xs">
-                      Event Successfully Completed
+                    <div className="p-6 rounded-3xl bg-muted/30 border border-muted/50 text-center">
+                      <CheckCircle2 className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-50" />
+                      <h4 className="text-muted-foreground font-bold">Event Completed</h4>
+                      <p className="text-muted-foreground/70 text-xs mt-2 font-medium">This gathering has concluded.</p>
                     </div>
                   )}
                 </CardContent>

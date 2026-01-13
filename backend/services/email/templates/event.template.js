@@ -125,9 +125,10 @@ function getEventCancellationEmail({ event, registration, attendeeName, refundDe
         } else if (refundDetails.amount > 0) {
             refundSection = `
                 <div class="info-box">
-                    <strong>Refund Status:</strong><br>
-                    Your refund of ₹${refundDetails.amount?.toFixed(2)} is being processed.<br>
-                    It will be credited to your original payment method within 5-7 business days.
+                    <strong>Refund Status: Initiated</strong><br>
+                    Your refund of ₹${refundDetails.amount?.toFixed(2)} has been initiated.<br>
+                    It will be credited to your original payment method within 5-7 business days.<br>
+                    ${refundDetails.refundId ? `<small style="color: #666;">Reference: ${refundDetails.refundId}</small>` : ''}
                 </div>
             `;
         }
@@ -136,8 +137,14 @@ function getEventCancellationEmail({ event, registration, attendeeName, refundDe
     const content = `
         <h2>Registration Cancelled</h2>
         <p>Hi ${firstName},</p>
-        <p>Your registration for <strong>${event.title}</strong> has been cancelled.</p>
+        <p>This is to inform you that your registration for <strong>${event.title}</strong> has been cancelled.</p>
         
+        ${event.cancellationReason ? `
+        <div class="warning-box">
+            <strong>Reason for Cancellation:</strong><br>
+            ${event.cancellationReason}
+        </div>` : ''}
+
         <div class="info-box">
             <strong>Cancelled Registration Details:</strong><br>
             📅 Event Date: ${eventDate.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}<br>
@@ -148,13 +155,13 @@ function getEventCancellationEmail({ event, registration, attendeeName, refundDe
         
         ${refundSection}
         
-        <p>We're sorry to see you go! If you cancelled by mistake or would like to register again, you can do so from our events page.</p>
+        <p>We're sorry for any inconvenience caused. If you have any questions or would like to browse other events, please visit our website.</p>
         
         <p style="text-align: center;">
             <a href="${FRONTEND_URL}/events" class="button">Browse Other Events</a>
         </p>
         
-        <p class="text-muted">If you have any questions about your cancellation or refund, please contact our support team.</p>
+        <p class="text-muted">For support, please contact us at support@${APP_NAME.toLowerCase().replace(/\s/g, '')}.com</p>
         <p class="text-muted">Best regards,<br>The ${APP_NAME} Team</p>
     `;
 
@@ -164,7 +171,52 @@ function getEventCancellationEmail({ event, registration, attendeeName, refundDe
     };
 }
 
+/**
+ * Event schedule update (postpone/prepone) email
+ */
+function getEventUpdateEmail({ event, attendeeName }) {
+    const firstName = attendeeName ? attendeeName.split(' ')[0] : 'there';
+    const eventDate = new Date(event.startDate || event.date);
+    const dateStr = eventDate.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const locationStr = getLocationString(event.location);
+
+    const content = `
+        <h2>Event Schedule Updated</h2>
+        <p>Hi ${firstName},</p>
+        <p>This is to inform you that the schedule for <strong>${event.title}</strong> has been updated.</p>
+        
+        ${event.updateReason ? `
+        <div class="info-box">
+            <strong>Update Reason:</strong><br>
+            ${event.updateReason}
+        </div>` : ''}
+
+        <div class="success-box">
+            <strong>New Event Schedule:</strong><br>
+            📅 New Date: ${dateStr}<br>
+            📍 Location: ${locationStr}<br>
+            🕒 Time: ${event.startTime || 'Same as before'}
+        </div>
+        
+        <p>Your current registration is still valid for the new date. No action is required from your side.</p>
+        
+        <p>If you are unable to attend on the new date, please contact us for assistance.</p>
+        
+        <p style="text-align: center;">
+            <a href="${FRONTEND_URL}/event/${event.id || ''}" class="button">View Updated Event</a>
+        </p>
+        
+        <p class="text-muted">Best regards,<br>The ${APP_NAME} Team</p>
+    `;
+
+    return {
+        subject: `Update: Schedule Changed for ${event.title}`,
+        html: wrapInTemplate(content, { title: 'Event Update' })
+    };
+}
+
 module.exports = {
     getEventRegistrationEmail,
-    getEventCancellationEmail
+    getEventCancellationEmail,
+    getEventUpdateEmail
 };

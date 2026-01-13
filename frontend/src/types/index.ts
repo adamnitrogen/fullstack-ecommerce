@@ -80,7 +80,7 @@ export interface Event {
   endDate?: string;
   endTime?: string;
   location: { lat?: number; lng?: number; address?: string };
-  status: "upcoming" | "ongoing" | "completed";
+  status: "upcoming" | "ongoing" | "completed" | "cancelled";
   capacity?: number;
   image?: string;
   registrations?: number;
@@ -91,6 +91,10 @@ export interface Event {
   isRegistrationEnabled?: boolean;
   keyHighlights?: string[];
   specialPrivileges?: string[];
+  cancellationStatus?: "CANCELLATION_PENDING" | "CANCELLED";
+  cancelledAt?: string;
+  cancellationReason?: string;
+  cancellationCorrelationId?: string;
 }
 
 export interface Blog {
@@ -507,19 +511,51 @@ export interface RazorpayOrderResponse {
   key_id: string;
 }
 
-export interface OrderNotification {
+export type RefundStatus = 'NOT_APPLICABLE' | 'INITIATED' | 'PROCESSING' | 'SETTLED' | 'FAILED' | 'REVERSED';
+
+export interface EventRefund {
   id: string;
-  order_id: string;
-  admin_id?: string;
-  status: 'unread' | 'read' | 'archived';
+  event_id: string;
+  registration_id: string;
+  payment_id: string;
+  amount: number;
+  status: RefundStatus;
+  gateway_reference?: string;
+  initiated_at?: string;
+  settled_at?: string;
+  failed_at?: string;
+  failure_reason?: string;
+  correlation_id: string;
+}
+
+export interface EventRegistration {
+  id: string;
+  registration_number: string;
+  event_id: string;
+  user_id?: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  amount: number;
+  payment_status: string;
+  status: "pending" | "confirmed" | "cancelled" | "refunded";
   created_at: string;
-  read_at?: string;
-  orders?: {
-    id: string;
-    order_number: string;
-    customer_name: string;
-    total_amount: number;
-    status: string;
-    created_at: string;
-  };
+  updated_at: string;
+  cancellation_reason?: string;
+  cancelled_at?: string;
+  events?: Event;
+  refunds?: EventRefund[];
+}
+
+export interface CancellationJobStatus {
+  id: string;
+  event_id: string;
+  correlation_id: string;
+  status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "FAILED" | "PARTIAL_FAILURE";
+  total_registrations: number;
+  processed_count: number;
+  failed_count: number;
+  batch_size: number;
+  last_processed_at?: string;
+  completed_at?: string;
 }

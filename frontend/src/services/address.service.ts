@@ -21,22 +21,22 @@ interface BackendAddress {
     updatedAt: string;
 }
 
-const transformToCheckoutAddress = (data: BackendAddress): CheckoutAddress => ({
+const transformToCheckoutAddress = (data: any): CheckoutAddress => ({
     id: data.id,
-    user_id: data.userId,
+    user_id: data.user_id || data.userId,
     // Preserve the actual backend type (home/work/other)
     type: data.type || 'other',
-    is_primary: data.isPrimary,
-    full_name: data.label || 'User', // Use label as full_name, fallback to 'User'
-    phone: data.phone || '', // Phone now stored via phone_numbers table
-    address_line1: data.streetAddress,
-    address_line2: data.apartment,
+    is_primary: data.is_primary !== undefined ? data.is_primary : data.isPrimary,
+    full_name: data.full_name || data.label || 'User', // Handle both field names
+    phone: data.phone || '', // Unified phone field
+    address_line1: data.address_line1 || data.street_address || data.streetAddress, // Handle all variations
+    address_line2: data.address_line2 || data.apartment,
     city: data.city,
     state: data.state,
-    postal_code: data.postalCode,
+    postal_code: data.postal_code || data.postalCode,
     country: data.country,
-    created_at: data.createdAt,
-    updated_at: data.updatedAt
+    created_at: data.created_at || data.createdAt,
+    updated_at: data.updated_at || data.updatedAt
 });
 
 // Helper to transform CreateAddressDto to backend payload
@@ -99,8 +99,9 @@ export const addressService = {
     /**
      * Set an address as primary
      */
-    setPrimary: async (id: string): Promise<CheckoutAddress> => {
-        const response = await apiClient.post(`/addresses/${id}/set-primary`);
+    setPrimary: async (id: string, type: 'home' | 'work' | 'other'): Promise<CheckoutAddress> => {
+        console.log(`[AddressService:setPrimary] id=${id}, type=${type}`);
+        const response = await apiClient.post(`/addresses/${id}/set-primary`, { type });
         return transformToCheckoutAddress(response.data.address);
     },
 };

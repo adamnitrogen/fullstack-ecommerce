@@ -245,46 +245,37 @@ router.post('/:id/set-primary', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.userId;
         const { id } = req.params;
+        let { type } = req.body; // Expect type to be passed from frontend
+        const correlationId = req.headers['x-correlation-id'] || require('crypto').randomUUID();
 
-        // Verify ownership
-        const { data: existingAddress } = await supabase
-            .from('addresses')
-            .select('id')
-            .eq('id', id)
-            .eq('user_id', userId)
-            .single();
+        logger.info({ id, type, userId }, '[AddressRoute] Set primary triggered');
 
-        if (!existingAddress) {
-            return res.status(404).json({ error: 'Address not found' });
+        if (!type) {
+            logger.warn({ id, userId }, '[AddressRoute] Type missing in set-primary request, fetching from DB');
+            const { data: address, error: fetchError } = await supabase
+                .from('addresses')
+                .select('type')
+                .eq('id', id)
+                .eq('user_id', userId)
+                .single();
+
+            if (fetchError || !address) {
+                logger.error({ err: fetchError, id, userId }, '[AddressRoute] Failed to fetch address for type lookup');
+                return res.status(404).json({ error: 'Address not found' });
+            }
+            type = address.type;
+            logger.info({ id, type }, '[AddressRoute] Successfully looked up address type');
         }
 
-        // First, unset all other addresses as primary for this user
-        const { error: unsetError } = await supabase
-            .from('addresses')
-            .update({ is_primary: false })
-            .eq('user_id', userId)
-            .neq('id', id);
-
-        if (unsetError) {
-            logger.error({ err: unsetError }, 'Error unsetting other primary addresses:');
-        }
-
-        // Now set this address as primary
-        const { data, error } = await supabase
-            .from('addresses')
-            .update({ is_primary: true })
-            .eq('id', id)
-            .select()
-            .single();
-
-        if (error) throw error;
+        const { setPrimaryAddress, formatAddress } = require('../services/address.service');
+        const updatedAddress = await setPrimaryAddress(id, userId, type, correlationId);
 
         res.json({
             message: 'Primary address updated successfully',
-            address: data
+            address: formatAddress(updatedAddress)
         });
     } catch (error) {
-        logger.error({ err: error }, 'Error setting primary address:');
+        logger.error({ err: error.message, id: req.params.id }, 'Error setting primary address:');
         res.status(500).json({ error: 'Failed to set primary address' });
     }
 });

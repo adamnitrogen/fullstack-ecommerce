@@ -12,6 +12,11 @@ export interface EventRegistration {
     payment_status: 'pending' | 'paid' | 'failed' | 'free';
     status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
     created_at: string;
+    cancellationReason?: string;
+    refunds?: Array<{
+        status: string;
+        amount: number;
+    }>;
     events?: {
         id: string;
         title: string;
@@ -22,14 +27,19 @@ export interface EventRegistration {
     };
 }
 
+export interface GetRegistrationsResponse {
+    registrations: EventRegistration[];
+    total: number;
+}
+
 export const eventRegistrationService = {
-    getMyRegistrations: async (): Promise<EventRegistration[]> => {
-        const response = await apiClient.get('/event-registrations/my');
+    getMyRegistrations: async ({ page = 1, limit = 5 } = {}): Promise<GetRegistrationsResponse> => {
+        const response = await apiClient.get('/event-registrations/my', { params: { page, limit } });
         return response.data;
     },
 
-    cancelRegistration: async (registrationId: string) => {
-        const response = await apiClient.post('/event-registrations/cancel', { registrationId });
+    cancelRegistration: async ({ registrationId, reason }: { registrationId: string; reason: string }) => {
+        const response = await apiClient.post('/event-registrations/cancel', { registrationId, reason });
         return response.data;
     }
 };

@@ -17,6 +17,11 @@ router.post('/create-order', optionalAuth, async (req, res) => {
         // Log the full error for debugging
         logger.error({ err: error }, 'Error creating event registration order');
 
+        // Check for cancelled event
+        if (error.message && error.message.includes('cancelled')) {
+            return res.status(400).json({ error: error.message });
+        }
+
         // Check for Row-Level Security policy violation
         if (error.message && error.message.includes('row-level security policy')) {
             logger.error('RLS Policy Violation.');
@@ -66,7 +71,9 @@ router.post('/verify-payment', optionalAuth, async (req, res) => {
  */
 router.get('/my', authenticateToken, async (req, res) => {
     try {
-        const data = await EventRegistrationService.getUserRegistrations(req.user.id);
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 5;
+        const data = await EventRegistrationService.getUserRegistrations(req.user.id, { page, limit });
         res.json(data);
     } catch (error) {
         logger.error({ err: error }, 'Error fetching user registrations:');
@@ -97,7 +104,8 @@ router.get('/:id', optionalAuth, async (req, res) => {
  */
 router.post('/cancel', authenticateToken, async (req, res) => {
     try {
-        const result = await EventRegistrationService.cancelRegistration(req.user.id, req.body.registrationId);
+        const { registrationId, reason } = req.body;
+        const result = await EventRegistrationService.cancelRegistration(req.user.id, registrationId, reason);
         res.json(result);
     } catch (error) {
         logger.error({ err: error }, 'Error cancelling registration');

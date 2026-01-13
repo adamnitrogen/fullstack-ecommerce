@@ -7,7 +7,7 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Star, Plus, Pencil, Trash2, Truck, CreditCard, Package, ChevronRight, Home, Briefcase, Globe, Phone } from "lucide-react";
+import { MapPin, Star, Plus, Pencil, Trash2, Truck, CreditCard, Package, ChevronRight, Home, Briefcase, Globe, Phone, Loader2 } from "lucide-react";
 import type { CheckoutAddress, CreateAddressDto } from "@/types";
 import { useState } from "react";
 import AddressFormModal from "./AddressFormModal";
@@ -40,6 +40,7 @@ export default function AddressManager({
     const [showForm, setShowForm] = useState(false);
     const [editingAddress, setEditingAddress] = useState<CheckoutAddress | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [settingPrimaryId, setSettingPrimaryId] = useState<string | null>(null);
 
     const getTypeIcon = (type: string) => {
         switch (type) {
@@ -68,6 +69,15 @@ export default function AddressManager({
     const handleCloseForm = () => {
         setShowForm(false);
         setEditingAddress(null);
+    };
+
+    const handleSetPrimary = async (id: string) => {
+        try {
+            setSettingPrimaryId(id);
+            await onSetPrimary(id);
+        } finally {
+            setSettingPrimaryId(null);
+        }
     };
 
     return (
@@ -117,7 +127,7 @@ export default function AddressManager({
                                 <div
                                     key={address.id}
                                     className={`group border border-border/60 rounded-[2rem] p-6 relative transition-all duration-300 shadow-soft hover:shadow-elevated hover:bg-white/80 ${address.is_primary ? 'ring-2 ring-[#B85C3C]/20 border-[#B85C3C]/40 bg-white shadow-md' : 'bg-white/60'
-                                        }`}
+                                        } ${settingPrimaryId === address.id ? 'animate-pulse bg-[#B85C3C]/5 border-[#B85C3C]/30' : ''}`}
                                 >
                                     {/* Action buttons in top-right corner */}
                                     <div className="absolute top-4 right-4 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -126,6 +136,7 @@ export default function AddressManager({
                                             size="icon"
                                             className="h-9 w-9 rounded-full bg-white/80 border border-border/40 hover:bg-[#B85C3C] hover:text-white transition-all shadow-sm"
                                             onClick={() => handleEdit(address)}
+                                            disabled={!!settingPrimaryId}
                                         >
                                             <Pencil className="h-4 w-4" />
                                         </Button>
@@ -134,6 +145,7 @@ export default function AddressManager({
                                             size="icon"
                                             className="h-9 w-9 rounded-full bg-white/80 border border-border/40 hover:bg-red-500 hover:text-white transition-all shadow-sm"
                                             onClick={() => setDeletingId(address.id)}
+                                            disabled={!!settingPrimaryId}
                                         >
                                             <Trash2 className="h-4 w-4" />
                                         </Button>
@@ -179,13 +191,18 @@ export default function AddressManager({
                                             variant="ghost"
                                             size="sm"
                                             className="w-full justify-between items-center rounded-2xl bg-[#2C1810]/5 hover:bg-[#B85C3C] hover:text-white group/btn transition-all font-bold text-[10px] uppercase tracking-widest h-10 px-4"
-                                            onClick={() => onSetPrimary(address.id)}
+                                            onClick={() => handleSetPrimary(address.id)}
+                                            disabled={!!settingPrimaryId}
                                         >
                                             <div className="flex items-center gap-2">
-                                                <Star className="h-3.5 w-3.5 group-hover/btn:fill-current" />
-                                                Set as Primary
+                                                {settingPrimaryId === address.id ? (
+                                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                ) : (
+                                                    <Star className="h-3.5 w-3.5 group-hover/btn:fill-current" />
+                                                )}
+                                                {settingPrimaryId === address.id ? 'Sanctifying...' : 'Set as Primary'}
                                             </div>
-                                            <ChevronRight className="h-3.5 w-3.5" />
+                                            <ChevronRight className={`h-3.5 w-3.5 ${settingPrimaryId === address.id ? 'opacity-0' : ''}`} />
                                         </Button>
                                     )}
                                     {address.is_primary && (

@@ -170,6 +170,7 @@ app.use('/api/bank-details', bankDetailsRoutes);
 app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/managers', managerRoutes);
 app.use('/api/contact', require('./routes/contact.routes'));
+app.use('/api/admin/events', require('./routes/admin-event.routes'));
 app.use('/api/admin/alerts', require('./routes/admin-alert.routes'));
 app.use('/api/reviews', require('./routes/review.routes'));
 app.use('/api/comments', require('./routes/comments.routes'));

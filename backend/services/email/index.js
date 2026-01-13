@@ -20,7 +20,7 @@ const SmtpProvider = require('./providers/smtp.provider');
 // Templates
 const { getRegistrationEmail, getEmailVerificationEmail, getEmailConfirmationEmail } = require('./templates/registration.template');
 const { getOrderConfirmationEmail, getOrderStatusUpdateEmail } = require('./templates/order.template');
-const { getEventRegistrationEmail, getEventCancellationEmail } = require('./templates/event.template');
+const { getEventRegistrationEmail, getEventCancellationEmail, getEventUpdateEmail } = require('./templates/event.template');
 const { getDonationReceiptEmail, getSubscriptionConfirmationEmail, getSubscriptionCancellationEmail } = require('./templates/donation.template');
 const { getContactFormEmail, getContactAutoReplyEmail } = require('./templates/contact.template');
 
@@ -83,6 +83,9 @@ class EmailService {
 
             case EmailEventTypes.EVENT_CANCELLATION:
                 return getEventCancellationEmail(data);
+
+            case EmailEventTypes.EVENT_UPDATE:
+                return getEventUpdateEmail(data);
 
             case EmailEventTypes.DONATION_RECEIPT:
                 return getDonationReceiptEmail(data);
@@ -294,6 +297,13 @@ class EmailService {
      */
     async sendEventCancellationEmail(to, { event, registration, attendeeName, refundDetails = null }, userId = null) {
         return this.send(EmailEventTypes.EVENT_CANCELLATION, to, { event, registration, attendeeName, refundDetails }, { userId, referenceId: registration.id });
+    }
+
+    /**
+     * Send event schedule update email
+     */
+    async sendEventUpdateEmail(to, { event, attendeeName }, userId = null) {
+        return this.send(EmailEventTypes.EVENT_UPDATE, to, { event, attendeeName }, { userId, referenceId: event.id });
     }
 
     /**

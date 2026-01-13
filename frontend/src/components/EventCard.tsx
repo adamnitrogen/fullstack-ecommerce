@@ -42,6 +42,8 @@ export const EventCard = ({
         return "success" as const;
       case "completed":
         return "default" as const;
+      case "cancelled":
+        return "destructive" as const;
       default:
         return "default" as const;
     }
@@ -80,7 +82,9 @@ export const EventCard = ({
           <div className="absolute top-4 right-4 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
             <span className={cn(
               "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg backdrop-blur-md",
-              event.status === "ongoing" ? "bg-green-500 text-white" : "bg-[#B85C3C] text-white"
+              event.status === "ongoing" ? "bg-green-500 text-white" :
+                event.status === "cancelled" ? "bg-destructive text-destructive-foreground" :
+                  "bg-[#B85C3C] text-white"
             )}>
               {t(`events.${event.status}`)}
             </span>
@@ -140,7 +144,20 @@ export const EventCard = ({
         )}
       </CardContent>
 
-      {!isCompleted && event.isRegistrationEnabled !== false && (
+      {/* Show Cancelled button for cancelled events */}
+      {event.status === 'cancelled' && (
+        <CardFooter className="p-8 pt-0">
+          <Button
+            disabled
+            className="w-full h-12 rounded-full bg-red-100 text-red-700 font-bold uppercase tracking-widest text-xs shadow-none cursor-not-allowed border-none"
+          >
+            Event Cancelled
+          </Button>
+        </CardFooter>
+      )}
+
+      {/* Show Register button for upcoming and ongoing events */}
+      {(event.status === 'upcoming' || event.status === 'ongoing') && event.isRegistrationEnabled !== false && (
         <CardFooter className="p-8 pt-0">
           <Button
             className="w-full h-12 rounded-full bg-[#2C1810] hover:bg-[#B85C3C] text-white font-bold uppercase tracking-widest text-xs shadow-lg hover:shadow-xl transition-all duration-300 border-none"

@@ -13,6 +13,7 @@ import AddressManager from "@/components/profile/AddressManager";
 import DeleteAccountSection from "@/components/profile/DeleteAccountSection";
 import DonationManager from "@/components/profile/DonationManager";
 import { UpdatePasswordDialog } from "@/components/profile/UpdatePasswordDialog";
+import { EventCancellationDialog } from "@/components/admin/EventCancellationDialog";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
@@ -45,6 +46,8 @@ export default function Profile() {
   const [selectedRegId, setSelectedRegId] = useState<string | null>(null);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [page, setPage] = useState(1);
+  const LIMIT = 5;
 
   // Fetch profile data
   const { data: profile, isLoading } = useQuery<ProfileData>({
@@ -54,14 +57,17 @@ export default function Profile() {
   });
 
   // Fetch event registrations
-  const { data: eventRegistrations = [], isLoading: registrationsLoading } = useQuery({
-    queryKey: ["myEventRegistrations"],
-    queryFn: eventRegistrationService.getMyRegistrations,
+  const { data: registrationsData, isLoading: registrationsLoading } = useQuery({
+    queryKey: ["myEventRegistrations", page],
+    queryFn: () => eventRegistrationService.getMyRegistrations({ page, limit: LIMIT }),
     enabled: !!user,
   });
 
+  const eventRegistrations = registrationsData?.registrations || [];
+  const totalRegistrations = registrationsData?.total || 0;
+
   // Fetch subscriptions for visibility check
-  const { data: subscriptionsData } = useQuery({
+  const { data: subscriptionsData } = useQuery<{ subscriptions: any[] }>({
     queryKey: ["mySubscriptions"],
     queryFn: donationService.getSubscriptions,
     enabled: !!user,
@@ -70,12 +76,12 @@ export default function Profile() {
 
   // Cancel registration mutation
   const cancelRegistrationMutation = useMutation({
-    mutationFn: eventRegistrationService.cancelRegistration,
+    mutationFn: (vars: { registrationId: string; reason: string }) => eventRegistrationService.cancelRegistration(vars),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["myEventRegistrations"] });
       toast({
         title: "Registration Cancelled",
-        description: "Your event registration has been cancelled.",
+        description: "Your event registration has been cancelled successfully.",
       });
       setSelectedRegId(null);
     },
@@ -88,15 +94,15 @@ export default function Profile() {
     },
   });
 
-  const confirmCancelRegistration = () => {
+  const confirmCancelRegistration = async (reason: string): Promise<void> => {
     if (selectedRegId) {
-      cancelRegistrationMutation.mutate(selectedRegId);
+      await cancelRegistrationMutation.mutateAsync({ registrationId: selectedRegId, reason });
     }
   };
 
   // Update profile mutation
   const updateProfileMutation = useMutation({
-    mutationFn: profileService.updateProfile,
+    mutationFn: (data: UpdateProfileData) => profileService.updateProfile(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       toast({
@@ -115,7 +121,7 @@ export default function Profile() {
 
   // Avatar upload mutation
   const uploadAvatarMutation = useMutation({
-    mutationFn: profileService.uploadAvatar,
+    mutationFn: (file: File) => profileService.uploadAvatar(file),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       toast({
@@ -155,7 +161,6 @@ export default function Profile() {
   const addAddressMutation = useMutation({
     mutationFn: addressService.createAddress,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
       toast({
         title: "Success",
         description: "Address added successfully",
@@ -168,13 +173,16 @@ export default function Profile() {
         variant: "destructive",
       });
     },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["addresses"] });
+    },
   });
 
   const updateAddressMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: CreateAddressDto }) =>
       addressService.updateAddress(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
       toast({
         title: "Success",
         description: "Address updated successfully",
@@ -187,12 +195,15 @@ export default function Profile() {
         variant: "destructive",
       });
     },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["addresses"] });
+    },
   });
 
   const deleteAddressMutation = useMutation({
     mutationFn: addressService.deleteAddress,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
       toast({
         title: "Success",
         description: "Address deleted successfully",
@@ -205,12 +216,16 @@ export default function Profile() {
         variant: "destructive",
       });
     },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["addresses"] });
+    },
   });
 
   const setPrimaryMutation = useMutation({
-    mutationFn: addressService.setPrimary,
+    mutationFn: ({ id, type }: { id: string; type: 'home' | 'work' | 'other' }) =>
+      addressService.setPrimary(id, type),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
       toast({
         title: "Success",
         description: "Primary address updated",
@@ -222,6 +237,11 @@ export default function Profile() {
         description: getErrorMessage(error, "Failed to set primary address"),
         variant: "destructive",
       });
+    },
+    onSettled: () => {
+      // Always refetch after error or success to guarantee we're in sync with the server
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["addresses"] });
     },
   });
 
@@ -260,7 +280,9 @@ export default function Profile() {
   // Helper functions for mutations to match the new structure's expectations
   const handleAvatarUpdate = (file: File) => uploadAvatarMutation.mutate(file);
   const handleAvatarDelete = () => deleteAvatarMutation.mutate();
-  const handleUpdateProfile = (data: UpdateProfileData) => updateProfileMutation.mutateAsync(data);
+  const handleUpdateProfile = async (data: UpdateProfileData) => {
+    await updateProfileMutation.mutateAsync(data);
+  };
   const setShowPasswordDialog = (open: boolean) => setPasswordDialogOpen(open);
 
   return (
@@ -350,7 +372,16 @@ export default function Profile() {
                       await deleteAddressMutation.mutateAsync(id);
                     }}
                     onSetPrimary={async (id) => {
-                      await setPrimaryMutation.mutateAsync(id);
+                      const addr = profile.addresses.find(a => a.id === id);
+                      if (addr) {
+                        console.log('[Profile:onSetPrimary] Setting primary for:', addr.id, 'type:', addr.type);
+                        const type = (addr.type === 'home' || addr.type === 'work' || addr.type === 'other')
+                          ? addr.type as 'home' | 'work' | 'other'
+                          : 'other';
+                        await setPrimaryMutation.mutateAsync({ id, type });
+                      } else {
+                        console.warn('[Profile:onSetPrimary] Address not found for ID:', id);
+                      }
                     }}
                   />
                 </div>
@@ -422,24 +453,43 @@ export default function Profile() {
                             </div>
 
                             <div className="flex flex-wrap items-center gap-2 mt-2">
-                              <Badge
-                                variant="outline"
-                                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border-none shadow-sm ${reg.status === 'cancelled' ? 'bg-red-50 text-red-600' :
-                                  reg.payment_status === 'paid' ? 'bg-green-50 text-green-700' :
+                              {reg.status === 'cancelled' ? (
+                                <Badge variant="destructive" className="text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-sm">
+                                  CANCELLED
+                                </Badge>
+                              ) : (
+                                <Badge
+                                  variant="outline"
+                                  className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border-none shadow-sm ${reg.payment_status === 'paid' ? 'bg-green-50 text-green-700' :
                                     reg.payment_status === 'free' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'
-                                  }`}
-                              >
-                                {reg.status === 'cancelled' ? 'CANCELLED' :
-                                  reg.payment_status === 'paid'
+                                    }`}
+                                >
+                                  {reg.payment_status === 'paid'
                                     ? `₹${reg.amount} PAID`
                                     : reg.payment_status === 'free'
                                       ? 'COMPLIMENTARY'
                                       : 'PENDING'}
-                              </Badge>
+                                </Badge>
+                              )}
+
+                              {reg.status === 'cancelled' && reg.refunds && reg.refunds.length > 0 && (
+                                <Badge variant="outline" className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-sm ${reg.refunds[0].status === 'SETTLED' ? 'bg-green-100 text-green-800' :
+                                  reg.refunds[0].status === 'FAILED' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
+                                  }`}>
+                                  Refund: {reg.refunds[0].status}
+                                </Badge>
+                              )}
+
                               <Badge variant="secondary" className="text-[10px] font-mono bg-muted/50 text-muted-foreground">
                                 #{reg.registration_number}
                               </Badge>
                             </div>
+
+                            {reg.cancellationReason && (
+                              <p className="text-[10px] text-muted-foreground italic mt-2 line-clamp-2">
+                                Reason: {reg.cancellationReason}
+                              </p>
+                            )}
 
                             <div className="flex items-center gap-3 pt-2">
                               <Button
@@ -489,6 +539,35 @@ export default function Profile() {
                   )}
                 </CardContent>
               </Card>
+
+              {/* Pagination Controls */}
+              {totalRegistrations > LIMIT && (
+                <div className="flex items-center justify-between mt-6 px-2">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {(page - 1) * LIMIT + 1} to {Math.min(page * LIMIT, totalRegistrations)} of {totalRegistrations} registrations
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="rounded-full"
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(p => p + 1)}
+                      disabled={page * LIMIT >= totalRegistrations}
+                      className="rounded-full"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </TabsContent>
 
             {hasSubscriptions && (
@@ -525,25 +604,16 @@ export default function Profile() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={!!selectedRegId} onOpenChange={(open) => !open && setSelectedRegId(null)}>
-        <AlertDialogContent className="rounded-[2rem] border-none shadow-elevated p-8">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-2xl font-playfair text-[#2C1810]">Cancel Registration?</AlertDialogTitle>
-            <AlertDialogDescription className="text-base pt-2">
-              Are you sure you want to cancel your attendance? This will free up space for another seeker.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="pt-6">
-            <AlertDialogCancel className="rounded-full px-8">Stay Registered</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmCancelRegistration}
-              className="bg-[#2C1810] text-white hover:bg-[#B85C3C] rounded-full px-8"
-            >
-              {cancelRegistrationMutation.isPending ? 'Processing...' : 'Yes, Cancel'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <EventCancellationDialog
+        isOpen={!!selectedRegId}
+        onClose={() => setSelectedRegId(null)}
+        onConfirm={confirmCancelRegistration}
+        title="Cancel Registration?"
+        description="Are you sure you want to cancel your attendance? A reason is required to free up space for another seeker."
+        warningText="This action is irreversible. For free events, this happens immediately. For paid events, please contact support as automated online cancellation is disabled for security."
+        confirmLabel="Confirm Cancellation"
+        isLoading={cancelRegistrationMutation.isPending}
+      />
     </div>
   );
 }
