@@ -48,4 +48,10 @@ export const cartService = {
     clearCart: async (): Promise<void> => {
         await apiClient.delete('/cart');
     },
+
+    // Get dynamic delivery settings
+    getDeliverySettings: async (): Promise<{ delivery_threshold: number; delivery_charge: number }> => {
+        const response = await apiClient.get('/settings/delivery');
+        return response.data;
+    },
 };

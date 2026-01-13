@@ -62,9 +62,10 @@ const ContactManagement = lazy(() => import("./pages/admin/ContactManagement"));
 const ContactMessages = lazy(() => import("./pages/admin/ContactMessages"));
 const ContactMessageDetail = lazy(() => import("./pages/admin/ContactMessageDetail"));
 const AboutUsManagement = lazy(() => import("./pages/admin/AboutUsManagement"));
-const CouponsManagement = lazy(() => import("./pages/admin/CouponsManagement"));
+
 const OrdersManagement = lazy(() => import("./pages/admin/OrdersManagement"));
 const OrderDetail = lazy(() => import("./pages/admin/OrderDetail"));
+const SettingsManagement = lazy(() => import("./pages/admin/SettingsManagement"));
 
 const queryClient = new QueryClient();
 
@@ -226,7 +227,8 @@ const App = () => {
                   <Route path="contact-messages" element={<ContactMessages />} />
                   <Route path="contact-messages/:id" element={<ContactMessageDetail />} />
                   <Route path="about-us" element={<AboutUsManagement />} />
-                  <Route path="coupons" element={<CouponsManagement />} />
+
+                  <Route path="settings" element={<SettingsManagement />} />
                 </Route>
 
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

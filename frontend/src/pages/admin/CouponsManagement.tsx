@@ -131,14 +131,8 @@ const CouponsManagement = () => {
     };
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold">Coupons Management</h1>
-                    <p className="text-muted-foreground mt-2">
-                        Create and manage discount coupons for your store
-                    </p>
-                </div>
+        <div className="space-y-4">
+            <div className="flex justify-end">
                 <Button onClick={handleCreate}>
                     <Plus className="mr-2 h-4 w-4" />
                     Create Coupon

@@ -145,55 +145,64 @@ export function AddressSelector({ type, selectedAddressId, onSelect }: AddressSe
             }}>
                 <div className="grid gap-3">
                     {addresses.map((address) => (
-                        <Card key={address.id} className={`relative ${selectedAddressId === address.id ? "border-primary" : ""}`}>
-                            <CardContent className="p-4">
-                                <div className="flex items-start gap-3">
-                                    <RadioGroupItem value={address.id} id={`${type}-${address.id}`} className="mt-1" />
-                                    <div className="flex-1">
-                                        <Label htmlFor={`${type}-${address.id}`} className="cursor-pointer block">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <MapPin className="h-4 w-4" />
-                                                <span className="font-semibold">{address.full_name}</span>
-                                                {address.is_primary && (
-                                                    <Badge variant="default" className="text-xs">Primary</Badge>
-                                                )}
-                                                <Badge variant="outline" className="text-xs capitalize">{address.type}</Badge>
-                                            </div>
-                                            <p className="text-sm text-muted-foreground">
-                                                {address.address_line1}
-                                                {address.address_line2 && `, ${address.address_line2}`}
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {address.city}, {address.state} - {address.postal_code}
-                                            </p>
-                                            <p className="text-sm text-muted-foreground mt-1">
-                                                Phone: {address.phone}
-                                            </p>
-                                        </Label>
+                        <div
+                            key={address.id}
+                            onClick={() => onSelect(address)}
+                            className={`
+                                relative p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 group
+                                ${selectedAddressId === address.id
+                                    ? "border-primary bg-primary/5 shadow-sm"
+                                    : "border-border/40 hover:border-primary/50 hover:bg-muted/30"
+                                }
+                            `}
+                        >
+                            <div className="flex items-start gap-3">
+                                <RadioGroupItem
+                                    value={address.id}
+                                    id={`${type}-${address.id}`}
+                                    className="mt-1 data-[state=checked]:border-primary data-[state=checked]:text-primary"
+                                />
+                                <div className="flex-1 space-y-1">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-bold text-base text-foreground">{address.full_name}</span>
+                                            {address.is_primary && (
+                                                <Badge variant="default" className="h-5 px-1.5 text-[10px] bg-primary/80 hover:bg-primary">Primary</Badge>
+                                            )}
+                                            <Badge variant="outline" className="h-5 px-1.5 text-[10px] capitalize border-primary/20 text-primary">{address.type}</Badge>
+                                        </div>
                                     </div>
 
-                                    {/* Edit/Delete Actions */}
-                                    <div className="flex flex-col gap-2 ml-2">
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8 text-muted-foreground hover:text-primary"
-                                            onClick={(e) => handleEdit(address, e)}
-                                        >
-                                            <Pencil className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                            onClick={(e) => handleDeleteClick(address.id, e)}
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
+                                    <div className="text-sm text-muted-foreground leading-relaxed pr-8">
+                                        <p>{address.address_line1}{address.address_line2 && `, ${address.address_line2}`}</p>
+                                        <p>{address.city}, {address.state} - {address.postal_code}</p>
+                                        <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-foreground/70">
+                                            Phone: <span className="text-foreground">{address.phone}</span>
+                                        </p>
                                     </div>
                                 </div>
-                            </CardContent>
-                        </Card>
+
+                                {/* Actions - Absolute positioned for cleaner layout */}
+                                <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 rounded-full bg-background/80 backdrop-blur-sm border border-border/50 hover:bg-white hover:text-primary shadow-sm"
+                                        onClick={(e) => handleEdit(address, e)}
+                                    >
+                                        <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 rounded-full bg-background/80 backdrop-blur-sm border border-border/50 hover:bg-white hover:text-destructive shadow-sm"
+                                        onClick={(e) => handleDeleteClick(address.id, e)}
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
                     ))}
 
                     <Button
@@ -203,7 +212,7 @@ export function AddressSelector({ type, selectedAddressId, onSelect }: AddressSe
                         onClick={() => setDialogOpen(true)}
                     >
                         <Plus className="h-4 w-4 mr-2" />
-                        Add New {type === 'shipping' ? 'Shipping' : 'Billing'} Address
+                        Add Address
                     </Button>
                 </div>
             </RadioGroup>

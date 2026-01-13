@@ -5,10 +5,9 @@ import { donationService } from "@/services/donation.service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Heart, ShieldCheck, Lock } from "lucide-react";
+import { Heart, ShieldCheck, Lock, Gift, CalendarHeart } from "lucide-react";
 import { PhoneInput } from "@/components/ui/phone-input";
 import {
     AlertDialog,
@@ -21,6 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { getErrorMessage } from "@/lib/errorUtils";
+import { cn } from "@/lib/utils";
 
 export const DonationForm = () => {
     const { t } = useTranslation();
@@ -90,7 +90,7 @@ export const DonationForm = () => {
             setStatusDialog({
                 open: true,
                 title: "Missing Details",
-                message: "Please fill in your details.",
+                message: "Please fill in all your details to proceed.",
                 type: "error"
             });
             return;
@@ -113,16 +113,15 @@ export const DonationForm = () => {
                     key: orderData.key_id,
                     amount: orderData.amount,
                     currency: orderData.currency,
-                    name: "Merigaumata Donation",
-                    description: `Ref: ${orderData.donation_ref}`,
+                    name: "Meri Gau Mata",
+                    description: `Donation Ref: ${orderData.donation_ref}`,
                     order_id: orderData.order_id,
                     handler: async (response: {
                         razorpay_order_id: string;
                         razorpay_payment_id: string;
                         razorpay_signature: string;
                     }) => {
-                        // Show loading overlay during verification
-                        setLoadingMessage("Verifying your donation...");
+                        setLoadingMessage("Verifying your generous donation...");
                         setLoading(true);
                         try {
                             await donationService.verifyPayment({
@@ -136,7 +135,7 @@ export const DonationForm = () => {
                             setLoadingMessage("");
                             setStatusDialog({
                                 open: true,
-                                title: "Thank You!",
+                                title: "Thank You! 🙏",
                                 message: "Your donation has been received successfully. A receipt has been sent to your email.",
                                 type: "success"
                             });
@@ -174,7 +173,7 @@ export const DonationForm = () => {
                         type: "error"
                     });
                 });
-                setLoading(false); // Stop button loading, popup is open
+                setLoading(false);
                 rzp.open();
             } else {
                 // Monthly Subscription Flow
@@ -189,15 +188,13 @@ export const DonationForm = () => {
                 const options = {
                     key: subscriptionData.key_id,
                     subscription_id: subscriptionData.subscription_id,
-                    name: "Cow Welfare Donation",
-                    description: `Monthly Donation: ₹${finalAmount}`,
+                    name: "Meri Gau Mata - Monthly",
+                    description: `Monthly Support: ₹${finalAmount}`,
                     handler: async (_response: unknown) => {
-                        // Subscription created successfully.
-                        // Webhook will handle the actual payment success and DB update for the first charge.
                         setStatusDialog({
                             open: true,
                             title: "🎉 Subscription Started!",
-                            message: "Your monthly donation has been set up successfully! Thank you for your sustained support. You can view, pause, or cancel your subscription anytime from your Profile → Donations tab.",
+                            message: "Your monthly donation has been set up successfully! Thank you for your sustained support.",
                             type: "success"
                         });
                         setAmount("");
@@ -222,7 +219,7 @@ export const DonationForm = () => {
                         type: "error"
                     });
                 });
-                setLoading(false); // Stop button loading, popup is open
+                setLoading(false);
                 rzp.open();
             }
         } catch (error: unknown) {
@@ -237,120 +234,177 @@ export const DonationForm = () => {
         }
     };
 
+    const amounts = [
+        { value: "500", label: "₹500", desc: "Feed a cow for a day" },
+        { value: "2100", label: "₹2,100", desc: "Medical care kit", popular: true },
+        { value: "5100", label: "₹5,100", desc: "Sponsor a week of fodder" }
+    ];
+
     return (
         <>
-            {/* Full-page loading overlay */}
             <LoadingOverlay isLoading={loading && !!loadingMessage} message={loadingMessage} />
 
-            <div className="w-full max-w-2xl mx-auto">
-                <Card>
-                    <CardContent className="p-6 space-y-6">
-                        <div className="text-center space-y-2">
-                            <Heart className="w-12 h-12 text-primary mx-auto" />
-                            <h2 className="text-2xl font-bold">Make a Donation</h2>
-                            <p className="text-muted-foreground">Your contribution changes lives.</p>
-                        </div>
+            <Card className="border-none shadow-xl bg-card/50 backdrop-blur-sm overflow-hidden">
+                <CardHeader className="text-center pb-2 pt-8 bg-gradient-to-b from-primary/5 to-transparent">
+                    <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4 text-primary">
+                        <Heart className="w-8 h-8 fill-current animate-pulse duration-[2000ms]" />
+                    </div>
+                    <CardTitle className="text-3xl font-bold">Make a Donation</CardTitle>
+                    <p className="text-muted-foreground max-w-sm mx-auto">
+                        Your small contribution can save a life today.
+                    </p>
+                </CardHeader>
 
-                        <Tabs value={donationType} onValueChange={(v) => setDonationType(v as "one_time" | "monthly")}>
-                            <TabsList className="grid w-full grid-cols-2">
-                                <TabsTrigger value="one_time">One-Time</TabsTrigger>
-                                <TabsTrigger value="monthly">Monthly</TabsTrigger>
-                            </TabsList>
-                        </Tabs>
+                <CardContent className="p-4 sm:p-8 space-y-8">
+                    <Tabs value={donationType} onValueChange={(v) => setDonationType(v as "one_time" | "monthly")} className="w-full">
+                        <TabsList className="grid w-full grid-cols-2 p-1.5 h-auto bg-muted/60 rounded-xl">
+                            <TabsTrigger
+                                value="one_time"
+                                className="data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm h-10 rounded-lg transition-all"
+                            >
+                                <Gift className="w-4 h-4 mr-2" />
+                                One-Time
+                            </TabsTrigger>
+                            <TabsTrigger
+                                value="monthly"
+                                className="data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm h-10 rounded-lg transition-all"
+                            >
+                                <CalendarHeart className="w-4 h-4 mr-2" />
+                                Monthly
+                            </TabsTrigger>
+                        </TabsList>
 
-                        <div className="space-y-4">
-                            <Label>Select Amount</Label>
-                            <div className="grid grid-cols-3 gap-3">
-                                {["500", "1000", "5000"].map((val) => (
-                                    <Button
-                                        key={val}
-                                        variant={amount === val ? "default" : "outline"}
-                                        onClick={() => handleAmountSelect(val)}
-                                        className="h-12 text-lg"
+                        <div className="mt-6 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-base font-medium">Select Amount</Label>
+                                {donationType === "monthly" && (
+                                    <span className="text-xs text-primary bg-primary/10 px-2 py-1 rounded-full font-medium">
+                                        Recurring monthly
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                {amounts.map((opt) => (
+                                    <button
+                                        key={opt.value}
+                                        onClick={() => handleAmountSelect(opt.value)}
+                                        className={cn(
+                                            "relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all hover:border-primary/50 hover:bg-primary/5",
+                                            amount === opt.value
+                                                ? "border-primary bg-primary/5 shadow-inner"
+                                                : "border-border bg-card"
+                                        )}
                                     >
-                                        ₹{val}
-                                    </Button>
+                                        {opt.popular && (
+                                            <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-[10px] uppercase font-bold px-2 py-0.5 rounded-full shadow-sm">
+                                                Popular
+                                            </span>
+                                        )}
+                                        <span className="text-lg font-bold">{opt.label}</span>
+                                        <span className="text-xs text-muted-foreground text-center mt-1">{opt.desc}</span>
+                                    </button>
                                 ))}
                             </div>
-                            <div className="relative">
-                                <span className="absolute left-3 top-3 text-muted-foreground">₹</span>
+
+                            <div className="relative mt-2">
+                                <Label className="sr-only">Custom Amount</Label>
+                                <div className="relative group">
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-semibold group-focus-within:text-primary transition-colors">₹</span>
+                                    <Input
+                                        placeholder="Enter custom amount"
+                                        className="pl-8 h-12 text-lg font-medium transition-all focus-visible:ring-offset-0 focus-visible:border-primary"
+                                        value={customAmount}
+                                        onChange={handleCustomAmountChange}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </Tabs>
+
+                    <div className="space-y-4 pt-6 border-t border-dashed">
+                        <h3 className="font-semibold text-lg flex items-center gap-2">
+                            User Details
+                            <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Required for receipt</span>
+                        </h3>
+
+                        <div className="grid gap-4">
+                            <div className="space-y-2">
+                                <Label>Full Name</Label>
                                 <Input
-                                    placeholder="Enter custom amount"
-                                    className="pl-8 h-12 text-lg"
-                                    value={customAmount}
-                                    onChange={handleCustomAmountChange}
+                                    value={formData.fullName}
+                                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                                    placeholder="e.g. Rahul Sharma"
+                                    className="h-11"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Email Address</Label>
+                                <Input
+                                    value={formData.email}
+                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                    placeholder="name@example.com"
+                                    type="email"
+                                    className="h-11"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <PhoneInput
+                                    id="phone"
+                                    value={formData.phone}
+                                    onChange={(val) => setFormData({ ...formData, phone: val })}
+                                    label="Phone Number"
+                                    className="h-11 w-full"
                                 />
                             </div>
                         </div>
+                    </div>
 
-                        <div className="space-y-4 pt-4 border-t">
-                            <h3 className="font-semibold">Your Details</h3>
-
-                            <div className="grid gap-4">
-                                <div className="space-y-2">
-                                    <Label>Full Name</Label>
-                                    <Input
-                                        value={formData.fullName}
-                                        onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                                        placeholder="Enter your name"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Email</Label>
-                                    <Input
-                                        value={formData.email}
-                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                        placeholder="Enter your email"
-                                        type="email"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <PhoneInput
-                                        id="phone"
-                                        value={formData.phone}
-                                        onChange={(val) => setFormData({ ...formData, phone: val })}
-                                        label="Phone Number"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
+                    <div className="space-y-4 pt-4">
                         <Button
                             size="lg"
-                            className="w-full text-lg h-14"
+                            className="w-full text-lg h-14 font-bold shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all hover:-translate-y-0.5"
                             onClick={handleDonate}
                             disabled={loading}
                         >
-                            {loading ? "Processing..." : `Donate ₹${amount || "0"}`}
+                            {loading ? "Processing..." : `Donate ₹${amount || "0"} Now`}
                         </Button>
 
-                        <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                            <ShieldCheck className="w-4 h-4" />
-                            <span>Secure payment by Razorpay</span>
-                            <Lock className="w-4 h-4 ml-2" />
-                            <span>256-bit SSL Encrypted</span>
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-xs text-muted-foreground bg-muted/30 p-2 rounded-lg border border-border/40">
+                            <div className="flex items-center gap-1.5">
+                                <ShieldCheck className="w-3.5 h-3.5 text-green-600" />
+                                <span>Secure Payment</span>
+                            </div>
+                            <span className="hidden sm:inline text-border">|</span>
+                            <div className="flex items-center gap-1.5">
+                                <Lock className="w-3.5 h-3.5 text-blue-600" />
+                                <span>256-bit SSL Encrypted</span>
+                            </div>
+                            <span className="hidden sm:inline text-border">|</span>
+                            <span>Tax Benefit under 80G</span>
                         </div>
-                    </CardContent>
-                </Card>
+                    </div>
+                </CardContent>
+            </Card>
 
-                <AlertDialog open={statusDialog.open} onOpenChange={(open) => !open && setStatusDialog(prev => ({ ...prev, open: false }))}>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle className={statusDialog.type === "error" ? "text-destructive" : "text-primary"}>
-                                {statusDialog.title}
-                            </AlertDialogTitle>
-                            <AlertDialogDescription>
-                                {statusDialog.message}
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogAction onClick={() => setStatusDialog(prev => ({ ...prev, open: false }))}>
-                                OK
-                            </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-            </div>
+            <AlertDialog open={statusDialog.open} onOpenChange={(open) => !open && setStatusDialog(prev => ({ ...prev, open: false }))}>
+                <AlertDialogContent className="rounded-2xl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className={cn("text-xl flex items-center gap-2", statusDialog.type === "error" ? "text-destructive" : "text-primary")}>
+                            {statusDialog.type === "success" && <Heart className="w-5 h-5 fill-current" />}
+                            {statusDialog.title}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-base pt-2">
+                            {statusDialog.message}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogAction onClick={() => setStatusDialog(prev => ({ ...prev, open: false }))}>
+                            Close
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     );
 };

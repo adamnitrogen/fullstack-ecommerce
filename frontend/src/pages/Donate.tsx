@@ -1,141 +1,73 @@
 import { DonationForm } from "@/components/donation/DonationForm";
-
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DonationImpact } from "@/components/donation/DonationImpact";
+import { AnonymousDonation } from "@/components/donation/AnonymousDonation";
+import { TaxBenefitsCard } from "@/components/donation/TaxBenefitsCard";
 import { useTranslation } from "react-i18next";
-import { HandHeart, Loader2 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { donationService } from "@/services/donation.service";
-
-const QrCodeDisplay = () => {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['donationQrCode'],
-    queryFn: donationService.getQrCode,
-    staleTime: 1000 * 60 * 60, // Cache for 1 hour
-  });
-
-  if (isLoading) {
-    return <div className="w-48 h-48 flex items-center justify-center bg-gray-100 rounded-lg"><Loader2 className="animate-spin text-primary" /></div>;
-  }
-
-  if (error || !data?.qr_code_url) {
-    return (
-      <div className="w-48 h-48 flex items-center justify-center bg-gray-100 text-muted-foreground text-xs text-center p-2 rounded-lg">
-        QR Code unavailable
-      </div>
-    );
-  }
-
-  return (
-    <img
-      src={data.qr_code_url}
-      alt="Donate QR Code"
-      className="w-48 h-48 object-contain"
-    />
-  );
-};
+import { HandHeart } from "lucide-react";
 
 const Donate = () => {
   const { t } = useTranslation();
 
   return (
     <>
-      {/* Hero Section */}
-      <section className="bg-gradient-to-r from-primary/10 via-accent/10 to-secondary/10 py-12">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-3xl mx-auto text-center">
-            <HandHeart className="h-16 w-16 text-primary mx-auto mb-6 animate-pulse" />
-            <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4">
-              {t("donate.title", "Support Our Cause")}
-            </h1>
-            <p className="text-xl text-muted-foreground">
-              {t("donate.subtitle", "Your contribution provides food, shelter, and medical care to cows in need.")}
-            </p>
+      {/* Compact Premium Hero Section */}
+      <section className="bg-[#2C1810] text-white py-12 md:py-16 relative overflow-hidden shadow-2xl">
+        {/* Abstract Background Decoration */}
+        <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+          <HandHeart className="h-64 w-64 text-[#B85C3C] blur-sm" />
+        </div>
+        <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-[#B85C3C]/10 rounded-full blur-[100px]" />
+
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-[0.2em] mb-2">
+                <HandHeart className="h-3 w-3" /> Seva & Compassion
+              </div>
+              <h1 className="text-3xl md:text-5xl font-bold font-playfair">
+                {t("donate.title", "Support Our")} <span className="text-[#B85C3C] italic">{t("donate.cause", "Cause")}</span>
+              </h1>
+            </div>
+
+            <div className="flex flex-col md:flex-row gap-6 md:items-center max-w-xl">
+              <p className="text-white/50 text-sm md:text-base font-light border-l border-[#B85C3C]/30 pl-6 hidden md:block">
+                {t("donate.subtitle", "Your contribution provides food, shelter, and medical care to cows in need.")}
+              </p>
+            </div>
           </div>
         </div>
       </section>
 
-      <div className="py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto space-y-16">
+      <div className="bg-background relative">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16">
 
-          <div className="grid md:grid-cols-3 gap-8 items-start">
-            <div className="md:col-span-2">
-              <DonationForm />
+            {/* Left Column: Form */}
+            <div className="lg:col-span-7 space-y-8 order-2 lg:order-1">
+              {/* Main Donation Form */}
+              <div className="relative z-10 -mt-20 lg:mt-0 space-y-6">
+                <DonationForm />
+                <TaxBenefitsCard />
+              </div>
+
+              {/* Impact Section Mobile (Hidden on Desktop, shown below form on mobile) */}
+              <div className="block lg:hidden pt-8">
+                <DonationImpact />
+              </div>
             </div>
 
-            <div className="space-y-6">
-              <Card className="bg-gradient-to-br from-primary/10 to-accent/10 border-none shadow-lg">
-                <CardHeader className="text-center pb-2">
-                  <CardTitle className="text-xl">Anonymous Donation</CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col items-center gap-4 text-center">
-                  <div className="bg-white p-4 rounded-xl shadow-sm">
-                    {/* Placeholder or Fetched QR */}
-                    <QrCodeDisplay />
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Scan this QR code with any UPI app (GPay, PhonePe, Paytm) to donate anonymously instantly.
-                  </p>
-                  <p className="text-xs text-muted-foreground font-mono bg-muted px-2 py-1 rounded">
-                    UPI: &lt;Scan to Pay&gt;
-                  </p>
-                </CardContent>
-              </Card>
+            {/* Right Column: Info & Anonymous */}
+            <div className="lg:col-span-5 space-y-10 order-1 lg:order-2">
+              {/* Anonymous Donation Card */}
+              <AnonymousDonation />
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Why Donate Anonymously?</CardTitle>
-                </CardHeader>
-                <CardContent className="text-sm text-muted-foreground space-y-2">
-                  <p>• Avoid filling out long forms</p>
-                  <p>• Immediate transfer via UPI</p>
-                  <p>• Your identity remains private</p>
-                  <p>• No tax receipt generated automatically</p>
-                </CardContent>
-              </Card>
+              {/* Impact Section Desktop */}
+              <div className="hidden lg:block">
+                <DonationImpact />
+              </div>
             </div>
+
           </div>
-
-          {/* Impact Stats */}
-          <section>
-            <h2 className="text-3xl font-bold text-center mb-10">{t("donate.whyDonate", "Why Donate?")}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">🌾 {t("donate.impact1Title", "Nutritious Food")}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">{t("donate.impact1Desc", "We ensure every cow gets a balanced diet of green fodder and grains.")}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">🏥 {t("donate.impact2Title", "Medical Care")}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">{t("donate.impact2Desc", "24/7 veterinary support for injured and aged cows.")}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">🏠 {t("donate.impact3Title", "Shelter Maintenance")}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">{t("donate.impact3Desc", "Clean, spacious, and ventilated sheds/gaushalas.")}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">💚 {t("donate.impact4Title", "Ethical Treatment")}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">{t("donate.impact4Desc", "We promote kindness and compassion towards all beings.")}</p>
-                </CardContent>
-              </Card>
-            </div>
-          </section>
-
-
-
         </div>
       </div>
     </>

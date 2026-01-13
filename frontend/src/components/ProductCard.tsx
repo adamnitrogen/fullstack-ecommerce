@@ -64,84 +64,91 @@ export const ProductCard = ({
   };
 
   return (
-    <Link to={`/product/${product.id}`}>
+    <Link to={`/product/${product.id}`} className="block h-full">
       <Card
-        className={`group cursor-pointer hover:shadow-elevated transition-all duration-300 h-full flex flex-col ${className}`}
+        className={`group cursor-pointer hover:shadow-elevated transition-all duration-500 h-full flex flex-col border-none bg-white rounded-[2rem] overflow-hidden ${className}`}
       >
-        <div className="relative overflow-hidden rounded-t-lg">
+        <div className="relative overflow-hidden aspect-square">
           <img
             src={product.images[0]}
             alt={product.title}
             loading="lazy"
-            className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
           />
 
-          {/* Quick View Button - appears on hover only on desktop when onQuickView is provided */}
-          {onQuickView && (
-            <button
-              onClick={handleQuickView}
-              className="hidden md:flex absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 items-center justify-center"
-              aria-label="Quick view product"
-            >
-              <div className="bg-white text-foreground p-3 rounded-lg flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-colors">
-                <Eye className="h-5 w-5" />
-              </div>
-            </button>
-          )}
+          {/* Premium Overlays */}
+          <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+          {/* Action Buttons Overlay */}
+          <div className="absolute top-4 right-4 flex flex-col gap-2 translate-x-4 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-500">
+            {onQuickView && (
+              <Button
+                onClick={handleQuickView}
+                size="icon"
+                className="h-10 w-10 rounded-full bg-white text-[#2C1810] hover:bg-[#B85C3C] hover:text-white shadow-lg border-none"
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
 
           {product.isNew && (
-            <Tag variant="new" className="absolute top-3 right-3 z-10">
-              {t("products.new")}
-            </Tag>
+            <div className="absolute top-4 left-4 z-10">
+              <span className="bg-[#B85C3C] text-white text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1 rounded-full shadow-lg">
+                {t("products.new")}
+              </span>
+            </div>
           )}
+
           {product.tags && product.tags.length > 0 && (
-            <div className="absolute top-3 left-3 flex flex-wrap gap-1 max-w-[60%] z-10">
+            <div className="absolute bottom-4 left-4 flex flex-wrap gap-1 max-w-[80%] z-10 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
               {product.tags.slice(0, 2).map((tag) => (
-                <Tag key={tag}>{tag}</Tag>
+                <span key={tag} className="bg-white/90 backdrop-blur-sm text-[#2C1810] text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md">
+                  {tag}
+                </span>
               ))}
             </div>
           )}
         </div>
 
-        <CardContent className="p-4 flex-grow">
-          <h3 className="font-semibold text-lg mb-2 line-clamp-1 group-hover:text-primary transition-smooth">
-            {product.title}
-          </h3>
-          <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-            {product.description}
-          </p>
+        <CardContent className="p-4 flex-grow flex flex-col gap-2">
+          <div className="space-y-1">
+            <h3 className="font-playfair text-lg font-bold text-[#2C1810] line-clamp-1 group-hover:text-[#B85C3C] transition-colors duration-300">
+              {product.title}
+            </h3>
+            <p className="text-[11px] text-muted-foreground line-clamp-2 font-light leading-relaxed">
+              {product.description}
+            </p>
+          </div>
 
-          {/* Only show rating when there are reviews */}
-          {(product.reviewCount || 0) > 0 && (
-            <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <div className="flex items-center gap-1">
-                <Star className="h-4 w-4 fill-accent text-accent" />
-                <span className="text-sm font-medium">{product.rating}</span>
+          <div className="mt-auto pt-1">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0">
+                <p className="text-lg font-bold text-[#2C1810]">₹{product.price}</p>
+                {product.mrp && product.mrp > product.price && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground/60 line-through font-light">
+                      ₹{product.mrp}
+                    </span>
+                    <span className="text-[9px] font-black text-[#B85C3C] uppercase tracking-tighter">
+                      Save {calculateDiscount(product.mrp, product.price)}%
+                    </span>
+                  </div>
+                )}
               </div>
-              <span className="text-xs text-muted-foreground">
-                {product.ratingCount || 0} ratings & {product.reviewCount || 0}{" "}
-                reviews
-              </span>
-            </div>
-          )}
 
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <p className="text-2xl font-bold text-primary">₹{product.price}</p>
-            {product.mrp && product.mrp > product.price && (
-              <>
-                <p className="text-sm text-muted-foreground line-through">
-                  ₹{product.mrp}
-                </p>
-                <Tag variant="discount" size="sm">
-                  {calculateDiscount(product.mrp, product.price)}% OFF
-                </Tag>
-              </>
-            )}
+              {(product.reviewCount || 0) > 0 && (
+                <div className="flex items-center gap-1 bg-muted/30 px-1.5 py-0.5 rounded-lg">
+                  <Star className="h-3 w-3 fill-[#D4AF37] text-[#D4AF37]" />
+                  <span className="text-[10px] font-bold text-[#2C1810]">{product.rating}</span>
+                </div>
+              )}
+            </div>
           </div>
         </CardContent>
 
         {showAddToCart && (
-          <CardFooter className="p-4 pt-0 mt-auto flex flex-col gap-2">
+          <CardFooter className="p-4 pt-0 mt-auto flex flex-col gap-1.5">
             {quantity > 0 ? (
               <>
                 <div className="flex items-center gap-2 w-full">
@@ -149,28 +156,30 @@ export const ProductCard = ({
                     variant="outline"
                     size="icon"
                     onClick={handleDecreaseQuantity}
-                    className="h-9 w-9"
+                    className="h-8 w-8"
                   >
-                    <Minus className="h-4 w-4" />
+                    <span className="sr-only">Decrease</span>
+                    <Minus className="h-3 w-3" />
                   </Button>
-                  <span className="flex-1 text-center font-bold">
+                  <span className="flex-1 text-center font-bold text-sm">
                     {quantity}
                   </span>
                   <Button
                     variant="outline"
                     size="icon"
                     onClick={handleIncreaseQuantity}
-                    className="h-9 w-9"
+                    className="h-8 w-8"
                     disabled={
                       product.inventory !== undefined &&
                       quantity >= product.inventory
                     }
                   >
-                    <Plus className="h-4 w-4" />
+                    <span className="sr-only">Increase</span>
+                    <Plus className="h-3 w-3" />
                   </Button>
                 </div>
                 <Link to="/cart" className="w-full">
-                  <Button variant="secondary" className="w-full text-xs h-8">
+                  <Button variant="secondary" className="w-full text-[10px] h-7">
                     {t("cart.goToCart")}
                   </Button>
                 </Link>
@@ -178,7 +187,7 @@ export const ProductCard = ({
             ) : (
               <Button
                 variant="default"
-                className="w-full"
+                className="w-full h-9 text-xs"
                 onClick={handleAddToCart}
                 disabled={!product.inventory || product.inventory === 0}
               >

@@ -15,535 +15,166 @@ import {
   FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { api, endpoints } from '@/lib/api';
 import { toast } from 'sonner';
-import { Facebook, Instagram, Youtube, Mail, Phone, MapPin, Settings } from 'lucide-react';
-import { PhoneInput } from "@/components/ui/phone-input";
+import { Truck, Tag } from 'lucide-react';
 import { getErrorMessage } from '@/lib/errorUtils';
+import CouponsManagement from './CouponsManagement';
 
-// Social Media Settings Schema
-const socialMediaSchema = z.object({
-  facebook: z.string().url('Invalid URL').optional().or(z.literal('')),
-  instagram: z.string().url('Invalid URL').optional().or(z.literal('')),
-  youtube: z.string().url('Invalid URL').optional().or(z.literal('')),
-  twitter: z.string().url('Invalid URL').optional().or(z.literal('')),
+// Delivery Settings Schema
+const deliverySchema = z.object({
+  delivery_threshold: z.number().min(0, 'Threshold must be positive'),
+  delivery_charge: z.number().min(0, 'Charge must be positive'),
 });
 
-// Contact Information Schema
-const contactInfoSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  phone: z.string().min(10, 'Phone number must be at least 10 digits'),
-  address: z.string().min(1, 'Address is required'),
-  city: z.string().min(1, 'City is required'),
-  state: z.string().min(1, 'State is required'),
-  zipcode: z.string().min(1, 'Zipcode is required'),
-});
-
-// Newsletter Settings Schema
-const newsletterSchema = z.object({
-  senderName: z.string().min(1, 'Sender name is required'),
-  senderEmail: z.string().email('Invalid email address'),
-  replyToEmail: z.string().email('Invalid email address'),
-  footerText: z.string().optional(),
-});
-
-type SocialMediaFormValues = z.infer<typeof socialMediaSchema>;
-type ContactInfoFormValues = z.infer<typeof contactInfoSchema>;
-type NewsletterFormValues = z.infer<typeof newsletterSchema>;
-
-interface Settings {
-  socialMedia: SocialMediaFormValues;
-  contactInfo: ContactInfoFormValues;
-  newsletter: NewsletterFormValues;
-}
+type DeliveryFormValues = z.infer<typeof deliverySchema>;
 
 export default function SettingsManagement() {
-  const [activeTab, setActiveTab] = useState('social');
+  const [activeTab, setActiveTab] = useState('delivery');
   const queryClient = useQueryClient();
 
-  // Fetch settings
-  const { data: settings, isLoading } = useQuery<Settings>({
-    queryKey: ['settings'],
+  // Fetch Delivery Settings
+  const { data: deliverySettings, isLoading: isDeliveryLoading } = useQuery<DeliveryFormValues>({
+    queryKey: ['deliverySettings'],
     queryFn: async () => {
-      const response = await api.get(endpoints.getSettings);
+      const response = await api.get(endpoints.getDeliverySettings);
       return response.data;
     },
   });
 
-  // Social Media Form
-  const socialMediaForm = useForm<SocialMediaFormValues>({
-    resolver: zodResolver(socialMediaSchema),
-    values: settings?.socialMedia || {
-      facebook: '',
-      instagram: '',
-      youtube: '',
-      twitter: '',
+  // Delivery Form
+  const deliveryForm = useForm<DeliveryFormValues>({
+    resolver: zodResolver(deliverySchema),
+    values: deliverySettings || {
+      delivery_threshold: 1500,
+      delivery_charge: 50,
     },
   });
 
-  // Contact Info Form
-  const contactInfoForm = useForm<ContactInfoFormValues>({
-    resolver: zodResolver(contactInfoSchema),
-    values: settings?.contactInfo || {
-      email: '',
-      phone: '',
-      address: '',
-      city: '',
-      state: '',
-      zipcode: '',
-    },
-  });
-
-  // Newsletter Form
-  const newsletterForm = useForm<NewsletterFormValues>({
-    resolver: zodResolver(newsletterSchema),
-    values: settings?.newsletter || {
-      senderName: '',
-      senderEmail: '',
-      replyToEmail: '',
-      footerText: '',
-    },
-  });
-
-  // Update Social Media Mutation
-  const updateSocialMediaMutation = useMutation({
-    mutationFn: async (data: SocialMediaFormValues) => {
-      await api.put(endpoints.updateSettings, { socialMedia: data });
+  // Update Delivery Settings Mutation
+  const updateDeliveryMutation = useMutation({
+    mutationFn: async (data: DeliveryFormValues) => {
+      await api.patch(endpoints.updateDeliverySettings, {
+        threshold: data.delivery_threshold,
+        charge: data.delivery_charge,
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['settings'] });
-      toast.success('Social media links updated successfully');
+      queryClient.invalidateQueries({ queryKey: ['deliverySettings'] });
+      toast.success('Delivery settings updated successfully');
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, 'Failed to update social media links'));
+      toast.error(getErrorMessage(error, 'Failed to update delivery settings'));
     },
   });
-
-  // Update Contact Info Mutation
-  const updateContactInfoMutation = useMutation({
-    mutationFn: async (data: ContactInfoFormValues) => {
-      await api.put(endpoints.updateSettings, { contactInfo: data });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['settings'] });
-      toast.success('Contact information updated successfully');
-    },
-    onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, 'Failed to update contact information'));
-    },
-  });
-
-  // Update Newsletter Mutation
-  const updateNewsletterMutation = useMutation({
-    mutationFn: async (data: NewsletterFormValues) => {
-      await api.put(endpoints.updateSettings, { newsletter: data });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['settings'] });
-      toast.success('Newsletter settings updated successfully');
-    },
-    onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, 'Failed to update newsletter settings'));
-    },
-  });
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <p className="text-muted-foreground">Loading settings...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Settings</h1>
-        <p className="text-muted-foreground">Manage website configuration and preferences</p>
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Settings</h1>
+        <p className="text-muted-foreground">Manage website configuration, delivery settings, and coupons</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-md grid-cols-3">
-          <TabsTrigger value="social">Social Media</TabsTrigger>
-          <TabsTrigger value="contact">Contact Info</TabsTrigger>
-          <TabsTrigger value="newsletter">Newsletter</TabsTrigger>
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="delivery">Delivery</TabsTrigger>
+          <TabsTrigger value="coupons">Coupons</TabsTrigger>
         </TabsList>
 
-        {/* Social Media Tab */}
-        <TabsContent value="social" className="space-y-4">
+        {/* Delivery Tab */}
+        <TabsContent value="delivery" className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Social Media Links
+                <Truck className="h-5 w-5 text-primary" />
+                Delivery Settings
               </CardTitle>
               <CardDescription>
-                Manage your social media presence and links displayed on the website
+                Configure free delivery thresholds and charges
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Form {...socialMediaForm}>
-                <form
-                  onSubmit={socialMediaForm.handleSubmit((data) =>
-                    updateSocialMediaMutation.mutate(data)
-                  )}
-                  className="space-y-4"
-                >
-                  <FormField
-                    control={socialMediaForm.control}
-                    name="facebook"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center gap-2">
-                          <Facebook className="h-4 w-4" />
-                          Facebook
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            id="facebook-url"
-                            placeholder="https://facebook.com/yourpage"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
+              {isDeliveryLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <p className="text-muted-foreground animate-pulse">Loading delivery settings...</p>
+                </div>
+              ) : (
+                <Form {...deliveryForm}>
+                  <form
+                    onSubmit={deliveryForm.handleSubmit((data) =>
+                      updateDeliveryMutation.mutate(data)
                     )}
-                  />
-
-                  <FormField
-                    control={socialMediaForm.control}
-                    name="instagram"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center gap-2">
-                          <Instagram className="h-4 w-4" />
-                          Instagram
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            id="instagram-url"
-                            placeholder="https://instagram.com/yourprofile"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={socialMediaForm.control}
-                    name="youtube"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center gap-2">
-                          <Youtube className="h-4 w-4" />
-                          YouTube
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            id="youtube-url"
-                            placeholder="https://youtube.com/yourchannel"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={socialMediaForm.control}
-                    name="twitter"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center gap-2">
-                          <svg
-                            className="h-4 w-4"
-                            viewBox="0 0 24 24"
-                            fill="currentColor"
-                          >
-                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                          </svg>
-                          Twitter/X
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            id="twitter-url"
-                            placeholder="https://twitter.com/yourhandle"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <Button
-                    type="submit"
-                    disabled={updateSocialMediaMutation.isPending}
+                    className="space-y-6"
                   >
-                    {updateSocialMediaMutation.isPending ? 'Saving...' : 'Save Changes'}
-                  </Button>
-                </form>
-              </Form>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <FormField
+                        control={deliveryForm.control}
+                        name="delivery_threshold"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Free Delivery Threshold (₹)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="1500"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                                className="transition-all hover:border-primary/50 focus:border-primary"
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Orders above this amount will have free delivery.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={deliveryForm.control}
+                        name="delivery_charge"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Delivery Charge (₹)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="50"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                                className="transition-all hover:border-primary/50 focus:border-primary"
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Standard delivery charge for orders below threshold.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <Button
+                      type="submit"
+                      disabled={updateDeliveryMutation.isPending}
+                      className="w-full md:w-auto transition-transform hover:scale-105"
+                    >
+                      {updateDeliveryMutation.isPending ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                  </form>
+                </Form>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Contact Information Tab */}
-        <TabsContent value="contact" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Phone className="h-5 w-5" />
-                Contact Information
-              </CardTitle>
-              <CardDescription>
-                Update business contact details displayed on the website
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Form {...contactInfoForm}>
-                <form
-                  onSubmit={contactInfoForm.handleSubmit((data) =>
-                    updateContactInfoMutation.mutate(data)
-                  )}
-                  className="space-y-4"
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={contactInfoForm.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="flex items-center gap-2">
-                            <Mail className="h-4 w-4" />
-                            Email
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              id="contact-email"
-                              type="email"
-                              placeholder="contact@example.com"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={contactInfoForm.control}
-                      name="phone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <PhoneInput
-                            value={field.value}
-                            onChange={field.onChange}
-                            label="Phone"
-                            placeholder="+91 1234567890"
-                          />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={contactInfoForm.control}
-                    name="address"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4" />
-                          Street Address
-                        </FormLabel>
-                        <FormControl>
-                          <Textarea
-                            id="contact-address"
-                            placeholder="123 Main Street"
-                            rows={2}
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <FormField
-                      control={contactInfoForm.control}
-                      name="city"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>City</FormLabel>
-                          <FormControl>
-                            <Input id="contact-city" placeholder="City" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={contactInfoForm.control}
-                      name="state"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>State</FormLabel>
-                          <FormControl>
-                            <Input id="contact-state" placeholder="State" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={contactInfoForm.control}
-                      name="zipcode"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Zipcode</FormLabel>
-                          <FormControl>
-                            <Input id="contact-zipcode" placeholder="123456" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <Button
-                    type="submit"
-                    disabled={updateContactInfoMutation.isPending}
-                  >
-                    {updateContactInfoMutation.isPending ? 'Saving...' : 'Save Changes'}
-                  </Button>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Newsletter Tab */}
-        <TabsContent value="newsletter" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Mail className="h-5 w-5" />
-                Newsletter Configuration
-              </CardTitle>
-              <CardDescription>
-                Configure newsletter sender information and default settings
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Form {...newsletterForm}>
-                <form
-                  onSubmit={newsletterForm.handleSubmit((data) =>
-                    updateNewsletterMutation.mutate(data)
-                  )}
-                  className="space-y-4"
-                >
-                  <FormField
-                    control={newsletterForm.control}
-                    name="senderName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Sender Name</FormLabel>
-                        <FormControl>
-                          <Input id="newsletter-sender-name" placeholder="Your Organization Name" {...field} />
-                        </FormControl>
-                        <FormDescription>
-                          Name displayed as the sender of newsletter emails
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={newsletterForm.control}
-                    name="senderEmail"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Sender Email</FormLabel>
-                        <FormControl>
-                          <Input
-                            id="newsletter-sender-email"
-                            type="email"
-                            placeholder="newsletter@example.com"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Email address used to send newsletters
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={newsletterForm.control}
-                    name="replyToEmail"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Reply-To Email</FormLabel>
-                        <FormControl>
-                          <Input
-                            id="newsletter-reply-to"
-                            type="email"
-                            placeholder="support@example.com"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Email address where replies will be sent
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={newsletterForm.control}
-                    name="footerText"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Footer Text (Optional)</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            id="newsletter-footer"
-                            placeholder="Add custom footer text for newsletters..."
-                            rows={4}
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Additional text to include at the bottom of newsletters
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <Button
-                    type="submit"
-                    disabled={updateNewsletterMutation.isPending}
-                  >
-                    {updateNewsletterMutation.isPending ? 'Saving...' : 'Save Changes'}
-                  </Button>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
+        {/* Coupons Tab */}
+        <TabsContent value="coupons" className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out">
+          {/* Wrapping CouponsManagement to handle layout internally if needed, or just render it */}
+          {/* Since CouponsManagement has its own layout, we might want to just render it. 
+               However, it has a page-level header. It might be better to just let it be for now. */}
+          <CouponsManagement />
         </TabsContent>
       </Tabs>
     </div>

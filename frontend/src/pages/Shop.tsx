@@ -1,11 +1,13 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
-import { Search } from "lucide-react";
+import { Search, Sparkles, Filter, SlidersHorizontal, ArrowLeft } from "lucide-react";
 import { ProductCard } from "@/components/ProductCard";
 import { ProductQuickView } from "@/components/ProductQuickView";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 import {
   Select,
   SelectContent,
@@ -93,80 +95,113 @@ const Shop = () => {
   const categories = ["all", ...categoriesData.map(c => c.name)];
 
   return (
-    <div className="min-h-screen bg-background py-8">
+    <div className="min-h-screen bg-background pb-20">
+      <LoadingOverlay isLoading={isLoading} message="Curating Pure Goods..." />
+
       <ProductQuickView
         product={quickViewProduct}
         open={quickViewProduct !== null}
         onOpenChange={(open) => !open && setQuickViewProduct(null)}
       />
 
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">{t("nav.shop")}</h1>
-          <p className="text-muted-foreground">
-            Browse our collection of pure, organic cow products
-          </p>
+      {/* Compact Premium Hero Section */}
+      <section className="bg-[#2C1810] text-white py-12 md:py-16 relative overflow-hidden shadow-2xl">
+        <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
+          <Sparkles className="h-48 w-48 text-[#B85C3C]" />
         </div>
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-[0.2em]">
+                <Sparkles className="h-3 w-3" /> Pure & Vedic
+              </div>
+              <h1 className="text-3xl md:text-5xl font-bold font-playfair">
+                {t("nav.shop")} <span className="text-[#B85C3C]">Collection</span>
+              </h1>
+            </div>
+            <p className="text-white/50 text-sm md:text-base max-w-md font-light border-l border-[#B85C3C]/30 pl-6 hidden md:block">
+              Hand-crafted A2 dairy and natural wellness products, rooted in tradition and purity.
+            </p>
+          </div>
+        </div>
+      </section>
 
-        {/* Search and Filter Bar */}
-        <div className="bg-card rounded-lg p-4 shadow-soft mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 -mt-6 relative z-20">
+        {/* Sleek Search and Filter Bar */}
+        <div className="bg-white rounded-2xl p-4 md:p-6 shadow-elevated border border-border/50 mb-12">
+          <div className="flex flex-col lg:flex-row gap-4 lg:gap-8 items-stretch lg:items-end">
             {/* Search */}
-            <div className="relative md:col-span-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder={t("products.search")}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+            <div className="w-full lg:flex-1 space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Search Products</label>
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#B85C3C]" />
+                <Input
+                  type="text"
+                  placeholder={t("products.search")}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-12 h-14 rounded-2xl bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-[#B85C3C] transition-all"
+                />
+              </div>
             </div>
 
-            {/* Category Filter */}
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Categories" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((cat) => (
-                  <SelectItem key={cat} value={cat}>
-                    {cat === "all" ? "All Categories" : cat}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Filters Group */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full lg:w-auto lg:min-w-[500px]">
+              {/* Category Filter */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1 flex items-center gap-2">
+                  <Filter className="h-3 w-3" /> Category
+                </label>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger className="h-14 rounded-2xl bg-muted/30 border-none focus:ring-1 focus:ring-[#B85C3C]">
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl border-none shadow-elevated">
+                    {categories.map((cat) => (
+                      <SelectItem key={cat} value={cat} className="rounded-xl mt-1 first:mt-0">
+                        {cat === "all" ? "All Collections" : cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            {/* Sort */}
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="newest">{t("products.newest")}</SelectItem>
-                <SelectItem value="priceLowHigh">
-                  {t("products.priceLowHigh")}
-                </SelectItem>
-                <SelectItem value="priceHighLow">
-                  {t("products.priceHighLow")}
-                </SelectItem>
-              </SelectContent>
-            </Select>
+              {/* Sort */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1 flex items-center gap-2">
+                  <SlidersHorizontal className="h-3 w-3" /> Sorting
+                </label>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="h-14 rounded-2xl bg-muted/30 border-none focus:ring-1 focus:ring-[#B85C3C]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl border-none shadow-elevated">
+                    <SelectItem value="newest" className="rounded-xl">{t("products.newest")}</SelectItem>
+                    <SelectItem value="priceLowHigh" className="rounded-xl">
+                      {t("products.priceLowHigh")}
+                    </SelectItem>
+                    <SelectItem value="priceHighLow" className="rounded-xl">
+                      {t("products.priceHighLow")}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Products Grid */}
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {[...Array(8)].map((_, i) => (
-              <div key={i} className="h-96 bg-muted rounded-lg animate-pulse" />
+              <div key={i} className="aspect-[3/4] bg-muted/50 rounded-[2rem] animate-pulse" />
             ))}
           </div>
         ) : allProducts.length > 0 ? (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 animate-fade-in">
               {allProducts.map((product) => (
-                <div key={product.id} className="w-full max-w-[320px] mx-auto">
+                <div key={product.id} className="w-full transition-all duration-500 hover:-translate-y-2">
                   <ProductCard
                     product={product}
                     onQuickView={setQuickViewProduct}
@@ -177,23 +212,39 @@ const Shop = () => {
 
             {/* Load More Button */}
             {hasNextPage && (
-              <div className="mt-12 text-center">
+              <div className="mt-20 text-center">
                 <Button
                   onClick={() => fetchNextPage()}
                   disabled={isFetchingNextPage}
                   variant="outline"
                   size="lg"
+                  className="rounded-full px-12 h-14 text-lg font-bold border-[#B85C3C] text-[#B85C3C] hover:bg-[#B85C3C] hover:text-white transition-all shadow-xl disabled:opacity-50"
                 >
-                  {isFetchingNextPage ? "Loading more..." : "Load More Products"}
+                  {isFetchingNextPage ? "Curating More..." : "Discover More Products"}
                 </Button>
               </div>
             )}
           </>
         ) : (
-          <div className="text-center py-16">
-            <p className="text-xl text-muted-foreground">
-              No products found matching your criteria
+          <div className="text-center py-32 bg-muted/20 rounded-[3rem] border-2 border-dashed border-border/50">
+            <div className="mb-6 inline-flex p-6 rounded-full bg-muted/50">
+              <Search className="h-12 w-12 text-muted-foreground/50" />
+            </div>
+            <p className="text-2xl font-bold text-[#2C1810] mb-2">No Products Found</p>
+            <p className="text-muted-foreground mb-8">
+              We couldn't find any products matching your current criteria.
             </p>
+            <Button
+              variant="outline"
+              className="rounded-full border-[#B85C3C] text-[#B85C3C] hover:bg-[#B85C3C] hover:text-white"
+              onClick={() => {
+                setSearchQuery("");
+                setCategory("all");
+                setSortBy("newest");
+              }}
+            >
+              Clear all filters
+            </Button>
           </div>
         )}
       </div>

@@ -22,6 +22,7 @@ import {
   ChevronLeft,
   ChevronRight,
   MessageSquare,
+  Sparkles,
 } from "lucide-react";
 
 const Index = () => {
@@ -178,41 +179,36 @@ const Index = () => {
 
 
       {/* Featured Products */}
-      <section className="py-16 bg-background">
+      <section className="py-12 bg-background relative overflow-hidden">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="text-3xl font-bold text-foreground mb-2">
+          <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-6">
+            <div className="space-y-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-widest">
+                <Leaf className="h-3 w-3" /> Nature's Bounty
+              </div>
+              <h2 className="text-4xl md:text-6xl font-bold font-playfair text-[#2C1810]">
                 {t("products.title")}
               </h2>
-              <p className="text-muted-foreground">
-                Discover our range of pure, organic cow products
+              <p className="text-muted-foreground text-base md:text-lg font-light max-w-xl">
+                Discover our curated selection of pure, organic cow products crafted with ancient wisdom.
               </p>
             </div>
             <Link to="/shop">
-              <Button variant="outline">{t("products.viewAll")}</Button>
+              <Button variant="outline" className="rounded-full px-8 py-6 border-[#2C1810]/20 hover:bg-[#2C1810] hover:text-white transition-all duration-500 font-bold uppercase tracking-widest text-xs h-auto">
+                {t("products.viewAll")}
+              </Button>
             </Link>
           </div>
 
           {featuredProducts.length > 0 ? (
-            <div className="relative">
-              {featuredProducts.length > 1 && (
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="absolute left-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 rounded-full shadow-lg bg-background"
-                  onClick={() => scroll(productsScrollRef, "left")}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-              )}
+            <div className="group/scroll relative px-2">
               <div
                 ref={productsScrollRef}
-                className="flex gap-6 overflow-x-auto scrollbar-hide"
+                className="flex gap-8 overflow-x-auto scrollbar-hide pb-8 pt-4 snap-x snap-mandatory"
                 style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
               >
                 {featuredProducts.map((product) => (
-                  <div key={product.id} className="flex-shrink-0 w-[320px]">
+                  <div key={product.id} className="flex-shrink-0 w-[280px] sm:w-[320px] snap-start">
                     <ProductCard
                       product={product}
                       onQuickView={setQuickViewProduct}
@@ -220,20 +216,30 @@ const Index = () => {
                   </div>
                 ))}
               </div>
-              {featuredProducts.length > 1 && (
+
+              {/* Custom Scroll Controls - Premium */}
+              <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 flex justify-between pointer-events-none px-4">
                 <Button
                   variant="outline"
                   size="icon"
-                  className="absolute right-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 rounded-full shadow-lg bg-background"
+                  className="h-12 w-12 rounded-full shadow-xl bg-white/90 backdrop-blur-sm border-none pointer-events-auto opacity-0 group-hover/scroll:opacity-100 -translate-x-6 group-hover/scroll:translate-x-0 transition-all duration-500 hover:bg-[#B85C3C] hover:text-white"
+                  onClick={() => scroll(productsScrollRef, "left")}
+                >
+                  <ChevronLeft className="h-6 w-6" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-12 w-12 rounded-full shadow-xl bg-white/90 backdrop-blur-sm border-none pointer-events-auto opacity-0 group-hover/scroll:opacity-100 translate-x-6 group-hover/scroll:translate-x-0 transition-all duration-500 hover:bg-[#B85C3C] hover:text-white"
                   onClick={() => scroll(productsScrollRef, "right")}
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className="h-6 w-6" />
                 </Button>
-              )}
+              </div>
             </div>
           ) : (
-            <div className="text-center py-12 bg-muted/30 rounded-lg">
-              <p className="text-muted-foreground text-lg">
+            <div className="text-center py-20 bg-muted/20 rounded-[3rem] border-2 border-dashed border-border/50">
+              <p className="text-muted-foreground text-lg italic font-light">
                 No products available at the moment
               </p>
             </div>
@@ -242,59 +248,68 @@ const Index = () => {
       </section>
 
       {/* Upcoming Events */}
-      <section className="py-16 bg-muted">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="text-3xl font-bold text-foreground mb-2">
-                Latest Events
+      <section className="py-12 bg-[#FAF7F2] relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-24 opacity-5 pointer-events-none">
+          <Heart className="h-96 w-96 text-[#B85C3C]" />
+        </div>
+
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-6">
+            <div className="space-y-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#2C1810]/5 text-[#2C1810] text-[10px] font-bold uppercase tracking-widest">
+                <Sparkles className="h-3 w-3" /> Community Connection
+              </div>
+              <h2 className="text-4xl md:text-6xl font-bold font-playfair text-[#2C1810]">
+                Sacred Gatherings
               </h2>
-              <p className="text-muted-foreground">
-                Ongoing and upcoming events - Join us in our community programs
+              <p className="text-muted-foreground text-base md:text-lg font-light max-w-xl">
+                Join our community programs, festivals, and spiritual experiences.
               </p>
             </div>
             <Link to="/events">
-              <Button variant="outline">{t("events.viewAll")}</Button>
+              <Button variant="outline" className="rounded-full px-8 py-6 border-[#2C1810]/20 hover:bg-[#2C1810] hover:text-white transition-all duration-500 font-bold uppercase tracking-widest text-xs h-auto bg-transparent">
+                {t("events.viewAll")}
+              </Button>
             </Link>
           </div>
 
           {upcomingEvents.length > 0 ? (
-            <div className="relative">
-              {upcomingEvents.length > 1 && (
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="absolute left-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 rounded-full shadow-lg bg-background"
-                  onClick={() => scroll(eventsScrollRef, "left")}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-              )}
+            <div className="group/events-scroll relative px-2">
               <div
                 ref={eventsScrollRef}
-                className="flex gap-6 overflow-x-auto scrollbar-hide"
+                className="flex gap-8 overflow-x-auto scrollbar-hide pb-8 pt-4 snap-x snap-mandatory"
                 style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
               >
                 {upcomingEvents.map((event) => (
-                  <div key={event.id} className="flex-shrink-0 w-[420px]">
+                  <div key={event.id} className="flex-shrink-0 w-[300px] sm:w-[420px] snap-start">
                     <EventCard event={event} />
                   </div>
                 ))}
               </div>
-              {upcomingEvents.length > 1 && (
+
+              {/* Custom Scroll Controls - Premium */}
+              <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 flex justify-between pointer-events-none px-4">
                 <Button
                   variant="outline"
                   size="icon"
-                  className="absolute right-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 rounded-full shadow-lg bg-background"
+                  className="h-12 w-12 rounded-full shadow-xl bg-white/90 backdrop-blur-sm border-none pointer-events-auto opacity-0 group-hover/events-scroll:opacity-100 -translate-x-6 group-hover/events-scroll:translate-x-0 transition-all duration-500 hover:bg-[#B85C3C] hover:text-white"
+                  onClick={() => scroll(eventsScrollRef, "left")}
+                >
+                  <ChevronLeft className="h-6 w-6" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-12 w-12 rounded-full shadow-xl bg-white/90 backdrop-blur-sm border-none pointer-events-auto opacity-0 group-hover/events-scroll:opacity-100 translate-x-6 group-hover/events-scroll:translate-x-0 transition-all duration-500 hover:bg-[#B85C3C] hover:text-white"
                   onClick={() => scroll(eventsScrollRef, "right")}
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className="h-6 w-6" />
                 </Button>
-              )}
+              </div>
             </div>
           ) : (
-            <div className="text-center py-12 bg-background rounded-lg">
-              <p className="text-muted-foreground text-lg">
+            <div className="text-center py-20 bg-white/50 rounded-[3rem] border-2 border-dashed border-[#2C1810]/10">
+              <p className="text-muted-foreground text-lg italic font-light">
                 No upcoming events at the moment
               </p>
             </div>
@@ -303,29 +318,32 @@ const Index = () => {
       </section>
 
       {/* Benefits of Cow */}
-      <section className="py-16 bg-background">
+      <section className="py-12 bg-white relative overflow-hidden">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-foreground mb-4">
+          <div className="text-center mb-10 space-y-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-widest">
+              <Milk className="h-3 w-3" /> Ancient Wisdom
+            </div>
+            <h2 className="text-4xl md:text-5xl font-bold font-playfair text-[#2C1810]">
               {t("benefits.title")}
             </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-muted-foreground text-base md:text-lg font-light max-w-2xl mx-auto">
               {t("benefits.subtitle")}
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {benefits.map((benefit, index) => (
               <div
                 key={index}
-                className="text-center p-6 rounded-lg bg-card shadow-soft hover:shadow-elevated transition-all animate-fade-in"
+                className="group p-8 rounded-[2rem] bg-[#FAF7F2] border border-transparent hover:border-[#B85C3C]/20 hover:bg-white hover:shadow-elevated transition-all duration-500 animate-fade-in flex flex-col items-center text-center"
                 style={{ animationDelay: `${index * 100}ms` }}
               >
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
-                  <benefit.icon className="h-8 w-8 text-primary" />
+                <div className="w-16 h-16 rounded-2xl bg-white shadow-sm flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-[#B85C3C] group-hover:text-white transition-all duration-500 text-[#B85C3C]">
+                  <benefit.icon className="h-8 w-8" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">{benefit.title}</h3>
-                <p className="text-muted-foreground">{benefit.description}</p>
+                <h3 className="text-xl font-bold text-[#2C1810] mb-3 font-playfair">{benefit.title}</h3>
+                <p className="text-sm text-muted-foreground/80 font-light leading-relaxed">{benefit.description}</p>
               </div>
             ))}
           </div>
@@ -333,31 +351,36 @@ const Index = () => {
       </section>
 
       {/* What's New - Blogs */}
-      <section className="py-16 bg-muted">
+      <section className="py-12 bg-[#FAF7F2] relative overflow-hidden">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="text-3xl font-bold text-foreground mb-2">
+          <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-6">
+            <div className="space-y-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-widest">
+                <Leaf className="h-3 w-3" /> The Journal
+              </div>
+              <h2 className="text-4xl md:text-5xl font-bold font-playfair text-[#2C1810]">
                 {t("whatsNew")}
               </h2>
-              <p className="text-muted-foreground">
-                Latest news and articles from our community
+              <p className="text-muted-foreground text-base md:text-lg font-light max-w-xl">
+                Latest news, sacred stories, and articles from our community.
               </p>
             </div>
             <Link to="/blog">
-              <Button variant="outline">View All</Button>
+              <Button variant="outline" className="rounded-full px-8 py-6 border-[#2C1810]/20 hover:bg-[#2C1810] hover:text-white transition-all duration-500 font-bold uppercase tracking-widest text-xs h-auto bg-transparent">
+                View All Stories
+              </Button>
             </Link>
           </div>
 
           {latestBlogs.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {latestBlogs.map((blog) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              {latestBlogs.slice(0, 4).map((blog) => (
                 <BlogCard key={blog.id} blog={blog} />
               ))}
             </div>
           ) : (
-            <div className="text-center py-12 bg-background rounded-lg">
-              <p className="text-muted-foreground text-lg">
+            <div className="text-center py-20 bg-white/50 rounded-[3rem] border-2 border-dashed border-[#2C1810]/10">
+              <p className="text-muted-foreground text-lg italic font-light">
                 No blog posts available at the moment
               </p>
             </div>
@@ -366,62 +389,67 @@ const Index = () => {
       </section>
 
       {/* Testimonials */}
-      <section className="py-16 bg-background">
+      <section className="py-12 bg-white relative overflow-hidden">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-foreground mb-4">
-              What People Say About Us
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-6">
-              Hear from our satisfied customers and community members
-            </p>
-            <Link to="/about#testimonials">
-              <Button variant="outline" size="lg">
-                <MessageSquare className="h-5 w-5 mr-2" />
+          <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-6">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-widest">
+                <MessageSquare className="h-3 w-3" /> Voice of Community
+              </div>
+              <h2 className="text-4xl md:text-5xl font-bold font-playfair text-[#2C1810]">
+                What People Say
+              </h2>
+              <p className="text-muted-foreground text-base md:text-lg font-light max-w-xl">
+                Hear from our satisfied customers and community members about their divine experiences.
+              </p>
+            </div>
+            <Link to="/about#feedback">
+              <Button variant="outline" className="rounded-full px-8 py-6 border-[#2C1810]/20 hover:bg-[#2C1810] hover:text-white transition-all duration-500 font-bold uppercase tracking-widest text-xs h-auto bg-transparent">
                 Share Your Story
               </Button>
             </Link>
           </div>
 
           {testimonials.length > 0 ? (
-            <div className="relative">
-              {testimonials.length > 1 && (
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="absolute left-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 rounded-full shadow-lg bg-background"
-                  onClick={() => scroll(testimonialsScrollRef, "left")}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-              )}
+            <div className="group/testimonials-scroll relative px-2">
               <div
                 ref={testimonialsScrollRef}
-                className="flex gap-6 overflow-x-auto scrollbar-hide py-4"
+                className="flex gap-8 overflow-x-auto scrollbar-hide py-8 pt-4 snap-x snap-mandatory"
                 style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
               >
                 {testimonials.map((testimonial: Testimonial) => (
-                  <TestimonialCard
-                    key={testimonial.id}
-                    testimonial={testimonial}
-                    onClick={() => setSelectedTestimonial(testimonial)}
-                  />
+                  <div key={testimonial.id} className="flex-shrink-0 w-[280px] sm:w-[320px] snap-start">
+                    <TestimonialCard
+                      testimonial={testimonial}
+                      onClick={() => setSelectedTestimonial(testimonial)}
+                    />
+                  </div>
                 ))}
               </div>
-              {testimonials.length > 1 && (
+
+              {/* Custom Scroll Controls - Premium */}
+              <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 flex justify-between pointer-events-none px-4">
                 <Button
                   variant="outline"
                   size="icon"
-                  className="absolute right-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 rounded-full shadow-lg bg-background"
+                  className="h-12 w-12 rounded-full shadow-xl bg-white/90 backdrop-blur-sm border-none pointer-events-auto opacity-0 group-hover/testimonials-scroll:opacity-100 -translate-x-6 group-hover/testimonials-scroll:translate-x-0 transition-all duration-500 hover:bg-[#B85C3C] hover:text-white"
+                  onClick={() => scroll(testimonialsScrollRef, "left")}
+                >
+                  <ChevronLeft className="h-6 w-6" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-12 w-12 rounded-full shadow-xl bg-white/90 backdrop-blur-sm border-none pointer-events-auto opacity-0 group-hover/testimonials-scroll:opacity-100 translate-x-6 group-hover/testimonials-scroll:translate-x-0 transition-all duration-500 hover:bg-[#B85C3C] hover:text-white"
                   onClick={() => scroll(testimonialsScrollRef, "right")}
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className="h-6 w-6" />
                 </Button>
-              )}
+              </div>
             </div>
           ) : (
-            <div className="text-center py-12 bg-muted/30 rounded-lg">
-              <p className="text-muted-foreground text-lg">
+            <div className="text-center py-20 bg-muted/20 rounded-[3rem] border-2 border-dashed border-border/50">
+              <p className="text-muted-foreground text-lg italic font-light">
                 No testimonials yet. Be the first to share your experience!
               </p>
             </div>

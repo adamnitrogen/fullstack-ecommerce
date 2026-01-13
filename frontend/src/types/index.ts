@@ -427,6 +427,11 @@ export interface CartTotals {
   coupon?: Coupon | null;
 }
 
+export interface DeliverySettings {
+  delivery_threshold: number;
+  delivery_charge: number;
+}
+
 // Checkout & Payment Types
 export interface CheckoutAddress {
   id: string;

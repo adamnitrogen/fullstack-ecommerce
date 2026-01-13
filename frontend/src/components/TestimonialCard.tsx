@@ -13,9 +13,8 @@ function CompactStarRating({ rating }: { rating: number }) {
       {[...Array(5)].map((_, i) => (
         <svg
           key={i}
-          className={`h-4 w-4 ${
-            i < rating ? "text-accent fill-accent" : "text-muted fill-muted"
-          }`}
+          className={`h-4 w-4 ${i < rating ? "text-accent fill-accent" : "text-muted fill-muted"
+            }`}
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 24 24"
           fill="currentColor"
@@ -33,32 +32,36 @@ export function TestimonialCard({
 }: TestimonialCardProps) {
   return (
     <div
-      className="flex-shrink-0 w-[380px] h-[280px] bg-card p-6 rounded-lg shadow-soft hover:shadow-elevated transition-all cursor-pointer flex flex-col"
+      className="flex-shrink-0 w-full bg-[#FAF7F2] p-8 rounded-[2rem] border border-transparent hover:border-[#B85C3C]/20 hover:bg-white hover:shadow-elevated transition-all duration-500 cursor-pointer flex flex-col group h-full"
       onClick={onClick}
     >
-      <div className="flex items-center gap-4 mb-4">
+      <div className="flex items-center gap-4 mb-6">
         <UserAvatar
           name={testimonial.name}
           image={testimonial.image}
           size="sm"
         />
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-foreground truncate">
+          <h3 className="font-bold text-[#2C1810] font-playfair truncate group-hover:text-[#B85C3C] transition-colors">
             {testimonial.name}
           </h3>
           {testimonial.role && (
-            <p className="text-sm text-muted-foreground truncate">
+            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest truncate">
               {testimonial.role}
             </p>
           )}
         </div>
       </div>
-      <div className="mb-3">
+      <div className="mb-4">
         <CompactStarRating rating={testimonial.rating} />
       </div>
-      <p className="text-muted-foreground leading-relaxed break-words line-clamp-6 flex-1 overflow-hidden">
+      <p className="text-sm text-muted-foreground/80 font-light leading-relaxed break-words line-clamp-5 italic flex-1 overflow-hidden">
         &ldquo;{testimonial.content}&rdquo;
       </p>
+
+      <div className="mt-6 pt-4 border-t border-[#2C1810]/5 flex items-center gap-2 text-[10px] font-bold text-[#B85C3C] tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
+        READ STORY
+      </div>
     </div>
   );
 }

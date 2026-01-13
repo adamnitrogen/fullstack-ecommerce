@@ -190,6 +190,7 @@ app.use('/api/analytics', require('./routes/analytics.routes'));
 app.use('/api/returns', require('./routes/return.routes'));
 app.use('/api/email', require('./routes/email.routes'));
 app.use('/api/logs', require('./routes/logs.routes'));
+app.use('/api/settings', require('./routes/settings.routes'));
 
 // Global Error Handler (Must be last)
 app.use(require('./middleware/error.middleware'));

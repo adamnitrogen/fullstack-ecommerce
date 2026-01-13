@@ -1,6 +1,7 @@
 const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
-const { validateCoupon, calculateCouponDiscount, DELIVERY_THRESHOLD, DELIVERY_CHARGE } = require('./coupon.service');
+const { validateCoupon, calculateCouponDiscount } = require('./coupon.service');
+const settingsService = require('./settings.service');
 
 /**
  * Cart Service
@@ -245,11 +246,11 @@ async function calculateCartTotals(userId, existingCart = null) {
         }
 
         // Calculate delivery charge
-        const amountAfterCoupon = totalPrice - couponDiscount;
-        const deliveryCharge = amountAfterCoupon >= DELIVERY_THRESHOLD ? 0 : DELIVERY_CHARGE;
+        const settings = await settingsService.getDeliverySettings();
+        const deliveryCharge = totalPrice >= settings.delivery_threshold ? 0 : settings.delivery_charge;
 
         // Calculate final amount
-        const finalAmount = amountAfterCoupon + deliveryCharge;
+        const finalAmount = (totalPrice - couponDiscount) + deliveryCharge;
 
         return {
             itemsCount: cartItems.reduce((sum, item) => sum + item.quantity, 0),

@@ -1,4 +1,4 @@
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
   const { isManager } = useManagerPermissions();
 
   return (
@@ -23,11 +24,11 @@ export default function AdminLayout() {
       />
 
       <div
-        className={`flex-1 transition-all duration-300 ${sidebarOpen ? (sidebarCollapsed ? "md:ml-16" : "md:ml-64") : "ml-0"
+        className={`flex-1 transition-all duration-300 ease-in-out ${sidebarOpen ? (sidebarCollapsed ? "md:ml-16" : "md:ml-64") : "ml-0"
           }`}
       >
-        <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="flex h-16 items-center gap-4 px-6">
+        <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
+          <div className="flex h-16 items-center gap-4 px-6 relative">
             <Button
               variant="ghost"
               size="icon"
@@ -37,12 +38,12 @@ export default function AdminLayout() {
               <Menu className="h-5 w-5" />
             </Button>
             <div className="flex-1">
-              <h1 className="text-2xl font-bold">
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent animate-in fade-in slide-in-from-left-2 duration-500">
                 {isManager ? "Manager Portal" : "Admin Portal"}
               </h1>
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground">
+              <span className="text-sm text-muted-foreground hidden sm:inline-block">
                 Welcome, {user?.name || 'User'}
               </span>
               <Button
@@ -50,6 +51,7 @@ export default function AdminLayout() {
                 size="icon"
                 onClick={() => navigate("/")}
                 title="Back to Website"
+                className="hover:scale-110 transition-transform duration-200"
               >
                 <Home className="h-5 w-5" />
               </Button>
@@ -58,7 +60,9 @@ export default function AdminLayout() {
         </header>
 
         <main className="p-6">
-          <Outlet />
+          <div key={location.pathname} className="animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

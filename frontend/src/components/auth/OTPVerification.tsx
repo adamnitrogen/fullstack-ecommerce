@@ -2,7 +2,7 @@ import { useState, useRef, KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Pencil } from "lucide-react";
+import { Pencil, ArrowLeft, RefreshCw, Shield } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { toast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
@@ -36,14 +36,12 @@ export function OTPVerification({
   const login = useAuthStore((state) => state.login);
 
   const handleChange = (index: number, value: string) => {
-    // Only allow digits
     if (value && !/^\d$/.test(value)) return;
 
     const newOtp = [...otp];
     newOtp[index] = value;
     setOtp(newOtp);
 
-    // Auto-focus next input
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
@@ -66,7 +64,6 @@ export function OTPVerification({
     });
     setOtp(newOtp);
 
-    // Focus last filled input or next empty
     const nextIndex = Math.min(pastedData.length, 5);
     inputRefs.current[nextIndex]?.focus();
   };
@@ -86,8 +83,6 @@ export function OTPVerification({
     setIsVerifying(true);
 
     if (isForgotPassword) {
-      // Just verify OTP for password reset, don't login
-      // TODO: Implement real API call for forgot password OTP verify if needed
       setTimeout(() => {
         toast({
           title: t("auth.success"),
@@ -100,14 +95,7 @@ export function OTPVerification({
     }
 
     if (isRegistration) {
-      // Registration flow usually involves verifying OTP then calling register
-      // For now keeping mock/delay consistent with previous behavior or assuming parent handles it
-      // But effectively we might want to verify OTP here too?
-      // IMPORTANT: The previous code just mocked success.
-      // If we want to change ONLY login, we keep this as is.
       setTimeout(() => {
-        // Mock user data for registration flow (or just success)
-        // The parent component likely takes over after onVerified
         const mockUser = {
           id: Math.random().toString(36).substr(2, 9),
           name: name || "New User",
@@ -116,10 +104,7 @@ export function OTPVerification({
           addresses: [],
         };
 
-        // For registration we often don't login immediately until final step, 
-        // but previous code did login(mockUser).
-        // I'll keep previous behavior for registration to avoid breaking it.
-        login(mockUser); // This might be wrong for registration if it's not fully complete?
+        login(mockUser);
 
         toast({
           title: t("auth.success"),
@@ -131,7 +116,6 @@ export function OTPVerification({
       return;
     }
 
-    // LOGIN FLOW
     try {
       const response = await apiClient.post('/auth/verify-login-otp', {
         email: emailOrPhone,
@@ -140,7 +124,6 @@ export function OTPVerification({
 
       const { user } = response.data;
 
-      // Login updates the store
       login(user);
 
       toast({
@@ -148,7 +131,6 @@ export function OTPVerification({
         description: t("auth.loginSuccess"),
       });
 
-      // Pass userData to parent
       onVerified(user.role === 'admin' || user.role === 'manager', user);
 
     } catch (error: unknown) {
@@ -164,16 +146,16 @@ export function OTPVerification({
 
   const getTitle = () => {
     if (isForgotPassword) return "Reset Password";
-    if (isRegistration) return "Verify Registration";
-    return "Verify OTP";
+    if (isRegistration) return "Verify Your Account";
+    return "Enter Verification Code";
   };
 
   const getDescription = () => {
     if (isForgotPassword)
-      return `Enter the 6-digit code sent to ${emailOrPhone} to reset your password`;
+      return `We sent a 6-digit code to reset your password`;
     if (isRegistration)
-      return `Enter the 6-digit code sent to ${emailOrPhone} to verify your account`;
-    return `Enter the 6-digit code sent to ${emailOrPhone}`;
+      return `We sent a 6-digit code to verify your account`;
+    return `We sent a 6-digit code to your email/phone`;
   };
 
   const handleResendOTP = () => {
@@ -185,34 +167,39 @@ export function OTPVerification({
     inputRefs.current[0]?.focus();
   };
 
+  const isComplete = otp.join("").length === 6;
+
   return (
-    <div className="p-6 sm:p-8">
+    <div className="p-6 sm:p-8 bg-white">
       {/* Header */}
-      <div className="text-center mb-6">
+      <div className="text-center mb-8">
         <div className="flex items-center justify-center mb-4">
-          <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center">
-            <span className="text-3xl">🐄</span>
+          <div className="w-16 h-16 bg-gradient-to-br from-[#B85C3C] to-[#D4AF37] rounded-2xl flex items-center justify-center shadow-lg shadow-[#B85C3C]/20">
+            <Shield className="w-8 h-8 text-white" />
           </div>
         </div>
-        <h2 className="text-lg font-semibold text-foreground mb-1">
+        <h2 className="text-2xl font-bold text-[#2C1810] font-playfair mb-1">
           {getTitle()}
         </h2>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-[#2C1810]/60">
           {getDescription()}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onBack}
-            className="ml-1 h-auto p-1 inline-flex"
-          >
-            <Pencil className="h-3 w-3" />
-          </Button>
         </p>
+
+        {/* Email/Phone Display with Edit */}
+        <div className="mt-3 inline-flex items-center gap-2 bg-[#FAF7F2] px-3 py-1.5 rounded-full">
+          <span className="text-sm font-medium text-[#B85C3C]">{emailOrPhone}</span>
+          <button
+            onClick={onBack}
+            className="text-[#2C1810]/40 hover:text-[#B85C3C] transition-colors"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* OTP Input - 6 Separate Boxes */}
       <div className="space-y-6">
-        <div className="flex justify-center gap-2">
+        <div className="flex justify-center gap-2 sm:gap-3">
           {otp.map((digit, index) => (
             <Input
               key={index}
@@ -224,34 +211,66 @@ export function OTPVerification({
               onChange={(e) => handleChange(index, e.target.value)}
               onKeyDown={(e) => handleKeyDown(index, e)}
               onPaste={index === 0 ? handlePaste : undefined}
-              className="w-12 h-12 text-center text-lg font-semibold"
+              className={`w-11 h-14 sm:w-12 sm:h-14 text-center text-xl font-bold rounded-xl border-2 bg-[#FAF7F2] focus:bg-white transition-all ${digit
+                  ? "border-[#B85C3C] text-[#2C1810]"
+                  : "border-[#B85C3C]/10 text-[#2C1810]/60"
+                } focus:border-[#B85C3C] focus:ring-2 focus:ring-[#B85C3C]/20`}
               autoFocus={index === 0}
+            />
+          ))}
+        </div>
+
+        {/* Progress Indicator */}
+        <div className="flex justify-center gap-1">
+          {otp.map((digit, index) => (
+            <div
+              key={index}
+              className={`w-2 h-2 rounded-full transition-all ${digit ? 'bg-[#B85C3C]' : 'bg-[#B85C3C]/20'}`}
             />
           ))}
         </div>
 
         <Button
           onClick={handleVerify}
-          className="w-full"
+          className={`w-full h-12 rounded-xl text-base font-bold transition-all duration-300 shadow-lg ${isComplete
+              ? "bg-[#B85C3C] hover:bg-[#2C1810] shadow-[#B85C3C]/20"
+              : "bg-[#B85C3C]/50 cursor-not-allowed"
+            }`}
           size="lg"
-          disabled={isVerifying || otp.join("").length !== 6}
+          disabled={isVerifying || !isComplete}
         >
-          {isVerifying ? "Verifying..." : "Verify & Continue"}
+          {isVerifying ? (
+            <span className="flex items-center gap-2">
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              Verifying...
+            </span>
+          ) : (
+            "Verify & Continue"
+          )}
         </Button>
 
-        <div className="text-center">
-          <p className="text-sm text-muted-foreground mb-2">
+        {/* Resend Section */}
+        <div className="text-center space-y-2">
+          <p className="text-sm text-[#2C1810]/50">
             Didn't receive the code?
           </p>
-          <Button
-            variant="link"
-            className="text-primary"
+          <button
+            className="text-[#B85C3C] hover:text-[#2C1810] font-bold text-sm transition-colors"
             onClick={handleResendOTP}
             disabled={isVerifying}
           >
             Resend OTP
-          </Button>
+          </button>
         </div>
+
+        {/* Back Button */}
+        <button
+          onClick={onBack}
+          className="w-full flex items-center justify-center gap-2 text-sm text-[#2C1810]/50 hover:text-[#B85C3C] transition-colors"
+        >
+          <ArrowLeft size={14} />
+          Back to previous step
+        </button>
       </div>
     </div>
   );

@@ -1,28 +1,17 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate } from "react-router-dom";
-import {
-  Minus,
-  Plus,
-  X,
-  ShoppingBag,
-  Package,
-  RotateCcw,
-  Tag as TagIcon,
-  Loader2,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
-import { Tag } from "@/components/ui/Tag";
+import { useNavigate } from "react-router-dom";
+import { ShieldCheck, Truck, RotateCcw, Headphones } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
 import AuthPage from "@/pages/Auth";
-import { toast } from "sonner";
-
-const DELIVERY_THRESHOLD = 1500; // Updated from 2000
-const DELIVERY_CHARGE = 50;
+import { CartItem } from "@/components/cart/CartItem";
+import { CartSummary } from "@/components/cart/CartSummary";
+import { EmptyCart } from "@/components/cart/EmptyCart";
+import { Skeleton } from "@/components/ui/skeleton";
+import { BackButton } from "@/components/ui/BackButton";
+import { couponService } from "@/services/coupon.service";
+import { Coupon } from "@/types";
 
 const Cart = () => {
   const { t } = useTranslation();
@@ -37,10 +26,11 @@ const Cart = () => {
     updateQuantity,
     applyCoupon,
     removeCoupon,
+    deliverySettings,
   } = useCartStore();
   const { isAuthenticated } = useAuthStore();
-  const [couponCode, setCouponCode] = useState("");
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
+  const [availableCoupons, setAvailableCoupons] = useState<Coupon[]>([]);
 
   // Fetch cart on mount
   useEffect(() => {
@@ -49,24 +39,18 @@ const Cart = () => {
     }
   }, [isAuthenticated, initialized, fetchCart]);
 
-  // Calculate pricing helper
-  const calculateDiscount = (mrp: number, price: number) => {
-    return Math.round(((mrp - price) / mrp) * 100);
-  };
-
-  const handleApplyCoupon = async () => {
-    if (!couponCode.trim()) {
-      toast.error("Please enter a coupon code");
-      return;
-    }
-
-    await applyCoupon(couponCode);
-    setCouponCode("");
-  };
-
-  const handleRemoveCoupon = async () => {
-    await removeCoupon();
-  };
+  // Fetch available coupons
+  useEffect(() => {
+    const fetchCoupons = async () => {
+      try {
+        const coupons = await couponService.getActive();
+        setAvailableCoupons(coupons);
+      } catch (error) {
+        console.error("Failed to fetch coupons:", error);
+      }
+    };
+    fetchCoupons();
+  }, []);
 
   const handlePlaceOrder = () => {
     if (!isAuthenticated) {
@@ -76,341 +60,134 @@ const Cart = () => {
     navigate("/checkout");
   };
 
+  const benefits = [
+    {
+      icon: <Truck className="w-6 h-6" />,
+      title: "Fast Delivery",
+      description: "Get your orders delivered within 2-4 business days."
+    },
+    {
+      icon: <ShieldCheck className="w-6 h-6" />,
+      title: "Secure Payment",
+      description: "100% secure payment processing with top-tier encryption."
+    },
+    {
+      icon: <RotateCcw className="w-6 h-6" />,
+      title: "Easy Returns",
+      description: "Not satisfied? Return your items within 30 days easily."
+    },
+    {
+      icon: <Headphones className="w-6 h-6" />,
+      title: "24/7 Support",
+      description: "Our dedicated support team is always here to help you."
+    }
+  ];
+
+  // Loading state
   if (isLoading && !initialized) {
     return (
-      <div className="min-h-screen bg-background py-16 flex justify-center items-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="min-h-screen bg-background py-16">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex gap-4 p-4 border rounded-xl">
+                  <Skeleton className="h-24 w-24 rounded-lg" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="h-4 w-1/3" />
+                    <Skeleton className="h-8 w-1/4 mt-2" />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="lg:col-span-1">
+              <Skeleton className="h-96 w-full rounded-xl" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
+  // Loaded but empty
   if (items.length === 0) {
     return (
-      <div className="min-h-screen bg-background py-16">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <ShoppingBag className="h-24 w-24 mx-auto text-muted-foreground mb-6" />
-          <h1 className="text-3xl font-bold mb-4">{t("cart.empty")}</h1>
-          <p className="text-muted-foreground mb-8">
-            Looks like you haven't added any items to your cart yet
-          </p>
-          <Link to="/shop">
-            <Button variant="default" size="lg">
-              {t("cart.continue")}
-            </Button>
-          </Link>
+      <div className="min-h-screen bg-background py-8">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <BackButton to="/shop" label={t("cart.continue")} />
+          <EmptyCart />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background py-8">
+    <div className="min-h-screen bg-background py-8 sm:py-16 animate-in fade-in duration-700">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-bold mb-8">{t("cart.title")}</h1>
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
+          <div className="space-y-2">
+            <h1 className="text-4xl md:text-5xl font-black tracking-tight font-playfair">{t("cart.title")}</h1>
+            <p className="text-muted-foreground flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-primary" />
+              You have {items.length} {items.length === 1 ? 'item' : 'items'} in your shopping bag
+            </p>
+          </div>
+          <BackButton to="/shop" label="Continue Shopping" variant="pill" className="rounded-full px-6" />
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Cart Items */}
-          <div className="lg:col-span-2 space-y-4">
-            {items.map((item) => {
-              const itemMRP = item.product.mrp || item.product.price;
-              const itemDiscount = item.product.mrp
-                ? calculateDiscount(item.product.mrp, item.product.price)
-                : 0;
-              const hasDiscount = itemMRP > item.product.price;
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 lg:gap-16 items-start">
+          {/* Cart Items List */}
+          <div className="lg:col-span-2 space-y-6 sm:space-y-8">
+            <div className="space-y-6">
+              {items.map((item) => (
+                <CartItem
+                  key={item.productId}
+                  item={item}
+                  updateQuantity={updateQuantity}
+                  removeItem={removeItem}
+                  isLoading={isLoading}
+                  isFreeDelivery={totals?.deliveryCharge === 0}
+                />
+              ))}
+            </div>
 
-              return (
-                <Card key={item.productId}>
-                  <CardContent className="p-4 md:p-6">
-                    <div className="flex gap-4">
-                      {/* Product Image */}
-                      <Link to={`/product/${item.productId}`}>
-                        <img
-                          src={item.product.images[0]}
-                          alt={item.product.title}
-                          loading="lazy"
-                          className="w-20 h-20 md:w-28 md:h-28 object-cover rounded-lg hover:opacity-80 transition-opacity cursor-pointer"
-                        />
-                      </Link>
-
-                      {/* Product Details */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="flex-1 pr-2">
-                            <Link to={`/product/${item.productId}`}>
-                              <h3 className="font-semibold text-base md:text-lg hover:text-primary transition-colors line-clamp-1">
-                                {item.product.title}
-                              </h3>
-                            </Link>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Tag variant="category" size="sm">
-                                {item.product.category}
-                              </Tag>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => removeItem(item.productId)}
-                            className="text-muted-foreground hover:text-destructive transition-smooth flex-shrink-0"
-                            aria-label="Remove item"
-                            disabled={isLoading}
-                          >
-                            <X className="h-5 w-5" />
-                          </button>
-                        </div>
-
-                        {/* Short Description */}
-                        <p className="text-xs md:text-sm text-muted-foreground line-clamp-2 mb-3">
-                          {item.product.description}
-                        </p>
-
-                        {/* Price Details */}
-                        <div className="flex items-baseline gap-2 mb-3 flex-wrap">
-                          <p className="text-lg md:text-xl font-bold text-primary">
-                            ₹{item.product.price}
-                          </p>
-                          {hasDiscount && (
-                            <>
-                              <p className="text-sm text-muted-foreground line-through">
-                                ₹{itemMRP}
-                              </p>
-                              <Tag variant="discount" size="sm">
-                                {itemDiscount}% OFF
-                              </Tag>
-                            </>
-                          )}
-                        </div>
-
-                        {/* Return Policy & Quantity Controls */}
-                        <div className="flex items-center justify-between gap-4 flex-wrap">
-                          {/* Return Info */}
-                          <div className="flex items-center gap-4 text-xs md:text-sm">
-                            {item.product.isReturnable ? (
-                              <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
-                                <RotateCcw className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                                <span className="font-medium">
-                                  {item.product.returnDays} days return
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1 text-muted-foreground">
-                                <Package className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                                <span>Non-returnable</span>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Quantity Controls */}
-                          <div className="flex items-center gap-3 border border-border rounded-lg p-1">
-                            <button
-                              onClick={() => {
-                                if (item.quantity > 1) {
-                                  updateQuantity(item.productId, item.quantity - 1);
-                                } else {
-                                  removeItem(item.productId);
-                                }
-                              }}
-                              className="p-1 hover:bg-muted rounded transition-smooth"
-                              aria-label="Decrease quantity"
-                            >
-                              <Minus className="h-4 w-4" />
-                            </button>
-                            <span className="w-8 text-center font-medium">
-                              {item.quantity}
-                            </span>
-                            <button
-                              onClick={() =>
-                                updateQuantity(item.productId, item.quantity + 1)
-                              }
-                              className="p-1 hover:bg-muted rounded transition-smooth"
-                              disabled={
-                                item.product.inventory !== undefined &&
-                                item.quantity >= item.product.inventory
-                              }
-                              aria-label="Increase quantity"
-                            >
-                              <Plus className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Item Total */}
-                        <div className="mt-3 pt-3 border-t border-border">
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-muted-foreground">
-                              Item Total:
-                            </span>
-                            <span className="text-lg font-bold text-primary">
-                              ₹{item.product.price * item.quantity}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+            <div className="mt-12 pt-8 border-t border-dashed border-border/60 flex items-center justify-between">
+              <p className="text-sm text-muted-foreground italic">
+                * Prices are inclusive of all taxes
+              </p>
+            </div>
           </div>
 
-          {/* Price Details */}
-          <div className="lg:col-span-1">
-            <Card className="sticky top-24">
-              <CardHeader>
-                <CardTitle className="text-xl">Price Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Price Breakdown */}
-                <div className="space-y-3">
-                  {/* Total MRP */}
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      Items Price ({totals?.itemsCount || items.length}{" "}
-                      {(totals?.itemsCount || items.length) === 1
-                        ? "item"
-                        : "items"}
-                      )
-                    </span>
-                    <span className="font-medium">₹{totals?.totalMrp || 0}</span>
-                  </div>
-
-                  {/* Discount */}
-                  {totals && totals.discount > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        Discount Price
-                      </span>
-                      <span className="font-medium text-green-600">
-                        −₹{totals.discount}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Delivery Charges */}
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      Delivery Charges
-                      {totals && totals.totalPrice < DELIVERY_THRESHOLD && (
-                        <span className="block text-xs mt-0.5">
-                          (Free above ₹{DELIVERY_THRESHOLD})
-                        </span>
-                      )}
-                    </span>
-                    <span className="font-medium">
-                      {totals?.deliveryCharge === 0 ? (
-                        <span className="text-green-600">Free</span>
-                      ) : (
-                        `₹${totals?.deliveryCharge || 0}`
-                      )}
-                    </span>
-                  </div>
-
-                  {/* Coupon Discount */}
-                  {totals?.coupon && totals.couponDiscount > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground flex items-center gap-1">
-                        Coupon ({totals.coupon.code})
-                      </span>
-                      <span className="font-medium text-green-600">
-                        −₹{totals.couponDiscount}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                <Separator />
-
-                {/* Coupon Section */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <TagIcon className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-medium">Apply Coupon</span>
-                  </div>
-                  {totals?.coupon ? (
-                    <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <Tag variant="success" size="sm">
-                          {totals.coupon.code}
-                        </Tag>
-                        <span className="text-xs text-green-700 dark:text-green-300">
-                          Applied
-                        </span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleRemoveCoupon}
-                        className="h-7 text-xs"
-                        disabled={isLoading}
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <Input
-                        id="coupon-code"
-                        name="coupon-code"
-                        placeholder="Enter coupon code"
-                        value={couponCode}
-                        onChange={(e) =>
-                          setCouponCode(e.target.value.toUpperCase())
-                        }
-                        className="flex-1"
-                        disabled={isLoading}
-                      />
-                      <Button
-                        variant="outline"
-                        onClick={handleApplyCoupon}
-                        disabled={!couponCode || isLoading}
-                      >
-                        {isLoading ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          "Apply"
-                        )}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                <Separator />
-
-                {/* Order Total */}
-                <div className="pt-2">
-                  <div className="flex justify-between items-center mb-4">
-                    <span className="text-lg font-bold">Order Total</span>
-                    <span className="text-2xl font-bold text-primary">
-                      ₹{totals?.finalAmount || 0}
-                    </span>
-                  </div>
-
-                  {totals && totals.discount + totals.couponDiscount > 0 && (
-                    <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                      <p className="text-sm text-green-700 dark:text-green-300 font-medium">
-                        You saved ₹{totals.discount + totals.couponDiscount} on
-                        this order!
-                      </p>
-                    </div>
-                  )}
-
-                  <Button
-                    variant="default"
-                    className="w-full mb-3"
-                    size="lg"
-                    onClick={handlePlaceOrder}
-                    disabled={isLoading}
-                  >
-                    Place Order
-                  </Button>
-
-                  <Link to="/shop" className="block">
-                    <Button variant="outline" className="w-full">
-                      {t("cart.continue")}
-                    </Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Cart Summary Side Panel */}
+          <div className="lg:col-span-1 relative lg:sticky lg:top-24">
+            <CartSummary
+              totals={totals}
+              itemsCount={items.length}
+              isLoading={isLoading}
+              onApplyCoupon={applyCoupon}
+              onRemoveCoupon={removeCoupon}
+              isAuthenticated={isAuthenticated}
+              onCheckout={handlePlaceOrder}
+              availableCoupons={availableCoupons}
+              deliverySettings={deliverySettings}
+            />
           </div>
+        </div>
+
+        {/* Benefits Section */}
+        <div className="mt-24 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 border-t border-border/60 pt-16">
+          {benefits.map((benefit, index) => (
+            <div key={index} className="flex flex-col items-center text-center space-y-4 p-6 rounded-3xl hover:bg-muted/50 transition-all group border border-transparent hover:border-border/50">
+              <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300">
+                {benefit.icon}
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-bold text-sm uppercase tracking-widest">{benefit.title}</h3>
+                <p className="text-xs text-muted-foreground leading-relaxed px-4">{benefit.description}</p>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 

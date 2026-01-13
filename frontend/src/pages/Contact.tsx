@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { faqService } from "@/services/faq.service";
 import { socialMediaService } from "@/services/social-media.service";
@@ -19,7 +19,9 @@ import {
   Link as LinkIcon,
   Loader2,
   Clock,
+  Heart,
 } from "lucide-react";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -32,6 +34,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage, getErrorDetails } from "@/lib/errorUtils";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 export default function Contact() {
   const { t } = useTranslation();
@@ -52,6 +60,8 @@ export default function Contact() {
     },
   });
 
+
+
   const { data: socialMediaLinks = [], isLoading: isLoadingSocial } = useQuery({
     queryKey: ["social-media-links"],
     queryFn: () => socialMediaService.getAll(),
@@ -61,6 +71,19 @@ export default function Contact() {
     queryKey: ["contact-info-public"],
     queryFn: () => contactInfoService.getAll(false),
   });
+
+  const location = useLocation();
+
+  useEffect(() => {
+    if (!isLoadingFAQs && !isLoadingSocial && !isLoadingContact && location.hash) {
+      const element = document.getElementById(location.hash.replace('#', ''));
+      if (element) {
+        setTimeout(() => {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+      }
+    }
+  }, [isLoadingFAQs, isLoadingSocial, isLoadingContact, location.hash]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,142 +161,161 @@ export default function Contact() {
   };
 
   if (isLoadingFAQs || isLoadingSocial || isLoadingContact) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FDFBF7]">
-        <Loader2 className="h-8 w-8 animate-spin text-[#B85C3C]" />
-      </div>
-    )
+    return <LoadingOverlay isLoading={true} message="Loading contact information..." />;
   }
 
   const primaryPhone = contactInfo?.phones.find(p => p.is_primary) || contactInfo?.phones[0];
   const primaryEmail = contactInfo?.emails.find(e => e.is_primary) || contactInfo?.emails[0];
   const address = contactInfo?.address;
 
+  // Helper function to format time from 24hr to 12hr with AM/PM
+  const formatTime = (time: string): string => {
+    if (!time) return '';
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
+  };
+
   return (
-    <div className="min-h-screen bg-[#FDFBF7] pt-12 pb-20">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
-        {/* Header */}
-        <div className="mb-12">
-          <h1 className="text-4xl font-bold mb-3 text-[#2C1810] font-playfair">{t("contact.title")}</h1>
-          <p className="text-muted-foreground text-lg">{t("contact.subtitle")}</p>
+    <div className="min-h-screen bg-background pb-20 overflow-hidden">
+      {/* Hero Section */}
+      <section className="relative h-[60vh] flex items-center justify-center overflow-hidden">
+        <div className="absolute inset-0 z-0">
+          <img
+            src="/contact-hero.png"
+            alt="Contact Hero"
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-background" />
         </div>
 
+        <div className="container relative z-10 mx-auto px-4 text-center">
+          <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 font-playfair animate-in fade-in slide-in-from-bottom-8 duration-700">
+            {t("contact.title")}
+          </h1>
+          <p className="text-xl md:text-2xl text-white/90 max-w-2xl mx-auto font-light leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
+            {t("contact.subtitle")}
+          </p>
+        </div>
+
+        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-background to-transparent" />
+      </section>
+
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl -mt-16 relative z-20">
         {/* Contact Info Cards Row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
           {/* Phone Card */}
-          <Card className="border-none shadow-sm hover:shadow-md transition-shadow bg-white">
-            <CardContent className="p-8 flex flex-col items-center text-center">
-              <div className="w-12 h-12 rounded-full bg-[#FDFBF7] flex items-center justify-center mb-4 text-[#B85C3C]">
-                <Phone className="h-6 w-6" />
+          <Card className="border-none shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 bg-white/80 backdrop-blur-md">
+            <CardContent className="p-10 flex flex-col items-center text-center">
+              <div className="w-16 h-16 rounded-2xl bg-[#B85C3C]/10 flex items-center justify-center mb-6 text-[#B85C3C]">
+                <Phone className="h-8 w-8" />
               </div>
-              <h3 className="font-bold text-[#2C1810] mb-2 text-lg">Phone</h3>
+              <h3 className="text-xl font-bold text-[#2C1810] mb-3">{t("contact.phone")}</h3>
               {primaryPhone ? (
-                <div className="text-muted-foreground space-y-1">
-                  <p>{primaryPhone.number}</p>
+                <div className="text-muted-foreground space-y-1 text-lg">
+                  <a href={`tel:${primaryPhone.number}`} className="hover:text-[#B85C3C] transition-colors">
+                    {primaryPhone.number}
+                  </a>
                   {(contactInfo?.phones?.length ?? 0) > 1 && (
-                    <p>{contactInfo?.phones?.[1]?.number}</p>
+                    <p className="opacity-60 text-sm mt-1">{contactInfo?.phones?.[1]?.number}</p>
                   )}
                 </div>
               ) : (
-                <p className="text-muted-foreground">No phone available</p>
+                <p className="text-muted-foreground italic opacity-70">Not set</p>
               )}
             </CardContent>
           </Card>
 
           {/* Email Card */}
-          <Card className="border-none shadow-sm hover:shadow-md transition-shadow bg-white">
-            <CardContent className="p-8 flex flex-col items-center text-center">
-              <div className="w-12 h-12 rounded-full bg-[#FDFBF7] flex items-center justify-center mb-4 text-[#B85C3C]">
-                <Mail className="h-6 w-6" />
+          <Card className="border-none shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 bg-white/80 backdrop-blur-md">
+            <CardContent className="p-10 flex flex-col items-center text-center">
+              <div className="w-16 h-16 rounded-2xl bg-[#B85C3C]/10 flex items-center justify-center mb-6 text-[#B85C3C]">
+                <Mail className="h-8 w-8" />
               </div>
-              <h3 className="font-bold text-[#2C1810] mb-2 text-lg">Email</h3>
+              <h3 className="text-xl font-bold text-[#2C1810] mb-3">{t("contact.email")}</h3>
               {primaryEmail ? (
-                <div className="text-muted-foreground space-y-1">
-                  <p>{primaryEmail.email}</p>
+                <div className="text-muted-foreground space-y-1 text-lg">
+                  <a href={`mailto:${primaryEmail.email}`} className="hover:text-[#B85C3C] transition-colors break-all">
+                    {primaryEmail.email}
+                  </a>
                   {(contactInfo?.emails?.length ?? 0) > 1 && (
-                    <p>{contactInfo?.emails?.[1]?.email}</p>
+                    <p className="opacity-60 text-sm mt-1 break-all">{contactInfo?.emails?.[1]?.email}</p>
                   )}
                 </div>
               ) : (
-                <p className="text-muted-foreground">No email available</p>
+                <p className="text-muted-foreground italic opacity-70">Not set</p>
               )}
             </CardContent>
           </Card>
 
           {/* Address Card */}
-          <Card className="border-none shadow-sm hover:shadow-md transition-shadow bg-white">
-            <CardContent className="p-8 flex flex-col items-center text-center">
-              <div className="w-12 h-12 rounded-full bg-[#FDFBF7] flex items-center justify-center mb-4 text-[#B85C3C]">
-                <MapPin className="h-6 w-6" />
+          <Card className="border-none shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 bg-white/80 backdrop-blur-md">
+            <CardContent className="p-10 flex flex-col items-center text-center">
+              <div className="w-16 h-16 rounded-2xl bg-[#B85C3C]/10 flex items-center justify-center mb-6 text-[#B85C3C]">
+                <MapPin className="h-8 w-8" />
               </div>
-              <h3 className="font-bold text-[#2C1810] mb-2 text-lg">Address</h3>
+              <h3 className="text-xl font-bold text-[#2C1810] mb-3">{t("contact.address")}</h3>
               {address ? (
-                <div className="text-muted-foreground">
+                <div className="text-muted-foreground text-lg leading-relaxed">
                   <p>{address.address_line1}</p>
                   <p>{address.city}, {address.state} {address.pincode}</p>
-                  <p>{address.country}</p>
                 </div>
               ) : (
-                <p className="text-muted-foreground">No address available</p>
+                <p className="text-muted-foreground italic opacity-70">Not set</p>
               )}
             </CardContent>
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-20">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-12 mb-20">
           {/* Left Column: Contact Form */}
-          <div>
-            <Card className="h-full border-none shadow-sm bg-white">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-2xl font-bold text-[#2C1810]">
+          <div className="lg:col-span-3 h-full" id="contact-form">
+            <Card className="border-none shadow-2xl bg-white p-2 h-full flex flex-col">
+              <CardHeader className="p-8 pb-4">
+                <CardTitle className="text-3xl font-bold text-[#2C1810]">
                   {t("contact.sendMessage")}
                 </CardTitle>
-                <p className="text-muted-foreground text-sm mt-1">
+                <p className="text-muted-foreground mt-2">
                   {t("contact.formSubtitle")}
                 </p>
               </CardHeader>
-              <CardContent className="pt-6">
-                <form onSubmit={handleSubmit} className="space-y-5">
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="text-[#2C1810] font-medium">
-                      {t("contact.name")} <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="John Doe"
-                      required
-                      autoComplete="name"
-                      className={`bg-[#FDFBF7] border-input/50 focus:bg-white transition-colors h-11 ${errors.name ? "border-destructive" : ""}`}
-                    />
-                    {errors.name && (
-                      <p className="text-xs text-destructive mt-1">{errors.name}</p>
-                    )}
+              <CardContent className="p-8 pt-4 flex-1">
+                <form onSubmit={handleSubmit} className="space-y-6 h-full flex flex-col">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="name" className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                        {t("contact.name")}
+                      </Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="John Doe"
+                        required
+                        className={`h-12 bg-muted/30 border-none focus-visible:ring-2 focus-visible:ring-[#B85C3C] ${errors.name ? "ring-2 ring-destructive" : ""}`}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                        {t("contact.email")}
+                      </Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        placeholder="john@example.com"
+                        required
+                        className={`h-12 bg-muted/30 border-none focus-visible:ring-2 focus-visible:ring-[#B85C3C] ${errors.email ? "ring-2 ring-destructive" : ""}`}
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="email" className="text-[#2C1810] font-medium">
-                      {t("contact.email")} <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      placeholder="john@example.com"
-                      required
-                      autoComplete="email"
-                      className={`bg-[#FDFBF7] border-input/50 focus:bg-white transition-colors h-11 ${errors.email ? "border-destructive" : ""}`}
-                    />
-                    {errors.email && (
-                      <p className="text-xs text-destructive mt-1">{errors.email}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="subject" className="text-[#2C1810] font-medium">
-                      {t("contact.subject")} <span className="text-destructive">*</span>
+                    <Label htmlFor="subject" className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                      {t("contact.subject")}
                     </Label>
                     <Input
                       id="subject"
@@ -281,44 +323,40 @@ export default function Contact() {
                       onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                       placeholder={t("contact.subjectPlaceholder")}
                       required
-                      className={`bg-[#FDFBF7] border-input/50 focus:bg-white transition-colors h-11 ${errors.subject ? "border-destructive" : ""}`}
+                      className={`h-12 bg-muted/30 border-none focus-visible:ring-2 focus-visible:ring-[#B85C3C] ${errors.subject ? "ring-2 ring-destructive" : ""}`}
                     />
-                    {errors.subject && (
-                      <p className="text-xs text-destructive mt-1">{errors.subject}</p>
-                    )}
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="message" className="text-[#2C1810] font-medium">
-                      {t("contact.message")} <span className="text-destructive">*</span>
+                    <Label htmlFor="message" className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                      {t("contact.message")}
                     </Label>
                     <Textarea
                       id="message"
                       value={formData.message}
                       onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                       placeholder={t("contact.messagePlaceholder")}
-                      rows={6}
+                      rows={10}
                       required
-                      className={`bg-[#FDFBF7] border-input/50 focus:bg-white transition-colors resize-none ${errors.message ? "border-destructive" : ""}`}
+                      className={`bg-muted/30 border-none focus-visible:ring-2 focus-visible:ring-[#B85C3C] resize-none ${errors.message ? "ring-2 ring-destructive" : ""}`}
                     />
-                    {errors.message && (
-                      <p className="text-xs text-destructive mt-1">{errors.message}</p>
-                    )}
                   </div>
+
+                  <div className="flex-1" />
 
                   <Button
                     type="submit"
-                    className="w-full bg-[#B85C3C] hover:bg-[#A04B2E] text-white font-medium h-12 text-base mt-2"
+                    className="w-full bg-[#B85C3C] hover:bg-[#A04B2E] text-white font-bold h-14 text-lg shadow-lg hover:shadow-xl transition-all mt-auto"
                     disabled={isSubmitting}
                   >
                     {isSubmitting ? (
                       <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        <Loader2 className="mr-3 h-6 w-6 animate-spin" />
                         {t("contact.sending")}
                       </>
                     ) : (
                       <>
-                        <Send className="mr-2 h-5 w-5" />
+                        <Send className="mr-3 h-5 w-5" />
                         {t("contact.send")}
                       </>
                     )}
@@ -328,16 +366,12 @@ export default function Contact() {
             </Card>
           </div>
 
-          {/* Right Column: Map, Hours, Socials */}
-          <div className="space-y-6">
-            {/* Map Section */}
-            <Card className="overflow-hidden border-none shadow-sm bg-white">
-              <div className="h-64 w-full bg-muted relative">
-                {isLoadingContact ? (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-                  </div>
-                ) : (
+          {/* Right Column: Information */}
+          <div className="lg:col-span-2 space-y-8">
+            {/* Map & Socials */}
+            <div className="space-y-6">
+              <Card className="overflow-hidden border-none shadow-xl bg-white group">
+                <div className="h-64 w-full bg-muted relative">
                   <iframe
                     width="100%"
                     height="100%"
@@ -358,70 +392,55 @@ export default function Contact() {
                     )}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
                     title="Office Location"
                   ></iframe>
-                )}
-              </div>
-              <div className="p-4">
-                <Button
-                  variant="outline"
-                  className="w-full border-[#B85C3C] text-[#B85C3C] hover:bg-[#B85C3C] hover:text-white h-11"
-                  onClick={() =>
-                    window.open(
-                      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                        [
-                          contactInfo?.address?.address_line1,
-                          contactInfo?.address?.city,
-                          contactInfo?.address?.state,
-                          contactInfo?.address?.pincode,
-                          contactInfo?.address?.country,
-                        ]
-                          .filter(Boolean)
-                          .join(", ") || "Vrindavan, Mathura"
-                      )}`,
-                      "_blank"
-                    )
-                  }
-                >
-                  <MapPin className="mr-2 h-4 w-4" />
-                  {t("contact.openInMaps")}
-                </Button>
-              </div>
-            </Card>
 
-            {/* Office Hours */}
-            <Card className="border-none shadow-sm bg-white">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xl font-bold text-[#2C1810]">Office Hours</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <div className="space-y-3">
+                  <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors pointer-events-none" />
+                </div>
+                <div className="p-4 bg-white flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm font-medium text-[#2C1810]">
+                    <MapPin className="h-4 w-4 text-[#B85C3C]" />
+                    <span>Our Location</span>
+                  </div>
+                  <Button
+                    variant="link"
+                    className="text-[#B85C3C] h-auto p-0 font-bold"
+                    onClick={() =>
+                      window.open(
+                        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                          [
+                            contactInfo?.address?.address_line1,
+                            contactInfo?.address?.city,
+                            contactInfo?.address?.state,
+                            contactInfo?.address?.pincode,
+                            contactInfo?.address?.country,
+                          ]
+                            .filter(Boolean)
+                            .join(", ") || "Vrindavan, Mathura"
+                        )}`,
+                        "_blank"
+                      )
+                    }
+                  >
+                    {t("contact.openInMaps")}
+                  </Button>
+                </div>
+              </Card>
+
+              {/* Office Hours */}
+              <Card className="border-none shadow-xl bg-white p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-lg bg-[#B85C3C]/10 flex items-center justify-center text-[#B85C3C]">
+                    <Clock className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-xl font-bold text-[#2C1810]">Office Hours</h3>
+                </div>
+
+                <div className="space-y-4">
                   {contactInfo?.officeHours && contactInfo.officeHours.length > 0 ? (
                     (() => {
-                      // Helper function to format time from 24hr to 12hr with AM/PM
-                      const formatTime = (time: string): string => {
-                        if (!time) return '';
-                        const [hours, minutes] = time.split(':');
-                        const hour = parseInt(hours);
-                        const ampm = hour >= 12 ? 'PM' : 'AM';
-                        const displayHour = hour % 12 || 12;
-                        return `${displayHour}:${minutes} ${ampm}`;
-                      };
-
                       // Day abbreviations
                       const dayAbbr: Record<string, string> = {
-                        'Monday': 'Mon',
-                        'Tuesday': 'Tue',
-                        'Wednesday': 'Wed',
-                        'Thursday': 'Thu',
-                        'Friday': 'Fri',
-                        'Saturday': 'Sat',
-                        'Sunday': 'Sun'
-                      };
-
-                      // Format day range
-                      const formatDayRange = (days: string[]): string => {
-                        if (days.length === 1) return days[0];
-                        if (days.length === 2) return `${dayAbbr[days[0]]}-${dayAbbr[days[1]]}`;
-                        return `${dayAbbr[days[0]]}-${dayAbbr[days[days.length - 1]]}`;
+                        'Monday': 'Mon', 'Tuesday': 'Tue', 'Wednesday': 'Wed',
+                        'Thursday': 'Thu', 'Friday': 'Fri', 'Saturday': 'Sat', 'Sunday': 'Sun'
                       };
 
                       interface GroupedHours {
@@ -449,36 +468,32 @@ export default function Contact() {
                         return groups;
                       }, []);
 
-                      return groupedHours.map((group, index) => (
-                        <div key={index} className="flex justify-between items-center text-sm">
+                      return (groupedHours as GroupedHours[]).map((group, index) => (
+                        <div key={index} className="flex justify-between items-center py-2 border-b border-dashed border-border last:border-none">
                           <span className="text-[#2C1810] font-medium">
-                            {formatDayRange(group.days)}
+                            {group.days.length === 1 ? group.days[0] : `${dayAbbr[group.days[0]]} - ${dayAbbr[group.days[group.days.length - 1]]}`}
                           </span>
-                          <span className="text-muted-foreground">
+                          <span className="text-muted-foreground font-mono">
                             {group.is_closed
-                              ? "Closed"
+                              ? <span className="text-destructive font-bold uppercase tracking-tighter">Closed</span>
                               : `${formatTime(group.open_time)} - ${formatTime(group.close_time)}`}
                           </span>
                         </div>
                       ));
                     })()
                   ) : (
-                    <div className="text-sm text-muted-foreground">
-                      Office hours not available
-                    </div>
+                    <p className="text-muted-foreground italic opacity-70">Not available</p>
                   )}
                 </div>
-              </CardContent>
-            </Card>
+              </Card>
 
-            {/* Follow Us */}
-            <Card className="border-none shadow-sm bg-white">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xl font-bold text-[#2C1810]">{t("contact.followUs")}</CardTitle>
-                <p className="text-sm text-muted-foreground">Stay connected on social media</p>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <div className="flex gap-3 flex-wrap">
+              {/* Follow Us */}
+              <Card className="border-none shadow-xl bg-[#2C1810] text-white p-8">
+                <h3 className="text-xl font-bold mb-6 flex items-center gap-3">
+                  <LinkIcon className="h-5 w-5 text-[#B85C3C]" />
+                  {t("contact.followUs")}
+                </h3>
+                <div className="flex gap-4 flex-wrap">
                   {socialMediaLinks.map((social) => {
                     const Icon = getSocialIcon(social.platform);
                     return (
@@ -487,68 +502,65 @@ export default function Contact() {
                         href={social.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="w-10 h-10 rounded-full bg-[#FDFBF7] flex items-center justify-center text-[#2C1810] hover:bg-[#B85C3C] hover:text-white transition-all duration-300"
+                        className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center text-white hover:bg-[#B85C3C] hover:scale-110 transition-all duration-300"
                         aria-label={social.platform}
                       >
-                        <Icon className="h-5 w-5" />
+                        <Icon className="h-6 w-6" />
                       </a>
                     );
                   })}
-                  {socialMediaLinks.length === 0 && (
-                    <p className="text-sm text-muted-foreground">No social links available</p>
-                  )}
                 </div>
-              </CardContent>
-            </Card>
+              </Card>
+            </div>
           </div>
         </div>
 
         {/* FAQ Section */}
-        <section className="py-12 bg-[#F8F9FA] rounded-3xl px-8">
-          <div className="text-center mb-10">
-            <h2 className="text-3xl font-bold text-[#2C1810] mb-3 font-playfair">
+        <section className="mt-12 py-16 bg-muted/30 rounded-[3rem] px-8 md:px-16 overflow-hidden relative">
+          <div className="absolute top-0 right-0 p-8 opacity-5">
+            <Heart className="h-64 w-64 text-[#B85C3C]" />
+          </div>
+
+          <div className="text-center mb-16 relative z-10">
+            <h2 className="text-4xl md:text-5xl font-bold text-[#2C1810] mb-4 font-playfair">
               {t("contact.faqTitle")}
             </h2>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
               {t("contact.faqSubtitle")}
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto mb-10">
+          <div className="max-w-4xl mx-auto relative z-10">
             {isLoadingFAQs ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <Card key={i} className="border-none shadow-sm bg-white">
-                  <CardContent className="p-6">
-                    <div className="h-6 bg-muted rounded w-3/4 animate-pulse mb-4"></div>
-                    <div className="h-4 bg-muted rounded w-full animate-pulse mb-2"></div>
-                    <div className="h-4 bg-muted rounded w-5/6 animate-pulse"></div>
-                  </CardContent>
-                </Card>
-              ))
-            ) : faqError ? (
-              <div className="col-span-2 text-center">
-                <p className="text-destructive">{t("contact.faqError")}</p>
+              <div className="space-y-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="h-16 bg-white rounded-xl animate-pulse" />
+                ))}
               </div>
+            ) : faqError ? (
+              <p className="text-center text-destructive">{t("contact.faqError")}</p>
             ) : (
-              faqs.slice(0, 4).map((faq) => (
-                <Card key={faq.id} className="border-none shadow-sm hover:shadow-md transition-shadow bg-white">
-                  <CardContent className="p-6">
-                    <h3 className="font-bold text-[#2C1810] mb-3 text-lg">{faq.question}</h3>
-                    <p className="text-muted-foreground text-sm leading-relaxed">
+              <Accordion type="single" collapsible className="w-full space-y-4">
+                {faqs.slice(0, 6).map((faq) => (
+                  <AccordionItem key={faq.id} value={faq.id} className="border-none bg-white rounded-2xl shadow-sm overflow-hidden px-6">
+                    <AccordionTrigger className="text-left py-6 hover:no-underline font-bold text-lg text-[#2C1810] hover:text-[#B85C3C] transition-colors">
+                      {faq.question}
+                    </AccordionTrigger>
+                    <AccordionContent className="text-muted-foreground text-base leading-relaxed pb-6">
                       {faq.answer}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
             )}
-          </div>
 
-          <div className="text-center">
-            <Link to="/faq">
-              <Button variant="outline" className="border-[#B85C3C] text-[#B85C3C] hover:bg-[#B85C3C] hover:text-white px-8">
-                {t("contact.viewAllFaqs")}
-              </Button>
-            </Link>
+            <div className="text-center mt-12">
+              <Link to="/faq">
+                <Button className="bg-[#B85C3C] hover:bg-[#A04B2E] text-white px-10 py-6 rounded-full font-bold shadow-lg hover:shadow-xl transition-all">
+                  {t("contact.viewAllFaqs")}
+                </Button>
+              </Link>
+            </div>
           </div>
         </section>
       </div>

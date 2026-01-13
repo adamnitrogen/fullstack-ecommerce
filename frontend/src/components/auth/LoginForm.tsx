@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Facebook, Twitter, Instagram, Youtube } from "lucide-react";
+import { Facebook, Twitter, Instagram, Youtube, ArrowLeft } from "lucide-react";
 import { validators, ValidationError } from "@/lib/validation";
 import { FormError } from "@/components/ui/form-error";
 import { toast } from "@/hooks/use-toast";
@@ -49,11 +49,9 @@ export function LoginForm({
     const requiredError = validators.required(value, "Email or Phone");
     if (requiredError) return requiredError;
 
-    // Check if it's email or phone
     const emailError = validators.email(value);
     const phoneError = validators.phone(value);
 
-    // Valid if either email or phone is valid
     if (!emailError || !phoneError) {
       return null;
     }
@@ -74,7 +72,6 @@ export function LoginForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 1. Validate based on current step
     const newErrors: ValidationError = {};
     let isValid = true;
 
@@ -110,29 +107,20 @@ export function LoginForm({
       return;
     }
 
-    // 2. Handle Logic
     setIsLoading(true);
     try {
       if (showOtp) {
-        // Step 3: Verify OTP
         const user = await verifyLoginOtp(emailOrPhone, otp);
-        login(user); // Auth Store Login
+        login(user);
         toast({ title: "Login Successful", description: `Welcome back, ${user.name}!` });
-
-        // Notify parent if needed, or redirect via Auth logic
         if (onPasswordSubmit) onPasswordSubmit("otp_verified_placeholder");
-        // We pass a placeholder because the parent might expect a password, but we've already done the auth.
-        // Ideally parent (Auth.tsx) just closes modal or redirects on auth state change.
-
       } else if (showPasswordField) {
-        // Step 2: Validate Credentials (Password)
         const res = await validateCredentials(emailOrPhone, password);
         if (res.success) {
           toast({ title: "Verification Required", description: "OTP sent to your email." });
           setShowOtp(true);
         }
       } else {
-        // Step 1: Check Email (Parent Logic)
         if (onSubmit) onSubmit(emailOrPhone);
       }
     } catch (error: unknown) {
@@ -141,52 +129,44 @@ export function LoginForm({
         description: getErrorMessage(error, "An error occurred"),
         variant: "destructive"
       });
-
-      if (showOtp && typeof error === 'object' && error !== null && 'attemptsRemaining' in error) {
-        // Optional: show attempts remaining
-        const attemptsRemaining = (error as { attemptsRemaining: number }).attemptsRemaining;
-        if (attemptsRemaining !== undefined) {
-          // We could show this in the toast or a separate label
-        }
-      }
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="p-6 sm:p-8">
+    <div className="p-6 sm:p-8 bg-white">
+      {/* Back Button */}
+      {onBack && (
+        <button
+          onClick={onBack}
+          className="absolute top-4 left-4 flex items-center gap-1.5 text-[#2C1810]/60 hover:text-[#B85C3C] transition-colors text-sm font-medium"
+        >
+          <ArrowLeft size={16} />
+          Back
+        </button>
+      )}
+
       {/* Header */}
-      <div className="text-center mb-6">
+      <div className="text-center mb-8">
         <div className="flex items-center justify-center mb-4">
-          <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center">
+          <div className="w-16 h-16 bg-gradient-to-br from-[#B85C3C] to-[#D4AF37] rounded-2xl flex items-center justify-center shadow-lg shadow-[#B85C3C]/20">
             <span className="text-3xl">🐄</span>
           </div>
         </div>
-        <h2 className="text-lg font-semibold text-foreground mb-1">
+        <h2 className="text-2xl font-bold text-[#2C1810] font-playfair mb-1">
           Welcome Back
         </h2>
-        <p className="text-sm text-muted-foreground">Sign in to continue</p>
+        <p className="text-sm text-[#2C1810]/60">Sign in to continue your journey</p>
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {onBack && (
-          <Button
-            variant="ghost"
-            className="absolute top-4 left-4"
-            onClick={onBack}
-          >
-            Back
-          </Button>
-        )}
-
+      <form onSubmit={handleSubmit} className="space-y-5">
         {!showOtp ? (
-          /* Email/Phone + Password Step */
           <>
             <div className="space-y-2">
-              <Label htmlFor="emailOrPhone">
-                Email / Phone Number <span className="text-destructive">*</span>
+              <Label htmlFor="emailOrPhone" className="text-xs font-bold uppercase tracking-wider text-[#2C1810]">
+                Email / Phone Number <span className="text-[#B85C3C]">*</span>
               </Label>
               <Input
                 id="emailOrPhone"
@@ -195,7 +175,7 @@ export function LoginForm({
                 onChange={(e) => handleEmailOrPhoneChange(e.target.value)}
                 placeholder="Enter your email or phone number"
                 disabled={showPasswordField}
-                className={errors.emailOrPhone ? "border-destructive" : ""}
+                className={`h-12 rounded-xl border-2 bg-[#FAF7F2] focus:bg-white transition-colors ${errors.emailOrPhone ? "border-red-500" : "border-[#B85C3C]/10 focus:border-[#B85C3C]"}`}
               />
               <FormError error={errors.emailOrPhone} />
             </div>
@@ -203,17 +183,16 @@ export function LoginForm({
             {showPasswordField && (
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <Label htmlFor="password">
-                    Password <span className="text-destructive">*</span>
+                  <Label htmlFor="password" className="text-xs font-bold uppercase tracking-wider text-[#2C1810]">
+                    Password <span className="text-[#B85C3C]">*</span>
                   </Label>
-                  <Button
-                    variant="link"
-                    className="h-auto p-0 text-xs text-primary"
+                  <button
                     type="button"
+                    className="text-xs text-[#B85C3C] hover:text-[#2C1810] font-medium transition-colors"
                     onClick={onForgotPassword}
                   >
                     Forgot Password?
-                  </Button>
+                  </button>
                 </div>
                 <Input
                   id="password"
@@ -221,7 +200,7 @@ export function LoginForm({
                   value={password}
                   onChange={(e) => handlePasswordChange(e.target.value)}
                   placeholder="Enter your password"
-                  className={errors.password ? "border-destructive" : ""}
+                  className={`h-12 rounded-xl border-2 bg-[#FAF7F2] focus:bg-white transition-colors ${errors.password ? "border-red-500" : "border-[#B85C3C]/10 focus:border-[#B85C3C]"}`}
                 />
                 <FormError error={errors.password} />
               </div>
@@ -229,121 +208,133 @@ export function LoginForm({
           </>
         ) : (
           /* OTP Step */
-          <div className="space-y-2">
-            <div className="text-center mb-4">
-              <h3 className="font-medium">Enter OTP</h3>
-              <p className="text-sm text-muted-foreground">
-                We sent a verification code to {emailOrPhone}
+          <div className="space-y-4">
+            <div className="text-center mb-6">
+              <div className="w-12 h-12 bg-[#B85C3C]/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                <span className="text-2xl">🔐</span>
+              </div>
+              <h3 className="font-bold text-[#2C1810] text-lg">Enter Verification Code</h3>
+              <p className="text-sm text-[#2C1810]/60 mt-1">
+                We sent a 6-digit code to <span className="font-medium text-[#B85C3C]">{emailOrPhone}</span>
               </p>
             </div>
-            <Label htmlFor="otp">
-              OTP Code <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="otp"
-              type="text"
-              value={otp}
-              onChange={(e) => {
-                const val = e.target.value.replace(/\D/g, '').slice(0, 6);
-                setOtp(val);
-                setErrors((prev) => ({ ...prev, otp: undefined }));
-              }}
-              placeholder="123456"
-              maxLength={6}
-              className={errors.otp ? "border-destructive text-center text-lg tracking-widest" : "text-center text-lg tracking-widest"}
-            />
-            <FormError error={errors.otp} />
-            <div className="text-center mt-2">
-              <Button variant="link" size="sm" type="button" onClick={() => setShowOtp(false)}>Back to Login</Button>
+            <div className="space-y-2">
+              <Label htmlFor="otp" className="text-xs font-bold uppercase tracking-wider text-[#2C1810]">
+                OTP Code <span className="text-[#B85C3C]">*</span>
+              </Label>
+              <Input
+                id="otp"
+                type="text"
+                value={otp}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                  setOtp(val);
+                  setErrors((prev) => ({ ...prev, otp: undefined }));
+                }}
+                placeholder="• • • • • •"
+                maxLength={6}
+                className={`h-14 rounded-xl border-2 bg-[#FAF7F2] focus:bg-white text-center text-2xl font-bold tracking-[0.5em] transition-colors ${errors.otp ? "border-red-500" : "border-[#B85C3C]/10 focus:border-[#B85C3C]"}`}
+              />
+              <FormError error={errors.otp} />
             </div>
+            <button
+              type="button"
+              className="text-sm text-[#B85C3C] hover:text-[#2C1810] font-medium transition-colors w-full text-center"
+              onClick={() => setShowOtp(false)}
+            >
+              ← Back to Login
+            </button>
           </div>
         )}
 
         {!showOtp && (
-          <p className="text-xs text-muted-foreground text-center">
+          <p className="text-[10px] text-[#2C1810]/50 text-center leading-relaxed">
             By continuing, you agree to our{" "}
-            <Button
-              variant="link"
-              className="h-auto p-0 text-xs text-primary"
+            <button
               type="button"
+              className="text-[#B85C3C] hover:underline font-medium"
               onClick={() => window.open("/terms", "_blank")}
             >
               Terms of Use
-            </Button>{" "}
+            </button>{" "}
             and{" "}
-            <Button
-              variant="link"
-              className="h-auto p-0 text-xs text-primary"
+            <button
               type="button"
+              className="text-[#B85C3C] hover:underline font-medium"
               onClick={() => window.open("/privacy", "_blank")}
             >
               Privacy Policy
-            </Button>
+            </button>
             .
           </p>
         )}
 
-        <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
+        <Button
+          type="submit"
+          className="w-full h-12 rounded-xl text-base font-bold bg-[#B85C3C] hover:bg-[#2C1810] transition-all duration-300 shadow-lg shadow-[#B85C3C]/20"
+          size="lg"
+          disabled={isLoading}
+        >
           {isLoading ? "Please wait..." : (showOtp ? "Verify & Login" : (showPasswordField ? "Sign In" : "Continue"))}
         </Button>
       </form>
 
       {/* Divider */}
-      {!showPasswordField && (
+      {!showPasswordField && !showOtp && (
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
+            <span className="w-full border-t border-[#B85C3C]/10" />
           </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">Or</span>
+          <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
+            <span className="bg-white px-3 text-[#2C1810]/40 font-medium">Or continue with</span>
           </div>
         </div>
       )}
 
       {/* Google OAuth */}
-      {!showPasswordField && (
+      {!showPasswordField && !showOtp && (
         <Button
           type="button"
           variant="outline"
-          className="w-full gap-2"
+          className="w-full h-12 rounded-xl gap-3 border-2 border-[#B85C3C]/10 text-[#2C1810] hover:bg-[#FAF7F2] hover:border-[#B85C3C]/20 transition-all"
           size="lg"
           onClick={onGoogleSignIn}
         >
           <FcGoogle className="h-5 w-5" />
-          Continue with Google
+          <span className="font-medium">Continue with Google</span>
         </Button>
       )}
 
       {/* Switch to Register */}
-      <p className="text-center mt-6 text-sm text-muted-foreground">
+      <p className="text-center mt-6 text-sm text-[#2C1810]/60">
         Don't have an account?{" "}
-        <Button
-          variant="link"
-          className="px-1 text-primary"
+        <button
+          type="button"
+          className="text-[#B85C3C] hover:text-[#2C1810] font-bold transition-colors"
           onClick={onSwitchToRegister}
         >
           Register here
-        </Button>
+        </button>
       </p>
 
       {/* Social Media Links */}
-      <div className="mt-6 pt-4 border-t">
-        <p className="text-center text-xs text-muted-foreground mb-3">
+      <div className="mt-8 pt-6 border-t border-[#B85C3C]/10">
+        <p className="text-center text-[10px] text-[#2C1810]/40 uppercase tracking-wider font-medium mb-3">
           Follow Us
         </p>
-        <div className="flex justify-center gap-4">
-          <Button variant="ghost" size="icon" className="rounded-full">
-            <Facebook className="h-5 w-5" />
-          </Button>
-          <Button variant="ghost" size="icon" className="rounded-full">
-            <Twitter className="h-5 w-5" />
-          </Button>
-          <Button variant="ghost" size="icon" className="rounded-full">
-            <Instagram className="h-5 w-5" />
-          </Button>
-          <Button variant="ghost" size="icon" className="rounded-full">
-            <Youtube className="h-5 w-5" />
-          </Button>
+        <div className="flex justify-center gap-2">
+          <button className="w-9 h-9 rounded-full bg-[#FAF7F2] flex items-center justify-center text-[#2C1810]/50 hover:bg-[#B85C3C] hover:text-white transition-all">
+            <Facebook size={16} />
+          </button>
+          <button className="w-9 h-9 rounded-full bg-[#FAF7F2] flex items-center justify-center text-[#2C1810]/50 hover:bg-[#B85C3C] hover:text-white transition-all">
+            <Twitter size={16} />
+          </button>
+          <button className="w-9 h-9 rounded-full bg-[#FAF7F2] flex items-center justify-center text-[#2C1810]/50 hover:bg-[#B85C3C] hover:text-white transition-all">
+            <Instagram size={16} />
+          </button>
+          <button className="w-9 h-9 rounded-full bg-[#FAF7F2] flex items-center justify-center text-[#2C1810]/50 hover:bg-[#B85C3C] hover:text-white transition-all">
+            <Youtube size={16} />
+          </button>
         </div>
       </div>
     </div>

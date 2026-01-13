@@ -98,6 +98,8 @@
     "quickLinks": "Quick Links",
     "contact": "Contact Us",
     "followUs": "Follow Us",
+    "customerService": "Customer Service",
+    "ancientRoots": "Ancient Roots",
     "copyright": "© 2025 MeriGauMata. All rights reserved."
   },
   "auth": {
@@ -365,7 +367,7 @@
     "volunteer": "Become a Volunteer"
   },
   "blog": {
-    "title": "Blog & Resources",
+    "title": "Blogs",
     "subtitle": "Insights, stories, and knowledge about cow welfare, care, and community impact",
     "featured": "Featured Posts",
     "allCategories": "All",
@@ -378,6 +380,16 @@
     "backToBlog": "Back to Blog",
     "relatedPosts": "Related Posts",
     "notFound": "Blog post not found"
+  },
+  "faq": {
+    "title": "Frequently Asked Questions",
+    "subtitle": "Everything you need to know about our mission, products, and how you can contribute",
+    "noFaqs": "No FAQs available at the moment. Please check back later.",
+    "searchPlaceholder": "Search for questions...",
+    "stillHaveQuestions": "Still have questions?",
+    "contactSupport": "Can't find the answer you're looking for? Reach out to our compassionate team for help.",
+    "callUs": "Call Us",
+    "contactUs": "Contact Us"
   },
   "common": {
     "save": "Save",

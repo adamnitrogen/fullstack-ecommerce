@@ -6,12 +6,14 @@ import { toast } from "sonner";
 import { CartDTO } from "@/lib/dto/cart.dto";
 import axios from "axios";
 import { getErrorMessage } from "@/lib/errorUtils";
+import { useAuthStore } from "./authStore";
 
 interface CartState {
   items: CartItem[];
   totals: CartTotals | null;
   isLoading: boolean;
   initialized: boolean;
+  deliverySettings: { threshold: number; charge: number };
 
   // Actions
   fetchCart: () => Promise<void>;
@@ -23,6 +25,7 @@ interface CartState {
   clearCart: () => Promise<void>;
   getTotalItems: () => number;
   getTotalPrice: () => number;
+  fetchDeliverySettings: () => Promise<void>;
 }
 
 // Module-level variables to track timeouts, action queue, and pending requests
@@ -36,8 +39,9 @@ const calculateOptimisticTotals = (items: CartItem[], currentTotals: CartTotals 
   const totalMrp = items.reduce((acc, item) => acc + (item.product.mrp || item.product.price) * item.quantity, 0);
   const totalPrice = items.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
 
-  // Apply delivery charge threshold (₹1500)
-  const deliveryCharge = totalPrice >= 1500 ? 0 : 50;
+  // Apply delivery charge threshold from dynamic settings
+  const { threshold, charge } = useCartStore.getState().deliverySettings;
+  const deliveryCharge = totalPrice >= threshold ? 0 : charge;
 
   // Retain coupon info if available but recalculate discounts
   const coupon = currentTotals?.coupon || null;
@@ -78,6 +82,7 @@ export const useCartStore = create<CartState>()((set, get) => {
     totals: null,
     isLoading: false,
     initialized: false,
+    deliverySettings: { threshold: 1500, charge: 50 }, // Default values
 
     fetchCart: async () => {
       // Don't overwrite if we have pending mutations
@@ -96,6 +101,10 @@ export const useCartStore = create<CartState>()((set, get) => {
             initialized: true,
             isLoading: false
           });
+          // Also fetch delivery settings if not yet fetched or periodically
+          if (get().deliverySettings.threshold === 1500) {
+            get().fetchDeliverySettings();
+          }
         }
       } catch (error: unknown) {
         if (axios.isAxiosError(error) && error.response?.status === 401) {
@@ -146,8 +155,13 @@ export const useCartStore = create<CartState>()((set, get) => {
           }
         } catch (error: unknown) {
           await get().fetchCart();
+          const isAuthenticated = useAuthStore.getState().isAuthenticated;
+
           if (axios.isAxiosError(error) && error.response?.status === 401) {
-            toast.error("Please login to add items to cart");
+            if (isAuthenticated) {
+              toast.error("Please login to add items to cart");
+            }
+            // Guest users: suppress the toast
           } else {
             toast.error("Failed to add to cart");
           }
@@ -183,7 +197,16 @@ export const useCartStore = create<CartState>()((set, get) => {
           }
         } catch (error) {
           await get().fetchCart();
-          toast.error("Failed to remove item");
+          const isAuthenticated = useAuthStore.getState().isAuthenticated;
+
+          if (axios.isAxiosError(error) && error.response?.status === 401) {
+            if (isAuthenticated) {
+              toast.error("Please login to remove items");
+            }
+            // Guest users: suppress the toast
+          } else {
+            toast.error("Failed to remove item");
+          }
         }
       });
     },
@@ -224,7 +247,16 @@ export const useCartStore = create<CartState>()((set, get) => {
             delete updateTimeouts[productId];
           } catch (error: unknown) {
             await get().fetchCart();
-            toast.error("Failed to update quantity");
+            const isAuthenticated = useAuthStore.getState().isAuthenticated;
+
+            if (axios.isAxiosError(error) && error.response?.status === 401) {
+              if (isAuthenticated) {
+                toast.error("Please login to update quantity");
+              }
+              // Guest users: suppress the toast
+            } else {
+              toast.error("Failed to update quantity");
+            }
             delete updateTimeouts[productId];
           }
         });
@@ -232,6 +264,12 @@ export const useCartStore = create<CartState>()((set, get) => {
     },
 
     applyCoupon: async (code: string): Promise<boolean> => {
+      const isAuthenticated = useAuthStore.getState().isAuthenticated;
+      if (!isAuthenticated) {
+        toast.error("Please login to apply the coupon codes");
+        return false;
+      }
+
       set({ isLoading: true });
       try {
         const response = await cartService.applyCoupon(code);
@@ -280,5 +318,19 @@ export const useCartStore = create<CartState>()((set, get) => {
       const state = get();
       return state.totals?.finalAmount || 0;
     },
+
+    fetchDeliverySettings: async () => {
+      try {
+        const settings = await cartService.getDeliverySettings();
+        set({
+          deliverySettings: {
+            threshold: settings.delivery_threshold,
+            charge: settings.delivery_charge
+          }
+        });
+      } catch (error) {
+        logger.error("Failed to fetch delivery settings:", error);
+      }
+    }
   };
 });

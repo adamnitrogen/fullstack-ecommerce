@@ -2,6 +2,7 @@ import { logger } from "@/lib/logger";
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { logAPICall, logPageAction } from '@/lib/logger';
 import { ApiErrorResponse } from "@/types";
+import { supabase } from "@/lib/supabase";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
@@ -117,6 +118,18 @@ apiClient.interceptors.response.use(
                                     logger.debug('[API Client] Acquired refresh lock, starting token refresh...');
                                     const res = await apiClient.post('/auth/refresh');
                                     logger.debug('[API Client] Refresh success');
+
+                                    // Sync Supabase Client SDK with new tokens
+                                    const { tokens } = res.data;
+                                    if (tokens?.access_token && tokens?.refresh_token) {
+                                        const { error } = await supabase.auth.setSession({
+                                            access_token: tokens.access_token,
+                                            refresh_token: tokens.refresh_token
+                                        });
+                                        if (error) logger.warn("[API Client] Supabase session sync warning:", error);
+                                        else logger.debug("[API Client] Supabase session synced with new tokens");
+                                    }
+
                                     sessionExpiredHandled = false;
                                     return res;
                                 });
@@ -125,6 +138,18 @@ apiClient.interceptors.response.use(
                                 logger.debug('[API Client] Starting token refresh (no lock capability)...');
                                 const res = await apiClient.post('/auth/refresh');
                                 logger.debug('[API Client] Refresh success');
+
+                                // Sync Supabase Client SDK with new tokens
+                                const { tokens } = res.data;
+                                if (tokens?.access_token && tokens?.refresh_token) {
+                                    const { error } = await supabase.auth.setSession({
+                                        access_token: tokens.access_token,
+                                        refresh_token: tokens.refresh_token
+                                    });
+                                    if (error) logger.warn("[API Client] Supabase session sync warning:", error);
+                                    else logger.debug("[API Client] Supabase session synced with new tokens");
+                                }
+
                                 sessionExpiredHandled = false;
                                 return res;
                             }

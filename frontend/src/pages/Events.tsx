@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Calendar, Clock, CheckCircle2, MapPin, Loader2 } from "lucide-react";
+import { Calendar, Clock, CheckCircle2, MapPin, Loader2, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -22,6 +22,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { eventService } from "@/services/event.service";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 
 export default function Events() {
   const { t } = useTranslation();
@@ -110,9 +111,8 @@ export default function Events() {
   const renderEventList = (emptyIcon: React.ReactNode, emptyMessage: string) => {
     if (isLoading) {
       return (
-        <div className="text-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-          <p className="mt-2 text-muted-foreground">Loading events...</p>
+        <div className="min-h-[400px] relative">
+          <LoadingOverlay message="Loading events..." isLoading={true} />
         </div>
       );
     }
@@ -161,75 +161,111 @@ export default function Events() {
   };
 
   return (
-    <div className="min-h-screen bg-background py-8">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">{t("events.pageTitle")}</h1>
-          <p className="text-muted-foreground">{t("events.pageSubtitle")}</p>
+    <div className="min-h-screen bg-background pb-20">
+      <LoadingOverlay message="Gathering Sacred Events..." isLoading={isLoading && !isFetchingNextPage} />
+
+      {/* Compact Premium Hero Section (Unified Height) */}
+      <section className="bg-[#2C1810] text-white py-12 md:py-16 relative overflow-hidden shadow-2xl">
+        {/* Abstract Background Decoration */}
+        <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+          <Calendar className="h-64 w-64 text-[#D4AF37] blur-sm" />
         </div>
+        <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-[#B85C3C]/10 rounded-full blur-[100px]" />
 
-        {/* Events Tabs */}
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-[#D4AF37]/10 text-[#D4AF37] text-[10px] font-bold uppercase tracking-[0.2em] mb-2">
+                <Sparkles className="h-3 w-3" /> Community & Vedic Spirit
+              </div>
+              <h1 className="text-3xl md:text-5xl font-bold font-playfair">
+                Sacred <span className="text-[#D4AF37] italic">Gatherings</span>
+              </h1>
+            </div>
+
+            <div className="flex flex-col md:flex-row gap-6 md:items-center max-w-xl">
+              <p className="text-white/50 text-sm md:text-base font-light border-l border-[#D4AF37]/30 pl-6 hidden md:block">
+                Experience the divine essence of our community through traditional festivals, workshops, and spiritual events.
+              </p>
+              <div className="flex items-center gap-4 text-sm font-medium">
+                <div className="px-4 py-2 rounded-2xl bg-[#D4AF37]/10 border border-[#D4AF37]/20 text-[#D4AF37] min-w-[120px]">
+                  <span className="block text-[9px] uppercase tracking-wider opacity-60 mb-0.5">Total Events</span>
+                  <span className="text-base font-bold">{totalEvents} Active</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-20">
+        {/* Events Tabs Navigation - Modernized */}
         <Tabs defaultValue="all" className="w-full" onValueChange={setActiveTab}>
-          <TabsList className="mb-8">
-            <TabsTrigger value="all">
-              All {activeTab === "all" && events.length > 0 && `(${totalEvents})`}
-            </TabsTrigger>
-            <TabsTrigger value="upcoming">
-              {t("events.upcoming")} {activeTab === "upcoming" && events.length > 0 && `(${totalEvents})`}
-            </TabsTrigger>
-            <TabsTrigger value="ongoing">
-              {t("events.ongoing")} {activeTab === "ongoing" && events.length > 0 && `(${totalEvents})`}
-            </TabsTrigger>
-            <TabsTrigger value="completed">
-              {t("events.completed")} {activeTab === "completed" && events.length > 0 && `(${totalEvents})`}
-            </TabsTrigger>
-          </TabsList>
+          <div className="flex justify-center mb-12">
+            <TabsList className="h-16 rounded-full bg-white shadow-elevated p-1.5 border border-border/50">
+              <TabsTrigger value="all" className="rounded-full px-8 data-[state=active]:bg-[#2C1810] data-[state=active]:text-white transition-all font-bold text-xs uppercase tracking-widest">
+                All {activeTab === "all" && events.length > 0 && <span className="ml-2 opacity-50">{totalEvents}</span>}
+              </TabsTrigger>
+              <TabsTrigger value="upcoming" className="rounded-full px-8 data-[state=active]:bg-[#2C1810] data-[state=active]:text-white transition-all font-bold text-xs uppercase tracking-widest">
+                {t("events.upcoming")} {activeTab === "upcoming" && events.length > 0 && <span className="ml-2 opacity-50">{totalEvents}</span>}
+              </TabsTrigger>
+              <TabsTrigger value="ongoing" className="rounded-full px-8 data-[state=active]:bg-[#2C1810] data-[state=active]:text-white transition-all font-bold text-xs uppercase tracking-widest">
+                {t("events.ongoing")} {activeTab === "ongoing" && events.length > 0 && <span className="ml-2 opacity-50">{totalEvents}</span>}
+              </TabsTrigger>
+              <TabsTrigger value="completed" className="rounded-full px-8 data-[state=active]:bg-[#2C1810] data-[state=active]:text-white transition-all font-bold text-xs uppercase tracking-widest">
+                {t("events.completed")} {activeTab === "completed" && events.length > 0 && <span className="ml-2 opacity-50">{totalEvents}</span>}
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-          <TabsContent value="all" className="mt-0">
-            {renderEventList(
-              <Calendar className="h-16 w-16 text-muted-foreground mx-auto opacity-50" />,
-              "No events available at the moment"
-            )}
-          </TabsContent>
+          <div className="min-h-[400px]">
+            <TabsContent value="all" className="mt-0 focus-visible:outline-none">
+              {renderEventList(
+                <div className="mb-6 inline-flex p-6 rounded-full bg-muted/50"><Calendar className="h-12 w-12 text-muted-foreground/50" /></div>,
+                "No events available at the moment"
+              )}
+            </TabsContent>
 
-          <TabsContent value="upcoming" className="mt-0">
-            {renderEventList(
-              <Clock className="h-16 w-16 text-muted-foreground mx-auto opacity-50" />,
-              t("events.noUpcoming")
-            )}
-          </TabsContent>
+            <TabsContent value="upcoming" className="mt-0 focus-visible:outline-none">
+              {renderEventList(
+                <div className="mb-6 inline-flex p-6 rounded-full bg-muted/50"><Clock className="h-12 w-12 text-muted-foreground/50" /></div>,
+                t("events.noUpcoming")
+              )}
+            </TabsContent>
 
-          <TabsContent value="ongoing" className="mt-0">
-            {renderEventList(
-              <Clock className="h-16 w-16 text-muted-foreground mx-auto opacity-50" />,
-              t("events.noOngoing")
-            )}
-          </TabsContent>
+            <TabsContent value="ongoing" className="mt-0 focus-visible:outline-none">
+              {renderEventList(
+                <div className="mb-6 inline-flex p-6 rounded-full bg-muted/50"><Clock className="h-12 w-12 text-muted-foreground/50" /></div>,
+                t("events.noOngoing")
+              )}
+            </TabsContent>
 
-          <TabsContent value="completed" className="mt-0">
-            {renderEventList(
-              <CheckCircle2 className="h-16 w-16 text-muted-foreground mx-auto opacity-50" />,
-              t("events.noCompleted")
-            )}
-          </TabsContent>
+            <TabsContent value="completed" className="mt-0 focus-visible:outline-none">
+              {renderEventList(
+                <div className="mb-6 inline-flex p-6 rounded-full bg-muted/50"><CheckCircle2 className="h-12 w-12 text-muted-foreground/50" /></div>,
+                t("events.noCompleted")
+              )}
+            </TabsContent>
+          </div>
         </Tabs>
       </div>
 
       {/* Registration Dialog */}
       <Dialog open={registrationOpen} onOpenChange={setRegistrationOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{t("events.registerFor")}</DialogTitle>
-            <DialogDescription>
-              {selectedEvent?.title || "Complete your registration details below"}
+        <DialogContent className="sm:max-w-md rounded-[2rem] border-none shadow-elevated p-8">
+          <DialogHeader className="space-y-4">
+            <div className="mx-auto w-12 h-12 rounded-full bg-[#B85C3C]/10 flex items-center justify-center mb-2">
+              <Calendar className="h-6 w-6 text-[#B85C3C]" />
+            </div>
+            <DialogTitle className="text-2xl font-bold font-playfair text-center">{t("events.registerFor")}</DialogTitle>
+            <DialogDescription className="text-center text-muted-foreground/80 leading-relaxed italic">
+              "{selectedEvent?.title || "Complete your registration details below"}"
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmitRegistration} className="space-y-4">
+          <form onSubmit={handleSubmitRegistration} className="space-y-6 mt-6">
             <div className="space-y-2">
-              <Label htmlFor="reg-name">
-                {t("events.fullName")}{" "}
-                <span className="text-destructive">*</span>
+              <Label htmlFor="reg-name" className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">
+                {t("events.fullName")} <span className="text-[#B85C3C]">*</span>
               </Label>
               <Input
                 id="reg-name"
@@ -242,13 +278,14 @@ export default function Events() {
                   })
                 }
                 placeholder="John Doe"
+                className="h-12 rounded-xl bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-[#B85C3C]"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="reg-email">
-                {t("events.email")} <span className="text-destructive">*</span>
+              <Label htmlFor="reg-email" className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">
+                {t("events.email")} <span className="text-[#B85C3C]">*</span>
               </Label>
               <Input
                 id="reg-email"
@@ -261,6 +298,7 @@ export default function Events() {
                   })
                 }
                 placeholder="john@example.com"
+                className="h-12 rounded-xl bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-[#B85C3C]"
                 required
               />
             </div>
@@ -281,7 +319,7 @@ export default function Events() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="reg-message">{t("events.message")}</Label>
+              <Label htmlFor="reg-message" className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">{t("events.message")}</Label>
               <Textarea
                 id="reg-message"
                 value={registrationData.message}
@@ -293,23 +331,24 @@ export default function Events() {
                 }
                 placeholder={t("events.messagePlaceholder")}
                 rows={3}
+                className="rounded-xl bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-[#B85C3C] resize-none"
               />
             </div>
 
             {selectedEvent && (
-              <div className="bg-muted p-3 rounded-md text-sm space-y-1">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  <span>{format(new Date(selectedEvent.startDate), "PPP")}</span>
+              <div className="bg-[#2C1810]/5 p-4 rounded-2xl border border-[#2C1810]/10 text-sm space-y-2">
+                <div className="flex items-center gap-3 text-[#2C1810]">
+                  <Calendar className="h-4 w-4 text-[#B85C3C]" />
+                  <span className="font-semibold">{format(new Date(selectedEvent.startDate), "PPP")}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
+                <div className="flex items-center gap-3 text-muted-foreground">
+                  <MapPin className="h-4 w-4 text-[#B85C3C]" />
                   <span>{selectedEvent.location.address}</span>
                 </div>
               </div>
             )}
 
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full h-14 rounded-full bg-[#B85C3C] hover:bg-[#2C1810] text-white font-bold text-lg shadow-lg hover:shadow-xl transition-all">
               {t("events.confirmRegistration")}
             </Button>
           </form>

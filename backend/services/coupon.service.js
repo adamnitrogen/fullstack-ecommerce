@@ -6,8 +6,6 @@ const logger = require('../utils/logger');
  * Handles all coupon-related business logic including validation, discount calculation, and usage tracking
  */
 
-const DELIVERY_THRESHOLD = 1500;
-const DELIVERY_CHARGE = 50;
 
 /**
  * Validate if a coupon can be applied to the given cart
@@ -55,9 +53,9 @@ async function validateCoupon(code, userId, cartItems, cartTotal) {
 
         // Check minimum purchase amount
         if (coupon.min_purchase_amount && cartTotal < coupon.min_purchase_amount) {
-            return { 
-                valid: false, 
-                error: `Minimum purchase amount of ₹${coupon.min_purchase_amount} required` 
+            return {
+                valid: false,
+                error: `Minimum purchase amount of ₹${coupon.min_purchase_amount} required`
             };
         }
 
@@ -203,7 +201,5 @@ module.exports = {
     calculateCouponDiscount,
     incrementUsageCount,
     getActiveCoupons,
-    recordCouponUsage,
-    DELIVERY_THRESHOLD,
-    DELIVERY_CHARGE
+    recordCouponUsage
 };

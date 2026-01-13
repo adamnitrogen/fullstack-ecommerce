@@ -10,9 +10,12 @@ import {
   User,
   Sparkles,
   Gift,
+  CheckCircle2,
+  Shield,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { BackButton } from "@/components/ui/BackButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tag } from "@/components/ui/Tag";
 import { Separator } from "@/components/ui/separator";
@@ -45,8 +48,8 @@ const EventDetail = () => {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Event not found</h2>
-          <Button onClick={() => navigate("/events")}>Back to Events</Button>
+          <h2 className="text-2xl font-bold mb-4 font-playfair">Event not found</h2>
+          <BackButton to="/events" label="Back to Events" />
         </div>
       </div>
     );
@@ -72,212 +75,230 @@ const EventDetail = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background py-8">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
-        {/* Back Button */}
-        <Button variant="ghost" className="mb-6" onClick={() => navigate(-1)}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
+    <div className="min-h-screen bg-[#FAF7F2]/30 pb-20">
+      {/* Premium Hero Section */}
+      <section className="bg-[#2C1810] text-white pt-12 pb-24 md:pb-32 relative overflow-hidden">
+        {/* Background Decoration */}
+        <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+          <Sparkles className="h-64 w-64 text-[#B85C3C]" />
+        </div>
+        <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-[#B85C3C]/10 rounded-full blur-[100px] pointer-events-none" />
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Side - Event Image */}
-          <div className="relative">
-            {eventData.image ? (
-              <div className="relative h-full">
-                <img
-                  src={eventData.image}
-                  alt={eventData.title}
-                  loading="lazy"
-                  className="w-full h-full rounded-lg shadow-lg object-cover"
-                />
-                <Tag
-                  variant={getStatusVariant(eventData.status)}
-                  className="absolute top-4 right-4"
-                >
-                  {t(`events.${eventData.status}`)}
-                </Tag>
-              </div>
-            ) : (
-              <Card className="h-full min-h-[400px] flex items-center justify-center bg-muted">
-                <CardContent className="text-center py-12">
-                  <Calendar className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-muted-foreground">
-                    No event image available
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10 max-w-7xl">
+          <div className="flex flex-col gap-8 md:gap-12">
+            <BackButton className="w-fit text-white/60 hover:text-white border-white/10 hover:border-white/20 hover:bg-white/5 transition-all duration-300" />
+
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+              <div className="space-y-4 max-w-3xl">
+                <div className="flex flex-wrap items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  {eventData.category && (
+                    <Tag variant="category" size="sm" className="bg-[#B85C3C]/20 text-[#D4AF37] border-[#B85C3C]/30 font-bold uppercase tracking-widest text-[10px]">
+                      {eventData.category}
+                    </Tag>
+                  )}
+                  <Tag variant={getStatusVariant(eventData.status)} size="sm" className="font-bold uppercase tracking-widest text-[10px]">
+                    {t(`events.${eventData.status}`)}
+                  </Tag>
+                </div>
+                <h1 className="text-4xl md:text-6xl font-bold font-playfair leading-tight animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
+                  {eventData.title}
+                </h1>
+                {isKatha && eventData.kathaVachak && (
+                  <p className="text-[#D4AF37] text-lg font-medium italic flex items-center gap-2 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
+                    <User size={18} /> Katha Vachak: {eventData.kathaVachak}
                   </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Main Content Area */}
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl -mt-16 md:-mt-20 relative z-20">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+          {/* Left Column - Main Details */}
+          <div className="lg:col-span-2 space-y-8">
+            {/* Main Image */}
+            <div className="rounded-[2.5rem] overflow-hidden shadow-2xl bg-muted aspect-[16/9] relative group animate-in fade-in zoom-in-95 duration-1000">
+              <img
+                src={eventData.image || "/placeholder.svg"}
+                alt={eventData.title}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000"
+              />
+              {!eventData.image && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
+                  <Calendar className="h-16 w-16 mb-4 opacity-20" />
+                  <p>No event image provided</p>
+                </div>
+              )}
+            </div>
+
+            {/* About Section */}
+            <Card className="border-none shadow-xl rounded-[2rem] overflow-hidden bg-white group hover:shadow-2xl transition-all duration-500">
+              <CardHeader className="p-10 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#FAF7F2] flex items-center justify-center text-[#B85C3C]">
+                    <Sparkles size={20} />
+                  </div>
+                  <CardTitle className="text-3xl font-bold text-[#2C1810] font-playfair">About the Event</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="p-10 pt-0">
+                <p className="text-muted-foreground text-lg leading-relaxed whitespace-pre-line font-light">
+                  {eventData.description}
+                </p>
+              </CardContent>
+              <div className="h-1.5 w-0 bg-[#B85C3C] group-hover:w-full transition-all duration-700" />
+            </Card>
+
+            {/* Key Highlights */}
+            {eventData.keyHighlights && eventData.keyHighlights.length > 0 && (
+              <Card className="border-none shadow-xl rounded-[2rem] overflow-hidden bg-white">
+                <CardHeader className="p-10 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[#FAF7F2] flex items-center justify-center text-[#B85C3C]">
+                      <Gift size={20} />
+                    </div>
+                    <CardTitle className="text-3xl font-bold text-[#2C1810] font-playfair">Event Highlights</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-10 pt-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {eventData.keyHighlights.map((highlight, index) => (
+                      <div key={index} className="flex items-start gap-4 p-4 rounded-2xl bg-[#FAF7F2]/50 border border-transparent hover:border-[#B85C3C]/20 transition-all group">
+                        <div className="mt-1.5 h-2 w-2 rounded-full bg-[#B85C3C] group-hover:scale-150 transition-all" />
+                        <span className="text-muted-foreground font-medium">{highlight}</span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Special Privileges */}
+            {eventData.specialPrivileges && eventData.specialPrivileges.length > 0 && (
+              <Card className="border-none shadow-xl rounded-[2rem] overflow-hidden bg-[#2C1810] text-white relative">
+                <div className="absolute top-0 right-0 p-8 opacity-5">
+                  <Gift size={120} />
+                </div>
+                <CardHeader className="p-10 pb-4 relative z-10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-[#D4AF37]">
+                      <Sparkles size={20} />
+                    </div>
+                    <CardTitle className="text-3xl font-bold font-playfair">Special Privileges</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-10 pt-4 relative z-10">
+                  <div className="grid grid-cols-1 gap-4">
+                    {eventData.specialPrivileges.map((privilege, index) => (
+                      <div key={index} className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all">
+                        <CheckCircle2 className="h-5 w-5 text-[#D4AF37] flex-shrink-0" />
+                        <span className="text-white/80 font-light">{privilege}</span>
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
             )}
           </div>
 
-          {/* Right Side - Event Details */}
+          {/* Right Column - Booking Sidebar */}
           <div className="space-y-6">
-            {/* Title */}
-            <div>
-              <h1 className="text-4xl font-bold mb-2">{eventData.title}</h1>
-              {eventData.category && (
-                <Tag variant="category" size="sm">
-                  {eventData.category.charAt(0).toUpperCase() +
-                    eventData.category.slice(1)}
-                </Tag>
-              )}
-            </div>
-
-            {/* Katha Vachak - Only for Katha events */}
-            {isKatha && eventData.kathaVachak && (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <User className="h-5 w-5 text-primary" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">
-                        Katha Vachak
-                      </p>
-                      <p className="font-semibold">{eventData.kathaVachak}</p>
+            <div className="sticky top-24">
+              <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-white animate-in slide-in-from-right-8 duration-1000">
+                <CardHeader className="p-8 pb-4 border-b border-[#FAF7F2]">
+                  <div className="flex justify-between items-center mb-6">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#B85C3C]">Event Details</p>
+                      <h3 className="text-2xl font-bold text-[#2C1810] font-playfair">Live Registration</h3>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                </CardHeader>
 
-            {/* Event Info */}
-            <Card>
-              <CardContent className="pt-6 space-y-4">
-                {/* Date and Time */}
-                <div className="flex items-start gap-3">
-                  <Calendar className="h-5 w-5 mt-0.5 text-primary flex-shrink-0" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Date</p>
-                    <p className="font-medium">
-                      {format(new Date(eventData.startDate), "PPP")}
-                      {eventData.endDate &&
-                        eventData.endDate !== eventData.startDate && (
-                          <> - {format(new Date(eventData.endDate), "PPP")}</>
-                        )}
-                    </p>
-                    {(eventData.startTime || eventData.endTime) && (
-                      <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                        <Clock className="h-3 w-3" />
-                        {eventData.startTime}
-                        {eventData.endTime && <> - {eventData.endTime}</>}
+                <CardContent className="p-8 space-y-8">
+                  {/* Fee */}
+                  {showRegistration && (
+                    <div className="p-6 rounded-3xl bg-[#FAF7F2] border border-[#B85C3C]/10 flex flex-col items-center text-center">
+                      <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Pass Contribution</p>
+                      <p className="text-4xl font-black text-[#2C1810]">
+                        {isFree ? "Free Entry" : `₹${registrationAmount}`}
                       </p>
-                    )}
-                  </div>
-                </div>
+                      <p className="text-[10px] text-[#B85C3C] mt-2 font-bold uppercase tracking-tighter">Limited Slots Available</p>
+                    </div>
+                  )}
 
-                <Separator />
-
-                {/* Registration Amount */}
-                {showRegistration && (
-                  <>
-                    <div className="flex items-center gap-3">
-                      <Banknote className="h-5 w-5 text-primary flex-shrink-0" />
-                      <div>
-                        <p className="text-sm text-muted-foreground">
-                          Registration Fee
-                        </p>
-                        <p className="font-semibold text-lg">
-                          {isFree ? "Free Entry" : `₹${registrationAmount}`}
+                  {/* Info Grid */}
+                  <div className="space-y-6">
+                    <div className="flex gap-4 group">
+                      <div className="w-12 h-12 rounded-2xl bg-[#FAF7F2] flex items-center justify-center text-[#B85C3C] group-hover:bg-[#B85C3C] group-hover:text-white transition-all">
+                        <Calendar size={20} />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Date</p>
+                        <p className="text-sm font-bold text-[#2C1810]">
+                          {format(new Date(eventData.startDate), "MMMM d, yyyy")}
+                          {eventData.endDate && eventData.endDate !== eventData.startDate && (
+                            <> - {format(new Date(eventData.endDate), "MMM d")}</>
+                          )}
                         </p>
                       </div>
                     </div>
 
-                    <Separator />
-                  </>
-                )}
+                    <div className="flex gap-4 group">
+                      <div className="w-12 h-12 rounded-2xl bg-[#FAF7F2] flex items-center justify-center text-[#B85C3C] group-hover:bg-[#B85C3C] group-hover:text-white transition-all">
+                        <Clock size={20} />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Time</p>
+                        <p className="text-sm font-bold text-[#2C1810]">
+                          {eventData.startTime || "Check Details"} {eventData.endTime && <>- {eventData.endTime}</>}
+                        </p>
+                      </div>
+                    </div>
 
-                {/* Location */}
-                {eventData.location?.address && (
-                  <div className="flex items-start gap-3">
-                    <MapPin className="h-5 w-5 mt-0.5 text-primary flex-shrink-0" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Location</p>
-                      <p className="font-medium">
-                        {eventData.location.address}
-                      </p>
+                    <div className="flex gap-4 group">
+                      <div className="w-12 h-12 rounded-2xl bg-[#FAF7F2] flex items-center justify-center text-[#B85C3C] group-hover:bg-[#B85C3C] group-hover:text-white transition-all">
+                        <MapPin size={20} />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Location</p>
+                        <p className="text-sm font-bold text-[#2C1810] leading-snug">
+                          {eventData.location?.address}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
 
-            {/* Registration Button - Only if enabled */}
-            {showRegistration && eventData.status !== "completed" && (
-              <Button onClick={handleRegister} className="w-full" size="lg">
-                Register for Event
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* Event Description */}
-        <div className="mt-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>About This Event</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground leading-relaxed whitespace-pre-line">
-                {eventData.description}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Key Highlights */}
-        {eventData.keyHighlights && eventData.keyHighlights.length > 0 && (
-          <div className="mt-8">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-primary" />
-                  <CardTitle>Key Highlights</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-3">
-                  {eventData.keyHighlights.map((highlight, index) => (
-                    <li
-                      key={index}
-                      className="flex items-start gap-3 text-muted-foreground"
+                  {/* Register Button */}
+                  {showRegistration && eventData.status !== "completed" && (
+                    <Button
+                      onClick={handleRegister}
+                      className="w-full rounded-2xl py-8 text-lg font-bold bg-[#B85C3C] hover:bg-[#2C1810] transition-all duration-500 shadow-xl shadow-[#B85C3C]/20 hover:shadow-[#2C1810]/20 h-auto"
                     >
-                      <span className="h-2 w-2 rounded-full bg-primary mt-2 flex-shrink-0" />
-                      <span>{highlight}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                      <Sparkles size={20} className="mr-2" />
+                      Register Now
+                    </Button>
+                  )}
 
-        {/* Special Privileges */}
-        {eventData.specialPrivileges &&
-          eventData.specialPrivileges.length > 0 && (
-            <div className="mt-8">
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <Gift className="h-5 w-5 text-primary" />
-                    <CardTitle>Special Privileges for Devotees</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-3">
-                    {eventData.specialPrivileges.map((privilege, index) => (
-                      <li
-                        key={index}
-                        className="flex items-start gap-3 text-muted-foreground"
-                      >
-                        <span className="h-2 w-2 rounded-full bg-primary mt-2 flex-shrink-0" />
-                        <span>{privilege}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  {eventData.status === "completed" && (
+                    <div className="p-4 rounded-2xl bg-muted/50 text-center text-muted-foreground font-bold uppercase tracking-widest text-xs">
+                      Event Successfully Completed
+                    </div>
+                  )}
                 </CardContent>
               </Card>
+
+              {/* Secure Booking Tip */}
+              <div className="mt-6 flex items-center justify-center gap-2 text-muted-foreground/60">
+                <Shield size={14} className="text-green-500/50" />
+                <span className="text-[10px] uppercase font-bold tracking-widest">Secure Vedic Registration</span>
+              </div>
             </div>
-          )}
+          </div>
+        </div>
       </div>
     </div>
   );

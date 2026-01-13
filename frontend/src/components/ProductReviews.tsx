@@ -152,88 +152,96 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
         : 0,
   }));
 
-  return (
-    <div className="space-y-8">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">Customer Reviews</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Rating Summary - Only show if there are reviews */}
-          {reviews.length > 0 && (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="text-center md:text-left">
-                  <div className="text-5xl font-bold mb-2">
-                    {averageRating.toFixed(1)}
-                  </div>
-                  <div className="flex items-center justify-center md:justify-start gap-1 mb-2">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`h-6 w-6 ${i < Math.floor(averageRating)
-                          ? "fill-accent text-accent"
-                          : "text-muted"
-                          }`}
-                      />
-                    ))}
-                  </div>
-                  <p className="text-muted-foreground">
-                    Based on {reviews.length}{" "}
-                    {reviews.length === 1 ? "review" : "reviews"}
-                  </p>
-                </div>
+  if (reviews.length === 0 && !showForm) {
+    return (
+      <div className="pt-8">
+        <div className="text-center py-12 rounded-[2rem] border-2 border-dashed border-[#B85C3C]/10 bg-white/50">
+          <h3 className="font-playfair text-2xl font-bold text-[#2C1810] mb-2">No Reviews Yet</h3>
+          <p className="text-xs text-muted-foreground font-medium mb-6">Be the first to share your experience</p>
+          <Button
+            onClick={() => isAuthenticated ? setShowForm(true) : setAuthDialogOpen(true)}
+            className="rounded-full px-8 py-4 text-xs font-bold bg-[#B85C3C] hover:bg-[#2C1810] shadow-lg shadow-[#B85C3C]/10 h-auto transition-all"
+          >
+            Write a Review
+          </Button>
+        </div>
+        <AuthPage open={authDialogOpen} onOpenChange={setAuthDialogOpen} />
+      </div>
+    );
+  }
 
-                <div className="space-y-2">
-                  {ratingDistribution.map(({ stars, count, percentage }) => (
-                    <div key={stars} className="flex items-center gap-2">
-                      <span className="text-sm font-medium w-12">{stars} star</span>
-                      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-accent transition-all"
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                      <span className="text-sm text-muted-foreground w-8">
-                        {count}
-                      </span>
-                    </div>
+  return (
+    <div className="space-y-8 animate-in fade-in duration-700">
+      <Card className="border-none shadow-xl rounded-[2rem] overflow-hidden bg-white">
+        <CardHeader className="p-8 pb-4">
+          <CardTitle className="text-2xl font-bold text-[#2C1810] font-playfair">Guest Reviews</CardTitle>
+        </CardHeader>
+        <CardContent className="p-8 pt-4 space-y-8">
+          {/* Rating Summary */}
+          {reviews.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center bg-[#FAF7F2]/50 p-6 rounded-2xl border border-[#B85C3C]/5">
+              <div className="text-center md:text-left space-y-1">
+                <div className="text-5xl font-black text-[#2C1810]">
+                  {averageRating.toFixed(1)}
+                </div>
+                <div className="flex items-center justify-center md:justify-start gap-0.5">
+                  {[...Array(5)].map((_, i) => (
+                    <Star
+                      key={i}
+                      size={16}
+                      className={i < Math.floor(averageRating) ? "fill-[#D4AF37] text-[#D4AF37]" : "text-muted"}
+                    />
                   ))}
                 </div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-[#B85C3C]">
+                  Based on {reviews.length} {reviews.length === 1 ? "review" : "reviews"}
+                </p>
               </div>
 
-              <Separator />
-            </>
+              <div className="space-y-2">
+                {ratingDistribution.map(({ stars, count, percentage }) => (
+                  <div key={stars} className="flex items-center gap-3">
+                    <span className="text-[9px] font-bold w-8 text-muted-foreground uppercase">{stars} Str</span>
+                    <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-[#B85C3C] rounded-full transition-all duration-500"
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                    <span className="text-[9px] font-bold text-muted-foreground w-4 text-right">
+                      {count}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
           {/* Write Review Button */}
-          {!showForm && (
-            <Button
-              onClick={() => {
-                if (!isAuthenticated) {
-                  setAuthDialogOpen(true);
-                } else {
-                  setShowForm(true);
-                }
-              }}
-              className="w-full md:w-auto"
-            >
-              Write a Review
-            </Button>
+          {!showForm && reviews.length > 0 && (
+            <div className="flex justify-start">
+              <Button
+                onClick={() => isAuthenticated ? setShowForm(true) : setAuthDialogOpen(true)}
+                variant="outline"
+                className="rounded-full px-8 py-3 text-xs font-bold border-[#B85C3C]/20 text-[#B85C3C] hover:bg-[#FAF7F2] h-auto transition-all"
+              >
+                Share Your Experience
+              </Button>
+            </div>
           )}
 
           {/* Review Form */}
           {showForm && (
             <form
               onSubmit={handleSubmit}
-              className="space-y-4 border border-border rounded-lg p-6"
+              className="space-y-6 p-8 rounded-2xl bg-[#FAF7F2] border border-[#B85C3C]/10 animate-in zoom-in-95 duration-300"
             >
-              <h3 className="text-lg font-semibold">Write Your Review</h3>
+              <div className="space-y-1">
+                <h3 className="text-xl font-bold text-[#2C1810] font-playfair">Write a Review</h3>
+                <p className="text-[10px] text-muted-foreground uppercase font-bold">Your feedback honors our tradition</p>
+              </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Your Rating *
-                </label>
+              <div className="space-y-4">
                 <div className="flex gap-1">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
@@ -245,80 +253,59 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
                       className="transition-transform hover:scale-110"
                     >
                       <Star
-                        className={`h-8 w-8 ${star <= (hoveredRating || rating)
-                          ? "fill-accent text-accent"
-                          : "text-muted"
-                          }`}
+                        size={24}
+                        className={star <= (hoveredRating || rating) ? "fill-[#D4AF37] text-[#D4AF37]" : "text-muted"}
                       />
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div className="bg-muted/30 p-3 rounded-md">
-                <p className="text-sm text-muted-foreground">
-                  Posting as:{" "}
-                  <span className="font-semibold text-foreground">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label htmlFor="title" className="text-[10px] font-bold uppercase tracking-widest text-[#B85C3C]">Title</label>
+                  <Input
+                    id="title"
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    placeholder="Exceptional quality"
+                    className="bg-white rounded-xl border-none shadow-sm h-10 text-sm"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-[#B85C3C]">Posting As</label>
+                  <div className="h-10 flex items-center px-4 bg-white/50 rounded-xl border border-dashed border-[#B85C3C]/20 text-xs font-bold text-[#2C1810]">
                     {user?.name}
-                  </span>
-                </p>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label
-                  htmlFor="title"
-                  className="block text-sm font-medium mb-2"
-                >
-                  Review Title *
-                </label>
-                <Input
-                  id="title"
-                  value={formData.title}
-                  onChange={(e) =>
-                    setFormData({ ...formData, title: e.target.value })
-                  }
-                  placeholder="Summarize your experience"
-                  required
-                  maxLength={100}
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="comment"
-                  className="block text-sm font-medium mb-2"
-                >
-                  Your Review *
-                </label>
+              <div className="space-y-2">
+                <label htmlFor="comment" className="text-[10px] font-bold uppercase tracking-widest text-[#B85C3C]">Comment</label>
                 <Textarea
                   id="comment"
                   value={formData.comment}
-                  onChange={(e) =>
-                    setFormData({ ...formData, comment: e.target.value })
-                  }
-                  placeholder="Share your thoughts about this product"
+                  onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
+                  placeholder="Share your thoughts..."
+                  className="bg-white rounded-xl border-none shadow-sm p-4 min-h-[100px] text-sm resize-none"
                   required
-                  rows={4}
-                  maxLength={1000}
-                  className="resize-none"
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  {formData.comment.length}/1000 characters
-                </p>
               </div>
 
-              <div className="flex gap-2">
-                <Button type="submit" disabled={createReviewMutation.isPending}>
+              <div className="flex gap-3 pt-2">
+                <Button
+                  type="submit"
+                  disabled={createReviewMutation.isPending}
+                  className="rounded-full px-8 py-3 text-xs font-bold bg-[#B85C3C] hover:bg-[#2C1810] h-auto shadow-md"
+                >
                   {createReviewMutation.isPending ? "Submitting..." : "Submit Review"}
                 </Button>
                 <Button
                   type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setShowForm(false);
-                    setFormData({ title: "", comment: "" });
-                    setRating(0);
-                  }}
+                  variant="ghost"
+                  onClick={() => setShowForm(false)}
+                  className="rounded-full px-8 py-3 text-xs font-bold text-muted-foreground h-auto"
                 >
                   Cancel
                 </Button>
@@ -327,118 +314,66 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
           )}
 
           {/* Reviews List */}
-          {reviews.length > 0 ? (
-            <div className="space-y-8 animate-fade-in">
-              <Separator />
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-semibold">
-                  {reviews.length} {reviews.length === 1 ? "Review" : "Reviews"}
-                </h3>
-              </div>
-
-              <div className="space-y-6">
+          {reviews.length > 0 && (
+            <div className="space-y-6">
+              <Separator className="bg-[#B85C3C]/5" />
+              <div className="grid gap-6">
                 {displayedReviews.map((review) => (
-                  <div key={review.id} className="group animate-slide-up">
-                    <div className="flex items-start gap-4">
-                      {/* Avatar */}
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 text-primary font-bold text-lg">
+                  <div key={review.id} className="group animate-in fade-in duration-500">
+                    <div className="flex gap-4">
+                      <div className="h-10 w-10 rounded-xl bg-[#FAF7F2] border border-[#B85C3C]/5 flex items-center justify-center text-[#B85C3C] font-black text-xs flex-shrink-0">
                         {review.userAvatar ? (
-                          <img
-                            src={review.userAvatar}
-                            alt={review.userName}
-                            className="h-full w-full rounded-full object-cover"
-                          />
+                          <img src={review.userAvatar} alt={review.userName} className="h-full w-full rounded-xl object-cover" />
                         ) : (
                           review.userName.charAt(0).toUpperCase()
                         )}
                       </div>
 
-                      <div className="flex-1 min-w-0">
-                        {/* Header: Name, Date, Badge */}
-                        <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-foreground">
-                              {review.userName}
-                            </span>
-                            {review.verified && (
-                              <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-normal bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400">
-                                Verified Purchase
-                              </Badge>
-                            )}
+                            <span className="font-bold text-[#2C1810] text-xs">{review.userName}</span>
+                            <div className="flex items-center gap-0.5">
+                              {[...Array(5)].map((_, i) => (
+                                <Star
+                                  key={i}
+                                  size={10}
+                                  className={i < review.rating ? "fill-[#D4AF37] text-[#D4AF37]" : "text-muted"}
+                                />
+                              ))}
+                            </div>
                           </div>
-                          <span className="text-xs text-muted-foreground tabular-nums">
-                            {new Date(review.createdAt).toLocaleDateString(undefined, {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric'
-                            })}
+                          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
+                            {new Date(review.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                           </span>
                         </div>
 
-                        {/* Rating stars */}
-                        <div className="flex mb-3">
-                          {[...Array(5)].map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`h-4 w-4 ${i < review.rating
-                                ? "fill-accent text-accent"
-                                : "text-muted-foreground/20"
-                                }`}
-                            />
-                          ))}
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-bold text-[#2C1810] font-playfair">{review.title}</h4>
+                          <p className="text-xs text-muted-foreground leading-relaxed font-light">{review.comment}</p>
                         </div>
-
-                        {/* Content */}
-                        <h4 className="font-semibold text-base mb-1.5">
-                          {review.title}
-                        </h4>
-                        <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line">
-                          {review.comment}
-                        </p>
                       </div>
                     </div>
-                    <Separator className="mt-6 group-last:hidden" />
+                    <Separator className="mt-6 bg-[#B85C3C]/5 group-last:hidden" />
                   </div>
                 ))}
               </div>
 
               {hasMoreReviews && (
-                <div className="flex flex-col items-center justify-center pt-6 gap-2">
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Showing {displayCount} of {reviews.length} reviews
-                  </p>
+                <div className="flex justify-center pt-4">
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     onClick={loadMoreReviews}
-                    className="min-w-[200px] gap-2 hover:bg-primary/5 border-primary/20 text-primary"
+                    className="text-[10px] font-bold text-[#B85C3C] hover:bg-[#FAF7F2] rounded-full px-6"
                   >
                     Load More Reviews
                   </Button>
                 </div>
               )}
             </div>
-          ) : (
-            <div className="text-center py-12 bg-muted/30 rounded-lg border border-dashed border-border/60">
-              <div className="h-12 w-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
-                <Star className="h-6 w-6 text-muted-foreground/50" />
-              </div>
-              <h3 className="font-semibold text-lg mb-1">No reviews yet</h3>
-              <p className="text-muted-foreground text-sm mb-4">
-                Be the first to share your thoughts on this product!
-              </p>
-              {!showForm && (
-                <Button
-                  onClick={() => isAuthenticated ? setShowForm(true) : setAuthDialogOpen(true)}
-                  variant="secondary"
-                >
-                  Write First Review
-                </Button>
-              )}
-            </div>
           )}
         </CardContent>
       </Card>
-
       <AuthPage open={authDialogOpen} onOpenChange={setAuthDialogOpen} />
     </div>
   );

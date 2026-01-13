@@ -1,24 +1,18 @@
 import { logger } from "@/lib/logger";
 import { useState, useEffect } from "react";
-import { Tag, ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Tag, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Coupon } from "@/types";
 import { couponService } from "@/services/coupon.service";
 
 export function PromotionalBanner() {
     const [coupons, setCoupons] = useState<Coupon[]>([]);
-    const [currentIndex, setCurrentIndex] = useState(0);
     const [loading, setLoading] = useState(true);
-
 
     useEffect(() => {
         checkAndFetchCoupons();
-
-        // Check cache validity every minute (instead of fetching every 30s)
         const validityInterval = setInterval(checkAndFetchCoupons, 60000);
 
-        // Fetch on visibility change (tab becomes visible)
         const handleVisibilityChange = () => {
             if (document.visibilityState === "visible") {
                 checkAndFetchCoupons();
@@ -32,17 +26,6 @@ export function PromotionalBanner() {
             document.removeEventListener("visibilitychange", handleVisibilityChange);
         };
     }, []);
-
-    // Auto-rotate through coupons every 5 seconds (only if we have coupons)
-    useEffect(() => {
-        if (coupons.length <= 1) return;
-
-        const rotateInterval = setInterval(() => {
-            setCurrentIndex((prev) => (prev + 1) % coupons.length);
-        }, 5000);
-
-        return () => clearInterval(rotateInterval);
-    }, [coupons.length]);
 
     // Add/remove class to body when banner visibility changes
     useEffect(() => {
@@ -60,26 +43,24 @@ export function PromotionalBanner() {
 
     const checkAndFetchCoupons = async () => {
         const cacheKey = "promo_coupons_cache";
-        const cacheDuration = 60 * 60 * 1000; // 1 hour in milliseconds
+        const cacheDuration = 60 * 60 * 1000;
 
         try {
             const cachedData = localStorage.getItem(cacheKey);
 
             if (cachedData) {
-                const { coupons, timestamp } = JSON.parse(cachedData);
+                const { coupons: cachedCoupons, timestamp } = JSON.parse(cachedData);
                 const isExpired = Date.now() - timestamp > cacheDuration;
 
-                if (!isExpired && coupons.length > 0) {
-                    setCoupons(coupons);
+                if (!isExpired && cachedCoupons.length > 0) {
+                    setCoupons(cachedCoupons);
                     setLoading(false);
                     return;
                 }
             }
 
-            // Cache is missing or expired, fetch from API
             fetchActiveCoupons();
         } catch (error) {
-            // If local storage fails or parse error, fallback to fetch
             fetchActiveCoupons();
         }
     };
@@ -89,7 +70,6 @@ export function PromotionalBanner() {
             const data = await couponService.getActive();
             setCoupons(data);
 
-            // Update cache
             localStorage.setItem("promo_coupons_cache", JSON.stringify({
                 coupons: data,
                 timestamp: Date.now()
@@ -101,110 +81,84 @@ export function PromotionalBanner() {
         }
     };
 
-    const handleNext = () => {
-        if (currentIndex < coupons.length - 1) {
-            setCurrentIndex(currentIndex + 1);
-        } else {
-            setCurrentIndex(0);
-        }
-    };
-
-    const handlePrev = () => {
-        if (currentIndex > 0) {
-            setCurrentIndex(currentIndex - 1);
-        } else {
-            setCurrentIndex(coupons.length - 1);
-        }
-    };
-
     const getCouponDescription = (coupon: Coupon) => {
         if (coupon.type === "cart") {
-            return "Applies to entire cart";
+            return "Sitewide Discount";
         } else if (coupon.type === "category") {
-            return `Applies to ${coupon.target_id} category`;
+            return `${coupon.target_id} Special`;
         } else if (coupon.type === "product") {
-            return "Applies to specific product";
+            return "Product Deal";
         }
-        return "";
+        return "Limited Offer";
     };
 
     if (loading || coupons.length === 0) return null;
 
-    const currentCoupon = coupons[currentIndex];
+    // Duplicate coupons to ensure smooth marquee loop
+    const marqueeItems = [...coupons, ...coupons, ...coupons, ...coupons];
 
     return (
-        <div className="fixed top-0 left-0 right-0 w-full z-50 bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 border-b border-primary/20 backdrop-blur-sm bg-background/95 supports-[backdrop-filter]:bg-background/60">
-            <div className="container mx-auto px-4 py-3">
-                <div className="flex items-center justify-between gap-4">
-                    {/* Left Arrow */}
-                    {coupons.length > 1 && (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={handlePrev}
-                            className="flex-shrink-0"
-                        >
-                            <ChevronLeft className="h-5 w-5" />
-                        </Button>
-                    )}
+        <div className="relative w-full z-[60] bg-[#2C1810] text-white border-b border-[#B85C3C]/30 h-10 overflow-hidden flex items-center">
+            <style dangerouslySetInnerHTML={{
+                __html: `
+                @keyframes marquee {
+                    0% { transform: translateX(0); }
+                    100% { transform: translateX(-50%); }
+                }
+                .animate-marquee {
+                    display: flex;
+                    white-space: nowrap;
+                    animation: marquee 25s linear infinite;
+                }
+                .animate-marquee:hover {
+                    animation-play-state: paused;
+                }
+            `}} />
 
-                    {/* Banner Content */}
-                    <div className="flex-1 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 text-center sm:text-left">
-                        <div className="flex items-center gap-2">
-                            <Tag className="h-5 w-5 text-primary animate-pulse" />
-                            <span className="font-semibold text-sm sm:text-base">
-                                Special Offer
-                            </span>
-                        </div>
+            <div className="relative flex items-center w-full px-4 overflow-hidden group">
+                {/* Fixed Label to the left */}
+                <div className="flex-shrink-0 flex items-center gap-2 bg-[#2C1810] pr-6 border-r border-white/10 z-10 shadow-[20px_0_30px_-5px_#2C1810]">
+                    <Sparkles className="h-4 w-4 text-[#B85C3C] animate-pulse" />
+                    <span className="font-bold text-[10px] uppercase tracking-[0.2em] text-[#B85C3C]">Exclusive Offers</span>
+                </div>
 
-                        <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
-                            <Badge variant="default" className="text-base py-1 px-3 font-mono">
-                                {currentCoupon.code}
-                            </Badge>
-
-                            <div className="flex flex-col sm:flex-row items-center gap-2 text-sm">
-                                <span className="font-semibold text-primary">
-                                    {currentCoupon.discount_percentage}% OFF
-                                </span>
-                                <span className="text-muted-foreground hidden sm:inline">|</span>
-                                <span className="text-muted-foreground text-xs sm:text-sm">
-                                    {getCouponDescription(currentCoupon)}
-                                </span>
+                {/* Marquee Container */}
+                <div className="flex-1 overflow-hidden">
+                    <div className="animate-marquee gap-16">
+                        {marqueeItems.map((coupon, idx) => (
+                            <div key={`${coupon.id}-${idx}`} className="flex items-center gap-8 group cursor-default">
+                                <div className="flex items-center gap-2">
+                                    <Tag className="h-4 w-4 text-white/40 group-hover:text-[#B85C3C] transition-colors" />
+                                    <span className="font-medium text-xs tracking-wider uppercase">
+                                        {getCouponDescription(coupon)}:
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <Badge variant="outline" className="text-[10px] py-0.5 px-2 border-white/20 text-white font-mono h-6 flex items-center">
+                                        {coupon.code}
+                                    </Badge>
+                                    <span className="font-black text-xs text-[#B85C3C]">
+                                        {coupon.discount_percentage}% OFF
+                                    </span>
+                                </div>
+                                {coupon.min_purchase_amount && coupon.min_purchase_amount > 0 && (
+                                    <span className="text-[10px] text-white/90 font-bold bg-white/10 px-1.5 py-0.5 rounded-full">
+                                        Min: ₹{coupon.min_purchase_amount}
+                                    </span>
+                                )}
+                                <div className="flex items-center gap-4 ml-4 opacity-20">
+                                    <div className="h-4 w-[1px] bg-white" />
+                                    <Sparkles className="h-3 w-3 text-[#B85C3C]" />
+                                    <div className="h-4 w-[1px] bg-white" />
+                                </div>
                             </div>
-                        </div>
-
-                        {currentCoupon.min_purchase_amount && currentCoupon.min_purchase_amount > 0 && (
-                            <span className="text-xs text-muted-foreground">
-                                Min purchase: ₹{currentCoupon.min_purchase_amount}
-                            </span>
-                        )}
-
-                        {coupons.length > 1 && (
-                            <div className="flex items-center gap-1">
-                                {coupons.map((_, index) => (
-                                    <div
-                                        key={index}
-                                        className={`h-1.5 rounded-full transition-all ${index === currentIndex
-                                            ? "w-6 bg-primary"
-                                            : "w-1.5 bg-primary/30"
-                                            }`}
-                                    />
-                                ))}
-                            </div>
-                        )}
+                        ))}
                     </div>
+                </div>
 
-                    {/* Right Arrow */}
-                    {coupons.length > 1 && (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={handleNext}
-                            className="flex-shrink-0"
-                        >
-                            <ChevronRight className="h-5 w-5" />
-                        </Button>
-                    )}
+                {/* Fixed Action to the right */}
+                <div className="flex-shrink-0 flex items-center gap-2 bg-[#2C1810] pl-6 border-l border-white/10 z-10 shadow-[-20px_0_30px_-5px_#2C1810] hidden md:flex">
+                    <span className="text-[10px] font-medium uppercase tracking-widest text-white/60">Limited Time Only</span>
                 </div>
             </div>
         </div>

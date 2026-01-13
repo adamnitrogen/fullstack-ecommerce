@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Lock, ShieldCheck } from "lucide-react";
+import { Loader2, Lock, ShieldCheck, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import type { CheckoutSummary, CheckoutAddress } from "@/types";
@@ -26,6 +26,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { BackButton } from "@/components/ui/BackButton";
 
 export default function Checkout() {
   const navigate = useNavigate();
@@ -206,121 +207,147 @@ export default function Checkout() {
   if (!summary) return null;
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <div className="min-h-screen bg-background pb-20">
       <LoadingOverlay
         isLoading={processing && loading}
         message="Verifying payment and creating order..."
       />
-      <h1 className="text-3xl font-bold mb-8">Checkout</h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column - Addresses */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Shipping Address */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <span className="bg-primary text-primary-foreground w-6 h-6 rounded-full flex items-center justify-center text-sm">1</span>
-                Shipping Address
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <AddressSelector
-                type="shipping"
-                selectedAddressId={shippingAddress?.id}
-                onSelect={setShippingAddress}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Billing Address */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <span className="bg-primary text-primary-foreground w-6 h-6 rounded-full flex items-center justify-center text-sm">2</span>
-                Billing Address
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="billing-same"
-                  checked={billingSameAsShipping}
-                  onCheckedChange={(checked) => setBillingSameAsShipping(checked as boolean)}
-                />
-                <Label htmlFor="billing-same" className="cursor-pointer">
-                  Same as shipping address
-                </Label>
-              </div>
-
-              {!billingSameAsShipping && (
-                <div className="mt-4 animate-in fade-in slide-in-from-top-2">
-                  <AddressSelector
-                    type="billing"
-                    selectedAddressId={billingAddress?.id}
-                    onSelect={setBillingAddress}
-                  />
-                </div>
-              )}
-            </CardContent>
-          </Card>
+      {/* Compact Premium Hero Section */}
+      <section className="bg-[#2C1810] text-white py-12 relative overflow-hidden shadow-2xl mb-8">
+        <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
+          <ShoppingBag className="h-48 w-48 text-[#B85C3C]" />
         </div>
+        <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-[#B85C3C]/10 rounded-full blur-[100px]" />
 
-        {/* Right Column - Order Summary */}
-        <div className="space-y-6">
-          <Card className="sticky top-24">
-            <CardHeader>
-              <CardTitle>Order Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <OrderSummary items={summary.cart.cart_items.map((item) => ({
-                ...item,
-                productId: item.product_id,
-                product: item.products
-              }))} />
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+            <BackButton to="/cart" label="Back to Cart" className="text-white/80 hover:text-white hover:bg-white/10" />
+            <div className="space-y-1">
+              <h1 className="text-3xl md:text-4xl font-bold font-playfair">
+                Secure <span className="text-[#B85C3C]">Checkout</span>
+              </h1>
+              <p className="text-white/60 text-sm font-light">
+                Complete your purchase to support our mission
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
-              <Separator />
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+          {/* Left Column - Addresses */}
+          <div className="lg:col-span-8 space-y-8">
+            {/* Shipping Address */}
+            <Card className="border-none shadow-sm overflow-hidden">
+              <CardHeader className="bg-muted/30 pb-4">
+                <CardTitle className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm shadow-md">
+                    1
+                  </div>
+                  Shipping Address
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <AddressSelector
+                  type="shipping"
+                  selectedAddressId={shippingAddress?.id}
+                  onSelect={setShippingAddress}
+                />
+              </CardContent>
+            </Card>
 
-              <PriceBreakdown totals={summary.totals} />
+            {/* Billing Address */}
+            <Card className="border-none shadow-sm overflow-hidden">
+              <CardHeader className="bg-muted/30 pb-4">
+                <CardTitle className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm shadow-md">
+                    2
+                  </div>
+                  Billing Address
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-6">
+                <div className="flex items-center space-x-3 bg-muted/20 p-4 rounded-lg border border-border/50">
+                  <Checkbox
+                    id="billing-same"
+                    checked={billingSameAsShipping}
+                    onCheckedChange={(checked) => setBillingSameAsShipping(checked as boolean)}
+                  />
+                  <Label htmlFor="billing-same" className="cursor-pointer font-medium">
+                    Same as shipping address
+                  </Label>
+                </div>
 
-              <Button
-                className="w-full h-12 text-lg"
-                onClick={handlePayment}
-                disabled={processing}
-              >
-                {processing ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <Lock className="mr-2 h-4 w-4" />
-                    Pay ₹{summary.totals.finalAmount.toFixed(2)}
-                  </>
+                {!billingSameAsShipping && (
+                  <div className="animate-in fade-in slide-in-from-top-2 pt-2">
+                    <AddressSelector
+                      type="billing"
+                      selectedAddressId={billingAddress?.id}
+                      onSelect={setBillingAddress}
+                    />
+                  </div>
                 )}
-              </Button>
+              </CardContent>
+            </Card>
+          </div>
 
-              <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                <ShieldCheck className="h-4 w-4 text-green-600" />
-                <span>Secure Payment via Razorpay</span>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Right Column - Order Summary */}
+          <div className="lg:col-span-4 space-y-6">
+            <div className="sticky top-24 space-y-6">
+              <Card className="border-none shadow-elevated overflow-hidden">
+                <CardContent className="p-6 space-y-2">
+                  <OrderSummary items={summary.cart.cart_items.map((item) => ({
+                    ...item,
+                    productId: item.product_id,
+                    product: item.products
+                  }))} />
+
+                  <Separator className="bg-border/60 my-2" />
+
+                  <PriceBreakdown totals={summary.totals} />
+
+                  <Button
+                    className="w-full h-14 text-lg font-bold shadow-lg hover:shadow-xl transition-all"
+                    onClick={handlePayment}
+                    disabled={processing}
+                  >
+                    {processing ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="mr-2 h-4 w-4" />
+                        Pay ₹{summary.totals.finalAmount.toFixed(2)}
+                      </>
+                    )}
+                  </Button>
+
+                  <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground bg-muted/30 py-2 rounded-full">
+                    <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                    <span>Secure Payment via Razorpay</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </div>
       </div>
 
       <AlertDialog open={showPhoneWarning} onOpenChange={setShowPhoneWarning}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Phone Number Required</AlertDialogTitle>
-            <AlertDialogDescription>
-              A phone number is required for delivery coordination. Please edit your shipping address to include a valid phone number.
+            <AlertDialogTitle className="font-playfair text-2xl text-destructive">Phone Number Required</AlertDialogTitle>
+            <AlertDialogDescription className="text-base">
+              To ensure smooth delivery, we need a valid phone number. Please update your shipping address to include a contact number.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setShowPhoneWarning(false)}>
-              OK
+            <AlertDialogAction onClick={() => setShowPhoneWarning(false)} className="rounded-full px-6">
+              OK, I'll add it
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

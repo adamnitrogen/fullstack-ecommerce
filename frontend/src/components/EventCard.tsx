@@ -13,6 +13,7 @@ import {
 import { Tag } from "@/components/ui/Tag";
 import { Event } from "@/types";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface EventCardProps {
   event: Event;
@@ -63,52 +64,56 @@ export const EventCard = ({
 
   return (
     <Card
-      className={`overflow-hidden hover:shadow-elevated transition-all duration-300 flex flex-col h-full cursor-pointer ${className}`}
+      className={`group overflow-hidden hover:shadow-elevated transition-all duration-500 flex flex-col h-full cursor-pointer border-none bg-white rounded-[2.5rem] ${className}`}
       onClick={handleCardClick}
     >
       {event.image && (
-        <div className="relative h-48">
+        <div className="relative aspect-[16/10] overflow-hidden">
           <img
             src={event.image}
             alt={event.title}
             loading="lazy"
-            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
           />
-          <Tag
-            variant={getStatusVariant(event.status)}
-            className="absolute top-4 right-4"
-          >
-            {t(`events.${event.status}`)}
-          </Tag>
+          <div className="absolute inset-0 bg-gradient-to-t from-[#2C1810]/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+          <div className="absolute top-4 right-4 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
+            <span className={cn(
+              "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg backdrop-blur-md",
+              event.status === "ongoing" ? "bg-green-500 text-white" : "bg-[#B85C3C] text-white"
+            )}>
+              {t(`events.${event.status}`)}
+            </span>
+          </div>
         </div>
       )}
 
-      <CardHeader>
-        <CardTitle className="text-xl">{event.title}</CardTitle>
-        <CardDescription className="line-clamp-2">
-          {event.description}
-        </CardDescription>
+      <CardHeader className="p-8 pb-4">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="h-1 w-8 bg-[#B85C3C] rounded-full" />
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#B85C3C]">
+            {event.registrationAmount === 0 ? "Complimentary" : "Sacred Offering"}
+          </span>
+        </div>
+        <CardTitle className="text-2xl font-playfair font-bold text-[#2C1810] group-hover:text-[#B85C3C] transition-colors duration-300">
+          {event.title}
+        </CardTitle>
       </CardHeader>
 
-      <CardContent className="space-y-4 flex-grow">
-        <div className="space-y-3 text-sm">
+      <CardContent className="px-8 space-y-6 flex-grow">
+        <div className="space-y-4">
           {/* Date and Time */}
-          <div className="flex items-start gap-3">
-            <Calendar className="h-4 w-4 mt-0.5 flex-shrink-0 text-primary" />
-            <div className="flex flex-col gap-1">
-              <span className="font-medium text-foreground">
-                {event.startDate
-                  ? format(new Date(event.startDate), "PPP")
-                  : "TBA"}
-                {event.endDate && event.endDate !== event.startDate && (
-                  <> - {format(new Date(event.endDate), "PPP")}</>
-                )}
+          <div className="flex items-center gap-4">
+            <div className="h-10 w-10 rounded-2xl bg-[#B85C3C]/5 flex items-center justify-center text-[#B85C3C] flex-shrink-0 group-hover:bg-[#B85C3C] group-hover:text-white transition-colors duration-500">
+              <Calendar className="h-5 w-5" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-bold text-[#2C1810]">
+                {event.startDate ? format(new Date(event.startDate), "PPP") : "TBA"}
               </span>
-              {(event.startTime || event.endTime) && (
-                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  {formatTime(event.startTime)}
-                  {event.endTime && <> - {formatTime(event.endTime)}</>}
+              {event.startTime && (
+                <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+                  {event.startTime} {event.endTime && ` — ${event.endTime}`}
                 </span>
               )}
             </div>
@@ -116,38 +121,29 @@ export const EventCard = ({
 
           {/* Address */}
           {displayAddress && (
-            <div className="flex items-start gap-3">
-              <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0 text-primary" />
-              <span className="text-foreground leading-relaxed">
+            <div className="flex items-center gap-4">
+              <div className="h-10 w-10 rounded-2xl bg-[#B85C3C]/5 flex items-center justify-center text-[#B85C3C] flex-shrink-0 group-hover:bg-[#B85C3C] group-hover:text-white transition-colors duration-500">
+                <MapPin className="h-5 w-5" />
+              </div>
+              <span className="text-sm text-muted-foreground font-light line-clamp-1 italic">
                 {displayAddress}
               </span>
             </div>
           )}
-
-          {/* Registration Amount */}
-          <div className="flex items-center gap-3">
-            <Banknote className="h-4 w-4 flex-shrink-0 text-primary" />
-            <span className="font-medium text-foreground">
-              {event.registrationAmount === 0 ||
-                event.registrationAmount === undefined
-                ? "Free Entry"
-                : `₹${event.registrationAmount}`}
-            </span>
-          </div>
         </div>
 
         {isCompleted && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2">
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
+          <div className="flex items-center gap-3 bg-green-50 px-4 py-2 rounded-xl text-xs font-bold text-green-700">
+            <CheckCircle2 className="h-4 w-4" />
             <span>{t("events.successfullyCompleted")}</span>
           </div>
         )}
       </CardContent>
 
       {!isCompleted && event.isRegistrationEnabled !== false && (
-        <CardFooter className="mt-auto">
+        <CardFooter className="p-8 pt-0">
           <Button
-            className="w-full"
+            className="w-full h-12 rounded-full bg-[#2C1810] hover:bg-[#B85C3C] text-white font-bold uppercase tracking-widest text-xs shadow-lg hover:shadow-xl transition-all duration-300 border-none"
             onClick={(e) => {
               e.stopPropagation();
               handleRegisterClick();

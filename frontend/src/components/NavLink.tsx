@@ -1,31 +1,37 @@
 import { Link, LinkProps, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
-interface NavLinkProps extends LinkProps {
+interface NavLinkProps extends Omit<LinkProps, 'className' | 'children'> {
   activeClassName?: string;
   end?: boolean;
+  className?: string | ((props: { isActive: boolean }) => string);
+  children?: React.ReactNode | ((props: { isActive: boolean }) => React.ReactNode);
 }
 
-export function NavLink({ 
-  to, 
-  className, 
-  activeClassName = 'bg-accent text-accent-foreground', 
+export function NavLink({
+  to,
+  className,
+  activeClassName = 'bg-accent text-accent-foreground',
   end = false,
   children,
-  ...props 
+  ...props
 }: NavLinkProps) {
   const location = useLocation();
-  const isActive = end 
-    ? location.pathname === to 
+  const isActive = end
+    ? location.pathname === to
     : location.pathname.startsWith(to as string);
+
+  const resolvedClassName = typeof className === 'function'
+    ? className({ isActive })
+    : cn(className, isActive && activeClassName);
 
   return (
     <Link
       to={to}
-      className={cn(className, isActive && activeClassName)}
+      className={resolvedClassName}
       {...props}
     >
-      {children}
+      {typeof children === 'function' ? children({ isActive }) : children}
     </Link>
   );
 }

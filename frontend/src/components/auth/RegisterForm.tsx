@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, CheckCircle } from "lucide-react";
 import { FcGoogle } from "react-icons/fc";
 
 interface RegisterFormProps {
@@ -34,7 +34,6 @@ export function RegisterForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate password
     const passError = validators.password(password);
     if (passError) {
       setPasswordError(passError);
@@ -43,16 +42,9 @@ export function RegisterForm({
 
     if (
       name.trim() &&
-      phone && phone.length > 5 // Basic check, better validation exists in PhoneInput but this enforces presence
+      phone && phone.length > 5
     ) {
-      // The previous code had "emailOrPhone" passed in as phone?
-      // Let's add an Email field if it's missing or clarify the intent.
-      // In AuthNew.tsx, 'emailOrPhone' was passed. If it was an email, we are good.
-      // If it was a phone, we need an email for Supabase (by default).
-      // I'll add an Email input to be safe, or rename PhoneInput to dynamic input.
-      // Looking at the previous file, it had "Mobile Number" field.
-      // I will add an Email field.
-      onSubmit(name, phone, password, email); // This submits to AuthNew which calls registerUser
+      onSubmit(name, phone, password, email);
     }
   };
 
@@ -62,18 +54,40 @@ export function RegisterForm({
     setPasswordError(null);
   };
 
+  // Password strength indicator
+  const getPasswordStrength = () => {
+    if (password.length === 0) return null;
+    if (password.length < 6) return { level: 1, text: "Weak", color: "bg-red-500" };
+    if (password.length < 8) return { level: 2, text: "Fair", color: "bg-orange-500" };
+    if (password.length >= 8 && /[A-Z]/.test(password) && /[0-9]/.test(password)) {
+      return { level: 3, text: "Strong", color: "bg-green-500" };
+    }
+    return { level: 2, text: "Good", color: "bg-yellow-500" };
+  };
+
+  const passwordStrength = getPasswordStrength();
+
   return (
-    <div className="p-6 sm:p-8">
-      <div className="text-center mb-6">
-        <h2 className="text-lg font-semibold text-foreground mb-1">
+    <div className="p-6 sm:p-8 bg-white">
+      {/* Header */}
+      <div className="text-center mb-8">
+        <div className="flex items-center justify-center mb-4">
+          <div className="w-16 h-16 bg-gradient-to-br from-[#B85C3C] to-[#D4AF37] rounded-2xl flex items-center justify-center shadow-lg shadow-[#B85C3C]/20">
+            <span className="text-3xl">🌿</span>
+          </div>
+        </div>
+        <h2 className="text-2xl font-bold text-[#2C1810] font-playfair mb-1">
           Create Account
         </h2>
-        <p className="text-sm text-muted-foreground">Register to get started</p>
+        <p className="text-sm text-[#2C1810]/60">Join our community today</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4" action="#">
+        {/* Full Name */}
         <div className="space-y-2">
-          <Label htmlFor="name">Full Name</Label>
+          <Label htmlFor="name" className="text-xs font-bold uppercase tracking-wider text-[#2C1810]">
+            Full Name <span className="text-[#B85C3C]">*</span>
+          </Label>
           <Input
             id="name"
             type="text"
@@ -81,24 +95,31 @@ export function RegisterForm({
             onChange={(e) => setName(e.target.value)}
             placeholder="Enter your full name"
             required
+            className="h-12 rounded-xl border-2 bg-[#FAF7F2] focus:bg-white border-[#B85C3C]/10 focus:border-[#B85C3C] transition-colors"
           />
         </div>
 
-        {/* We generally need an Email for Supabase Auth unless using Phone Auth */}
+        {/* Email */}
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email" className="text-xs font-bold uppercase tracking-wider text-[#2C1810]">
+            Email <span className="text-[#B85C3C]">*</span>
+          </Label>
           <Input
             id="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="Enter your email"
-            required // Make it required for Supabase
+            placeholder="Enter your email address"
+            required
+            className="h-12 rounded-xl border-2 bg-[#FAF7F2] focus:bg-white border-[#B85C3C]/10 focus:border-[#B85C3C] transition-colors"
           />
         </div>
 
+        {/* Phone */}
         <div className="space-y-2">
-          <Label htmlFor="phone">Mobile Number</Label>
+          <Label htmlFor="phone" className="text-xs font-bold uppercase tracking-wider text-[#2C1810]">
+            Mobile Number <span className="text-[#B85C3C]">*</span>
+          </Label>
           <PhoneInput
             id="phone"
             value={phone}
@@ -106,94 +127,130 @@ export function RegisterForm({
             placeholder="Enter your mobile number"
           />
         </div>
+
+        {/* Password */}
         <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password" className="text-xs font-bold uppercase tracking-wider text-[#2C1810]">
+            Password <span className="text-[#B85C3C]">*</span>
+          </Label>
           <div className="relative">
             <Input
               id="password"
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={handlePasswordChange}
-              placeholder="Enter your password (min 8 characters)"
+              placeholder="Create a strong password"
               required
               minLength={8}
+              className={`h-12 rounded-xl border-2 bg-[#FAF7F2] focus:bg-white pr-12 transition-colors ${passwordError ? "border-red-500" : "border-[#B85C3C]/10 focus:border-[#B85C3C]"}`}
             />
-            <Button
+            <button
               type="button"
-              variant="ghost"
-              size="sm"
-              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#2C1810]/40 hover:text-[#B85C3C] transition-colors"
               onClick={() => setShowPassword((prev) => !prev)}
             >
-              {showPassword ? (
-                <EyeOff className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <Eye className="h-4 w-4 text-muted-foreground" />
-              )}
-            </Button>
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
           </div>
-          {passwordError && (
-            <p className="text-sm text-red-500 mt-1">{passwordError}</p>
+
+          {/* Password Strength Indicator */}
+          {passwordStrength && (
+            <div className="flex items-center gap-2 mt-2">
+              <div className="flex-1 h-1.5 bg-[#FAF7F2] rounded-full overflow-hidden flex gap-1">
+                <div className={`h-full w-1/3 rounded-full ${passwordStrength.level >= 1 ? passwordStrength.color : 'bg-[#FAF7F2]'}`} />
+                <div className={`h-full w-1/3 rounded-full ${passwordStrength.level >= 2 ? passwordStrength.color : 'bg-[#FAF7F2]'}`} />
+                <div className={`h-full w-1/3 rounded-full ${passwordStrength.level >= 3 ? passwordStrength.color : 'bg-[#FAF7F2]'}`} />
+              </div>
+              <span className={`text-[10px] font-bold uppercase tracking-wider ${passwordStrength.level === 3 ? 'text-green-600' : passwordStrength.level === 2 ? 'text-yellow-600' : 'text-red-600'}`}>
+                {passwordStrength.text}
+              </span>
+            </div>
           )}
+
+          {passwordError && (
+            <p className="text-xs text-red-500 mt-1">{passwordError}</p>
+          )}
+
+          {/* Password Requirements */}
+          <div className="text-[10px] text-[#2C1810]/40 mt-2 space-y-0.5">
+            <div className={`flex items-center gap-1 ${password.length >= 8 ? 'text-green-600' : ''}`}>
+              {password.length >= 8 && <CheckCircle size={10} />}
+              <span>At least 8 characters</span>
+            </div>
+            <div className={`flex items-center gap-1 ${/[A-Z]/.test(password) ? 'text-green-600' : ''}`}>
+              {/[A-Z]/.test(password) && <CheckCircle size={10} />}
+              <span>One uppercase letter</span>
+            </div>
+            <div className={`flex items-center gap-1 ${/[0-9]/.test(password) ? 'text-green-600' : ''}`}>
+              {/[0-9]/.test(password) && <CheckCircle size={10} />}
+              <span>One number</span>
+            </div>
+          </div>
         </div>
 
-        <p className="text-xs text-muted-foreground text-center">
-          By continuing, you agree to our{" "}
-          <Button
-            variant="link"
-            className="h-auto p-0 text-xs text-primary"
+        {/* Terms */}
+        <p className="text-[10px] text-[#2C1810]/50 text-center leading-relaxed">
+          By creating an account, you agree to our{" "}
+          <button
             type="button"
+            className="text-[#B85C3C] hover:underline font-medium"
             onClick={() => window.open("/terms", "_blank")}
           >
             Terms of Use
-          </Button>{" "}
+          </button>{" "}
           and{" "}
-          <Button
-            variant="link"
-            className="h-auto p-0 text-xs text-primary"
+          <button
             type="button"
+            className="text-[#B85C3C] hover:underline font-medium"
             onClick={() => window.open("/privacy", "_blank")}
           >
             Privacy Policy
-          </Button>
+          </button>
           .
         </p>
 
-        <Button type="submit" className="w-full" size="lg">
+        <Button
+          type="submit"
+          className="w-full h-12 rounded-xl text-base font-bold bg-[#B85C3C] hover:bg-[#2C1810] transition-all duration-300 shadow-lg shadow-[#B85C3C]/20"
+          size="lg"
+        >
           Create Account
         </Button>
-      </form >
+      </form>
 
+      {/* Divider */}
       <div className="relative my-6">
         <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t" />
+          <span className="w-full border-t border-[#B85C3C]/10" />
         </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-background px-2 text-muted-foreground">Or</span>
+        <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
+          <span className="bg-white px-3 text-[#2C1810]/40 font-medium">Or continue with</span>
         </div>
       </div>
 
+      {/* Google OAuth */}
       <Button
         type="button"
         variant="outline"
-        className="w-full gap-2"
+        className="w-full h-12 rounded-xl gap-3 border-2 border-[#B85C3C]/10 text-[#2C1810] hover:bg-[#FAF7F2] hover:border-[#B85C3C]/20 transition-all"
         size="lg"
         onClick={onGoogleSignIn}
       >
         <FcGoogle className="h-5 w-5" />
-        Continue with Google
+        <span className="font-medium">Continue with Google</span>
       </Button>
 
-      <p className="text-center mt-6 text-sm text-muted-foreground">
+      {/* Switch to Login */}
+      <p className="text-center mt-6 text-sm text-[#2C1810]/60">
         Already have an account?{" "}
-        <Button
-          variant="link"
-          className="px-1 text-primary"
+        <button
+          type="button"
+          className="text-[#B85C3C] hover:text-[#2C1810] font-bold transition-colors"
           onClick={onSwitchToLogin}
         >
           Login here
-        </Button>
+        </button>
       </p>
-    </div >
+    </div>
   );
 }

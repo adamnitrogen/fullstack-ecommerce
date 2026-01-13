@@ -161,6 +161,8 @@ export const endpoints = {
   // Settings (Admin)
   getSettings: "/admin/settings",
   updateSettings: "/admin/settings",
+  getDeliverySettings: "/settings/delivery",
+  updateDeliverySettings: "/settings/delivery",
 
   // User Management (Admin)
   getAllUsers: "/admin/users",
