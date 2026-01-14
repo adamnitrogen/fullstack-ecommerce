@@ -319,14 +319,17 @@ export const DonationForm = () => {
                             </div>
 
                             <div className="relative mt-2">
-                                <Label className="sr-only">Custom Amount</Label>
+                                <Label htmlFor="custom-amount" className="sr-only">Custom Amount</Label>
                                 <div className="relative group">
                                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-semibold group-focus-within:text-primary transition-colors">₹</span>
                                     <Input
+                                        id="custom-amount"
+                                        name="customAmount"
                                         placeholder="Enter custom amount"
                                         className="pl-8 h-12 text-lg font-medium transition-all focus-visible:ring-offset-0 focus-visible:border-primary"
                                         value={customAmount}
                                         onChange={handleCustomAmountChange}
+                                        autoComplete="off"
                                     />
                                 </div>
                             </div>
@@ -341,22 +344,28 @@ export const DonationForm = () => {
 
                         <div className="grid gap-4">
                             <div className="space-y-2">
-                                <Label>Full Name</Label>
+                                <Label htmlFor="fullName">Full Name</Label>
                                 <Input
+                                    id="fullName"
+                                    name="fullName"
                                     value={formData.fullName}
                                     onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                                     placeholder="e.g. Rahul Sharma"
                                     className="h-11"
+                                    autoComplete="name"
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label>Email Address</Label>
+                                <Label htmlFor="email">Email Address</Label>
                                 <Input
+                                    id="email"
+                                    name="email"
                                     value={formData.email}
                                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                     placeholder="name@example.com"
                                     type="email"
                                     className="h-11"
+                                    autoComplete="email"
                                 />
                             </div>
                             <div className="space-y-2">
@@ -376,6 +385,8 @@ export const DonationForm = () => {
                             <label className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20 cursor-pointer group hover:bg-primary/10 transition-colors">
                                 <input
                                     type="checkbox"
+                                    name="recurringConsent"
+                                    id="recurringConsent"
                                     className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
                                     checked={recurringConsent}
                                     onChange={(e) => setRecurringConsent(e.target.checked)}

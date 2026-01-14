@@ -18,34 +18,34 @@ import { EventCancellationDialog } from "@/components/admin/EventCancellationDia
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import { useAuthStore } from "@/store/authStore";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { Loader2, Heart, Calendar, ExternalLink, User, Sparkles, UserCircle } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+
 import { useTranslation } from "react-i18next";
 
 export default function Profile() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { user, logout } = useAuthStore();
   const [activeTab, setActiveTab] = useState("account");
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
+
   const [selectedRegId, setSelectedRegId] = useState<string | null>(null);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
   const [page, setPage] = useState(1);
   const LIMIT = 5;
 
@@ -245,25 +245,7 @@ export default function Profile() {
     },
   });
 
-  // Delete account mutation
-  const deleteAccountMutation = useMutation({
-    mutationFn: profileService.deleteAccount,
-    onSuccess: () => {
-      toast({
-        title: "Account Deleted",
-        description: "Your account has been successfully deleted",
-      });
-      logout();
-      navigate("/");
-    },
-    onError: (error: unknown) => {
-      toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to delete account"),
-        variant: "destructive",
-      });
-    },
-  });
+
 
   if (isLoading) {
     return <LoadingOverlay isLoading={true} message="Loading your profile..." />;
@@ -374,22 +356,23 @@ export default function Profile() {
                     onSetPrimary={async (id) => {
                       const addr = profile.addresses.find(a => a.id === id);
                       if (addr) {
-                        console.log('[Profile:onSetPrimary] Setting primary for:', addr.id, 'type:', addr.type);
                         const type = (addr.type === 'home' || addr.type === 'work' || addr.type === 'other')
                           ? addr.type as 'home' | 'work' | 'other'
                           : 'other';
                         await setPrimaryMutation.mutateAsync({ id, type });
                       } else {
-                        console.warn('[Profile:onSetPrimary] Address not found for ID:', id);
+                        // Address not found handled gracefully
                       }
                     }}
                   />
                 </div>
 
                 <div className="space-y-8">
-                  <DeleteAccountSection
-                    onDelete={async () => setShowDeleteDialog(true)}
-                  />
+                  {user?.role !== 'admin' && (
+                    <DeleteAccountSection
+                      onDelete={async () => navigate('/account/delete')}
+                    />
+                  )}
                 </div>
               </div>
             </TabsContent>
@@ -583,26 +566,6 @@ export default function Profile() {
         open={passwordDialogOpen}
         onOpenChange={setPasswordDialogOpen}
       />
-
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent className="rounded-[2rem] border-none shadow-elevated p-8">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-2xl font-playfair text-[#2C1810]">Delete Account Permanently?</AlertDialogTitle>
-            <AlertDialogDescription className="text-base pt-2">
-              This action cannot be undone. All your orders, donations, and personal data will be permanently removed from our records.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="pt-6">
-            <AlertDialogCancel className="rounded-full px-8">Return Safely</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteAccountMutation.mutate()}
-              className="bg-red-600 text-white hover:bg-red-700 rounded-full px-8"
-            >
-              {deleteAccountMutation.isPending ? "Removing..." : "Delete Permanently"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <EventCancellationDialog
         isOpen={!!selectedRegId}

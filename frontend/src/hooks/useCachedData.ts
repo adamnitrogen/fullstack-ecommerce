@@ -44,7 +44,7 @@ export function useCachedData<T>(
                             return;
                         }
                     } catch (e) {
-                        console.warn('Failed to parse cached data', e);
+                        // console.warn('Failed to parse cached data', e);
                         localStorage.removeItem(key);
                     }
                 }
@@ -64,7 +64,7 @@ export function useCachedData<T>(
                 };
                 localStorage.setItem(key, JSON.stringify(cacheItem));
             } catch (e) {
-                console.warn('Failed to save to localStorage (quota exceeded?)', e);
+                // console.warn('Failed to save to localStorage (quota exceeded?)', e);
             }
 
         } catch (err) {

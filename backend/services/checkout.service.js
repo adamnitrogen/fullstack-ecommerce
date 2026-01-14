@@ -1,5 +1,7 @@
 const Razorpay = require('razorpay');
 const logger = require('../utils/logger');
+const { createModuleLogger } = require('../utils/logging-standards');
+const { getTraceContext } = require('../utils/async-context');
 const crypto = require('crypto');
 const supabase = require('../config/supabase');
 const { calculateCartTotals, getUserCart } = require('./cart.service');
@@ -7,6 +9,9 @@ const { getPrimaryAddress, getLatestAddress } = require('./address.service');
 const { checkStockAvailability, decreaseInventory } = require('./inventory.service');
 const emailService = require('./email');
 const { capturePayment, voidAuthorization } = require('../utils/razorpay-helper');
+
+// Create module-specific logger
+const log = createModuleLogger('CheckoutService');
 
 /**
  * Checkout Service
@@ -61,8 +66,10 @@ const getCheckoutSummary = async (userId) => {
 // Create Razorpay order with AUTO CAPTURE
 // Payment is captured immediately
 const createRazorpayOrder = async (amount, receipt) => {
+    log.operationStart('CREATE_RAZORPAY_ORDER', { amount, receipt });
+    const startTime = Date.now();
+
     try {
-        logger.info(`Creating Razorpay order (auto capture): Amount=${amount}, Receipt=${receipt}`);
         const options = {
             amount: Math.round(amount * 100), // amount in paise
             currency: 'INR',
@@ -71,11 +78,14 @@ const createRazorpayOrder = async (amount, receipt) => {
         };
 
         const order = await razorpay.orders.create(options);
-        logger.info({ orderId: order.id, captureMode: 'auto' }, 'Razorpay order created successfully');
+        log.operationSuccess('CREATE_RAZORPAY_ORDER', {
+            orderId: order.id,
+            captureMode: 'auto',
+            amountPaise: order.amount
+        }, Date.now() - startTime);
         return order;
     } catch (error) {
-        logger.error('Razorpay order creation error FULL OBJECT:', JSON.stringify(error, null, 2));
-        logger.error({ err: error.message }, 'Razorpay order creation error message:');
+        log.operationError('CREATE_RAZORPAY_ORDER', error, { amount, receipt });
         throw new Error('Failed to create payment order');
     }
 };
@@ -513,6 +523,14 @@ async function processPaymentAndOrder(userId, {
     billing_address_id,
     notes
 }) {
+    const trace = getTraceContext();
+    log.operationStart('PROCESS_PAYMENT_ORDER', {
+        userId,
+        razorpayOrderId: razorpay_order_id,
+        hasPaymentId: !!payment_id
+    });
+    const startTime = Date.now();
+
     // Check if this is a mock payment (for testing)
     const isMockPayment = razorpay_order_id.startsWith('mock_');
 
@@ -520,6 +538,11 @@ async function processPaymentAndOrder(userId, {
     const cart = await getUserCart(userId);
     const totals = await calculateCartTotals(userId, cart);
     const captureAmount = totals.finalAmount;
+
+    log.debug('PROCESS_PAYMENT_ORDER', 'Cart loaded', {
+        itemCount: cart.cart_items?.length,
+        captureAmount
+    });
 
     // Verify payment signature (skip for mock payments)
     if (!isMockPayment) {

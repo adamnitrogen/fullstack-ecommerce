@@ -38,7 +38,7 @@ export const policyService = {
             if (cachedData) {
                 const parsed = JSON.parse(cachedData) as Policy;
                 if (parsed.version === version) {
-                    console.log(`Serving ${policyType} policy from cache (v${version})`);
+                    // console.log(`Serving ${policyType} policy from cache (v${version})`);
                     return parsed;
                 }
             }
@@ -52,7 +52,7 @@ export const policyService = {
 
             return data;
         } catch (error) {
-            console.error('Error fetching policy:', error);
+            // console.error('Error fetching policy:', error);
             // Fallback to direct fetch if version check fails
             const response = await apiClient.get(`/policies/public/${policyType}`);
             return response.data;

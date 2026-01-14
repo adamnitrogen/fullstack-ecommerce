@@ -23,6 +23,9 @@ const { getOrderConfirmationEmail, getOrderStatusUpdateEmail } = require('./temp
 const { getEventRegistrationEmail, getEventCancellationEmail, getEventUpdateEmail } = require('./templates/event.template');
 const { getDonationReceiptEmail, getSubscriptionConfirmationEmail, getSubscriptionCancellationEmail } = require('./templates/donation.template');
 const { getContactFormEmail, getContactAutoReplyEmail } = require('./templates/contact.template');
+const { getAccountDeletedEmail, getAccountDeletionScheduledEmail, getAccountDeletionOTPEmail } = require('./templates/account.template');
+const { getOTPEmail, getPasswordResetEmail } = require('./templates/auth.template');
+const { getManagerWelcomeEmail } = require('./templates/manager.template');
 
 class EmailService {
     constructor() {
@@ -102,6 +105,24 @@ class EmailService {
             case EmailEventTypes.EMAIL_CONFIRMATION:
                 return getEmailConfirmationEmail(data);
 
+            case EmailEventTypes.ACCOUNT_DELETED:
+                return getAccountDeletedEmail(data);
+
+            case EmailEventTypes.ACCOUNT_DELETION_SCHEDULED:
+                return getAccountDeletionScheduledEmail(data);
+
+            case EmailEventTypes.ACCOUNT_DELETION_OTP:
+                return getAccountDeletionOTPEmail(data);
+
+            case EmailEventTypes.OTP_VERIFICATION:
+                return getOTPEmail(data);
+
+            case EmailEventTypes.PASSWORD_RESET:
+                return getPasswordResetEmail(data);
+
+            case EmailEventTypes.MANAGER_WELCOME:
+                return getManagerWelcomeEmail(data);
+
             default:
                 throw new Error(`Unknown email event type: ${eventType}`);
         }
@@ -176,9 +197,13 @@ class EmailService {
         const { userId = null, referenceId = null } = options;
         let logId = null;
 
+        logger.info({ eventType, to, userId, hasData: !!data }, '[EmailService] Internal send triggered');
+
         try {
             // Get template
-            const { subject, html } = this._getTemplate(eventType, data);
+            const templateResult = this._getTemplate(eventType, data);
+            const { subject, html } = templateResult;
+            logger.info({ eventType, to, subject }, '[EmailService] Template generated successfully');
 
             // 1. Create Log (PENDING)
             logId = await this._createLog({
@@ -339,6 +364,48 @@ class EmailService {
      */
     async sendSubscriptionCancellationEmail(to, { subscription, donorName }, userId = null) {
         return this.send(EmailEventTypes.SUBSCRIPTION_CANCELLED, to, { subscription, donorName }, { userId, referenceId: subscription.donationRef });
+    }
+
+    /**
+     * Send account deletion confirmation email
+     */
+    async sendAccountDeletedEmail(to, { name }, userId = null) {
+        return this.send(EmailEventTypes.ACCOUNT_DELETED, to, { name }, { userId });
+    }
+
+    /**
+     * Send account deletion scheduled email
+     */
+    async sendAccountDeletionScheduledEmail(to, { name, scheduledDate }, userId = null) {
+        return this.send(EmailEventTypes.ACCOUNT_DELETION_SCHEDULED, to, { name, scheduledDate }, { userId });
+    }
+
+    /**
+     * Send account deletion OTP email
+     */
+    async sendAccountDeletionOTPEmail(to, otp, expiryMinutes) {
+        return this.send(EmailEventTypes.ACCOUNT_DELETION_OTP, to, { otp, expiryMinutes });
+    }
+
+    /**
+     * Send OTP email
+     */
+    async sendOTPEmail(to, otp, expiryMinutes) {
+        return this.send(EmailEventTypes.OTP_VERIFICATION, to, { otp, expiryMinutes });
+    }
+
+    /**
+     * Send password reset email
+     */
+    async sendPasswordResetEmail(to, resetLink) {
+        return this.send(EmailEventTypes.PASSWORD_RESET, to, { resetLink });
+    }
+
+    /**
+     * Send manager welcome email with temporary password
+     */
+    async sendManagerWelcomeEmail(to, name, password) {
+        return this.send(EmailEventTypes.MANAGER_WELCOME, to, { name, email: to, password });
     }
 }
 

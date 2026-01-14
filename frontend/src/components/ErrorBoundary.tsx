@@ -24,7 +24,7 @@ class ErrorBoundary extends Component<Props, State> {
     }
 
     componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-        console.error('Uncaught error:', error, errorInfo);
+        // console.error('Uncaught error:', error, errorInfo);
 
         // Send to New Relic if available
         // We can use the global newrelic object if the snippet was loaded, or check our instance logic.

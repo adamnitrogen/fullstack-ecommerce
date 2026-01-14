@@ -126,7 +126,6 @@ export default function Contact() {
       });
       setFormData({ name: "", email: "", subject: "", message: "" });
     } catch (error: unknown) {
-      console.error('Failed to send message:', error);
       const details = getErrorDetails(error);
       if (details) {
         const backendErrors: Record<string, string> = {};

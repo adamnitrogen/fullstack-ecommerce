@@ -63,7 +63,6 @@ export default function PolicyManagement() {
             }, 1000);
         },
         onError: (error: any) => {
-            console.error(error);
             toast.error(error.response?.data?.error || error.message || "Failed to upload policy");
         },
     });
@@ -124,16 +123,17 @@ export default function PolicyManagement() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Policy Type</label>
+                            <label id="policy-type-label" className="text-sm font-medium">Policy Type</label>
                             <Select
                                 value={selectedPolicy}
+                                name="policyType"
                                 onValueChange={(value: PolicyType) => {
                                     setSelectedPolicy(value);
                                     setPreviewContent(null);
                                     resetFileInput();
                                 }}
                             >
-                                <SelectTrigger>
+                                <SelectTrigger aria-labelledby="policy-type-label">
                                     <SelectValue placeholder="Select policy type" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -147,7 +147,7 @@ export default function PolicyManagement() {
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Upload Document</label>
                             <div className="flex items-center justify-center w-full">
-                                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                                <label htmlFor="policy-file-upload" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
                                     <div className="flex flex-col items-center justify-center pt-5 pb-6">
                                         <Upload className="w-8 h-8 mb-2 text-muted-foreground" />
                                         <p className="text-sm text-muted-foreground">
@@ -158,6 +158,8 @@ export default function PolicyManagement() {
                                         </p>
                                     </div>
                                     <input
+                                        id="policy-file-upload"
+                                        name="policyFile"
                                         ref={fileInputRef}
                                         type="file"
                                         className="hidden"

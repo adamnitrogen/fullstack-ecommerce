@@ -1,4 +1,5 @@
 const supabase = require('../config/supabase');
+const logger = require('./logger');
 
 /**
  * Upload base64 image to Supabase Storage
@@ -30,7 +31,7 @@ async function uploadBase64Image(base64Data, bucket, filename) {
             });
 
         if (error) {
-            console.error('[Upload Helper] Supabase upload error:', error);
+            logger.error({ err: error, bucket, filename }, '[UploadHelper] Supabase upload error');
             throw error;
         }
 
@@ -39,10 +40,10 @@ async function uploadBase64Image(base64Data, bucket, filename) {
             .from(bucket)
             .getPublicUrl(filename);
 
-        console.log(`[Upload Helper] Successfully uploaded: ${filename} to ${bucket}`);
+        logger.debug({ bucket, filename }, '[UploadHelper] Successfully uploaded base64 image');
         return publicUrl;
     } catch (error) {
-        console.error('[Upload Helper] Error uploading base64 image:', error);
+        logger.error({ err: error, bucket, filename }, '[UploadHelper] Error uploading base64 image');
         throw new Error('Failed to upload image to storage');
     }
 }
@@ -68,7 +69,7 @@ async function uploadFileToSupabase(file, bucket, filename = null) {
             });
 
         if (error) {
-            console.error('[Upload Helper] Supabase file upload error:', error);
+            logger.error({ err: error, bucket, filename: uploadFilename }, '[UploadHelper] Supabase file upload error');
             throw error;
         }
 
@@ -77,10 +78,10 @@ async function uploadFileToSupabase(file, bucket, filename = null) {
             .from(bucket)
             .getPublicUrl(uploadFilename);
 
-        console.log(`[Upload Helper] Successfully uploaded file: ${uploadFilename}`);
+        logger.debug({ bucket, filename: uploadFilename }, '[UploadHelper] Successfully uploaded file');
         return publicUrl;
     } catch (error) {
-        console.error('[Upload Helper] Error uploading file:', error);
+        logger.error({ err: error, bucket }, '[UploadHelper] Error uploading file');
         throw new Error('Failed to upload file to storage');
     }
 }
@@ -103,14 +104,14 @@ async function deleteFileFromSupabase(fileUrl, bucket) {
             .remove([filename]);
 
         if (error) {
-            console.error('[Upload Helper] Error deleting file:', error);
+            logger.error({ err: error, bucket, filename }, '[UploadHelper] Error deleting file');
             return false;
         }
 
-        console.log(`[Upload Helper] Successfully deleted: ${filename}`);
+        logger.debug({ bucket, filename }, '[UploadHelper] Successfully deleted file');
         return true;
     } catch (error) {
-        console.error('[Upload Helper] Error in deleteFileFromSupabase:', error);
+        logger.error({ err: error, bucket, fileUrl }, '[UploadHelper] Error in deleteFileFromSupabase');
         return false;
     }
 }

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
+import DOMPurify from "dompurify";
 import { policyService, PolicyType } from "@/services/policy.service";
 import { contactInfoService } from "@/services/contact-info.service";
 
@@ -105,7 +106,7 @@ export function PolicyViewer({ type, fallbackContent }: PolicyViewerProps) {
                                 [&_ul>li::before]:transition-transform
                                 hover:[&_ul>li::before]:scale-110
                             "
-                    dangerouslySetInnerHTML={{ __html: policy.contentHtml }}
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(policy.contentHtml) }}
                 />
 
                 {/* Contact Information Box */}

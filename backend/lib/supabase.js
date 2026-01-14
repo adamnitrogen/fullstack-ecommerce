@@ -18,4 +18,6 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
     }
 });
 
-module.exports = withQueryLogging(supabaseAdmin);
+const supabase = withQueryLogging(supabaseAdmin);
+
+module.exports = { supabase, supabaseAdmin };

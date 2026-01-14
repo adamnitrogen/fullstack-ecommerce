@@ -67,15 +67,16 @@ const createAddress = async (userId, addressData) => {
     let phoneNumberId;
 
     // Check if phone number already exists for this user
-    const { data: existingPhone } = await supabase
+    const { data: existingPhones } = await supabase
         .from('phone_numbers')
         .select('id')
         .eq('user_id', userId)
         .eq('phone_number', addressData.phone)
-        .single();
+        .eq('phone_number', addressData.phone)
+        .limit(1);
 
-    if (existingPhone) {
-        phoneNumberId = existingPhone.id;
+    if (existingPhones && existingPhones.length > 0) {
+        phoneNumberId = existingPhones[0].id;
     } else {
         // Create new phone number
         const { data: newPhone, error: createPhoneError } = await supabase
@@ -167,15 +168,16 @@ const updateAddress = async (id, userId, updates) => {
             throw new Error(validationResult.error);
         }
 
-        const { data: existingPhone } = await supabase
+        const { data: existingPhones } = await supabase
             .from('phone_numbers')
             .select('id')
             .eq('user_id', userId)
             .eq('phone_number', phone)
-            .single();
+            .eq('phone_number', phone)
+            .limit(1);
 
-        if (existingPhone) {
-            dbUpdates.phone_number_id = existingPhone.id;
+        if (existingPhones && existingPhones.length > 0) {
+            dbUpdates.phone_number_id = existingPhones[0].id;
         } else {
             // Create new phone number
             const { data: newPhone, error: createPhoneError } = await supabase

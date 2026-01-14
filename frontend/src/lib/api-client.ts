@@ -12,6 +12,7 @@ interface CustomAxiosConfig extends InternalAxiosRequestConfig {
         correlationId: string;
     };
     _retry?: boolean;
+    silent?: boolean;
 }
 
 const IDEMPOTENCY_ROUTES = [
@@ -51,8 +52,9 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.request.use(
     (config) => {
+        const customConfig = config as CustomAxiosConfig;
         const correlationId = generateUUID();
-        (config as CustomAxiosConfig).metadata = {
+        customConfig.metadata = {
             startTime: Date.now(),
             correlationId
         };
@@ -60,11 +62,14 @@ apiClient.interceptors.request.use(
         if (requiresIdempotencyKey(config.url, config.method)) {
             config.headers['X-Idempotency-Key'] = generateUUID();
         }
-        logPageAction('APIRequestStarted', {
-            method: config.method?.toUpperCase(),
-            url: config.url,
-            correlationId
-        });
+
+        if (!customConfig.silent) {
+            logPageAction('APIRequestStarted', {
+                method: config.method?.toUpperCase(),
+                url: config.url,
+                correlationId
+            });
+        }
         return config;
     },
     (error) => Promise.reject(error)
@@ -74,7 +79,7 @@ apiClient.interceptors.response.use(
     (response) => {
         const config = response.config as CustomAxiosConfig;
         const duration = config.metadata?.startTime ? Date.now() - config.metadata.startTime : 0;
-        logAPICall(config.url || 'unknown', config.method?.toUpperCase() || 'UNKNOWN', response.status, duration, config.metadata?.correlationId);
+        logAPICall(config.url || 'unknown', config.method?.toUpperCase() || 'UNKNOWN', response.status, duration, config.metadata?.correlationId, config.silent);
         sessionExpiredHandled = false;
         return response;
     },
@@ -83,12 +88,14 @@ apiClient.interceptors.response.use(
 
         if (originalRequest) {
             const duration = originalRequest.metadata?.startTime ? Date.now() - originalRequest.metadata.startTime : 0;
-            logAPICall(originalRequest.url || 'unknown', originalRequest.method?.toUpperCase() || 'UNKNOWN', error.response?.status || 0, duration, originalRequest.metadata?.correlationId);
+            logAPICall(originalRequest.url || 'unknown', originalRequest.method?.toUpperCase() || 'UNKNOWN', error.response?.status || 0, duration, originalRequest.metadata?.correlationId, originalRequest?.silent);
         }
 
         // 401 Unauthorized -> Refresh
         if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
             const isAuthEndpoint = originalRequest.url?.includes('/auth/refresh') ||
+                originalRequest.url?.includes('/auth/sync') ||
+                originalRequest.url?.includes('/auth/me') ||
                 originalRequest.url?.includes('/auth/register') ||
                 originalRequest.url?.includes('/auth/validate-credentials') ||
                 originalRequest.url?.includes('/auth/verify-login-otp');

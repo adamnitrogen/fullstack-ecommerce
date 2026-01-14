@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const logger = require('../utils/logger');
 // bcrypt removed for performance (using sha256 for OTPs)
-const supabase = require('../config/supabase');
+const { supabaseAdmin: supabase } = require('../lib/supabase');
 
 // Configuration
 const OTP_LENGTH = 6;
@@ -97,12 +97,17 @@ async function deleteOTP(identifier) {
 /**
  * Send OTP via Email using Resend
  */
-async function sendEmailOTP(email, otp) {
-    const { sendOTPEmail } = require('./email.service');
+async function sendEmailOTP(email, otp, metadata = null) {
+    const emailService = require('./email');
 
     try {
-        const result = await sendOTPEmail(email, otp, OTP_EXPIRY_MINUTES);
-        logger.info(`✅ OTP email sent to ${email} (Message ID: ${result.messageId})`);
+        let result;
+        if (metadata?.purpose === 'ACCOUNT_DELETION') {
+            result = await emailService.sendAccountDeletionOTPEmail(email, otp, OTP_EXPIRY_MINUTES);
+        } else {
+            result = await emailService.sendOTPEmail(email, otp, OTP_EXPIRY_MINUTES);
+        }
+        logger.info(`✅ OTP email sent to ${email}`);
         return result;
     } catch (error) {
         logger.error({ err: error }, 'Failed to send OTP email:');
@@ -180,8 +185,7 @@ async function sendOTP(identifier, metadata = null) {
         const expiresAt = new Date();
         expiresAt.setMinutes(expiresAt.getMinutes() + OTP_EXPIRY_MINUTES);
 
-        // Store hashed OTP
-        const { error } = await supabase
+        let { error } = await supabase
             .from('otp_codes')
             .insert([{
                 identifier: identifier,
@@ -192,6 +196,21 @@ async function sendOTP(identifier, metadata = null) {
                 metadata: metadata // Store metadata
             }]);
 
+        if (error && error.code === '42703') {
+            // FALLBACK: If metadata column is missing, retry without it
+            logger.warn({ identifier }, '[OTPService] metadata column missing, falling back to safe insert');
+            const fallback = await supabase
+                .from('otp_codes')
+                .insert([{
+                    identifier: identifier,
+                    code: hashedOTP,
+                    expires_at: expiresAt.toISOString(),
+                    attempts: 0,
+                    verified: false
+                }]);
+            error = fallback.error;
+        }
+
         if (error) {
             logger.error({ err: error }, 'Store OTP error:');
             throw new Error('Failed to store OTP');
@@ -200,7 +219,7 @@ async function sendOTP(identifier, metadata = null) {
         // Send OTP via appropriate channel
         if (isEmail) {
             // Optimization: Send email in background to speed up response
-            sendEmailOTP(identifier, otp).catch(err =>
+            sendEmailOTP(identifier, otp, metadata).catch(err =>
                 logger.error({ err }, 'Background OTP email send failed')
             );
         } else {
@@ -261,7 +280,7 @@ async function verifyOTP(identifier, otp) {
         if (error || !otpData) {
             return {
                 success: false,
-                error: 'No OTP found. Please request a new one.'
+                error: 'Invalid OTP'
             };
         }
 

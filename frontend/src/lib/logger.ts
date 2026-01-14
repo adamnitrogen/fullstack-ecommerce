@@ -69,6 +69,8 @@ export const logEvent = (level: LogLevel, message: string, data?: LogContext | u
     payload.context = contextData;
 
     // 1. Console Logging
+    // DISABLED per user request (Backend logs only)
+    /*
     if (!isProduction) {
         // DEVELOPMENT: Log structured object
         const consoleArgs = [
@@ -94,11 +96,12 @@ export const logEvent = (level: LogLevel, message: string, data?: LogContext | u
         }
         return;
     }
+    */
 
     // 2. PRODUCTION: External services
     if (['warn', 'error', 'critical'].includes(level)) {
-        // Console fallback
-        console.warn(`[${level.toUpperCase()}] ${message}`, payload);
+        // Console fallback - DISABLED
+        // console.warn(`[${level.toUpperCase()}] ${message}`, payload);
 
         if (['error', 'critical'].includes(level)) {
             // Send to Sentry
@@ -112,11 +115,6 @@ export const logEvent = (level: LogLevel, message: string, data?: LogContext | u
             if (newrelic && errorObj) {
                 newrelic.noticeError(errorObj, { ...payload, ...contextData });
             }
-
-            // Send to Backend
-            apiClient.post('/logs/client', payload).catch(() => {
-                // Silently fail
-            });
         }
     } else if (level !== 'debug') {
         // Breadcrumbs for info/warn
@@ -137,7 +135,7 @@ export const logPageAction = (name: string, attributes: Record<string, unknown> 
     // Keep console behavior consistent
 
     if (!isProduction) {
-        console.debug(`[PageAction] ${name}`, attributes);
+        // console.debug(`[PageAction] ${name}`, attributes);
     }
 
     const newrelic = getNewRelic();
@@ -163,19 +161,19 @@ export const logFeatureUsage = (featureName: string, details: Record<string, unk
     logPageAction('FeatureUsed', { feature: featureName, ...details });
 };
 
-export const logAPICall = (endpoint: string, method: string, status: number, duration: number, correlationId?: string): void => {
+export const logAPICall = (endpoint: string, method: string, status: number, duration: number, correlationId?: string, silent?: boolean): void => {
     const success = status >= 200 && status < 400;
 
     // Don't flood info logs with API calls in prod unless needed
     // But log specific structured event for debugging
-    if (!success) {
+    if (!success && !silent) {
         logEvent('error', `API Call Failed: ${method} ${endpoint}`, {
             module: 'APIClient',
             operation: 'REQUEST',
             context: { status, duration, correlationId }
         });
     } else {
-        logEvent('debug', `API Call Success: ${method} ${endpoint}`, {
+        logEvent('debug', `API Call ${success ? 'Success' : 'Failed'}: ${method} ${endpoint}`, {
             module: 'APIClient',
             operation: 'REQUEST',
             context: { status, duration, correlationId }
@@ -198,7 +196,7 @@ export const logPerformanceMetric = (name: string, value: number, unit = 'ms'): 
 
 export const setUserContext = (userId: string, userName?: string, userEmail?: string): void => {
     if (!isProduction) {
-        console.debug('[UserContext] Set:', { userId, userName });
+        // console.debug('[UserContext] Set:', { userId, userName });
     }
     const newrelic = getNewRelic();
     if (newrelic) {
@@ -211,7 +209,7 @@ export const setUserContext = (userId: string, userName?: string, userEmail?: st
 
 export const clearUserContext = (): void => {
     if (!isProduction) {
-        console.debug('[UserContext] Cleared');
+        // console.debug('[UserContext] Cleared');
     }
     const newrelic = getNewRelic();
     if (newrelic) {

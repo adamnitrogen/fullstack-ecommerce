@@ -539,6 +539,9 @@ export default function OrderDetail() {
                     </AlertDialogHeader>
                     <div className="py-2">
                         <textarea
+                            id="rejection-reason"
+                            name="rejectionReason"
+                            aria-label="Reason for rejection"
                             className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             placeholder="Reason for rejection..."
                             value={rejectionReason}
@@ -574,6 +577,9 @@ export default function OrderDetail() {
                     </AlertDialogHeader>
                     <div className="py-2">
                         <textarea
+                            id="cancellation-reason"
+                            name="cancellationReason"
+                            aria-label="Reason for cancellation"
                             className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             placeholder="Reason for cancellation..."
                             value={cancelReason}

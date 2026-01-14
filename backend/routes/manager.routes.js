@@ -3,7 +3,7 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const crypto = require('crypto');
-const emailService = require('../services/email.service');
+const emailService = require('../services/email');
 
 // Get all managers with their permissions
 router.get('/', async (req, res) => {

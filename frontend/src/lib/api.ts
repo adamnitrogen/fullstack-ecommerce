@@ -41,13 +41,8 @@ api.interceptors.request.use(
       correlationId
     };
 
-    const authStorage = localStorage.getItem("auth-storage");
-    if (authStorage) {
-      const { state } = JSON.parse(authStorage);
-      if (state?.token) {
-        config.headers.Authorization = `Bearer ${state.token}`;
-      }
-    }
+    // NOTE: Auth tokens are managed via httpOnly cookies by Supabase SDK
+    // No need to manually attach Authorization header from localStorage
     return config;
   },
   (error) => Promise.reject(error)

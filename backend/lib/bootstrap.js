@@ -1,6 +1,6 @@
 
 const logger = require('../utils/logger');
-const supabaseAdmin = require('./supabase');
+const { supabaseAdmin } = require('./supabase');
 
 /**
  * Bootstraps the Admin user based on environment variables.
@@ -15,72 +15,103 @@ async function bootstrapAdmin() {
         return;
     }
 
-    logger.info('Verifying admin user configuration');
+    logger.info('[Bootstrap] Verifying admin user configuration...');
 
     try {
-        // 1. Check if user exists by listing users (filtered by email if possible or just search)
-        // Supabase Admin listUsers doesn't support filter by email directly in all versions, 
-        // but we can search or just try to create and catch error, OR list and find.
-        // Safer to list and find to avoid "User already exists" error noise if we just want to verify.
+        // 1. Get Admin Role ID
+        const { data: roleData, error: roleError } = await supabaseAdmin
+            .from('roles')
+            .select('id')
+            .eq('name', 'admin')
+            .single();
 
-        // Actually, users usually fetched by ID. We can't easily "get user by email" with Admin API without listing?
-        // Wait, createUser throws if email exists. That's a strong signal.
-        // But we also want to ensure the EXISTING user has the admin role.
+        if (roleError || !roleData) {
+            logger.error('[Bootstrap] Failed to fetch admin role ID from database. Ensure roles table is seeded.');
+            return;
+        }
 
-        // Strategy: List users and find the email.
-        // Pagination might be an issue if we have millions, but for bootstrap it's usually early.
-        // Better Strategy: Try to sign in? No, we don't want to use auth api for that.
-        // Best Strategy for Admin: listUsers with query/filter if supported, or iterate.
-        // Since it's critical, we'll try to find it.
+        const adminRoleId = roleData.id;
 
-        // NOTE: Supabase listUsers usually returns latest users.
-        // Let's try `createUser` first. If it fails with "already registered", then we update it.
-
+        // 2. Try to create the user
         let userId;
+        let isNewUser = false;
 
-        // Try to verify if user exists implicitly by attempting to get it or just search?
-        // Let's use listUsers which effectively allows managing users.
-        const { data: listData, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+        const { data: createData, error: createError } = await supabaseAdmin.auth.admin.createUser({
+            email: adminEmail,
+            password: adminPassword,
+            email_confirm: true,
+            user_metadata: { role: 'admin' }
+        });
 
-        if (listError) throw listError;
+        if (createError) {
+            if (createError.message?.includes('already registered') || createError.status === 422) {
+                // User exists, find them
+                // Strategy: Check profiles table first (fastest)
+                const { data: profileData, error: profileError } = await supabaseAdmin
+                    .from('profiles')
+                    .select('id')
+                    .eq('email', adminEmail)
+                    .single();
 
-        const existingAdmin = listData.users.find(u => u.email === adminEmail);
+                if (profileData) {
+                    userId = profileData.id;
+                } else {
+                    // Fallback: Check Auth Users list (pagination handled simply for now, assuming admin is early user)
+                    // Note: Supabase Admin listUsers doesn't support email filtering easily, we fetch page 1
+                    const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+                    const foundUser = listData?.users?.find(u => u.email === adminEmail);
 
-        if (existingAdmin) {
-            // logger.info('[Bootstrap] Admin user already exists.');
-            userId = existingAdmin.id;
-
-            // Check if role is correct
-            const currentRole = existingAdmin.user_metadata?.role;
-            if (currentRole !== 'admin') {
-                logger.info('[Bootstrap] Updating existing user role to admin...');
-                const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-                    userId,
-                    { user_metadata: { ...existingAdmin.user_metadata, role: 'admin' } }
-                );
-                if (updateError) throw updateError;
-                // logger.info('[Bootstrap] Admin role assigned.');
+                    if (foundUser) {
+                        userId = foundUser.id;
+                    } else {
+                        logger.error('[Bootstrap] Admin user exists but could not be found via Profile or ListUsers.');
+                        return;
+                    }
+                }
             } else {
-                logger.info('[Bootstrap] Admin role verified.');
+                throw createError;
             }
         } else {
-            logger.info('[Bootstrap] Creating new admin user...');
-            const { data: newData, error: createError } = await supabaseAdmin.auth.admin.createUser({
-                email: adminEmail,
-                password: adminPassword,
-                email_confirm: true,
-                user_metadata: { role: 'admin' }
-            });
+            userId = createData.user.id;
+            isNewUser = true;
+            logger.info('[Bootstrap] Admin user created.');
+        }
 
-            if (createError) throw createError;
-            userId = newData.user.id;
-            logger.info('[Bootstrap] Admin user created successfully.');
+        // 3. Ensure "admin" role in Profiles table and User Metadata
+        if (userId) {
+            // Update Profile (Critical for Application Logic)
+            const { error: updateProfileError } = await supabaseAdmin
+                .from('profiles')
+                .update({ role_id: adminRoleId })
+                .eq('id', userId);
+
+            if (updateProfileError) {
+                logger.error({ err: updateProfileError }, '[Bootstrap] Failed to update admin profile role.');
+            } else {
+                if (isNewUser) {
+                    logger.info('[Bootstrap] Admin profile role set to "admin".');
+                } else {
+                    logger.info('[Bootstrap] Ensure admin profile role is "admin".');
+                }
+            }
+
+            // Update User Metadata (Critical for Auth Middleware)
+            // Even if we created the user with metadata, the trigger might not affect metadata but 
+            // subsequent updates ensuring it matches is good practice.
+            // If user existed, we MUST update this.
+            if (!isNewUser) {
+                const { error: updateMetaError } = await supabaseAdmin.auth.admin.updateUserById(
+                    userId,
+                    { user_metadata: { role: 'admin' } }
+                );
+                if (updateMetaError) {
+                    logger.warn({ err: updateMetaError }, '[Bootstrap] Failed to update admin user_metadata.');
+                }
+            }
         }
 
     } catch (error) {
         logger.error('[Bootstrap] Failed to bootstrap admin:', error.message);
-        // We do not exit process, just log error, to allow server to start even if bootstrap fails (optional)
-        // However, for security, maybe we should know. But standard practice is log and continue or retry.
     }
 }
 

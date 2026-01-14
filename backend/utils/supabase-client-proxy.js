@@ -16,7 +16,7 @@ const withQueryLogging = (client) => {
             if (prop === 'from' && typeof value === 'function') {
                 return function (...args) {
                     const table = args[0];
-                    const queryBuilder = value.apply(this, args);
+                    const queryBuilder = value.apply(target, args);
                     return createQueryProxy(queryBuilder, { type: 'table', name: table });
                 };
             }
@@ -27,7 +27,7 @@ const withQueryLogging = (client) => {
                     const funcName = args[0];
                     const params = args[1] || {};
                     // RPC calls return a promise/builder immediately, so we proxy that
-                    const rpcBuilder = value.apply(this, args);
+                    const rpcBuilder = value.apply(target, args);
                     // Log immediately for RPC if it's not chainable in the same way (usually it is awaiting immediately)
                     // But RPC can also key modifiers like .eq() if it returns a table set, so we treat it as a builder.
                     // However, most RPC usage is `await rpc(...)`.

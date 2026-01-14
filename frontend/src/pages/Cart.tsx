@@ -46,7 +46,6 @@ const Cart = () => {
         const coupons = await couponService.getActive();
         setAvailableCoupons(coupons);
       } catch (error) {
-        console.error("Failed to fetch coupons:", error);
       }
     };
     fetchCoupons();

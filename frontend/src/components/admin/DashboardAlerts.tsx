@@ -62,7 +62,6 @@ export const DashboardAlerts = () => {
                 old ? old.filter(a => a.id !== id) : []
             );
         } catch (error) {
-            console.error('Failed to dismiss alert:', error);
         }
     };
 

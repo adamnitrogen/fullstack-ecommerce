@@ -15,6 +15,7 @@ import { useLocationStore } from "@/store/locationStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ForceChangePasswordDialog } from "@/components/auth/ForceChangePasswordDialog";
+import { ReactivationModal } from "@/components/auth/ReactivationModal";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 
 // Lazy load pages for code splitting
@@ -41,8 +42,10 @@ const ShippingAndRefund = lazy(() => import("./pages/ShippingAndRefund"));
 const FAQ = lazy(() => import("./pages/FAQ"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const MyOrders = lazy(() => import("./pages/user/MyOrders"));
 const UserOrderDetail = lazy(() => import("./pages/user/UserOrderDetail"));
+const AccountDeletion = lazy(() => import("./pages/AccountDeletion"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Admin Pages
@@ -64,6 +67,7 @@ const ContactMessages = lazy(() => import("./pages/admin/ContactMessages"));
 const ContactMessageDetail = lazy(() => import("./pages/admin/ContactMessageDetail"));
 const AboutUsManagement = lazy(() => import("./pages/admin/AboutUsManagement"));
 const PolicyManagement = lazy(() => import("./pages/admin/PolicyManagement"));
+const JobsManagement = lazy(() => import("./pages/admin/JobsManagement"));
 
 const OrdersManagement = lazy(() => import("./pages/admin/OrdersManagement"));
 const OrderDetail = lazy(() => import("./pages/admin/OrderDetail"));
@@ -90,6 +94,11 @@ const App = () => {
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
 
   useEffect(() => {
+    // skip initialization on auth callback route to avoid race condition with AuthCallback component
+    if (window.location.pathname === '/auth/callback') {
+      return;
+    }
+
     // Restore session from JWT cookie on mount
     initializeAuth();
 
@@ -113,6 +122,7 @@ const App = () => {
             <ScrollToTop />
             <CookieConsent />
             <ForceChangePasswordDialog />
+            <ReactivationModal />
             <Suspense fallback={<LoadingOverlay isLoading={true} message="Loading..." />}>
               <Routes>
                 <Route element={<MainLayout />}>
@@ -174,6 +184,7 @@ const App = () => {
                   <Route path="/faq" element={<FAQ />} />
                   <Route path="/auth/callback" element={<AuthCallback />} />
                   <Route path="/verify-email" element={<VerifyEmail />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
                   <Route
                     path="/my-orders"
                     element={
@@ -187,6 +198,14 @@ const App = () => {
                     element={
                       <ProtectedRoute requireAuth>
                         <UserOrderDetail />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/account/delete"
+                    element={
+                      <ProtectedRoute requireAuth>
+                        <AccountDeletion />
                       </ProtectedRoute>
                     }
                   />
@@ -226,6 +245,7 @@ const App = () => {
                   <Route path="contact-messages/:id" element={<ContactMessageDetail />} />
                   <Route path="about-us" element={<AboutUsManagement />} />
                   <Route path="policies" element={<PolicyManagement />} />
+                  <Route path="jobs" element={<JobsManagement />} />
 
                   <Route path="settings" element={<SettingsManagement />} />
                 </Route>

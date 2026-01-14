@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import DOMPurify from "dompurify";
 
 interface PolicyPreviewDialogProps {
     open: boolean;
@@ -83,7 +84,7 @@ export function PolicyPreviewDialog({
                                 [&_ul>li::before]:bg-[#B85C3C]
                                 [&_ul>li::before]:rounded-full
                             "
-                        dangerouslySetInnerHTML={{ __html: contentHtml || "<p class='text-muted-foreground italic'>No content available to preview.</p>" }}
+                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(contentHtml || "<p class='text-muted-foreground italic'>No content available to preview.</p>") }}
                     />
                 </ScrollArea>
 

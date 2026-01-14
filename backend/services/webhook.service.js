@@ -1,11 +1,7 @@
 const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
 const { updatePaymentRecord } = require('./checkout.service');
-const {
-    sendOrderConfirmationEmail,
-    sendDonationReceiptEmail,
-    sendEventRegistrationEmail
-} = require('./email.service');
+const emailService = require('./email');
 
 /**
  * Webhook Service
@@ -80,12 +76,11 @@ async function handleDonationWebhook(event, payment, notes) {
                 if (status === 'success') {
                     try {
                         const amount = updatedDonation.amount;
-                        await sendDonationReceiptEmail(
+                        await emailService.sendDonationReceiptEmail(
                             updatedDonation.donor_email,
                             {
-                                amount,
-                                donationRef: updatedDonation.donation_reference_id,
-                                date: updatedDonation.created_at,
+                                donation: updatedDonation,
+                                donorName: updatedDonation.donor_name,
                                 isAnonymous: updatedDonation.is_anonymous
                             },
                             updatedDonation.user_id
@@ -150,12 +145,11 @@ async function handleSubscriptionWebhook(event, payment, payload) {
             logger.info(`Recurring Donation recorded: ${newRef}`);
             // Send Email for Recurring Charge
             try {
-                await sendDonationReceiptEmail(
+                await emailService.sendDonationReceiptEmail(
                     newDonation.donor_email,
                     {
-                        amount: newDonation.amount,
-                        donationRef: newDonation.donation_reference_id,
-                        date: newDonation.created_at,
+                        donation: newDonation,
+                        donorName: newDonation.donor_name,
                         isAnonymous: newDonation.is_anonymous
                     },
                     newDonation.user_id
@@ -236,13 +230,12 @@ async function handleEventWebhook(event, payment, notes) {
                         .single();
 
                     if (eventDetails) {
-                        await sendEventRegistrationEmail(
+                        await emailService.sendEventRegistrationEmail(
                             updatedReg.email,
                             {
-                                eventTitle: eventDetails.title,
-                                date: eventDetails.date,
-                                location: eventDetails.location,
-                                registrationNumber: updatedReg.registration_number
+                                event: eventDetails,
+                                registration: updatedReg,
+                                attendeeName: updatedReg.name
                             },
                             updatedReg.user_id
                         );
@@ -294,13 +287,11 @@ async function handleOrderWebhook(event, data, payment) {
                             .select('*')
                             .eq('order_id', updatedOrder.id);
 
-                        await sendOrderConfirmationEmail(
+                        await emailService.sendOrderConfirmationEmail(
                             updatedOrder.customer_email,
                             {
-                                orderId: updatedOrder.order_number,
-                                items: orderItems.map(i => ({ name: i.product_name, quantity: i.quantity, price: i.price, image: i.product_image })),
-                                totalAmount: updatedOrder.total_amount,
-                                shippingAddress: updatedOrder.shipping_address
+                                order: updatedOrder,
+                                customerName: updatedOrder.customer_name
                             },
                             updatedOrder.user_id
                         );

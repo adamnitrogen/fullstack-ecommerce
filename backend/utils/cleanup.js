@@ -1,4 +1,5 @@
 const supabase = require('../config/supabase');
+const logger = require('./logger');
 
 /**
  * Clean up orphaned Supabase Auth users
@@ -6,7 +7,7 @@ const supabase = require('../config/supabase');
  */
 async function cleanupOrphanedUser(email) {
     try {
-        console.log(`🔍 Checking for orphaned user: ${email}`);
+        logger.debug({ email }, '[Cleanup] Checking for orphaned user');
 
         // Check if user exists in profiles
         const { data: profile } = await supabase
@@ -16,7 +17,7 @@ async function cleanupOrphanedUser(email) {
             .single();
 
         if (profile) {
-            console.log(`✅ User has profile, no cleanup needed`);
+            logger.debug({ email }, '[Cleanup] User has profile, no cleanup needed');
             return { cleaned: false, reason: 'User has profile' };
         }
 
@@ -25,28 +26,28 @@ async function cleanupOrphanedUser(email) {
         const authUser = users.find(u => u.email === email);
 
         if (!authUser) {
-            console.log(`✅ No orphaned user found in Auth`);
+            logger.debug({ email }, '[Cleanup] No orphaned user found in Auth');
             return { cleaned: false, reason: 'No auth user found' };
         }
 
         // Found orphaned user, delete them
-        console.log(`🗑️  Deleting orphaned auth user: ${authUser.id}`);
+        logger.info({ email, userId: authUser.id }, '[Cleanup] Deleting orphaned auth user');
 
         const { error: deleteError } = await supabase.auth.admin.deleteUser(authUser.id);
 
         if (deleteError) {
-            console.error('❌ Failed to delete orphaned user:', deleteError);
+            logger.error({ err: deleteError, email, userId: authUser.id }, '[Cleanup] Failed to delete orphaned user');
             throw deleteError;
         }
 
-        console.log(`✅ Successfully deleted orphaned user: ${authUser.id}`);
+        logger.info({ email, userId: authUser.id }, '[Cleanup] Successfully deleted orphaned user');
 
         // Wait for deletion to propagate
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         return { cleaned: true, userId: authUser.id };
     } catch (error) {
-        console.error('Cleanup error:', error);
+        logger.error({ err: error, email }, '[Cleanup] Error during cleanup');
         throw error;
     }
 }

@@ -15,7 +15,7 @@ import { useNavigate } from "react-router-dom";
 import {
   registerUser,
   loginWithGoogle,
-  resetPassword,
+  requestPasswordReset,
   validateCredentials,
   verifyLoginOtp,
   resendConfirmationEmail
@@ -68,6 +68,19 @@ export default function AuthPage({
     }
   }, [open, initialStep]);
 
+  // Auto-hide general errors after 5 seconds
+  useEffect(() => {
+    if (fieldErrors.general) {
+      const timer = setTimeout(() => {
+        setFieldErrors((prev) => {
+          const { general, ...rest } = prev;
+          return rest;
+        });
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [fieldErrors.general]);
+
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -104,6 +117,9 @@ export default function AuthPage({
           toast.success("Credentials valid. OTP sent to your email.");
           setShowOtp(true);
           setFieldErrors({}); // Clear errors when moving to OTP step
+        } else {
+          // Pass the error to the catch block to be handled by getErrorDetails/getErrorMessage
+          throw new Error(res.error || "Validation failed");
         }
       }
     } catch (error: unknown) {
@@ -133,6 +149,30 @@ export default function AuthPage({
     // Validate phone
     if (!formData.phone || formData.phone.length < 10) {
       setFieldErrors(prev => ({ ...prev, phone: "Please enter a valid phone number" }));
+      setIsLoading(false);
+      return;
+    }
+
+    // Validate password
+    const passwordErrors: string[] = [];
+    if (formData.password.length < 8) {
+      passwordErrors.push("• Password must be at least 8 characters long");
+    }
+    if (!/[A-Z]/.test(formData.password)) {
+      passwordErrors.push("• Password must contain at least one uppercase letter");
+    }
+    if (!/[a-z]/.test(formData.password)) {
+      passwordErrors.push("• Password must contain at least one lowercase letter");
+    }
+    if (!/[0-9]/.test(formData.password)) {
+      passwordErrors.push("• Password must contain at least one number");
+    }
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(formData.password)) {
+      passwordErrors.push("• Password must contain at least one special character");
+    }
+
+    if (passwordErrors.length > 0) {
+      setFieldErrors(prev => ({ ...prev, password: passwordErrors.join("\n") }));
       setIsLoading(false);
       return;
     }
@@ -178,11 +218,11 @@ export default function AuthPage({
     setIsLoading(true);
 
     try {
-      await resetPassword(formData.email);
+      await requestPasswordReset(formData.email);
       toast.success("Password reset email sent! Check your inbox.");
       setStep("login");
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Failed to send reset email"));
+      setFieldErrors({ general: getErrorMessage(error, "Failed to send reset email") });
     } finally {
       setIsLoading(false);
     }
@@ -229,7 +269,11 @@ export default function AuthPage({
       toast.success("Confirmation email resent!");
       setResendCooldown(30);
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Failed to resend email"));
+      const msg = getErrorMessage(error, "Failed to resend email");
+      toast.error(msg);
+      if (msg.toLowerCase().includes("already verified")) {
+        setStep("login");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -530,7 +574,6 @@ export default function AuthPage({
                         }
                       }}
                       required
-                      minLength={8}
                       autoComplete="new-password"
                       className={`pr-10 ${fieldErrors.password ? "border-destructive" : ""}`}
                     />
@@ -549,7 +592,7 @@ export default function AuthPage({
                     </Button>
                   </div>
                   {fieldErrors.password && (
-                    <p className="text-xs text-destructive mt-1">{fieldErrors.password}</p>
+                    <p className="text-xs text-destructive mt-1 whitespace-pre-line leading-relaxed font-medium transition-all duration-200 animate-in slide-in-from-top-1">{fieldErrors.password}</p>
                   )}
                 </div>
 
@@ -589,9 +632,12 @@ export default function AuthPage({
                     type="email"
                     placeholder="you@example.com"
                     value={formData.email}
-                    onChange={(e) =>
-                      setFormData({ ...formData, email: e.target.value })
-                    }
+                    onChange={(e) => {
+                      setFormData({ ...formData, email: e.target.value });
+                      if (fieldErrors.general) {
+                        setFieldErrors({});
+                      }
+                    }}
                     required
                   />
                 </div>

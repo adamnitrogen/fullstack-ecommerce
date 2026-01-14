@@ -13,8 +13,11 @@ export interface User {
   createdBy?: string; // Admin ID who created this admin user
   emailVerified?: boolean;
   phoneVerified?: boolean;
+  authProvider?: "LOCAL" | "GOOGLE";
   isActive?: boolean; // Active/Inactive status for admins
   isDeleted?: boolean; // Whether account is permanently deleted
+  deletionStatus?: string;
+  scheduledDeletionAt?: string;
   createdAt?: string;
   updatedAt?: string;
   mustChangePassword?: boolean;

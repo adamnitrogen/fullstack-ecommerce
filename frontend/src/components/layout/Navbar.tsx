@@ -44,13 +44,14 @@ export const Navbar = () => {
     }
   }, [isAuthenticated, initialized, fetchCart]);
 
-  // Auto-open auth dialog if redirected from protected route
+  // Auto-open auth dialog if redirected from protected route OR via state
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const authParam = params.get("auth");
     const returnUrl = params.get("returnUrl");
+    const state = location.state as { openAuth?: boolean } | null;
 
-    if (authParam === "login" && !isAuthenticated) {
+    if ((authParam === "login" || state?.openAuth) && !isAuthenticated) {
       setAuthDialogOpen(true);
 
       // Store return URL for redirect after login
@@ -59,9 +60,16 @@ export const Navbar = () => {
       }
 
       // Clean up URL (remove query params) but stay on current page
-      navigate(location.pathname, { replace: true });
+      if (authParam === "login") {
+        navigate(location.pathname, { replace: true });
+      }
+
+      // Clean up state if it exists
+      if (state?.openAuth) {
+        navigate(location.pathname, { replace: true, state: {} });
+      }
     }
-  }, [location.search, isAuthenticated, navigate]);
+  }, [location.search, location.state, isAuthenticated, navigate]);
 
   const handleLogout = () => {
     setLogoutDialogOpen(true);

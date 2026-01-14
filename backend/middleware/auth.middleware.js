@@ -1,5 +1,5 @@
 const logger = require('../utils/logger');
-const supabaseAdmin = require('../lib/supabase');
+const { supabase, supabaseAdmin } = require('../lib/supabase');
 const MemoryStore = require('../lib/store/memory.store');
 const { getContext } = require('../utils/async-context');
 
@@ -77,14 +77,53 @@ async function authenticateToken(req, res, next) {
             return res.status(401).json({ error: 'Invalid or expired token' });
         }
 
+        // 3. Check Account Deletion Status (Critical Security Check)
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('deletion_status')
+            .eq('id', user.id)
+            .single();
+
+        const deletionStatus = profile?.deletion_status || 'ACTIVE';
+
+        // ENFORCE ACCESS RULES
+        if (deletionStatus === 'DELETED') {
+            return res.status(410).json({ error: 'Account deleted', code: 'ACCOUNT_DELETED' });
+        }
+        if (deletionStatus === 'DELETION_IN_PROGRESS') {
+            return res.status(403).json({ error: 'Account deletion in progress', code: 'DELETION_IN_PROGRESS' });
+        }
+        if (deletionStatus === 'PENDING_DELETION' || deletionStatus === 'PENDING_DELETION_BLOCKED') {
+            // Allow access ONLY to essential auth and deletion endpoints
+            const allowedPaths = [
+                '/api/auth/refresh',
+                '/api/auth/logout',
+                '/api/auth/me',
+                '/api/auth/sync',
+                '/api/account/delete/cancel',
+                '/api/account/delete/status'
+            ];
+
+            const isAllowed = allowedPaths.some(path => req.originalUrl.startsWith(path));
+
+            if (!isAllowed) {
+                logger.warn({ userId: user.id, path: req.originalUrl }, '[AuthMiddleware] Access blocked for account pending deletion');
+                return res.status(403).json({
+                    error: 'Account pending deletion. Please reactivate or logout.',
+                    code: 'ACCOUNT_PENDING_DELETION'
+                });
+            }
+        }
+
         logger.debug(`[AuthMiddleware] Supabase validation success for user ${user.id}`);
 
-        // 3. Build user object
+        // 4. Build user object
         const appUser = {
             id: user.id,
             userId: user.id, // Compatibility
             email: user.email,
             role: user.user_metadata?.role || 'customer',
+            deletionStatus, // Add status to user object
             ...user.user_metadata
         };
 
@@ -94,7 +133,7 @@ async function authenticateToken(req, res, next) {
         const store = getContext();
         if (store) store.userId = appUser.id;
 
-        // 4. Cache the result
+        // 5. Cache the result
         await authCache.set(cacheKey, appUser, AUTH_CACHE_TTL);
 
         logger.debug(`[AuthMiddleware] Authenticated user ${appUser.id}, cached for ${AUTH_CACHE_TTL}ms`);

@@ -243,6 +243,7 @@ export function ProductDialog({
                 </Label>
                 <Input
                   id="title"
+                  name="title"
                   value={formData.title}
                   onChange={(e) =>
                     setFormData({ ...formData, title: e.target.value })
@@ -258,6 +259,7 @@ export function ProductDialog({
                 </Label>
                 <Textarea
                   id="description"
+                  name="description"
                   value={formData.description}
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
@@ -274,6 +276,7 @@ export function ProductDialog({
                 </Label>
                 <Select
                   value={formData.category}
+                  name="category"
                   onValueChange={(value) =>
                     setFormData({ ...formData, category: value })
                   }
@@ -309,6 +312,7 @@ export function ProductDialog({
                   </Label>
                   <Input
                     id="mrp"
+                    name="mrp"
                     type="number"
                     min="0"
                     step="0.01"
@@ -331,6 +335,7 @@ export function ProductDialog({
                   </Label>
                   <Input
                     id="price"
+                    name="price"
                     type="number"
                     min="0"
                     step="0.01"
@@ -366,6 +371,7 @@ export function ProductDialog({
                 </Label>
                 <Input
                   id="inventory"
+                  name="inventory"
                   type="number"
                   min="0"
                   value={formData.inventory}
@@ -405,6 +411,9 @@ export function ProductDialog({
               <div className="space-y-3">
                 <div className="flex gap-2">
                   <Input
+                    id="benefit-input"
+                    name="benefitInput"
+                    aria-label="Add a benefit"
                     placeholder="Add a benefit (e.g., 100% Pure & Natural)"
                     value={benefitInput}
                     onChange={(e) => setBenefitInput(e.target.value)}
@@ -512,6 +521,9 @@ export function ProductDialog({
                 <Label className="text-sm">Add Custom Tags</Label>
                 <div className="flex gap-2">
                   <Input
+                    id="custom-tag-input"
+                    name="customTagInput"
+                    aria-label="Add custom tag"
                     placeholder="Enter custom tag"
                     value={customTag}
                     onChange={(e) => setCustomTag(e.target.value)}
@@ -584,6 +596,7 @@ export function ProductDialog({
                       </Label>
                       <Input
                         id="returnDays"
+                        name="returnDays"
                         type="number"
                         min="1"
                         max="30"

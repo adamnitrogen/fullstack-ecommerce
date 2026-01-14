@@ -1,7 +1,7 @@
 const { z } = require('zod');
 const logger = require('../utils/logger');
 const contactService = require('../services/contact.service');
-const emailService = require('../services/email.service');
+const emailService = require('../services/email');
 const AdminAlertService = require('../services/admin-alert.service');
 
 // Validation schema

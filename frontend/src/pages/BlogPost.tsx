@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Clock, User, Calendar, Tag, Share2 } from "lucide-react";
+import DOMPurify from "dompurify";
 import { Button } from "@/components/ui/button";
 import { BackButton } from "@/components/ui/BackButton";
 import {
@@ -166,7 +167,7 @@ export default function BlogPost() {
                 prose-ul:my-4 prose-li:text-[#2C1810]/70
                 prose-blockquote:border-l-4 prose-blockquote:border-[#B85C3C] prose-blockquote:bg-[#B85C3C]/5 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:rounded-r-lg prose-blockquote:not-italic
                 prose-img:rounded-2xl prose-img:shadow-lg"
-              dangerouslySetInnerHTML={{ __html: post.content }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(post.content) }}
             />
 
             <Separator className="my-10 bg-[#B85C3C]/10" />

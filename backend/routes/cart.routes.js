@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const { requestLock } = require('../middleware/requestLock.middleware');
 const validate = require('../middleware/validate.middleware');
 const { addToCartSchema, updateCartSchema, applyCouponSchema } = require('../schemas/cart.schema');
 const {
@@ -54,8 +53,7 @@ router.get('/', async (req, res) => {
 });
 
 // Add item to cart
-// Validate input first, then Lock
-router.post('/items', validate(addToCartSchema), requestLock((req) => `cart-add:${req.body.product_id}`), async (req, res) => {
+router.post('/items', validate(addToCartSchema), async (req, res) => {
     try {
         const userId = getUserId(req);
 
@@ -81,7 +79,7 @@ router.post('/items', validate(addToCartSchema), requestLock((req) => `cart-add:
 });
 
 // Update cart item quantity
-router.put('/items/:product_id', validate(updateCartSchema), requestLock((req) => `cart-update:${req.params.product_id}`), async (req, res) => {
+router.put('/items/:product_id', validate(updateCartSchema), async (req, res) => {
     try {
         const userId = getUserId(req);
 
@@ -107,8 +105,7 @@ router.put('/items/:product_id', validate(updateCartSchema), requestLock((req) =
 });
 
 // Remove item from cart
-// No body validation needed, just param (which express handles via route)
-router.delete('/items/:product_id', requestLock((req) => `cart-remove:${req.params.product_id}`), async (req, res) => {
+router.delete('/items/:product_id', async (req, res) => {
     try {
         const userId = getUserId(req);
 

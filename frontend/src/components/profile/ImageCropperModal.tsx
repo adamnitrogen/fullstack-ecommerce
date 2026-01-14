@@ -144,7 +144,7 @@ export default function ImageCropperModal({
                         className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors ${isDragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'
                             }`}
                     >
-                        <input {...getInputProps()} />
+                        <input {...getInputProps({ id: "dropzone-file-input", name: "profileImage", "aria-label": "Upload profile picture" })} />
                         <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                         <p className="text-sm text-muted-foreground">
                             {isDragActive
@@ -175,6 +175,7 @@ export default function ImageCropperModal({
                             <label htmlFor="zoom-slider" className="text-sm font-medium">Zoom</label>
                             <input
                                 id="zoom-slider"
+                                name="zoomLevel"
                                 type="range"
                                 min={1}
                                 max={3}

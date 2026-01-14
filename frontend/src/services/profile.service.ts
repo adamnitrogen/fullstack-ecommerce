@@ -31,6 +31,7 @@ export interface ProfileData {
     role: string;
     emailVerified: boolean;
     phoneVerified: boolean;
+    authProvider: 'LOCAL' | 'GOOGLE';
     addresses: CheckoutAddress[];
 }
 
@@ -106,5 +107,13 @@ export const profileService = {
      */
     deleteAccount: async (): Promise<void> => {
         await apiClient.post('/profile/delete-account');
+    },
+
+    /**
+     * Send email verification (for Google auth users)
+     */
+    sendEmailVerification: async (): Promise<{ success: boolean; message: string }> => {
+        const response = await apiClient.post('/profile/send-email-verification');
+        return response.data;
     },
 };

@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const { authenticateToken } = require('../middleware/auth.middleware');
+const AuthService = require('../services/auth.service');
 const multer = require('multer');
 const sharp = require('sharp');
 const { v4: uuidv4 } = require('uuid');
@@ -95,6 +96,7 @@ router.get('/', authenticateToken, async (req, res) => {
             role: profile.roles?.name || 'customer',
             emailVerified: profile.email_verified,
             phoneVerified: profile.phone_verified,
+            authProvider: profile.auth_provider || 'LOCAL',
             addresses: transformedAddresses
         });
     } catch (error) {
@@ -438,6 +440,22 @@ router.post('/change-password', authenticateToken, async (req, res) => {
     } catch (error) {
         logger.error({ err: error }, 'Error changing password:');
         res.status(500).json({ error: 'Failed to update password' });
+    }
+});
+
+/**
+ * POST /api/profile/send-email-verification
+ * Send email verification for Google auth users
+ * Only works for users with auth_provider = 'GOOGLE' and email_verified = false
+ */
+router.post('/send-email-verification', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const result = await AuthService.sendGoogleUserVerificationEmail(userId);
+        res.json(result);
+    } catch (error) {
+        logger.error({ err: error }, 'Error sending email verification:');
+        res.status(error.status || 500).json({ error: error.message });
     }
 });
 

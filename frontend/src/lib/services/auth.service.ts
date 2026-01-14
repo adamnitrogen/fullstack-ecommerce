@@ -55,6 +55,9 @@ export const loginWithGoogle = async (): Promise<void> => {
     provider: "google",
     options: {
       redirectTo: `${import.meta.env.VITE_SITE_URL || window.location.origin}/auth/callback`,
+      queryParams: {
+        prompt: 'select_account'
+      }
     },
   });
 
@@ -99,11 +102,40 @@ export const refreshToken = async () => {
   return data;
 };
 
+/**
+ * Request password reset email
+ * Uses backend API for consistent token handling
+ */
+export const requestPasswordReset = async (email: string): Promise<{ success: boolean; message: string }> => {
+  const response = await apiClient.post('/auth/reset-password-request', { email });
+  return response.data;
+};
+
+/**
+ * Legacy reset password using Supabase direct
+ * @deprecated Use requestPasswordReset instead
+ */
 export const resetPassword = async (email: string): Promise<void> => {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${window.location.origin}/auth/reset-password`,
   });
   if (error) throw error;
+};
+
+/**
+ * Validate a password reset token
+ */
+export const validateResetToken = async (token: string): Promise<{ valid: boolean; email: string }> => {
+  const response = await apiClient.get(`/auth/validate-reset-token?token=${token}`);
+  return response.data;
+};
+
+/**
+ * Reset password using a valid token
+ */
+export const resetPasswordWithToken = async (token: string, newPassword: string): Promise<{ success: boolean; message: string }> => {
+  const response = await apiClient.post('/auth/reset-password', { token, newPassword });
+  return response.data;
 };
 
 export const changePassword = async (data: { currentPassword: string; newPassword: string }): Promise<void> => {
@@ -117,16 +149,15 @@ export const updateUserPassword = async (newPassword: string): Promise<void> => 
 
 // Legacy/Placeholder exports
 // Helper to sync session (e.g. from Google OAuth) with Backend Cookies
-export const syncSession = async (accessToken: string, refreshToken: string): Promise<void> => {
+export const syncSession = async (accessToken: string, refreshToken: string, silent = false): Promise<any> => {
   try {
-    await apiClient.post('/auth/sync', {
+    const { data } = await apiClient.post('/auth/sync', {
       access_token: accessToken,
       refresh_token: refreshToken
-    });
+    }, { silent } as any);
+    return data.user;
   } catch (error) {
-    logger.error("Failed to sync session with backend:", error);
-    // Silent fail? Or throw?
-    // If sync fails, subsequent API calls will fail. Better to throw.
+    if (!silent) logger.error("Failed to sync session with backend:", error);
     throw error;
   }
 };
@@ -169,13 +200,14 @@ export const verifyLoginOtp = async (email: string, otp: string): Promise<User> 
 };
 
 export const resendConfirmationEmail = async (email: string): Promise<void> => {
-  const { error } = await supabase.auth.resend({
-    type: 'signup',
-    email,
-    options: {
-      emailRedirectTo: `${window.location.origin}/auth/callback`,
+  try {
+    const response = await apiClient.post('/auth/resend-confirmation', { email });
+    return response.data;
+  } catch (error: unknown) {
+    if (axios.isAxiosError(error) && error.response?.data) {
+      throw new Error(error.response.data.error || "Failed to resend email");
     }
-  });
-
-  if (error) throw error;
+    throw error;
+  }
 };
+

@@ -22,8 +22,8 @@ app.use(cors({
             'http://127.0.0.1:5173',
             'http://127.0.0.1:5174',
             'http://127.0.0.1:3000',
-            'http://localhost:4173',
-            'https://unnoised-johnie-coetaneously.ngrok-free.dev'
+            'http://localhost:4173'
+            // NOTE: Add ngrok/tunnel URLs via FRONTEND_URL env var
         ];
 
         if (process.env.FRONTEND_URL) {
@@ -102,13 +102,18 @@ app.use(pinoHttp({
     }
 }));
 
-// Context Middleware: Propagate Correlation ID to deep services
-const { context } = require('./utils/async-context');
+// Context Middleware: Propagate Trace Context to deep services
+const { tracingMiddleware } = require('./middleware/tracing.middleware');
 const newrelic = require('newrelic');
 
+// Apply tracing middleware - generates/extracts traceId, spanId, correlationId
+app.use(tracingMiddleware);
+
+// New Relic custom attributes for searchability
 app.use((req, res, next) => {
-    // Add custom attributes to New Relic transaction for searchability
-    newrelic.addCustomAttribute('correlationId', req.id);
+    newrelic.addCustomAttribute('traceId', req.traceId);
+    newrelic.addCustomAttribute('spanId', req.spanId);
+    newrelic.addCustomAttribute('correlationId', req.correlationId);
 
     // Add User ID from header if present
     const userIdHeader = req.headers['x-user-id'];
@@ -116,12 +121,7 @@ app.use((req, res, next) => {
         newrelic.addCustomAttribute('userId', userIdHeader);
     }
 
-    const store = {
-        correlationId: req.id,
-        // We can add userId here too if we want it in every deep log
-        // userId: req.user?.id // (Note: req.user might not be populated yet if auth middleware is later)
-    };
-    context.run(store, next);
+    next();
 });
 
 app.use(express.json({ limit: '50mb' }));
@@ -190,9 +190,10 @@ app.use('/api/donations', require('./routes/donation.routes')); // Added Donatio
 app.use('/api/analytics', require('./routes/analytics.routes'));
 app.use('/api/returns', require('./routes/return.routes'));
 app.use('/api/email', require('./routes/email.routes'));
-app.use('/api/logs', require('./routes/logs.routes'));
 app.use('/api/settings', require('./routes/settings.routes'));
 app.use('/api/policies', require('./routes/policy.routes'));
+app.use('/api/account/delete', require('./routes/account-deletion.routes'));
+app.use('/api/admin/jobs', require('./routes/jobs.routes'));
 
 // Global Error Handler (Must be last)
 app.use(require('./middleware/error.middleware'));

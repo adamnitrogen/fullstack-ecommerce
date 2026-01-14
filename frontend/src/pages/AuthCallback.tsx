@@ -21,27 +21,45 @@ const AuthCallback = () => {
 
             if (error) {
                 logger.error("Auth callback error:", error);
-                navigate("/auth?error=callback_failed");
+                navigate("/?auth=login&error=callback_failed");
                 return;
             }
 
             if (session) {
                 try {
                     // Sync session with backend cookies
-                    await syncSession(session.access_token, session.refresh_token);
+                    const userData = await syncSession(session.access_token, session.refresh_token);
 
-                    // Ensure store is synced (fetches user profile from backend using cookies)
-                    await initializeAuth();
+                    if (userData) {
+                        const { login } = useAuthStore.getState();
+                        login({
+                            id: userData.id,
+                            email: userData.email || '',
+                            name: userData.name || '',
+                            phone: userData.phone || undefined,
+                            role: userData.role || 'customer',
+                            emailVerified: userData.emailVerified,
+                            phoneVerified: userData.phoneVerified || false,
+                            mustChangePassword: userData.mustChangePassword || false,
+                            deletionStatus: userData.deletionStatus,
+                            scheduledDeletionAt: userData.scheduledDeletionAt,
+                            addresses: [],
+                        });
+                    } else {
+                        // Fallback to initialization if user data missing
+                        await initializeAuth();
+                    }
+
                     navigate("/");
                 } catch (err) {
                     logger.error("Session sync failed:", err);
-                    navigate("/auth?error=sync_failed");
+                    navigate("/?auth=login&error=sync_failed");
                 }
             } else {
                 // If no session found, maybe wait for event? 
                 // Usually getSession is enough if the URL contained the hash.
                 // We'll give it a small timeout or just redirect.
-                navigate("/auth");
+                navigate("/?auth=login");
             }
         };
 

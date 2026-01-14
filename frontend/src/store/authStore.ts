@@ -4,12 +4,37 @@ import type { User } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/react-query";
 import { apiClient } from "@/lib/api-client";
+import { syncSession } from "@/lib/services/auth.service";
+
+// Helper to check if session cookies exist (avoids 401 on first visit)
+const hasSessionCookies = (): boolean => {
+  const cookies = document.cookie;
+  return cookies.includes('sb-access-token') ||
+    cookies.includes('sb-refresh-token') ||
+    cookies.includes('access_token') ||
+    cookies.includes('refresh_token');
+};
+
+// Helper to check if a JWT is expired (avoids API calls with stale tokens)
+const isTokenExpired = (token: string | undefined): boolean => {
+  if (!token) return true;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    // Add 30 second buffer for clock skew
+    return payload.exp * 1000 < Date.now() + 30000;
+  } catch {
+    return true;
+  }
+};
 
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
+  isInitializing: boolean;
   isInitialized: boolean;
+  isReactivationRequired: boolean;
   setUser: (user: User | null) => void;
+  setReactivationRequired: (required: boolean) => void;
   login: (user: User) => void;
   logout: () => Promise<void>;
   initializeAuth: () => Promise<void>;
@@ -25,13 +50,19 @@ let sessionExpiredHandler: (() => void) | null = null;
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
+  isInitializing: false,
   isInitialized: false,
+  isReactivationRequired: false,
 
   setUser: (user) =>
     set({
       user,
       isAuthenticated: !!user,
+      isReactivationRequired: user?.deletionStatus === 'PENDING_DELETION',
     }),
+
+  setReactivationRequired: (required) =>
+    set({ isReactivationRequired: required }),
 
   login: (user) => {
     set({
@@ -64,17 +95,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         logger.warn("Backend logout error (potentially already logged out):", err);
       }
 
-      // NOTE: Silent logout - no page refresh
-      // Navigation (if needed) should be handled by the calling component
-      logger.debug('[AuthStore] Logout completed silently');
+      // Complete local storage wipe
+      localStorage.clear();
+      sessionStorage.clear();
+
+      logger.debug('[AuthStore] Logout completed with full storage wipe (no automatic refresh)');
     } catch (error) {
       logger.error("Logout error:", error);
     }
   },
 
   initializeAuth: async () => {
+    // 1. Skip if already initialized or in progress (to prevent redundant calls)
+    if (get().isInitialized || get().isInitializing) return;
+
+    set({ isInitializing: true });
+
     try {
-      // 1. Cleanup previous listeners
+      // 2. Cleanup previous listeners
       if (authListenerUnsubscribe) {
         authListenerUnsubscribe();
         authListenerUnsubscribe = null;
@@ -83,18 +121,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         window.removeEventListener('auth:session-expired', sessionExpiredHandler);
       }
 
-      // 2. Set up session expiry listener (from api-client interceptor)
+      // 3. Set up session expiry listener (from api-client interceptor)
       sessionExpiredHandler = () => {
         logger.warn('[AuthStore] Session expired event received from API Client');
         // Clear state but don't hard redirect yet, let components handle it if they want
-        // or we can force redirect here if needed.
         set({ user: null, isAuthenticated: false });
         queryClient.clear();
       };
       window.addEventListener('auth:session-expired', sessionExpiredHandler);
 
-      // 3. Check session via Supabase SDK (uses internal state)
-      // NOTE: /auth/me endpoint was removed - session init now uses Supabase directly
+      // 4. Check session via Supabase SDK (uses internal state)
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
@@ -103,27 +139,139 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
 
         if (session?.user) {
-          // User has valid Supabase session
-          const supabaseUser = session.user;
-          const user: User = {
-            id: supabaseUser.id,
-            email: supabaseUser.email || '',
-            name: supabaseUser.user_metadata?.name || '',
-            phone: supabaseUser.user_metadata?.phone || undefined,
-            role: supabaseUser.user_metadata?.role || 'customer',
-            emailVerified: supabaseUser.email_confirmed_at != null,
-            phoneVerified: false,
-            mustChangePassword: supabaseUser.user_metadata?.must_change_password || false,
-            addresses: [],
-          };
+          // User has Supabase session, now verify with backend and sync profile
 
-          set({
-            user,
-            isAuthenticated: true,
-            isInitialized: true,
-          });
+          // Check if we have session cookies - if not, skip refresh and go straight to sync
+          if (!hasSessionCookies()) {
+            // But first, check if the token is expired - if so, don't bother making API calls
+            if (isTokenExpired(session.access_token)) {
+              logger.debug('[AuthStore] Supabase session token expired, clearing stale session');
+              await supabase.auth.signOut();
+              set({
+                user: null,
+                isAuthenticated: false,
+                isInitialized: true,
+              });
+              return;
+            }
 
-          logger.debug('[AuthStore] User initialized from Supabase session');
+            logger.debug('[AuthStore] Supabase session exists but no backend cookies, attempting session sync...');
+            try {
+              const userData = await syncSession(session.access_token, session.refresh_token || '', true);
+              if (userData) {
+                const user: User = {
+                  id: userData.id,
+                  email: userData.email || '',
+                  name: userData.name || '',
+                  phone: userData.phone || undefined,
+                  role: userData.role || 'customer',
+                  emailVerified: userData.emailVerified,
+                  phoneVerified: userData.phoneVerified || false,
+                  mustChangePassword: userData.mustChangePassword || false,
+                  deletionStatus: userData.deletionStatus,
+                  scheduledDeletionAt: userData.scheduledDeletionAt,
+                  addresses: [],
+                };
+
+                set({
+                  user,
+                  isAuthenticated: true,
+                  isInitialized: true,
+                  isReactivationRequired: userData.deletionStatus === 'PENDING_DELETION',
+                });
+                logger.debug('[AuthStore] Session sync successful (no prior cookies)');
+                return;
+              }
+            } catch (syncError) {
+              logger.debug('[AuthStore] Session sync failed (silent):', syncError);
+              // Fall through to guest state
+            }
+
+            set({
+              user: null,
+              isAuthenticated: false,
+              isInitialized: true,
+            });
+            return;
+          }
+
+          try {
+            // Call backend to refresh/verify and get full profile
+            const response = await apiClient.post('/auth/refresh', {}, { silent: true } as any);
+            const data = response.data;
+
+            if (data.user) {
+              const user: User = {
+                id: data.user.id,
+                email: data.user.email || '',
+                name: data.user.name || '',
+                phone: data.user.phone || undefined,
+                role: data.user.role || 'customer',
+                emailVerified: data.user.emailVerified,
+                phoneVerified: data.user.phoneVerified || false,
+                mustChangePassword: data.user.mustChangePassword || false,
+                deletionStatus: data.user.deletionStatus,
+                scheduledDeletionAt: data.user.scheduledDeletionAt,
+                addresses: [],
+              };
+
+              set({
+                user,
+                isAuthenticated: true,
+                isInitialized: true,
+                isReactivationRequired: data.user.deletionStatus === 'PENDING_DELETION',
+              });
+              logger.debug(`[AuthStore] User initialized and verified with backend (Status: ${data.user.deletionStatus || 'ACTIVE'})`);
+            }
+          } catch (verifyError: any) {
+            // FALLBACK: If refresh fails with 401 (e.g. cookies missing) but we HAVE a session,
+            // try to sync the session instead of giving up.
+            if (verifyError.response?.status === 401 && session.access_token) {
+              logger.info('[AuthStore] Backend verification failed (401), attempting silent session re-sync...');
+              try {
+                const userData = await syncSession(session.access_token, session.refresh_token || '', true);
+                if (userData) {
+                  const user: User = {
+                    id: userData.id,
+                    email: userData.email || '',
+                    name: userData.name || '',
+                    phone: userData.phone || undefined,
+                    role: userData.role || 'customer',
+                    emailVerified: userData.emailVerified,
+                    phoneVerified: userData.phoneVerified || false,
+                    mustChangePassword: userData.mustChangePassword || false,
+                    deletionStatus: userData.deletionStatus,
+                    scheduledDeletionAt: userData.scheduledDeletionAt,
+                    addresses: [],
+                  };
+
+                  set({
+                    user,
+                    isAuthenticated: true,
+                    isInitialized: true,
+                    isReactivationRequired: userData.deletionStatus === 'PENDING_DELETION',
+                  });
+                  logger.debug('[AuthStore] Session re-sync successful');
+                  return; // Exit successful
+                }
+              } catch (syncError) {
+                logger.debug('[AuthStore] Session re-sync fallback failed (silent):', syncError);
+              }
+            }
+
+            logger.warn('[AuthStore] Backend verification failed:', verifyError.response?.data?.error || verifyError.message);
+
+            // If backend says 403/410, the session is definitively invalid or account is gone
+            if ([403, 410].includes(verifyError.response?.status)) {
+              await get().logout(); // Full cleanup for critical errors
+            }
+
+            set({
+              user: null,
+              isAuthenticated: false,
+              isInitialized: true,
+            });
+          }
         } else {
           set({
             user: null,
@@ -141,7 +289,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         logger.debug('[AuthStore] Session check failed, treating as guest');
       }
 
-      // 4. Set up Supabase listener (mainly for cross-tab debugging/sync)
+      // 5. Set up Supabase listener (mainly for cross-tab debugging/sync)
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
         logger.debug(`[AuthStore] Supabase auth event: ${event}`);
       });
@@ -155,6 +303,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isAuthenticated: false,
         isInitialized: true,
       });
+    } finally {
+      set({ isInitializing: false });
     }
   },
 
