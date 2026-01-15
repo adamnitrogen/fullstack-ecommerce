@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { RefreshCw, ChevronLeft, ChevronRight, Eye, RotateCcw, Play } from "lucide-react";
+import { RefreshCw, ChevronLeft, ChevronRight, Eye, RotateCcw, Play, Calendar, User } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
 import {
@@ -27,20 +27,33 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
 
 interface Job {
     id: string;
-    type: string;
+    type: "ACCOUNT_DELETION" | "EVENT_CANCELLATION";
     status: string;
     mode: string;
-    userId: string;
-    userEmail: string;
-    userName: string;
-    currentStep: string | null;
-    stepsCompleted: string[];
-    errorLog: Array<{ step?: string; error?: string; message?: string; timestamp: string }>;
+    // Account Deletion specific
+    userId?: string;
+    userEmail?: string;
+    userName?: string;
+    currentStep?: string | null;
+    stepsCompleted?: string[];
+    scheduledFor?: string | null;
+    // Event Cancellation specific
+    eventId?: string;
+    eventTitle?: string;
+    eventStatus?: string;
+    eventStartDate?: string;
+    eventLocation?: string;
+    totalRegistrations?: number;
+    processedCount?: number;
+    failedCount?: number;
+    batchSize?: number;
+    // Common fields
+    errorLog: Array<{ step?: string; error?: string; message?: string; timestamp: string; registrationId?: string }>;
     retryCount: number;
-    scheduledFor: string | null;
     startedAt: string | null;
     completedAt: string | null;
     createdAt: string;
@@ -59,12 +72,19 @@ interface JobsResponse {
     };
 }
 
+const TYPE_OPTIONS = [
+    { value: "all", label: "All Job Types" },
+    { value: "ACCOUNT_DELETION", label: "Account Deletion" },
+    { value: "EVENT_CANCELLATION", label: "Event Cancellation" },
+];
+
 const STATUS_OPTIONS = [
     { value: "all", label: "All Statuses" },
     { value: "PENDING", label: "Pending" },
     { value: "IN_PROGRESS", label: "In Progress" },
     { value: "COMPLETED", label: "Completed" },
     { value: "FAILED", label: "Failed" },
+    { value: "PARTIAL_FAILURE", label: "Partial Failure" },
     { value: "BLOCKED", label: "Blocked" },
     { value: "CANCELLED", label: "Cancelled" },
 ];
@@ -75,11 +95,19 @@ const getStatusBadge = (status: string) => {
         IN_PROGRESS: { variant: "default", className: "bg-blue-500 hover:bg-blue-500" },
         COMPLETED: { variant: "default", className: "bg-green-500 hover:bg-green-500" },
         FAILED: { variant: "destructive", className: "" },
+        PARTIAL_FAILURE: { variant: "secondary", className: "bg-orange-100 text-orange-800 hover:bg-orange-100" },
         BLOCKED: { variant: "secondary", className: "bg-orange-100 text-orange-800 hover:bg-orange-100" },
         CANCELLED: { variant: "secondary", className: "bg-gray-100 text-gray-600 hover:bg-gray-100" },
     };
     const config = variants[status] || { variant: "outline" as const, className: "" };
-    return <Badge variant={config.variant} className={config.className}>{status}</Badge>;
+    return <Badge variant={config.variant} className={config.className}>{status.replace("_", " ")}</Badge>;
+};
+
+const getTypeBadge = (type: string) => {
+    if (type === "ACCOUNT_DELETION") {
+        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200"><User className="h-3 w-3 mr-1" />Account Deletion</Badge>;
+    }
+    return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200"><Calendar className="h-3 w-3 mr-1" />Event Cancellation</Badge>;
 };
 
 const formatDate = (dateString: string | null) => {
@@ -91,6 +119,7 @@ const formatDate = (dateString: string | null) => {
 };
 
 export default function JobsManagement() {
+    const [typeFilter, setTypeFilter] = useState("all");
     const [statusFilter, setStatusFilter] = useState("all");
     const [page, setPage] = useState(1);
     const [selectedJob, setSelectedJob] = useState<Job | null>(null);
@@ -99,11 +128,12 @@ export default function JobsManagement() {
     const limit = 15;
 
     const { data, isLoading, refetch, isFetching } = useQuery<JobsResponse>({
-        queryKey: ["admin-jobs", statusFilter, page],
+        queryKey: ["admin-jobs", typeFilter, statusFilter, page],
         queryFn: async () => {
             const params = new URLSearchParams();
             params.set("page", page.toString());
             params.set("limit", limit.toString());
+            if (typeFilter !== "all") params.set("type", typeFilter);
             if (statusFilter !== "all") params.set("status", statusFilter);
             const response = await apiClient.get(`/admin/jobs?${params.toString()}`);
             return response.data;
@@ -115,8 +145,8 @@ export default function JobsManagement() {
             const response = await apiClient.post(`/admin/jobs/${jobId}/retry`);
             return response.data;
         },
-        onSuccess: () => {
-            toast.success("Job retry triggered successfully");
+        onSuccess: (data) => {
+            toast.success(data.message || "Job retry triggered successfully");
             queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
         },
         onError: (error: Error & { response?: { data?: { error?: string } } }) => {
@@ -129,8 +159,8 @@ export default function JobsManagement() {
             const response = await apiClient.post(`/admin/jobs/${jobId}/process`);
             return response.data;
         },
-        onSuccess: () => {
-            toast.success("Job processing triggered successfully");
+        onSuccess: (data) => {
+            toast.success(data.message || "Job processing triggered successfully");
             queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
         },
         onError: (error: Error & { response?: { data?: { error?: string } } }) => {
@@ -151,84 +181,122 @@ export default function JobsManagement() {
         processMutation.mutate(jobId);
     };
 
+    const canRetry = (job: Job) => {
+        if (job.type === "ACCOUNT_DELETION") {
+            return job.status === "FAILED" || job.status === "BLOCKED";
+        }
+        return job.status === "FAILED" || job.status === "PARTIAL_FAILURE";
+    };
+
     const jobs = data?.jobs || [];
     const pagination = data?.pagination || { page: 1, limit, total: 0, totalPages: 1 };
 
+    // Get display info based on job type
+    const getJobSubject = (job: Job) => {
+        if (job.type === "ACCOUNT_DELETION") {
+            return {
+                primary: job.userName || "N/A",
+                secondary: job.userEmail || "N/A"
+            };
+        }
+        return {
+            primary: job.eventTitle || "Unknown Event",
+            secondary: `${job.processedCount || 0}/${job.totalRegistrations || 0} processed`
+        };
+    };
+
     // Mobile Job Card Component
-    const JobCard = ({ job }: { job: Job }) => (
-        <Card className="mb-3">
-            <CardContent className="p-4 space-y-3">
-                {/* Header: Status + Type */}
-                <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        {getStatusBadge(job.status)}
-                        <Badge variant="outline" className="text-xs">
-                            {job.type.replace("_", " ")}
-                        </Badge>
+    const JobCard = ({ job }: { job: Job }) => {
+        const subject = getJobSubject(job);
+        return (
+            <Card className="mb-3">
+                <CardContent className="p-4 space-y-3">
+                    {/* Header: Status + Type */}
+                    <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {getStatusBadge(job.status)}
+                            {getTypeBadge(job.type)}
+                        </div>
+                        <span className="font-mono text-xs text-muted-foreground">
+                            {job.id.slice(0, 8)}...
+                        </span>
                     </div>
-                    <span className="font-mono text-xs text-muted-foreground">
-                        {job.id.slice(0, 8)}...
-                    </span>
-                </div>
 
-                {/* User info */}
-                <div>
-                    <p className="font-medium text-sm">{job.userName}</p>
-                    <p className="text-xs text-muted-foreground truncate">{job.userEmail}</p>
-                </div>
-
-                {/* Current Step */}
-                {job.currentStep && (
+                    {/* Subject info */}
                     <div>
-                        <span className="text-xs text-muted-foreground">Current Step: </span>
-                        <span className="text-xs font-mono">{job.currentStep}</span>
+                        <p className="font-medium text-sm">{subject.primary}</p>
+                        <p className="text-xs text-muted-foreground truncate">{subject.secondary}</p>
                     </div>
-                )}
 
-                {/* Dates */}
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                    <span>Created: {formatDate(job.createdAt)}</span>
-                    <span>Updated: {formatDate(job.updatedAt)}</span>
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-2 pt-2 border-t">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => handleViewDetails(job)}
-                    >
-                        <Eye className="h-4 w-4 mr-1" />
-                        Details
-                    </Button>
-                    {job.status === "PENDING" && (
-                        <Button
-                            size="sm"
-                            className="flex-1 bg-green-600 hover:bg-green-700"
-                            onClick={() => handleProcess(job.id)}
-                            disabled={processMutation.isPending}
-                        >
-                            <Play className="h-4 w-4 mr-1" />
-                            Process
-                        </Button>
+                    {/* Progress bar for event cancellation */}
+                    {job.type === "EVENT_CANCELLATION" && job.totalRegistrations && job.totalRegistrations > 0 && (
+                        <div className="space-y-1">
+                            <Progress
+                                value={((job.processedCount || 0) / job.totalRegistrations) * 100}
+                                className="h-2"
+                            />
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                                <span>{job.processedCount || 0} processed</span>
+                                {job.failedCount && job.failedCount > 0 && (
+                                    <span className="text-red-600">{job.failedCount} failed</span>
+                                )}
+                            </div>
+                        </div>
                     )}
-                    {(job.status === "FAILED" || job.status === "BLOCKED") && (
+
+                    {/* Current Step (for account deletion) */}
+                    {job.type === "ACCOUNT_DELETION" && job.currentStep && (
+                        <div>
+                            <span className="text-xs text-muted-foreground">Current Step: </span>
+                            <span className="text-xs font-mono">{job.currentStep}</span>
+                        </div>
+                    )}
+
+                    {/* Dates */}
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        <span>Created: {formatDate(job.createdAt)}</span>
+                        <span>Updated: {formatDate(job.updatedAt)}</span>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-2 pt-2 border-t">
                         <Button
                             variant="outline"
                             size="sm"
-                            className="flex-1 text-orange-600 border-orange-200 hover:bg-orange-50"
-                            onClick={() => handleRetry(job.id)}
-                            disabled={retryMutation.isPending}
+                            className="flex-1"
+                            onClick={() => handleViewDetails(job)}
                         >
-                            <RotateCcw className="h-4 w-4 mr-1" />
-                            Retry
+                            <Eye className="h-4 w-4 mr-1" />
+                            Details
                         </Button>
-                    )}
-                </div>
-            </CardContent>
-        </Card>
-    );
+                        {job.status === "PENDING" && (
+                            <Button
+                                size="sm"
+                                className="flex-1 bg-green-600 hover:bg-green-700"
+                                onClick={() => handleProcess(job.id)}
+                                disabled={processMutation.isPending}
+                            >
+                                <Play className="h-4 w-4 mr-1" />
+                                Process
+                            </Button>
+                        )}
+                        {canRetry(job) && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1 text-orange-600 border-orange-200 hover:bg-orange-50"
+                                onClick={() => handleRetry(job.id)}
+                                disabled={retryMutation.isPending}
+                            >
+                                <RotateCcw className="h-4 w-4 mr-1" />
+                                Retry
+                            </Button>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    };
 
     return (
         <div className="space-y-4 sm:space-y-6">
@@ -253,6 +321,18 @@ export default function JobsManagement() {
 
             {/* Filters - Responsive */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v); setPage(1); }}>
+                    <SelectTrigger className="w-full sm:w-[200px]">
+                        <SelectValue placeholder="Filter by type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {TYPE_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
                 <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
                     <SelectTrigger className="w-full sm:w-[180px]">
                         <SelectValue placeholder="Filter by status" />
@@ -301,73 +381,88 @@ export default function JobsManagement() {
                             <TableRow>
                                 <TableHead className="w-[120px]">ID</TableHead>
                                 <TableHead>Type</TableHead>
-                                <TableHead>User</TableHead>
+                                <TableHead>Subject</TableHead>
                                 <TableHead>Status</TableHead>
-                                <TableHead>Current Step</TableHead>
+                                <TableHead>Progress</TableHead>
                                 <TableHead>Created</TableHead>
                                 <TableHead>Updated</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {jobs.map((job) => (
-                                <TableRow key={job.id}>
-                                    <TableCell className="font-mono text-xs">
-                                        {job.id.slice(0, 8)}...
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge variant="outline">{job.type.replace("_", " ")}</Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex flex-col">
-                                            <span className="font-medium text-sm">{job.userName}</span>
-                                            <span className="text-xs text-muted-foreground">{job.userEmail}</span>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>{getStatusBadge(job.status)}</TableCell>
-                                    <TableCell className="text-xs font-mono">
-                                        {job.currentStep || "-"}
-                                    </TableCell>
-                                    <TableCell className="text-xs">{formatDate(job.createdAt)}</TableCell>
-                                    <TableCell className="text-xs">{formatDate(job.updatedAt)}</TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex justify-end gap-1">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => handleViewDetails(job)}
-                                                title="View Details"
-                                            >
-                                                <Eye className="h-4 w-4" />
-                                            </Button>
-                                            {job.status === "PENDING" && (
+                            {jobs.map((job) => {
+                                const subject = getJobSubject(job);
+                                return (
+                                    <TableRow key={job.id}>
+                                        <TableCell className="font-mono text-xs">
+                                            {job.id.slice(0, 8)}...
+                                        </TableCell>
+                                        <TableCell>
+                                            {getTypeBadge(job.type)}
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col">
+                                                <span className="font-medium text-sm">{subject.primary}</span>
+                                                <span className="text-xs text-muted-foreground">{subject.secondary}</span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>{getStatusBadge(job.status)}</TableCell>
+                                        <TableCell>
+                                            {job.type === "ACCOUNT_DELETION" ? (
+                                                <span className="text-xs font-mono">{job.currentStep || "-"}</span>
+                                            ) : (
+                                                <div className="w-24">
+                                                    <Progress
+                                                        value={job.totalRegistrations ? ((job.processedCount || 0) / job.totalRegistrations) * 100 : 0}
+                                                        className="h-2"
+                                                    />
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {job.processedCount || 0}/{job.totalRegistrations || 0}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-xs">{formatDate(job.createdAt)}</TableCell>
+                                        <TableCell className="text-xs">{formatDate(job.updatedAt)}</TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex justify-end gap-1">
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    onClick={() => handleProcess(job.id)}
-                                                    disabled={processMutation.isPending}
-                                                    title="Process Job"
-                                                    className="text-green-600 hover:text-green-700"
+                                                    onClick={() => handleViewDetails(job)}
+                                                    title="View Details"
                                                 >
-                                                    <Play className="h-4 w-4" />
+                                                    <Eye className="h-4 w-4" />
                                                 </Button>
-                                            )}
-                                            {(job.status === "FAILED" || job.status === "BLOCKED") && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() => handleRetry(job.id)}
-                                                    disabled={retryMutation.isPending}
-                                                    title="Retry Job"
-                                                    className="text-orange-600 hover:text-orange-700"
-                                                >
-                                                    <RotateCcw className="h-4 w-4" />
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
+                                                {job.status === "PENDING" && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => handleProcess(job.id)}
+                                                        disabled={processMutation.isPending}
+                                                        title="Process Job"
+                                                        className="text-green-600 hover:text-green-700"
+                                                    >
+                                                        <Play className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                                {canRetry(job) && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => handleRetry(job.id)}
+                                                        disabled={retryMutation.isPending}
+                                                        title="Retry Job"
+                                                        className="text-orange-600 hover:text-orange-700"
+                                                    >
+                                                        <RotateCcw className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
                         </TableBody>
                     </Table>
                 </div>
@@ -408,7 +503,10 @@ export default function JobsManagement() {
             <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
                 <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-y-auto">
                     <DialogHeader>
-                        <DialogTitle>Job Details</DialogTitle>
+                        <DialogTitle className="flex items-center gap-2">
+                            Job Details
+                            {selectedJob && getTypeBadge(selectedJob.type)}
+                        </DialogTitle>
                     </DialogHeader>
                     {selectedJob && (
                         <div className="space-y-4">
@@ -423,7 +521,7 @@ export default function JobsManagement() {
                                 </div>
                                 <div>
                                     <span className="text-muted-foreground">Type:</span>
-                                    <p>{selectedJob.type}</p>
+                                    <p>{selectedJob.type.replace("_", " ")}</p>
                                 </div>
                                 <div>
                                     <span className="text-muted-foreground">Mode:</span>
@@ -437,14 +535,65 @@ export default function JobsManagement() {
                                     <span className="text-muted-foreground">Retry Count:</span>
                                     <p>{selectedJob.retryCount}</p>
                                 </div>
-                                <div className="sm:col-span-2">
-                                    <span className="text-muted-foreground">User:</span>
-                                    <p className="break-all">{selectedJob.userName} ({selectedJob.userEmail})</p>
-                                </div>
-                                <div>
-                                    <span className="text-muted-foreground">Current Step:</span>
-                                    <p className="font-mono text-xs sm:text-sm">{selectedJob.currentStep || "-"}</p>
-                                </div>
+
+                                {/* Account Deletion specific fields */}
+                                {selectedJob.type === "ACCOUNT_DELETION" && (
+                                    <>
+                                        <div className="sm:col-span-2">
+                                            <span className="text-muted-foreground">User:</span>
+                                            <p className="break-all">{selectedJob.userName} ({selectedJob.userEmail})</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground">Current Step:</span>
+                                            <p className="font-mono text-xs sm:text-sm">{selectedJob.currentStep || "-"}</p>
+                                        </div>
+                                        {selectedJob.scheduledFor && (
+                                            <div>
+                                                <span className="text-muted-foreground">Scheduled For:</span>
+                                                <p>{formatDate(selectedJob.scheduledFor)}</p>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+
+                                {/* Event Cancellation specific fields */}
+                                {selectedJob.type === "EVENT_CANCELLATION" && (
+                                    <>
+                                        <div className="sm:col-span-2">
+                                            <span className="text-muted-foreground">Event:</span>
+                                            <p className="font-medium">{selectedJob.eventTitle}</p>
+                                            {selectedJob.eventLocation && (
+                                                <p className="text-xs text-muted-foreground">{selectedJob.eventLocation}</p>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground">Total Registrations:</span>
+                                            <p>{selectedJob.totalRegistrations || 0}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground">Processed:</span>
+                                            <p className="text-green-600">{selectedJob.processedCount || 0}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground">Failed:</span>
+                                            <p className="text-red-600">{selectedJob.failedCount || 0}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground">Batch Size:</span>
+                                            <p>{selectedJob.batchSize || 50}</p>
+                                        </div>
+                                        {selectedJob.totalRegistrations && selectedJob.totalRegistrations > 0 && (
+                                            <div className="sm:col-span-2">
+                                                <span className="text-muted-foreground">Progress:</span>
+                                                <Progress
+                                                    value={((selectedJob.processedCount || 0) / selectedJob.totalRegistrations) * 100}
+                                                    className="h-3 mt-2"
+                                                />
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+
                                 <div>
                                     <span className="text-muted-foreground">Created:</span>
                                     <p>{formatDate(selectedJob.createdAt)}</p>
@@ -453,12 +602,6 @@ export default function JobsManagement() {
                                     <span className="text-muted-foreground">Updated:</span>
                                     <p>{formatDate(selectedJob.updatedAt)}</p>
                                 </div>
-                                {selectedJob.scheduledFor && (
-                                    <div>
-                                        <span className="text-muted-foreground">Scheduled For:</span>
-                                        <p>{formatDate(selectedJob.scheduledFor)}</p>
-                                    </div>
-                                )}
                                 {selectedJob.completedAt && (
                                     <div>
                                         <span className="text-muted-foreground">Completed:</span>
@@ -467,8 +610,8 @@ export default function JobsManagement() {
                                 )}
                             </div>
 
-                            {/* Steps Completed */}
-                            {selectedJob.stepsCompleted && selectedJob.stepsCompleted.length > 0 && (
+                            {/* Steps Completed (Account Deletion) */}
+                            {selectedJob.type === "ACCOUNT_DELETION" && selectedJob.stepsCompleted && selectedJob.stepsCompleted.length > 0 && (
                                 <div>
                                     <span className="text-muted-foreground text-sm">Steps Completed:</span>
                                     <div className="flex flex-wrap gap-1 mt-1">
@@ -485,7 +628,7 @@ export default function JobsManagement() {
                             {selectedJob.errorLog && selectedJob.errorLog.length > 0 && (
                                 <div>
                                     <span className="text-muted-foreground text-sm">Error Log:</span>
-                                    <div className="mt-1 space-y-2">
+                                    <div className="mt-1 space-y-2 max-h-48 overflow-y-auto">
                                         {selectedJob.errorLog.map((err, i) => (
                                             <div
                                                 key={i}
@@ -493,6 +636,7 @@ export default function JobsManagement() {
                                             >
                                                 <p className="font-medium text-red-800 break-words">
                                                     {err.step && `[${err.step}] `}
+                                                    {err.registrationId && `[Reg: ${err.registrationId.slice(0, 8)}...] `}
                                                     {err.error || err.message}
                                                 </p>
                                                 <p className="text-red-600">{formatDate(err.timestamp)}</p>
@@ -516,7 +660,7 @@ export default function JobsManagement() {
                                     Process This Job
                                 </Button>
                             )}
-                            {(selectedJob.status === "FAILED" || selectedJob.status === "BLOCKED") && (
+                            {canRetry(selectedJob) && (
                                 <Button
                                     onClick={() => {
                                         handleRetry(selectedJob.id);

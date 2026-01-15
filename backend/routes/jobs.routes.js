@@ -6,8 +6,15 @@ const supabase = require('../config/supabase');
 
 /**
  * Admin Jobs Management Routes
+ * Unified API for managing both Account Deletion and Event Cancellation jobs
  * All routes require admin/manager authentication
  */
+
+// Job type constants
+const JOB_TYPES = {
+    ACCOUNT_DELETION: 'ACCOUNT_DELETION',
+    EVENT_CANCELLATION: 'EVENT_CANCELLATION'
+};
 
 // Middleware to check admin role
 const requireAdmin = (req, res, next) => {
@@ -18,82 +25,159 @@ const requireAdmin = (req, res, next) => {
 };
 
 /**
+ * Helper: Fetch account deletion jobs
+ */
+async function fetchAccountDeletionJobs(status, offset, limit) {
+    let query = supabase
+        .from('account_deletion_jobs')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false });
+
+    if (status) {
+        query = query.eq('status', status.toUpperCase());
+    }
+
+    if (offset !== undefined && limit !== undefined) {
+        query = query.range(offset, offset + limit - 1);
+    }
+
+    const { data: jobs, error, count } = await query;
+    if (error) throw error;
+
+    // Fetch profile data
+    let profileMap = {};
+    if (jobs && jobs.length > 0) {
+        const userIds = [...new Set(jobs.map(j => j.user_id).filter(Boolean))];
+        if (userIds.length > 0) {
+            const { data: profiles } = await supabase
+                .from('profiles')
+                .select('id, email, name')
+                .in('id', userIds);
+            if (profiles) {
+                profileMap = profiles.reduce((acc, p) => {
+                    acc[p.id] = p;
+                    return acc;
+                }, {});
+            }
+        }
+    }
+
+    // Transform for frontend
+    const transformedJobs = (jobs || []).map(job => ({
+        id: job.id,
+        type: JOB_TYPES.ACCOUNT_DELETION,
+        status: job.status,
+        mode: job.mode,
+        userId: job.user_id,
+        userEmail: profileMap[job.user_id]?.email || 'N/A',
+        userName: profileMap[job.user_id]?.name || 'N/A',
+        currentStep: job.current_step,
+        stepsCompleted: job.steps_completed,
+        errorLog: job.error_log,
+        retryCount: job.retry_count || 0,
+        scheduledFor: job.scheduled_for,
+        startedAt: job.started_at,
+        completedAt: job.completed_at,
+        createdAt: job.created_at,
+        updatedAt: job.updated_at,
+        correlationId: job.correlation_id
+    }));
+
+    return { jobs: transformedJobs, count: count || 0 };
+}
+
+/**
+ * Helper: Fetch event cancellation jobs
+ */
+async function fetchEventCancellationJobs(status, offset, limit) {
+    let query = supabase
+        .from('event_cancellation_jobs')
+        .select('*, events(id, title)', { count: 'exact' })
+        .order('created_at', { ascending: false });
+
+    if (status) {
+        query = query.eq('status', status.toUpperCase());
+    }
+
+    if (offset !== undefined && limit !== undefined) {
+        query = query.range(offset, offset + limit - 1);
+    }
+
+    const { data: jobs, error, count } = await query;
+    if (error) throw error;
+
+    // Transform for frontend
+    const transformedJobs = (jobs || []).map(job => ({
+        id: job.id,
+        type: JOB_TYPES.EVENT_CANCELLATION,
+        status: job.status,
+        mode: 'ASYNC', // Event cancellation is always async
+        eventId: job.event_id,
+        eventTitle: job.events?.title || 'Unknown Event',
+        totalRegistrations: job.total_registrations || 0,
+        processedCount: job.processed_count || 0,
+        failedCount: job.failed_count || 0,
+        batchSize: job.batch_size,
+        errorLog: job.error_log,
+        retryCount: job.retry_count || 0,
+        startedAt: job.started_at,
+        completedAt: job.completed_at,
+        createdAt: job.created_at,
+        updatedAt: job.updated_at || job.last_processed_at,
+        correlationId: job.correlation_id
+    }));
+
+    return { jobs: transformedJobs, count: count || 0 };
+}
+
+/**
  * GET /api/admin/jobs
  * List all jobs with filters
- * Query params: type, status, page, limit
+ * Query params: type (ACCOUNT_DELETION, EVENT_CANCELLATION, all), status, page, limit
  */
 router.get('/', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const { type, status, page = 1, limit = 20 } = req.query;
+        const { type = 'all', status, page = 1, limit = 20 } = req.query;
         const offset = (parseInt(page) - 1) * parseInt(limit);
+        const parsedLimit = parseInt(limit);
 
-        // Build query - use simple select without FK reference to avoid constraint issues
-        let query = supabase
-            .from('account_deletion_jobs')
-            .select('*', { count: 'exact' })
-            .order('created_at', { ascending: false })
-            .range(offset, offset + parseInt(limit) - 1);
+        let allJobs = [];
+        let totalCount = 0;
 
-        // Apply filters
-        if (status) {
-            query = query.eq('status', status.toUpperCase());
+        if (type === 'all' || type === JOB_TYPES.ACCOUNT_DELETION) {
+            const result = await fetchAccountDeletionJobs(
+                status,
+                type === 'all' ? undefined : offset,
+                type === 'all' ? undefined : parsedLimit
+            );
+            allJobs = allJobs.concat(result.jobs);
+            totalCount += result.count;
         }
 
-        const { data: jobs, error, count } = await query;
-
-        if (error) {
-            logger.error({ err: error }, 'Supabase error fetching jobs');
-            throw error;
+        if (type === 'all' || type === JOB_TYPES.EVENT_CANCELLATION) {
+            const result = await fetchEventCancellationJobs(
+                status,
+                type === 'all' ? undefined : offset,
+                type === 'all' ? undefined : parsedLimit
+            );
+            allJobs = allJobs.concat(result.jobs);
+            totalCount += result.count;
         }
 
-        // Fetch profile data separately if we have jobs
-        let profileMap = {};
-        if (jobs && jobs.length > 0) {
-            const userIds = [...new Set(jobs.map(j => j.user_id).filter(Boolean))];
-            if (userIds.length > 0) {
-                const { data: profiles } = await supabase
-                    .from('profiles')
-                    .select('id, email, name')
-                    .in('id', userIds);
-
-                if (profiles) {
-                    profileMap = profiles.reduce((acc, p) => {
-                        acc[p.id] = p;
-                        return acc;
-                    }, {});
-                }
-            }
+        // If fetching all types, sort by createdAt and apply pagination
+        if (type === 'all') {
+            allJobs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            allJobs = allJobs.slice(offset, offset + parsedLimit);
         }
-
-        // Transform data for frontend
-        const transformedJobs = (jobs || []).map(job => ({
-            id: job.id,
-            type: 'ACCOUNT_DELETION', // Currently only account deletion jobs
-            status: job.status,
-            mode: job.mode,
-            userId: job.user_id,
-            userEmail: profileMap[job.user_id]?.email || 'N/A',
-            userName: profileMap[job.user_id]?.name || 'N/A',
-            currentStep: job.current_step,
-            stepsCompleted: job.steps_completed,
-            errorLog: job.error_log,
-            retryCount: job.retry_count,
-            scheduledFor: job.scheduled_for,
-            startedAt: job.started_at,
-            completedAt: job.completed_at,
-            createdAt: job.created_at,
-            updatedAt: job.updated_at,
-            correlationId: job.correlation_id
-        }));
 
         res.json({
             success: true,
-            jobs: transformedJobs,
+            jobs: allJobs,
             pagination: {
                 page: parseInt(page),
-                limit: parseInt(limit),
-                total: count || 0,
-                totalPages: Math.ceil((count || 0) / parseInt(limit))
+                limit: parsedLimit,
+                total: totalCount,
+                totalPages: Math.ceil(totalCount / parsedLimit)
             }
         });
     } catch (error) {
@@ -104,56 +188,93 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
 
 /**
  * GET /api/admin/jobs/:id
- * Get single job details
+ * Get single job details - searches both tables
  */
 router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { id } = req.params;
 
-        const { data: job, error } = await supabase
+        // Try account deletion jobs first
+        let { data: job, error } = await supabase
             .from('account_deletion_jobs')
             .select('*')
             .eq('id', id)
-            .single();
+            .maybeSingle();
 
-        if (error || !job) {
-            return res.status(404).json({ error: 'Job not found' });
-        }
-
-        // Fetch profile separately
-        let profile = null;
-        if (job.user_id) {
-            const { data: profileData } = await supabase
-                .from('profiles')
-                .select('email, name, phone')
-                .eq('id', job.user_id)
-                .single();
-            profile = profileData;
-        }
-
-        res.json({
-            success: true,
-            job: {
-                id: job.id,
-                type: 'ACCOUNT_DELETION',
-                status: job.status,
-                mode: job.mode,
-                userId: job.user_id,
-                userEmail: profile?.email || 'N/A',
-                userName: profile?.name || 'N/A',
-                userPhone: profile?.phone || 'N/A',
-                currentStep: job.current_step,
-                stepsCompleted: job.steps_completed,
-                errorLog: job.error_log,
-                retryCount: job.retry_count,
-                scheduledFor: job.scheduled_for,
-                startedAt: job.started_at,
-                completedAt: job.completed_at,
-                createdAt: job.created_at,
-                updatedAt: job.updated_at,
-                correlationId: job.correlation_id
+        if (job) {
+            // Found in account_deletion_jobs
+            let profile = null;
+            if (job.user_id) {
+                const { data: profileData } = await supabase
+                    .from('profiles')
+                    .select('email, name, phone')
+                    .eq('id', job.user_id)
+                    .single();
+                profile = profileData;
             }
-        });
+
+            return res.json({
+                success: true,
+                job: {
+                    id: job.id,
+                    type: JOB_TYPES.ACCOUNT_DELETION,
+                    status: job.status,
+                    mode: job.mode,
+                    userId: job.user_id,
+                    userEmail: profile?.email || 'N/A',
+                    userName: profile?.name || 'N/A',
+                    userPhone: profile?.phone || 'N/A',
+                    currentStep: job.current_step,
+                    stepsCompleted: job.steps_completed,
+                    errorLog: job.error_log,
+                    retryCount: job.retry_count || 0,
+                    scheduledFor: job.scheduled_for,
+                    startedAt: job.started_at,
+                    completedAt: job.completed_at,
+                    createdAt: job.created_at,
+                    updatedAt: job.updated_at,
+                    correlationId: job.correlation_id
+                }
+            });
+        }
+
+        // Try event cancellation jobs
+        const { data: eventJob, error: eventError } = await supabase
+            .from('event_cancellation_jobs')
+            .select('*, events(id, title, status, start_date, location)')
+            .eq('id', id)
+            .maybeSingle();
+
+        if (eventJob) {
+            return res.json({
+                success: true,
+                job: {
+                    id: eventJob.id,
+                    type: JOB_TYPES.EVENT_CANCELLATION,
+                    status: eventJob.status,
+                    mode: 'ASYNC',
+                    eventId: eventJob.event_id,
+                    eventTitle: eventJob.events?.title || 'Unknown Event',
+                    eventStatus: eventJob.events?.status,
+                    eventStartDate: eventJob.events?.start_date,
+                    eventLocation: eventJob.events?.location,
+                    totalRegistrations: eventJob.total_registrations || 0,
+                    processedCount: eventJob.processed_count || 0,
+                    failedCount: eventJob.failed_count || 0,
+                    batchSize: eventJob.batch_size,
+                    errorLog: eventJob.error_log,
+                    retryCount: eventJob.retry_count || 0,
+                    startedAt: eventJob.started_at,
+                    completedAt: eventJob.completed_at,
+                    createdAt: eventJob.created_at,
+                    updatedAt: eventJob.updated_at || eventJob.last_processed_at,
+                    correlationId: eventJob.correlation_id
+                }
+            });
+        }
+
+        // Not found in either table
+        return res.status(404).json({ error: 'Job not found' });
     } catch (error) {
         logger.error({ err: error, jobId: req.params.id }, 'Error fetching job details');
         res.status(500).json({ error: 'Failed to fetch job details' });
@@ -162,70 +283,150 @@ router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
 
 /**
  * POST /api/admin/jobs/:id/retry
- * Retry a failed job
+ * Retry a failed job - auto-detects job type
  */
 router.post('/:id/retry', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { id } = req.params;
-        const correlationId = req.correlationId;
+        const correlationId = req.correlationId || require('crypto').randomUUID();
 
-        // Fetch job
-        const { data: job, error: fetchError } = await supabase
+        // Check account deletion jobs first
+        let { data: deletionJob } = await supabase
             .from('account_deletion_jobs')
             .select('*')
             .eq('id', id)
-            .single();
+            .maybeSingle();
 
-        if (fetchError || !job) {
-            return res.status(404).json({ error: 'Job not found' });
-        }
+        if (deletionJob) {
+            // Handle account deletion job retry
+            if (deletionJob.status !== 'FAILED' && deletionJob.status !== 'BLOCKED') {
+                return res.status(400).json({
+                    error: `Cannot retry job with status ${deletionJob.status}. Only FAILED or BLOCKED jobs can be retried.`
+                });
+            }
 
-        if (job.status !== 'FAILED' && job.status !== 'BLOCKED') {
-            return res.status(400).json({
-                error: `Cannot retry job with status ${job.status}. Only FAILED or BLOCKED jobs can be retried.`
+            const { error: updateError } = await supabase
+                .from('account_deletion_jobs')
+                .update({
+                    status: 'PENDING',
+                    current_step: 'LOCK_USER',
+                    retry_count: (deletionJob.retry_count || 0) + 1,
+                    error_log: [...(deletionJob.error_log || []), {
+                        message: `Manual retry by admin`,
+                        adminId: req.user.id,
+                        timestamp: new Date().toISOString()
+                    }],
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', id);
+
+            if (updateError) throw updateError;
+
+            await supabase
+                .from('profiles')
+                .update({ deletion_status: 'DELETION_IN_PROGRESS' })
+                .eq('id', deletionJob.user_id);
+
+            const { DeletionJobProcessor } = require('../services/deletion-job-processor');
+            setImmediate(async () => {
+                try {
+                    await DeletionJobProcessor.processJob(id);
+                } catch (err) {
+                    logger.error({ err, jobId: id }, '[AdminJobRetry] Account deletion job processing failed');
+                }
+            });
+
+            logger.info({ jobId: id, correlationId, adminId: req.user.id, type: 'ACCOUNT_DELETION' }, '[AdminJobRetry] Job retry triggered');
+
+            return res.json({
+                success: true,
+                message: 'Account deletion job retry triggered successfully.',
+                jobId: id,
+                type: JOB_TYPES.ACCOUNT_DELETION
             });
         }
 
-        // Reset job to PENDING
-        const { error: updateError } = await supabase
-            .from('account_deletion_jobs')
-            .update({
-                status: 'PENDING',
-                current_step: 'LOCK_USER',
-                error_log: [...(job.error_log || []), {
-                    message: `Manual retry by admin`,
-                    adminId: req.user.id,
-                    timestamp: new Date().toISOString()
-                }],
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', id);
+        // Check event cancellation jobs
+        let { data: eventJob } = await supabase
+            .from('event_cancellation_jobs')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle();
 
-        if (updateError) throw updateError;
-
-        // Ensure profile is in correct state
-        await supabase
-            .from('profiles')
-            .update({ deletion_status: 'DELETION_IN_PROGRESS' })
-            .eq('id', job.user_id);
-
-        // Trigger async processing
-        const { DeletionJobProcessor } = require('../services/deletion-job-processor');
-        setImmediate(async () => {
-            try {
-                await DeletionJobProcessor.processJob(id);
-            } catch (err) {
-                logger.error({ err, jobId: id }, '[AdminJobRetry] Job processing failed');
+        if (eventJob) {
+            // Handle event cancellation job retry
+            if (!['FAILED', 'PARTIAL_FAILURE'].includes(eventJob.status)) {
+                return res.status(400).json({
+                    error: `Cannot retry job with status ${eventJob.status}. Only FAILED or PARTIAL_FAILURE jobs can be retried.`
+                });
             }
-        });
 
-        logger.info({ jobId: id, correlationId, adminId: req.user.id }, '[AdminJobRetry] Job retry triggered');
+            // Count remaining registrations to process
+            const { count: pendingCount } = await supabase
+                .from('event_registrations')
+                .select('*', { count: 'exact', head: true })
+                .eq('event_id', eventJob.event_id)
+                .neq('status', 'cancelled');
 
-        res.json({
-            success: true,
-            message: 'Job retry triggered successfully. Monitor status for completion.',
-            jobId: id
-        });
+            if (pendingCount === 0) {
+                await supabase
+                    .from('event_cancellation_jobs')
+                    .update({
+                        status: 'COMPLETED',
+                        completed_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', id);
+
+                return res.json({
+                    success: true,
+                    message: 'All registrations already cancelled. Job marked as completed.',
+                    jobId: id,
+                    type: JOB_TYPES.EVENT_CANCELLATION
+                });
+            }
+
+            // Reset job for retry
+            const { error: resetError } = await supabase
+                .from('event_cancellation_jobs')
+                .update({
+                    status: 'PENDING',
+                    processed_count: 0,
+                    failed_count: 0,
+                    error_log: [],
+                    total_registrations: pendingCount,
+                    retry_count: (eventJob.retry_count || 0) + 1,
+                    last_processed_at: null,
+                    completed_at: null,
+                    updated_at: new Date().toISOString(),
+                    correlation_id: correlationId
+                })
+                .eq('id', id);
+
+            if (resetError) throw resetError;
+
+            // Trigger background processing
+            const EventCancellationService = require('../services/event-cancellation.service');
+            setImmediate(async () => {
+                try {
+                    await EventCancellationService.processJob(id);
+                } catch (err) {
+                    logger.error({ err, jobId: id }, '[AdminJobRetry] Event cancellation job processing failed');
+                }
+            });
+
+            logger.info({ jobId: id, correlationId, adminId: req.user.id, type: 'EVENT_CANCELLATION', pendingCount }, '[AdminJobRetry] Job retry triggered');
+
+            return res.json({
+                success: true,
+                message: `Event cancellation job retry triggered. Processing ${pendingCount} registrations.`,
+                jobId: id,
+                type: JOB_TYPES.EVENT_CANCELLATION,
+                pendingRegistrations: pendingCount
+            });
+        }
+
+        return res.status(404).json({ error: 'Job not found' });
     } catch (error) {
         logger.error({ err: error, jobId: req.params.id }, 'Error retrying job');
         res.status(500).json({ error: 'Failed to retry job' });
@@ -234,53 +435,85 @@ router.post('/:id/retry', authenticateToken, requireAdmin, async (req, res) => {
 
 /**
  * POST /api/admin/jobs/:id/process
- * Manually trigger processing of a PENDING job
+ * Manually trigger processing of a PENDING job - auto-detects job type
  */
 router.post('/:id/process', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { id } = req.params;
-        const correlationId = req.correlationId;
+        const correlationId = req.correlationId || require('crypto').randomUUID();
 
-        // Fetch job
-        const { data: job, error: fetchError } = await supabase
+        // Check account deletion jobs first
+        let { data: deletionJob } = await supabase
             .from('account_deletion_jobs')
             .select('*')
             .eq('id', id)
-            .single();
+            .maybeSingle();
 
-        if (fetchError || !job) {
-            return res.status(404).json({ error: 'Job not found' });
-        }
+        if (deletionJob) {
+            if (deletionJob.status !== 'PENDING') {
+                return res.status(400).json({
+                    error: `Cannot process job with status ${deletionJob.status}. Only PENDING jobs can be processed.`
+                });
+            }
 
-        if (job.status !== 'PENDING') {
-            return res.status(400).json({
-                error: `Cannot process job with status ${job.status}. Only PENDING jobs can be processed.`
+            await supabase
+                .from('profiles')
+                .update({ deletion_status: 'DELETION_IN_PROGRESS' })
+                .eq('id', deletionJob.user_id);
+
+            const { DeletionJobProcessor } = require('../services/deletion-job-processor');
+            setImmediate(async () => {
+                try {
+                    await DeletionJobProcessor.processJob(id);
+                } catch (err) {
+                    logger.error({ err, jobId: id }, '[AdminJobProcess] Account deletion job processing failed');
+                }
+            });
+
+            logger.info({ jobId: id, correlationId, adminId: req.user.id, type: 'ACCOUNT_DELETION' }, '[AdminJobProcess] Manual job processing triggered');
+
+            return res.json({
+                success: true,
+                message: 'Account deletion job processing triggered.',
+                jobId: id,
+                type: JOB_TYPES.ACCOUNT_DELETION
             });
         }
 
-        // Ensure profile is in correct state
-        await supabase
-            .from('profiles')
-            .update({ deletion_status: 'DELETION_IN_PROGRESS' })
-            .eq('id', job.user_id);
+        // Check event cancellation jobs
+        let { data: eventJob } = await supabase
+            .from('event_cancellation_jobs')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle();
 
-        // Trigger async processing
-        const { DeletionJobProcessor } = require('../services/deletion-job-processor');
-        setImmediate(async () => {
-            try {
-                await DeletionJobProcessor.processJob(id);
-            } catch (err) {
-                logger.error({ err, jobId: id }, '[AdminJobProcess] Job processing failed');
+        if (eventJob) {
+            if (eventJob.status !== 'PENDING') {
+                return res.status(400).json({
+                    error: `Cannot process job with status ${eventJob.status}. Only PENDING jobs can be processed.`
+                });
             }
-        });
 
-        logger.info({ jobId: id, correlationId, adminId: req.user.id }, '[AdminJobProcess] Manual job processing triggered');
+            const EventCancellationService = require('../services/event-cancellation.service');
+            setImmediate(async () => {
+                try {
+                    await EventCancellationService.processJob(id);
+                } catch (err) {
+                    logger.error({ err, jobId: id }, '[AdminJobProcess] Event cancellation job processing failed');
+                }
+            });
 
-        res.json({
-            success: true,
-            message: 'Job processing triggered. Monitor status for completion.',
-            jobId: id
-        });
+            logger.info({ jobId: id, correlationId, adminId: req.user.id, type: 'EVENT_CANCELLATION' }, '[AdminJobProcess] Manual job processing triggered');
+
+            return res.json({
+                success: true,
+                message: 'Event cancellation job processing triggered.',
+                jobId: id,
+                type: JOB_TYPES.EVENT_CANCELLATION
+            });
+        }
+
+        return res.status(404).json({ error: 'Job not found' });
     } catch (error) {
         logger.error({ err: error, jobId: req.params.id }, 'Error processing job');
         res.status(500).json({ error: 'Failed to process job' });
@@ -288,4 +521,3 @@ router.post('/:id/process', authenticateToken, requireAdmin, async (req, res) =>
 });
 
 module.exports = router;
-
