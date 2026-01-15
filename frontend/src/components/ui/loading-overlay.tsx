@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
+import { createPortal } from "react-dom";
 
 interface LoadingOverlayProps {
     isLoading: boolean;
@@ -9,6 +10,7 @@ interface LoadingOverlayProps {
 
 /**
  * Full-page loading overlay component
+ * Uses React Portal to render at the top level of the DOM to avoid layout shifts
  * Displays a centered spinner with optional message
  * Covers the entire viewport with a semi-transparent backdrop
  */
@@ -19,22 +21,21 @@ export function LoadingOverlay({
 }: LoadingOverlayProps) {
     if (!isLoading) return null;
 
-    return (
+    const content = (
         <div
             className={cn(
-                "fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm",
+                "fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background/60 backdrop-blur-md animate-in fade-in duration-300",
                 className
             )}
         >
-            <div className="flex flex-col items-center gap-4 p-8 rounded-2xl bg-white/90 shadow-2xl border">
-                <div className="relative">
-                    <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
-                    <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                </div>
-                <p className="text-lg font-medium text-foreground">{message}</p>
+            <div className="flex flex-col items-center gap-4 p-8 rounded-2xl bg-white shadow-[0_20px_50px_rgba(184,92,60,0.1)] border border-[#B85C3C]/10 animate-in zoom-in-95 duration-300">
+                <Loader2 className="h-10 w-10 animate-spin text-[#B85C3C] stroke-[2]" />
+                <p className="text-base font-semibold text-[#2C1810] tracking-tight">{message}</p>
             </div>
         </div>
     );
+
+    return typeof document !== 'undefined' ? createPortal(content, document.body) : null;
 }
 
 /**
@@ -51,12 +52,12 @@ export function LoadingOverlayRelative({
     return (
         <div
             className={cn(
-                "absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm rounded-lg",
+                "absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/40 backdrop-blur-[2px] rounded-lg animate-in fade-in duration-200",
                 className
             )}
         >
             <div className="flex flex-col items-center gap-3">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <Loader2 className="h-8 w-8 animate-spin text-primary opacity-80" />
                 <p className="text-sm font-medium text-muted-foreground">{message}</p>
             </div>
         </div>

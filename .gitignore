@@ -8,6 +8,8 @@ backend/node_modules/
 docs/
 id_ed25519_repo
 id_ed25519_repo.pub
+id_ed25519_local
+id_ed25519_local.pub
 
 # Testing
 coverage/

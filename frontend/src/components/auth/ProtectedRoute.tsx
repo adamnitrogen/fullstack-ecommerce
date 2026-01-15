@@ -10,26 +10,12 @@ interface ProtectedRouteProps {
     redirectTo?: string; // Custom redirect path (default: "/")
 }
 
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
+
 /**
  * ProtectedRoute Component
  * 
  * Protects routes based on authentication status and user roles.
- * 
- * @example
- * // Require login (any authenticated user)
- * <ProtectedRoute requireAuth>
- *   <Profile />
- * </ProtectedRoute>
- * 
- * // Require admin role
- * <ProtectedRoute allowedRoles={["admin"]}>
- *   <AdminDashboard />
- * </ProtectedRoute>
- * 
- * // Require admin or manager role
- * <ProtectedRoute allowedRoles={["admin", "manager"]}>
- *   <AdminPortal />
- * </ProtectedRoute>
  */
 export function ProtectedRoute({
     children,
@@ -43,14 +29,7 @@ export function ProtectedRoute({
 
     // Show loading while auth is initializing
     if (!isInitialized) {
-        return (
-            <div className="flex min-h-screen items-center justify-center">
-                <div className="text-center">
-                    <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto"></div>
-                    <p className="text-muted-foreground">Loading...</p>
-                </div>
-            </div>
-        );
+        return <LoadingOverlay isLoading={true} message="Checking authentication..." />;
     }
 
     // Check if authentication is required
