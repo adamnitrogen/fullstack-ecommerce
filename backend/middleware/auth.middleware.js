@@ -30,7 +30,7 @@ async function authenticateToken(req, res, next) {
         // Extract token - PRIORITIZE COOKIE over Authorization header
         let token = req.cookies?.access_token;
 
-        logger.debug({
+        logger.info({
             msg: '[AuthMiddleware] Request Details',
             method: req.method,
             url: req.originalUrl,
@@ -41,15 +41,15 @@ async function authenticateToken(req, res, next) {
             const authHeader = req.headers.authorization;
             if (authHeader && authHeader.startsWith('Bearer ')) {
                 token = authHeader.split(' ')[1];
-                logger.debug('[AuthMiddleware] Token found in Authorization header');
+                logger.info('[AuthMiddleware] Token found in Authorization header');
             }
         } else {
-            logger.debug('[AuthMiddleware] Token found in Cookies');
+            logger.info('[AuthMiddleware] Token found in Cookies');
         }
 
         if (!token) {
-            logger.debug('[AuthMiddleware] No token found');
-            return res.status(401).json({ error: 'Access token required' });
+            logger.info('[AuthMiddleware] No token found');
+            return res.status(401).json({ error: 'Access token missing', code: 'TOKEN_MISSING' });
         }
 
         // 1. Check Cache first (reduces Supabase API calls)
@@ -73,18 +73,41 @@ async function authenticateToken(req, res, next) {
         const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
 
         if (error || !user) {
-            logger.warn({ err: error?.message }, '[AuthMiddleware] Supabase validation failed');
+            logger.info({ err: error?.message }, '[AuthMiddleware] Supabase validation failed (Invalid or expired token)');
             return res.status(401).json({ error: 'Invalid or expired token' });
         }
 
-        // 3. Check Account Deletion Status (Critical Security Check)
-        const { data: profile } = await supabase
+        // 3. Check Account Deletion Status and Role (Critical Security Check)
+        const { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .select('deletion_status')
+            .select('deletion_status, roles(name)')
             .eq('id', user.id)
             .single();
 
+        if (profileError) {
+            logger.error({ userId: user.id, error: profileError }, '[AuthMiddleware] Profile fetch error');
+        }
+
         const deletionStatus = profile?.deletion_status || 'ACTIVE';
+
+        // Handle both singular join object and possible array join (PostgREST variance)
+        let databaseRole = 'customer';
+        if (profile?.roles) {
+            if (Array.isArray(profile.roles)) {
+                databaseRole = profile.roles[0]?.name || 'customer';
+            } else {
+                databaseRole = profile.roles.name || 'customer';
+            }
+        }
+
+        // Normalize role to lowercase for robust check
+        databaseRole = (databaseRole || 'customer').toLowerCase();
+
+        logger.info({
+            userId: user.id,
+            deletionStatus,
+            databaseRole
+        }, '[AuthMiddleware] Role resolution');
 
         // ENFORCE ACCESS RULES
         if (deletionStatus === 'DELETED') {
@@ -117,14 +140,14 @@ async function authenticateToken(req, res, next) {
 
         logger.debug(`[AuthMiddleware] Supabase validation success for user ${user.id}`);
 
-        // 4. Build user object
+        // 4. Build user object - DATABASE ROLE IS SOURCE OF TRUTH
         const appUser = {
             id: user.id,
             userId: user.id, // Compatibility
             email: user.email,
-            role: user.user_metadata?.role || 'customer',
             deletionStatus, // Add status to user object
-            ...user.user_metadata
+            ...user.user_metadata,
+            role: databaseRole // Prioritize database role last so it wins
         };
 
         req.user = appUser;
@@ -136,7 +159,7 @@ async function authenticateToken(req, res, next) {
         // 5. Cache the result
         await authCache.set(cacheKey, appUser, AUTH_CACHE_TTL);
 
-        logger.debug(`[AuthMiddleware] Authenticated user ${appUser.id}, cached for ${AUTH_CACHE_TTL}ms`);
+        logger.debug(`[AuthMiddleware] Authenticated user ${appUser.id} as ${appUser.role}, cached for ${AUTH_CACHE_TTL}ms`);
 
         next();
     } catch (error) {
@@ -147,8 +170,12 @@ async function authenticateToken(req, res, next) {
 
 /**
  * Middleware to check if user has required role
+ * Supports both rest parameters: authorizeRole('admin', 'manager')
+ * and a single array: authorizeRole(['admin', 'manager'])
  */
-function authorizeRole(...allowedRoles) {
+function authorizeRole(...roles) {
+    const allowedRoles = Array.isArray(roles[0]) ? roles[0] : roles;
+
     return (req, res, next) => {
         if (!req.user) {
             return res.status(401).json({ error: 'Authentication required' });
@@ -209,13 +236,24 @@ async function optionalAuth(req, res, next) {
             return res.status(401).json({ error: 'Session expired', code: 'TOKEN_EXPIRED' });
         }
 
-        // 3. Build and cache user
+        // 3. Fetch Profile for Status and Role - DATABASE IS SOURCE OF TRUTH
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('deletion_status, roles(name)')
+            .eq('id', user.id)
+            .single();
+
+        const deletionStatus = profile?.deletion_status || 'ACTIVE';
+        const databaseRole = profile?.roles?.name || 'customer';
+
+        // 4. Build and cache user
         const appUser = {
             id: user.id,
             userId: user.id,
             email: user.email,
-            role: user.user_metadata?.role || 'customer',
-            ...user.user_metadata
+            deletionStatus,
+            ...user.user_metadata,
+            role: databaseRole // Prioritize database role
         };
 
         req.user = appUser;

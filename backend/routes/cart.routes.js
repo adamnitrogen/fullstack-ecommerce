@@ -20,27 +20,38 @@ const logger = require('../utils/logger');
  * Note: All routes require authentication and use user_id from auth middleware or header
  */
 
-const { authenticateToken } = require('../middleware/auth.middleware');
+const { optionalAuth } = require('../middleware/auth.middleware');
 
-// Apply authentication to all cart routes
-router.use(authenticateToken);
+// Use optional authentication - guests are allowed
+router.use(optionalAuth);
 
-// Helper to get user ID (from auth middleware or header)
-const getUserId = (req) => {
-    return req.user?.id || req.headers['x-user-id'];
+// Helper to get User ID or Guest ID
+const getContextIds = (req) => {
+    const userId = req.user?.id;
+    // Guest ID from header (x-guest-id) or cookie (guest_id)
+    const guestId = req.headers['x-guest-id'] || req.cookies?.guest_id;
+    return { userId, guestId };
 };
+
+// Start Cart Routes
+// Note: All service functions now accept ({ userId, guestId }) object or similar arguments
+// but to minimize service signature changes, we might pass both or overload the first arg?
+// Decision: Update Service to accept `userId` (string|null) and `guestId` (string|null).
+// Or better: Pass an object context?
+// Let's look at service: `getUserCart(userId)`
+// I will update service to `getUserCart(userId, guestId)`
 
 // Get user's cart with items and totals
 router.get('/', async (req, res) => {
     try {
-        const userId = getUserId(req);
+        const { userId, guestId } = getContextIds(req);
 
-        if (!userId) {
-            return res.status(401).json({ error: 'Authentication required' });
+        if (!userId && !guestId) {
+            return res.status(400).json({ error: 'Guest ID or Authentication required' });
         }
 
-        const cart = await getUserCart(userId);
-        const totals = await calculateCartTotals(userId);
+        const cart = await getUserCart(userId, guestId);
+        const totals = await calculateCartTotals(userId, guestId);
 
         res.json({
             cart,
@@ -55,17 +66,17 @@ router.get('/', async (req, res) => {
 // Add item to cart
 router.post('/items', validate(addToCartSchema), async (req, res) => {
     try {
-        const userId = getUserId(req);
+        const { userId, guestId } = getContextIds(req);
 
-        if (!userId) {
-            return res.status(401).json({ error: 'Authentication required' });
+        if (!userId && !guestId) {
+            return res.status(400).json({ error: 'Guest ID or Authentication required' });
         }
 
-        const { product_id, quantity } = req.body;
-        // Validation handled by middleware
+        const { product_id, quantity, variant_id } = req.body; // Added variant_id support if missing in schema? Schema handles it?
+        // Note: The schema needs to support optional variant_id if not already
 
-        const cart = await addToCart(userId, product_id, quantity);
-        const totals = await calculateCartTotals(userId);
+        const cart = await addToCart(userId, guestId, product_id, quantity, variant_id);
+        const totals = await calculateCartTotals(userId, guestId);
 
         res.json({
             message: 'Item added to cart',
@@ -81,17 +92,18 @@ router.post('/items', validate(addToCartSchema), async (req, res) => {
 // Update cart item quantity
 router.put('/items/:product_id', validate(updateCartSchema), async (req, res) => {
     try {
-        const userId = getUserId(req);
+        const { userId, guestId } = getContextIds(req);
 
-        if (!userId) {
+        if (!userId && !guestId) {
             return res.status(401).json({ error: 'Authentication required' });
         }
 
         const { product_id } = req.params;
         const { quantity } = req.body;
+        const { variant_id } = req.query; // Support variant_id in query for updates
 
-        const cart = await updateCartItem(userId, product_id, quantity);
-        const totals = await calculateCartTotals(userId);
+        const cart = await updateCartItem(userId, guestId, product_id, quantity, variant_id);
+        const totals = await calculateCartTotals(userId, guestId);
 
         res.json({
             message: 'Cart updated',
@@ -107,17 +119,17 @@ router.put('/items/:product_id', validate(updateCartSchema), async (req, res) =>
 // Remove item from cart
 router.delete('/items/:product_id', async (req, res) => {
     try {
-        const userId = getUserId(req);
+        const { userId, guestId } = getContextIds(req);
 
-        if (!userId) {
+        if (!userId && !guestId) {
             return res.status(401).json({ error: 'Authentication required' });
         }
 
         const { product_id } = req.params;
-        // We could also validate param UUID using Zod if strictly needed, but route matching helps.
+        const { variant_id } = req.query;
 
-        const cart = await removeFromCart(userId, product_id);
-        const totals = await calculateCartTotals(userId);
+        const cart = await removeFromCart(userId, guestId, product_id, variant_id);
+        const totals = await calculateCartTotals(userId, guestId);
 
         res.json({
             message: 'Item removed from cart',
@@ -133,9 +145,9 @@ router.delete('/items/:product_id', async (req, res) => {
 // Apply coupon to cart
 router.post('/apply-coupon', async (req, res) => {
     try {
-        const userId = getUserId(req);
+        const { userId, guestId } = getContextIds(req);
 
-        if (!userId) {
+        if (!userId && !guestId) {
             return res.status(401).json({ error: 'Authentication required' });
         }
 
@@ -145,13 +157,13 @@ router.post('/apply-coupon', async (req, res) => {
             return res.status(400).json({ error: 'Coupon code is required' });
         }
 
-        const result = await applyCouponToCart(userId, code);
+        const result = await applyCouponToCart(userId, guestId, code);
 
         if (!result.success) {
             return res.status(400).json({ error: result.error });
         }
 
-        const totals = await calculateCartTotals(userId);
+        const totals = await calculateCartTotals(userId, guestId);
 
         res.json({
             message: result.message,
@@ -168,14 +180,14 @@ router.post('/apply-coupon', async (req, res) => {
 // Remove coupon from cart
 router.delete('/coupon', async (req, res) => {
     try {
-        const userId = getUserId(req);
+        const { userId, guestId } = getContextIds(req);
 
-        if (!userId) {
+        if (!userId && !guestId) {
             return res.status(401).json({ error: 'Authentication required' });
         }
 
-        const cart = await removeCouponFromCart(userId);
-        const totals = await calculateCartTotals(userId);
+        const cart = await removeCouponFromCart(userId, guestId);
+        const totals = await calculateCartTotals(userId, guestId);
 
         res.json({
             message: 'Coupon removed',
@@ -191,13 +203,13 @@ router.delete('/coupon', async (req, res) => {
 // Calculate cart totals (with delivery and discounts)
 router.post('/calculate', async (req, res) => {
     try {
-        const userId = getUserId(req);
+        const { userId, guestId } = getContextIds(req);
 
-        if (!userId) {
+        if (!userId && !guestId) {
             return res.status(401).json({ error: 'Authentication required' });
         }
 
-        const totals = await calculateCartTotals(userId);
+        const totals = await calculateCartTotals(userId, guestId);
 
         res.json(totals);
     } catch (error) {
@@ -209,13 +221,13 @@ router.post('/calculate', async (req, res) => {
 // Clear cart (after order is placed)
 router.delete('/', async (req, res) => {
     try {
-        const userId = getUserId(req);
+        const { userId, guestId } = getContextIds(req);
 
-        if (!userId) {
+        if (!userId && !guestId) {
             return res.status(401).json({ error: 'Authentication required' });
         }
 
-        await clearCart(userId);
+        await clearCart(userId, guestId);
 
         res.json({ message: 'Cart cleared successfully' });
     } catch (error) {

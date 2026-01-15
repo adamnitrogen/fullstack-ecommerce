@@ -33,10 +33,11 @@ router.post('/check-email', validate(z.object({ email: z.string().email() })), a
  */
 router.post('/sync', validate(z.object({ access_token: z.string(), refresh_token: z.string() })), async (req, res) => {
     const { access_token, refresh_token } = req.body;
+    const guestId = req.headers['x-guest-id'];
     logger.info({ email: req.body.email }, '[AuthRoutes] Received sync request');
 
     try {
-        const user = await AuthService.syncSession(access_token);
+        const user = await AuthService.syncSession(access_token, guestId);
 
         const isProd = process.env.NODE_ENV === 'production';
         const isHttps = process.env.FRONTEND_URL?.startsWith('https');
@@ -73,9 +74,10 @@ router.post('/sync', validate(z.object({ access_token: z.string(), refresh_token
  */
 router.post('/validate-credentials', validate(loginSchema), async (req, res) => {
     const { email, password } = req.body;
+    const guestId = req.headers['x-guest-id'];
 
     try {
-        const otpResult = await AuthService.validateCredentials(email, password);
+        const otpResult = await AuthService.validateCredentials(email, password, guestId);
 
         if (!otpResult.success) {
             // Return 200 OK for validation errors to prevent browser console noise (client request),

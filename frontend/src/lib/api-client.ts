@@ -50,6 +50,10 @@ export const apiClient = axios.create({
     timeout: 30000,
 });
 
+import { getGuestId } from '@/lib/guestId';
+
+// ... (existing imports)
+
 apiClient.interceptors.request.use(
     (config) => {
         const customConfig = config as CustomAxiosConfig;
@@ -59,6 +63,13 @@ apiClient.interceptors.request.use(
             correlationId
         };
         config.headers['X-Correlation-ID'] = correlationId;
+
+        // Attach Guest ID if present
+        const guestId = getGuestId();
+        if (guestId) {
+            config.headers['x-guest-id'] = guestId;
+        }
+
         if (requiresIdempotencyKey(config.url, config.method)) {
             config.headers['X-Idempotency-Key'] = generateUUID();
         }

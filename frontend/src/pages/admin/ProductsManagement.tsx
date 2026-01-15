@@ -19,7 +19,7 @@ import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { downloadCSV, flattenObject } from "@/lib/exportUtils";
-import type { Product } from "@/types";
+import type { Product, VariantFormData } from "@/types";
 
 export default function ProductsManagement() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -38,39 +38,105 @@ export default function ProductsManagement() {
   });
 
   const productMutation = useMutation({
-    mutationFn: async (productData: Partial<Product> & { imageFiles?: (File | string)[] }) => {
+    mutationFn: async (productData: Omit<Partial<Product>, "variants"> & { imageFiles?: (File | string)[], variants?: VariantFormData[] }) => {
       logger.debug("ProductMutation - Received product:", productData);
       const { productService } = await import("@/services/product.service");
+      const { uploadService } = await import("@/services/upload.service");
 
-      const finalProduct = { ...productData };
+      const { variants, imageFiles, ...finalProductData } = productData;
+      const finalProduct = { ...finalProductData } as any;
+      const newlyUploadedUrls: string[] = [];
 
-      // Handle image uploads if files are present
-      if (productData.imageFiles && productData.imageFiles.length > 0) {
-        const { uploadService } = await import("@/services/upload.service");
-        const processedImages: string[] = [];
-
-        for (const img of productData.imageFiles) {
-          if (img instanceof File) {
-            const response = await uploadService.uploadImage(img, 'product');
-            processedImages.push(response.url);
-          } else if (typeof img === 'string') {
-            processedImages.push(img);
+      try {
+        // 1. Handle main product image uploads
+        if (imageFiles && imageFiles.length > 0) {
+          const processedImages: string[] = [];
+          for (const img of imageFiles) {
+            if (img instanceof File) {
+              const response = await uploadService.uploadImage(img, 'product');
+              processedImages.push(response.url);
+              newlyUploadedUrls.push(response.url);
+            } else if (typeof img === 'string') {
+              if (img.startsWith('blob:')) {
+                // Convert blob URL to File and upload
+                try {
+                  const blob = await fetch(img).then(r => r.blob());
+                  const file = new File([blob], "image.jpg", { type: blob.type });
+                  const response = await uploadService.uploadImage(file, 'product');
+                  processedImages.push(response.url);
+                  newlyUploadedUrls.push(response.url);
+                } catch (err) {
+                  logger.error("Failed to process blob image:", err);
+                  // If conversion fails, try to proceed without it or throw
+                }
+              } else {
+                processedImages.push(img);
+              }
+            }
           }
+          finalProduct.images = processedImages;
         }
 
-        finalProduct.images = processedImages;
-        // Remove imageFiles from the object sent to API
-        delete finalProduct.imageFiles;
-      }
+        // 2. Handle variant image uploads
+        const processedVariants = variants ? await Promise.all(variants.map(async (v) => {
+          const variant = { ...v };
+          if (v.imageFile instanceof File) {
+            const response = await uploadService.uploadImage(v.imageFile, 'product');
+            variant.variant_image_url = response.url;
+            newlyUploadedUrls.push(response.url);
+          } else if (typeof v.imageFile === 'string') {
+            if (v.imageFile.startsWith('blob:')) {
+              // Convert blob URL to File and upload
+              try {
+                const blob = await fetch(v.imageFile).then(r => r.blob());
+                const file = new File([blob], "variant-image.jpg", { type: blob.type });
+                const response = await uploadService.uploadImage(file, 'product');
+                variant.variant_image_url = response.url;
+                newlyUploadedUrls.push(response.url);
+              } catch (err) {
+                logger.error("Failed to process variant blob image:", err);
+              }
+            } else {
+              variant.variant_image_url = v.imageFile;
+            }
+          }
+          delete variant.imageFile;
+          return variant;
+        })) : undefined;
 
-      if (finalProduct.id) {
-        logger.debug("ProductMutation - Updating product:", finalProduct.id);
-        return productService.update(finalProduct.id, finalProduct);
-      } else {
-        logger.debug("ProductMutation - Creating new product");
-        return productService.create(
-          { ...finalProduct, createdAt: finalProduct.createdAt || new Date().toISOString() } as Omit<Product, "id">
-        );
+        // 3. Save product (with or without variants)
+        if (finalProduct.id) {
+          logger.debug("ProductMutation - Updating product:", finalProduct.id);
+          if (processedVariants && processedVariants.length > 0) {
+            return await productService.updateWithVariants(finalProduct.id, {
+              product: finalProduct,
+              variants: processedVariants
+            });
+          }
+          return await productService.update(finalProduct.id, finalProduct);
+        } else {
+          logger.debug("ProductMutation - Creating new product");
+          if (processedVariants && processedVariants.length > 0) {
+            return await productService.createWithVariants({
+              product: { ...finalProduct, createdAt: finalProduct.createdAt || new Date().toISOString() },
+              variants: processedVariants
+            });
+          }
+          return await productService.create(
+            { ...finalProduct, createdAt: finalProduct.createdAt || new Date().toISOString() } as Omit<Product, "id">
+          );
+        }
+      } catch (error) {
+        // Rollback: Delete newly uploaded images if product saving fails
+        if (newlyUploadedUrls.length > 0) {
+          logger.warn("Product creation/update failed. Rolling back uploaded images...", newlyUploadedUrls);
+          await Promise.allSettled(newlyUploadedUrls.map(url =>
+            uploadService.deleteImageByUrl(url).catch(err =>
+              logger.error(`Failed to rollback image ${url}:`, err)
+            )
+          ));
+        }
+        throw error;
       }
     },
     onSuccess: () => {
@@ -169,7 +235,7 @@ export default function ProductsManagement() {
       return;
     }
 
-    const exportData = data.products.map((product) =>
+    const exportData = (data?.products || []).map((product) =>
       flattenObject({
         id: product.id,
         title: product.title,
@@ -346,7 +412,7 @@ export default function ProductsManagement() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {data.products.map((product) => {
+                    {(data?.products || []).map((product) => {
                       const stockStatus = getStockStatus(product.inventory);
                       return (
                         <TableRow key={product.id}>
@@ -437,7 +503,8 @@ export default function ProductsManagement() {
         open={productDialogOpen}
         onOpenChange={setProductDialogOpen}
         product={selectedProduct}
-        onSave={handleSaveProduct}
+        onSave={(data) => productMutation.mutate(data)}
+        isSaving={productMutation.isPending}
       />
 
       <DeleteConfirmDialog
@@ -445,7 +512,8 @@ export default function ProductsManagement() {
         onOpenChange={setDeleteDialogOpen}
         title="Delete Product"
         description={`Are you sure you want to delete "${selectedProduct?.title}"? This action cannot be undone.`}
-        onConfirm={handleConfirmDelete}
+        onConfirm={() => selectedProduct && deleteMutation.mutate(selectedProduct.id)}
+        isLoading={deleteMutation.isPending}
       />
     </div>
   );

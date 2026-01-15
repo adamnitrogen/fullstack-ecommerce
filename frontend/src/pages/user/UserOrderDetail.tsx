@@ -49,6 +49,16 @@ interface OrderResponse {
         product?: Product;
         title?: string; // fallback if product is flattened
         price?: number;
+        // Variant fields
+        variant_id?: string;
+        variant?: {
+            id: string;
+            size_label: string;
+            size_value: number;
+            unit: string;
+            variant_image_url?: string;
+        };
+        size_label?: string; // Direct size label if variant is flattened
     }>;
     order_status_history?: Array<{
         status: string;
@@ -438,28 +448,44 @@ export default function UserOrderDetail() {
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-4">
-                                    {order.items.map((item, index) => (
-                                        <div key={index} className="flex gap-4 items-start border-b pb-4 last:border-0 last:pb-0">
-                                            <div className="w-16 h-16 bg-muted rounded-md overflow-hidden">
-                                                {item.product?.images?.[0] && (
-                                                    <img
-                                                        src={item.product.images[0]}
-                                                        alt={item.product.title}
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                )}
+                                    {order.items.map((item, index) => {
+                                        // Get variant size label
+                                        const sizeLabel = item.variant?.size_label || item.size_label;
+                                        // Use variant image if available, otherwise use product image
+                                        const displayImage = item.variant?.variant_image_url || item.product?.images?.[0];
+                                        // Use price_per_unit from order item (reflects variant price at time of purchase)
+                                        const unitPrice = item.price_per_unit || item.product?.price || 0;
+
+                                        return (
+                                            <div key={index} className="flex gap-4 items-start border-b pb-4 last:border-0 last:pb-0">
+                                                <div className="w-16 h-16 bg-muted rounded-md overflow-hidden">
+                                                    {displayImage && (
+                                                        <img
+                                                            src={displayImage}
+                                                            alt={item.product?.title}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    )}
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <h4 className="font-medium">{item.product?.title || "Product"}</h4>
+                                                        {sizeLabel && (
+                                                            <Badge variant="secondary" className="text-xs font-normal">
+                                                                {sizeLabel}
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-sm text-muted-foreground">
+                                                        Qty: {item.quantity} × ₹{unitPrice}
+                                                    </p>
+                                                </div>
+                                                <div className="text-right font-medium">
+                                                    ₹{(item.quantity * unitPrice).toFixed(2)}
+                                                </div>
                                             </div>
-                                            <div className="flex-1">
-                                                <h4 className="font-medium">{item.product?.title || "Product"}</h4>
-                                                <p className="text-sm text-muted-foreground">
-                                                    Qty: {item.quantity} × ₹{item.product?.price || 0}
-                                                </p>
-                                            </div>
-                                            <div className="text-right font-medium">
-                                                ₹{(item.quantity * (item.product?.price || 0)).toFixed(2)}
-                                            </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                                 <Separator className="my-4" />
                                 <div className="space-y-2 text-sm">

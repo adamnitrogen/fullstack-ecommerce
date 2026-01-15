@@ -1,5 +1,6 @@
 import axios, { InternalAxiosRequestConfig } from "axios";
 import { logAPICall } from "./logger";
+import { getGuestId } from "./guestId";
 
 declare module 'axios' {
   export interface InternalAxiosRequestConfig {
@@ -34,6 +35,12 @@ api.interceptors.request.use(
       });
 
     config.headers['X-Correlation-ID'] = correlationId;
+
+    // Attach Guest ID if present
+    const guestId = getGuestId();
+    if (guestId) {
+      config.headers['x-guest-id'] = guestId;
+    }
 
     // Track request start time
     config.metadata = {

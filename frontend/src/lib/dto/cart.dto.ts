@@ -13,6 +13,8 @@ export class CartDTO {
             productId: item.product_id,
             quantity: item.quantity,
             product: item.products,
+            variantId: item.variant_id || undefined,
+            variant: item.product_variants,
         }));
     }
 

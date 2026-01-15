@@ -7,6 +7,7 @@ import { CartDTO } from "@/lib/dto/cart.dto";
 import axios from "axios";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { useAuthStore } from "./authStore";
+import { getGuestId } from "@/lib/guestId";
 
 interface CartState {
   items: CartItem[];
@@ -17,9 +18,9 @@ interface CartState {
 
   // Actions
   fetchCart: () => Promise<void>;
-  addItem: (product: Product, quantity?: number) => Promise<void>;
-  removeItem: (productId: string) => Promise<void>;
-  updateQuantity: (productId: string, quantity: number) => Promise<void>;
+  addItem: (product: Product, quantity?: number, variantId?: string) => Promise<void>;
+  removeItem: (productId: string, variantId?: string) => Promise<void>;
+  updateQuantity: (productId: string, quantity: number, variantId?: string) => Promise<void>;
   applyCoupon: (code: string) => Promise<boolean>;
   removeCoupon: () => Promise<void>;
   clearCart: () => Promise<void>;
@@ -88,6 +89,9 @@ export const useCartStore = create<CartState>()((set, get) => {
       // Don't overwrite if we have pending mutations
       if (pendingRequests > 0) return;
 
+      // Ensure guest ID exists
+      getGuestId();
+
       set({ isLoading: true });
       try {
         const response = await cartService.getCart();
@@ -117,24 +121,37 @@ export const useCartStore = create<CartState>()((set, get) => {
       }
     },
 
-    addItem: async (product, quantity = 1) => {
+    addItem: async (product, quantity = 1, variantId) => {
       // 1. Optimistic Update (Immediate)
       const previousItems = [...get().items];
       const previousTotals = get().totals ? { ...get().totals! } : null;
 
+      // Find variant if variantId is provided
+      const variant = variantId && product.variants
+        ? product.variants.find(v => v.id === variantId)
+        : undefined;
+
       set((state) => {
-        const existingItem = state.items.find(item => item.productId === product.id);
+        // Match by productId AND variantId (treating null/undefined as same)
+        const existingItem = state.items.find(item =>
+          item.productId === product.id && (item.variantId || null) === (variantId || null)
+        );
         let newItems;
 
         if (existingItem) {
           newItems = state.items.map(item =>
-            item.productId === product.id ? { ...item, quantity: item.quantity + quantity } : item
+            (item.productId === product.id && (item.variantId || null) === (variantId || null))
+              ? { ...item, quantity: item.quantity + quantity }
+              : item
           );
         } else {
           newItems = [...state.items, {
             productId: product.id,
+            variantId,
             quantity,
-            product
+            product,
+            variant,
+            sizeLabel: variant?.size_label
           }];
         }
 
@@ -147,7 +164,7 @@ export const useCartStore = create<CartState>()((set, get) => {
       // 2. Queue the Backend Sync
       return queueAction(async () => {
         try {
-          const response = await cartService.addItem(product.id, quantity);
+          const response = await cartService.addItem(product.id, quantity, variantId);
           const { items, totals } = CartDTO.fromResponse(response);
 
           if (pendingRequests === 1) {
@@ -170,16 +187,20 @@ export const useCartStore = create<CartState>()((set, get) => {
       });
     },
 
-    removeItem: async (productId) => {
+    removeItem: async (productId, variantId) => {
       // 1. Optimistic Update
       const previousItems = [...get().items];
       const previousTotals = get().totals ? { ...get().totals! } : null;
-      const removedItem = previousItems.find(item => item.productId === productId);
+      const removedItem = previousItems.find(item =>
+        item.productId === productId && (item.variantId || null) === (variantId || null)
+      );
 
       if (!removedItem) return;
 
       set((state) => {
-        const newItems = state.items.filter((item) => item.productId !== productId);
+        const newItems = state.items.filter((item) =>
+          !(item.productId === productId && (item.variantId || null) === (variantId || null))
+        );
         return {
           items: newItems,
           totals: calculateOptimisticTotals(newItems, state.totals)
@@ -189,7 +210,7 @@ export const useCartStore = create<CartState>()((set, get) => {
       // 2. Queue the Backend Sync
       return queueAction(async () => {
         try {
-          const response = await cartService.removeItem(productId);
+          const response = await cartService.removeItem(productId, variantId);
           const { items, totals } = CartDTO.fromResponse(response);
 
           if (pendingRequests === 1) {
@@ -211,18 +232,23 @@ export const useCartStore = create<CartState>()((set, get) => {
       });
     },
 
-    updateQuantity: async (productId, quantity) => {
+    updateQuantity: async (productId, quantity, variantId) => {
       // 1. Optimistic Update
       const previousItems = [...get().items];
       const previousTotals = get().totals ? { ...get().totals! } : null;
-      const itemToUpdate = previousItems.find(item => item.productId === productId);
+      const itemToUpdate = previousItems.find(item =>
+        item.productId === productId && (item.variantId || null) === (variantId || null)
+      );
 
       if (!itemToUpdate) return;
       const quantityDiff = quantity - itemToUpdate.quantity;
+      const itemKey = `${productId}:${variantId || 'no-variant'}`;
 
       set((state) => {
         const newItems = state.items.map((item) =>
-          item.productId === productId ? { ...item, quantity } : item
+          (item.productId === productId && (item.variantId || null) === (variantId || null))
+            ? { ...item, quantity }
+            : item
         );
         return {
           items: newItems,
@@ -231,20 +257,20 @@ export const useCartStore = create<CartState>()((set, get) => {
       });
 
       // 2. Debounce + Queue Action
-      if (updateTimeouts[productId]) {
-        clearTimeout(updateTimeouts[productId]);
+      if (updateTimeouts[itemKey]) {
+        clearTimeout(updateTimeouts[itemKey]);
       }
 
-      updateTimeouts[productId] = setTimeout(() => {
+      updateTimeouts[itemKey] = setTimeout(() => {
         queueAction(async () => {
           try {
-            const response = await cartService.updateItem(productId, quantity);
+            const response = await cartService.updateItem(productId, quantity, variantId);
             const { items, totals } = CartDTO.fromResponse(response);
 
             if (pendingRequests === 1) {
               set({ items, totals });
             }
-            delete updateTimeouts[productId];
+            delete updateTimeouts[itemKey];
           } catch (error: unknown) {
             await get().fetchCart();
             const isAuthenticated = useAuthStore.getState().isAuthenticated;
@@ -257,7 +283,7 @@ export const useCartStore = create<CartState>()((set, get) => {
             } else {
               toast.error("Failed to update quantity");
             }
-            delete updateTimeouts[productId];
+            delete updateTimeouts[itemKey];
           }
         });
       }, 300);

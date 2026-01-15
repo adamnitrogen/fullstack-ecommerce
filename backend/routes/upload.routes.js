@@ -69,6 +69,9 @@ router.post('/', upload.single('file'), async (req, res) => {
                 filePath = `carousel/${timestamp}-${cleanFileName}`;
                 break;
             case 'product':
+                bucketName = 'images';
+                filePath = `products/${timestamp}-${cleanFileName}`;
+                break;
             default:
                 bucketName = 'images';
                 filePath = `${userId}/${timestamp}-${cleanFileName}`;

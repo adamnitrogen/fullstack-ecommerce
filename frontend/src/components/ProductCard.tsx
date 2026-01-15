@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Star, Eye, Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ export const ProductCard = ({
   className = "",
 }: ProductCardProps) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { addItem, items, updateQuantity, removeItem } = useCartStore();
   const cartItem = items.find((item) => item.productId === product.id);
   const quantity = cartItem?.quantity || 0;
@@ -178,11 +179,17 @@ export const ProductCard = ({
                     <Plus className="h-3 w-3" />
                   </Button>
                 </div>
-                <Link to="/cart" className="w-full">
-                  <Button variant="secondary" className="w-full text-[10px] h-7">
-                    {t("cart.goToCart")}
-                  </Button>
-                </Link>
+                <Button
+                  variant="secondary"
+                  className="w-full text-[10px] h-7"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    navigate("/cart");
+                  }}
+                >
+                  {t("cart.goToCart")}
+                </Button>
               </>
             ) : (
               <Button

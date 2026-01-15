@@ -7,29 +7,35 @@ import { cn } from "@/lib/utils";
 
 interface CartItemProps {
     item: CartItemType;
-    updateQuantity: (productId: string, quantity: number) => Promise<void>;
-    removeItem: (productId: string) => Promise<void>;
+    updateQuantity: (productId: string, quantity: number, variantId?: string) => Promise<void>;
+    removeItem: (productId: string, variantId?: string) => Promise<void>;
     isLoading?: boolean;
     isFreeDelivery?: boolean;
 }
 
 export const CartItem = ({ item, updateQuantity, removeItem, isLoading, isFreeDelivery }: CartItemProps) => {
-    const { product, quantity } = item;
-    const itemMRP = product.mrp || product.price;
-    const isDiscounted = itemMRP > product.price;
+    const { product, quantity, variant, sizeLabel, variantId } = item;
+
+    // Use variant pricing if available, otherwise fall back to product pricing
+    const itemPrice = variant?.selling_price ?? product.price;
+    const itemMRP = variant?.mrp ?? product.mrp ?? product.price;
+    const itemStock = variant?.stock_quantity ?? product.inventory ?? 0;
+    const displayImage = variant?.variant_image_url || product.images[0];
+
+    const isDiscounted = itemMRP > itemPrice;
     const discountPercentage = isDiscounted
-        ? Math.round(((itemMRP - product.price) / itemMRP) * 100)
+        ? Math.round(((itemMRP - itemPrice) / itemMRP) * 100)
         : 0;
 
-    const isLowStock = product.inventory !== undefined && product.inventory > 0 && product.inventory <= 5;
-    const isOutOfStock = product.inventory !== undefined && product.inventory === 0;
+    const isLowStock = itemStock > 0 && itemStock <= 5;
+    const isOutOfStock = itemStock === 0;
 
     return (
         <div className="group relative flex flex-col sm:flex-row gap-4 sm:gap-6 p-5 sm:p-6 bg-card/60 backdrop-blur-sm hover:bg-card/80 border border-border/50 rounded-2xl transition-all duration-300 shadow-sm hover:shadow-md animate-in fade-in slide-in-from-bottom-2">
             {/* Product Image */}
             <Link to={`/product/${item.productId}`} className="shrink-0 relative overflow-hidden rounded-xl aspect-square w-28 sm:w-36 bg-muted shadow-inner border border-border/30">
                 <img
-                    src={product.images[0]}
+                    src={displayImage}
                     alt={product.title}
                     className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
                     loading="lazy"
@@ -51,6 +57,11 @@ export const CartItem = ({ item, updateQuantity, removeItem, isLoading, isFreeDe
                             <span className="text-[10px] uppercase tracking-wider font-bold text-primary/70 bg-primary/5 px-2 py-0.5 rounded-full border border-primary/10">
                                 {product.category}
                             </span>
+                            {(sizeLabel || variant?.size_label) && (
+                                <span className="text-[10px] uppercase tracking-wider font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
+                                    {sizeLabel || variant?.size_label}
+                                </span>
+                            )}
                         </div>
                         <Link
                             to={`/product/${item.productId}`}
@@ -138,7 +149,7 @@ export const CartItem = ({ item, updateQuantity, removeItem, isLoading, isFreeDe
                         </div>
 
                         <div className="flex items-baseline gap-2.5">
-                            <span className="text-2xl font-black text-primary tracking-tight">₹{product.price}</span>
+                            <span className="text-2xl font-black text-primary tracking-tight">₹{itemPrice}</span>
                             {isDiscounted && (
                                 <span className="text-sm text-muted-foreground line-through decoration-muted-foreground/60 font-medium">
                                     ₹{itemMRP}
@@ -158,8 +169,8 @@ export const CartItem = ({ item, updateQuantity, removeItem, isLoading, isFreeDe
                                     quantity === 1 ? "hover:bg-destructive/10 hover:text-destructive" : "hover:bg-muted"
                                 )}
                                 onClick={() => {
-                                    if (quantity > 1) updateQuantity(item.productId, quantity - 1);
-                                    else removeItem(item.productId);
+                                    if (quantity > 1) updateQuantity(item.productId, quantity - 1, variantId);
+                                    else removeItem(item.productId, variantId);
                                 }}
                                 disabled={isLoading}
                             >
@@ -176,8 +187,8 @@ export const CartItem = ({ item, updateQuantity, removeItem, isLoading, isFreeDe
                                 variant="ghost"
                                 size="icon"
                                 className="h-9 w-9 rounded-none hover:bg-muted transition-colors"
-                                onClick={() => updateQuantity(item.productId, quantity + 1)}
-                                disabled={isLoading || (product.inventory !== undefined && quantity >= product.inventory)}
+                                onClick={() => updateQuantity(item.productId, quantity + 1, variantId)}
+                                disabled={isLoading || quantity >= itemStock}
                             >
                                 <Plus className="w-4 h-4" />
                             </Button>

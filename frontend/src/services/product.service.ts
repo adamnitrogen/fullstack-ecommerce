@@ -25,4 +25,14 @@ export const productService = {
     delete: async (id: string): Promise<void> => {
         await apiClient.delete(`/products/${id}`);
     },
+
+    createWithVariants: async (data: { product: any; variants: any[] }): Promise<Product> => {
+        const response = await apiClient.post('/admin/products-with-variants', data);
+        return response.data;
+    },
+
+    updateWithVariants: async (id: string, data: { product?: any; variants?: any[] }): Promise<Product> => {
+        const response = await apiClient.put(`/admin/products-with-variants/${id}`, data);
+        return response.data;
+    },
 };

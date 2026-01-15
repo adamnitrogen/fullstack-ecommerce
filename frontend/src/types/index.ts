@@ -62,6 +62,7 @@ export interface Product {
   discount?: number;
   images: string[];
   category: string;
+  variant_mode?: 'UNIT' | 'SIZE'; // Added variant_mode
   tags?: string[];
   createdAt: string;
   rating?: number;
@@ -72,6 +73,40 @@ export interface Product {
   benefits?: string[];
   isReturnable?: boolean;
   returnDays?: number;
+  variants?: ProductVariant[];
+  defaultVariant?: ProductVariant;
+}
+
+export type VariantUnit = 'kg' | 'gm' | 'ltr' | 'ml' | 'pcs';
+
+export interface ProductVariant {
+  id: string;
+  product_id: string;
+  size_label: string;
+  size_value: number;
+  unit: VariantUnit;
+  description?: string; // Added description
+  mrp: number;
+  selling_price: number;
+  stock_quantity: number;
+  variant_image_url?: string;
+  is_default: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface VariantFormData {
+  id?: string;
+  size_label: string;
+  size_value: number;
+  unit: VariantUnit;
+  description?: string; // Added description
+  mrp: number;
+  selling_price: number;
+  stock_quantity: number;
+  variant_image_url?: string;
+  imageFile?: File | string;
+  is_default: boolean;
 }
 
 export interface Event {
@@ -114,8 +149,11 @@ export interface Blog {
 
 export interface CartItem {
   productId: string;
+  variantId?: string;
   quantity: number;
   product: Product;
+  variant?: ProductVariant;
+  sizeLabel?: string;
 }
 
 export type OrderStatus =
@@ -415,9 +453,11 @@ export interface CartResponse {
     cart_items: Array<{
       id: string;
       product_id: string;
+      variant_id?: string;
       quantity: number;
       added_at: string;
       products: Product;
+      product_variants?: ProductVariant;
     }>;
   };
   totals: CartTotals;
@@ -496,9 +536,11 @@ export interface CheckoutSummary {
     cart_items: Array<{
       id: string;
       product_id: string;
+      variant_id?: string;
       quantity: number;
       added_at: string;
       products: Product;
+      product_variants?: ProductVariant;
     }>;
   };
   totals: CartTotals;

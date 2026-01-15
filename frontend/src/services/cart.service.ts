@@ -8,21 +8,23 @@ export const cartService = {
         return response.data;
     },
 
-    // Add item to cart
-    addItem: async (product_id: string, quantity: number = 1): Promise<CartResponse> => {
-        const response = await apiClient.post('/cart/items', { product_id, quantity });
+    // Add item to cart (with optional variant)
+    addItem: async (product_id: string, quantity: number = 1, variant_id?: string): Promise<CartResponse> => {
+        const response = await apiClient.post('/cart/items', { product_id, quantity, variant_id });
         return response.data;
     },
 
-    // Update cart item quantity
-    updateItem: async (product_id: string, quantity: number): Promise<CartResponse> => {
-        const response = await apiClient.put(`/cart/items/${product_id}`, { quantity });
+    // Update cart item quantity (with optional variant)
+    updateItem: async (product_id: string, quantity: number, variant_id?: string): Promise<CartResponse> => {
+        const params = variant_id ? `?variant_id=${variant_id}` : '';
+        const response = await apiClient.put(`/cart/items/${product_id}${params}`, { quantity });
         return response.data;
     },
 
-    // Remove item from cart
-    removeItem: async (product_id: string): Promise<CartResponse> => {
-        const response = await apiClient.delete(`/cart/items/${product_id}`);
+    // Remove item from cart (with optional variant)
+    removeItem: async (product_id: string, variant_id?: string): Promise<CartResponse> => {
+        const params = variant_id ? `?variant_id=${variant_id}` : '';
+        const response = await apiClient.delete(`/cart/items/${product_id}${params}`);
         return response.data;
     },
 

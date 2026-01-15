@@ -42,7 +42,7 @@ app.use(cors({
     },
     credentials: true, // Allow cookies
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id', 'X-Correlation-ID', 'X-Idempotency-Key', 'x-rtb-fingerprint-id'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id', 'x-guest-id', 'X-Correlation-ID', 'X-Idempotency-Key', 'x-rtb-fingerprint-id'],
     exposedHeaders: ['x-rtb-fingerprint-id']
 }));
 app.use(cookieParser()); // Parse cookies
@@ -194,6 +194,7 @@ app.use('/api/settings', require('./routes/settings.routes'));
 app.use('/api/policies', require('./routes/policy.routes'));
 app.use('/api/account/delete', require('./routes/account-deletion.routes'));
 app.use('/api/admin/jobs', require('./routes/jobs.routes'));
+app.use('/api', require('./routes/product-variant.routes')); // Product variants (admin + public)
 
 // Global Error Handler (Must be last)
 app.use(require('./middleware/error.middleware'));

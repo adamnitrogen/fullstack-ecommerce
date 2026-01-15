@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -15,10 +15,11 @@ import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/ui/Tag";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Product } from "@/types";
+import { Product, ProductVariant } from "@/types";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
 import { toast } from "sonner";
+import { VariantSelector } from "@/components/VariantSelector";
 
 interface ProductDetailViewProps {
   product: Product;
@@ -35,14 +36,89 @@ export const ProductDetailView = ({
   const { user } = useAuthStore();
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
-  // Check if product is in cart
-  const cartItem = items.find((item) => item.productId === product.id);
+  // Variant state - default to the is_default variant or first variant
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(
+    () => {
+      if (product.variants && product.variants.length > 0) {
+        return product.defaultVariant || product.variants[0];
+      }
+      return null;
+    }
+  );
+
+  // Computed values based on selected variant
+  const displayPrice = useMemo(() => {
+    if (selectedVariant) return selectedVariant.selling_price;
+    return product.price;
+  }, [selectedVariant, product.price]);
+
+  const displayMrp = useMemo(() => {
+    if (selectedVariant) return selectedVariant.mrp;
+    return product.mrp;
+  }, [selectedVariant, product.mrp]);
+
+  const displayStock = useMemo(() => {
+    if (selectedVariant) return selectedVariant.stock_quantity;
+    return product.inventory || 0;
+  }, [selectedVariant, product.inventory]);
+
+  // State for the currently displayed image
+  const [displayImage, setDisplayImage] = useState<string>(
+    product.images && product.images.length > 0 ? product.images[0] : ""
+  );
+
+  // Update display image when variant changes (if variant has specific image)
+  // Update display image when variant changes (if variant has specific image)
+  useEffect(() => {
+    if (selectedVariant?.variant_image_url) {
+      setDisplayImage(selectedVariant.variant_image_url);
+    } else {
+      // Revert to main product image if variant has no specific image
+      // Use the current index or default to 0
+      setDisplayImage(product.images[selectedImageIndex] || product.images[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedVariant, product.images]);
+
+
+  // Combine all images (product images + variant images)
+  const allImages = useMemo(() => {
+    const images = [...(product.images || [])];
+    if (product.variants) {
+      product.variants.forEach((variant) => {
+        if (variant.variant_image_url && !images.includes(variant.variant_image_url)) {
+          images.push(variant.variant_image_url);
+        }
+      });
+    }
+    return images;
+  }, [product.images, product.variants]);
+
+  // Update display image when thumbnail is clicked
+  const handleImageClick = (image: string, index: number) => {
+    setSelectedImageIndex(index);
+    setDisplayImage(image);
+  };
+
+  // Check if product is in cart (with variant match)
+  const cartItem = items.find((item) => {
+    if (selectedVariant) {
+      return item.productId === product.id && item.variantId === selectedVariant.id;
+    }
+    return item.productId === product.id && !item.variantId;
+  });
   const quantity = cartItem?.quantity || 0;
+
+  const handleVariantSelect = (variant: ProductVariant) => {
+    setSelectedVariant(variant);
+    // The useEffect above will handle the image update
+  };
 
   const handleAddToCart = async () => {
     try {
-      await addItem(product);
-      toast.success(`${product.title} added to cart`, {
+      await addItem(product, 1, selectedVariant?.id);
+      const sizeLabel = selectedVariant ? ` (${selectedVariant.size_label})` : "";
+      toast.success(`${product.title}${sizeLabel} added to cart`, {
         icon: <ShoppingCart size={16} className="text-primary" />,
       });
     } catch (error) {
@@ -59,7 +135,7 @@ export const ProductDetailView = ({
     }
     if (!cartItem) {
       try {
-        await addItem(product);
+        await addItem(product, 1, selectedVariant?.id);
       } catch (error) {
         // Error toast shown by store
         return;
@@ -71,9 +147,9 @@ export const ProductDetailView = ({
   const handleIncreaseQuantity = async () => {
     try {
       if (cartItem) {
-        await updateQuantity(product.id, quantity + 1);
+        await updateQuantity(product.id, quantity + 1, selectedVariant?.id);
       } else {
-        await addItem(product);
+        await addItem(product, 1, selectedVariant?.id);
       }
     } catch (error) {
       // Handled by store
@@ -84,9 +160,9 @@ export const ProductDetailView = ({
     if (cartItem) {
       try {
         if (quantity > 1) {
-          await updateQuantity(product.id, quantity - 1);
+          await updateQuantity(product.id, quantity - 1, selectedVariant?.id);
         } else {
-          await removeItem(product.id);
+          await removeItem(product.id, selectedVariant?.id);
           toast.success(`${product.title} removed from cart`);
         }
       } catch (error) {
@@ -96,11 +172,12 @@ export const ProductDetailView = ({
   };
 
   const calculateDiscount = (mrp: number, price: number) => {
+    if (!mrp || mrp <= price) return 0;
     return Math.round(((mrp - price) / mrp) * 100);
   };
 
   const getStockStatus = () => {
-    const inventory = product.inventory || 0;
+    const inventory = displayStock;
     if (inventory === 0) return { text: t("products.outOfStock"), color: "text-red-600" };
     if (inventory < 5) return { text: "Only few left", color: "text-orange-600" };
     if (inventory < 20) return { text: "Low stock", color: "text-orange-500" };
@@ -109,6 +186,8 @@ export const ProductDetailView = ({
 
   const stockStatus = getStockStatus();
   const hasRating = (product.ratingCount || 0) > 0;
+  const hasVariants = product.variants && product.variants.length > 0;
+  const discount = calculateDiscount(displayMrp || 0, displayPrice);
 
   return (
     <div className={`${className} animate-in fade-in slide-in-from-bottom-4 duration-700`}>
@@ -118,9 +197,9 @@ export const ProductDetailView = ({
           {/* Main Product Image */}
           <Card className="relative overflow-hidden rounded-[2rem] border-none shadow-xl bg-white aspect-square max-w-xl mx-auto lg:mx-0">
             <img
-              src={product.images[selectedImageIndex]}
+              src={displayImage}
               alt={product.title}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover transition-opacity duration-300"
             />
 
             {product.isNew && (
@@ -131,23 +210,23 @@ export const ProductDetailView = ({
               </div>
             )}
 
-            {product.mrp && product.mrp > product.price && (
+            {discount > 0 && (
               <div className="absolute top-6 right-6">
                 <Tag variant="discount" size="sm" className="bg-[#D4AF37] text-white border-none px-4 py-1.5 shadow-lg font-black text-[9px]">
-                  {calculateDiscount(product.mrp, product.price)}% OFF
+                  {discount}% OFF
                 </Tag>
               </div>
             )}
           </Card>
 
           {/* Image Thumbnails */}
-          {product.images.length > 1 && (
+          {allImages.length > 1 && (
             <div className="flex gap-3 px-1 overflow-x-auto pb-2 no-scrollbar justify-center lg:justify-start">
-              {product.images.map((image, index) => (
+              {allImages.map((image, index) => (
                 <button
                   key={index}
-                  onClick={() => setSelectedImageIndex(index)}
-                  className={`relative flex-shrink-0 w-16 h-16 rounded-2xl overflow-hidden transition-all duration-300 border-2 ${selectedImageIndex === index
+                  onClick={() => handleImageClick(image, index)}
+                  className={`relative flex-shrink-0 w-16 h-16 rounded-2xl overflow-hidden transition-all duration-300 border-2 ${displayImage === image
                     ? "border-[#B85C3C] shadow-md scale-105"
                     : "border-transparent opacity-60 hover:opacity-100"
                     }`}
@@ -198,12 +277,21 @@ export const ProductDetailView = ({
             )}
           </div>
 
+          {/* Variant Selector */}
+          {hasVariants && (
+            <VariantSelector
+              variants={product.variants!}
+              selectedVariantId={selectedVariant?.id || ""}
+              onSelect={handleVariantSelect}
+            />
+          )}
+
           {/* Price & Taxes */}
           <div className="space-y-1">
             <div className="flex items-center gap-4">
-              <span className="text-3xl font-black text-[#B85C3C]">₹{product.price}</span>
-              {product.mrp && product.mrp > product.price && (
-                <span className="text-lg text-muted-foreground line-through font-light opacity-50">₹{product.mrp}</span>
+              <span className="text-3xl font-black text-[#B85C3C] transition-all duration-200">₹{displayPrice}</span>
+              {displayMrp && displayMrp > displayPrice && (
+                <span className="text-lg text-muted-foreground line-through font-light opacity-50">₹{displayMrp}</span>
               )}
             </div>
             <p className="text-[10px] text-muted-foreground font-medium tracking-wide">Inclusive of all taxes</p>

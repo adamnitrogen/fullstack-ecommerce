@@ -2,6 +2,7 @@ const { supabaseAdmin } = require('../lib/supabase');
 const logger = require('../utils/logger');
 const { cleanupOrphanedUser } = require('../utils/cleanup');
 const { sendOTP, verifyOTP } = require('./otp.service');
+const CartService = require('./cart.service');
 const crypto = require('crypto');
 
 // Encryption Keys (should be in env, but generating for now or using secret)
@@ -80,7 +81,7 @@ class AuthService {
     /**
      * Sync Session (Exchange Token for Cookies)
      */
-    static async syncSession(accessToken) {
+    static async syncSession(accessToken, guestId) {
         try {
             const { data: { user }, error } = await supabaseAdmin.auth.getUser(accessToken);
 
@@ -229,6 +230,12 @@ class AuthService {
                 }
             }
 
+            // Merge Guest Cart if present
+            if (guestId) {
+                CartService.mergeGuestCart(user.id, guestId)
+                    .catch(err => logger.error({ err }, 'Background cart merge failed during sync'));
+            }
+
             logger.info({ userId: user.id }, '[AuthService] syncSession nearly complete, fetching final profile');
             // Return full user profile for consistency
             return await this.getUserProfile(user.id);
@@ -299,7 +306,7 @@ class AuthService {
     /**
      * Validate Credentials & Send OTP (Step 1 of Login)
      */
-    static async validateCredentials(email, password) {
+    static async validateCredentials(email, password, guestId) {
         // Create a temporary client to validate credentials without tainting the global instance
         const { createClient } = require('@supabase/supabase-js');
         const tempClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
@@ -353,7 +360,8 @@ class AuthService {
         const encryptedTokens = encryptTokens(tokens);
 
         // Send OTP with encrypted tokens as metadata
-        return await sendOTP(email, { tokens: encryptedTokens });
+        // Pass guestId in metadata so it can be retrieved during verification
+        return await sendOTP(email, { tokens: encryptedTokens, guestId });
     }
 
     /**
@@ -394,6 +402,13 @@ class AuthService {
 
         if (profileError || !profile) {
             throw new Error('User profile not found');
+        }
+
+        // 5. Merge Guest Cart if guestId provided
+        if (otpResult.metadata?.guestId) {
+            // Fire and forget merge
+            CartService.mergeGuestCart(profile.id, otpResult.metadata.guestId)
+                .catch(err => logger.error({ err }, 'Background cart merge failed'));
         }
 
         return {

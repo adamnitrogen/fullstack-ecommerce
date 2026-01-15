@@ -13,63 +13,137 @@ const settingsService = require('./settings.service');
  * @param {string} userId - User ID
  * @returns {Promise<object>} - Cart object with items
  */
-async function getUserCart(userId) {
-    try {
-        // Atomic "Get or Create" using upsert (user_id is UNIQUE)
-        const { data: cart, error } = await supabase
-            .from('carts')
-            .upsert([{ user_id: userId }], { onConflict: 'user_id' })
-            .select(`
-                *,
-                cart_items (
-                    id,
-                    product_id,
-                    quantity,
-                    added_at,
-                    products (*)
-                )
-            `)
-            .single();
 
-        if (error) throw error;
+
+/**
+ * Cart Service
+ * Handles all shopping cart operations including adding/removing items, coupon application, and total calculations
+ */
+
+/**
+ * Get or create a cart for the user or guest
+ * @param {string|null} userId - User ID (optional if guestId provided)
+ * @param {string|null} guestId - Guest ID (optional if userId provided)
+ * @returns {Promise<object>} - Cart object with items
+ */
+async function getUserCart(userId, guestId) {
+    try {
+        if (!userId && !guestId) throw new Error('UserId or GuestId required');
+
+        let query = supabase.from('carts').select(`
+            *,
+            cart_items (
+                id,
+                product_id,
+                variant_id,
+                quantity,
+                added_at,
+                products (*),
+                product_variants (*)
+            )
+        `);
+
+        if (userId) {
+            query = query.eq('user_id', userId);
+        } else {
+            query = query.eq('guest_id', guestId).is('user_id', null);
+        }
+
+        let { data: cart, error } = await query.single();
+
+        // If cart not found, create one
+        if (!cart && !error) {
+            // Logic to create cart
+            const newCartData = userId ? { user_id: userId } : { guest_id: guestId };
+            const { data: newCart, error: createError } = await supabase
+                .from('carts')
+                .insert(newCartData)
+                .select()
+                .single();
+
+            if (createError) {
+                // Handle concurrent creation (race condition)
+                if (createError.code === '23505') { // Unique violation
+                    // Retry fetch
+                    return getUserCart(userId, guestId);
+                }
+                throw createError;
+            }
+            cart = newCart;
+            cart.cart_items = [];
+        } else if (error && error.code !== 'PGRST116') { // PGRST116 is "Row not found" (single() returns this if no rows)
+            // Actually Supabase JS .single() returns error if no rows or multiple rows.
+            // If error is null, cart exists. If error, check code.
+            throw error;
+        } else if (error && error.code === 'PGRST116') {
+            // Not found, create
+            const newCartData = userId ? { user_id: userId } : { guest_id: guestId };
+            const { data: newCart, error: createError } = await supabase
+                .from('carts')
+                .insert(newCartData)
+                .select()
+                .single();
+
+            if (createError) {
+                if (createError.code === '23505') return getUserCart(userId, guestId);
+                throw createError;
+            }
+            cart = newCart;
+            cart.cart_items = [];
+        }
 
         // Ensure cart_items is an array
         if (!cart.cart_items) {
             cart.cart_items = [];
         }
 
-        // Sort items locally if needed (upsert result might not be sorted)
+        // Sort items locally
         cart.cart_items.sort((a, b) => new Date(a.added_at) - new Date(b.added_at));
 
         return cart;
     } catch (error) {
-        logger.error({ err: error }, 'Error getting user cart:');
+        logger.error({ err: error, userId, guestId }, 'Error getting cart:');
         throw error;
     }
 }
 
 /**
- * Add an item to the cart or update quantity if it already exists
- * @param {string} userId - User ID
- * @param {string} productId - Product ID
- * @param {number} quantity - Quantity to add
- * @returns {Promise<object>} - Updated cart
+ * Add an item to the cart
+ * @param {string|null} userId 
+ * @param {string|null} guestId
+ * @param {string} productId 
+ * @param {number} quantity 
+ * @param {string} [variantId]
  */
-async function addToCart(userId, productId, quantity = 1) {
+async function addToCart(userId, guestId, productId, quantity = 1, variantId = null) {
     try {
-        const { data: cart, error } = await supabase.rpc('add_to_cart_atomic', {
-            p_user_id: userId,
-            p_product_id: productId,
-            p_quantity: quantity
-        });
+        const cart = await getUserCart(userId, guestId);
+
+        // Check if item exists
+        // Need to match variant_id as well (null matches null)
+        const existingItem = cart.cart_items.find(item =>
+            item.product_id === productId &&
+            (item.variant_id === variantId || (!item.variant_id && !variantId))
+        );
+
+        if (existingItem) {
+            // Update quantity
+            return updateCartItem(userId, guestId, productId, existingItem.quantity + quantity, variantId);
+        }
+
+        // Insert new item
+        const { error } = await supabase
+            .from('cart_items')
+            .insert({
+                cart_id: cart.id,
+                product_id: productId,
+                quantity: quantity,
+                variant_id: variantId
+            });
 
         if (error) throw error;
 
-        // Ensure cart_items is an array and sorted (matching getUserCart behavior)
-        if (!cart.cart_items) cart.cart_items = [];
-        cart.cart_items.sort((a, b) => new Date(a.added_at) - new Date(b.added_at));
-
-        return cart;
+        return getUserCart(userId, guestId);
     } catch (error) {
         logger.error({ err: error }, 'Error adding to cart:');
         throw error;
@@ -78,26 +152,34 @@ async function addToCart(userId, productId, quantity = 1) {
 
 /**
  * Update cart item quantity
- * @param {string} userId - User ID
- * @param {string} productId - Product ID
- * @param {number} quantity - New quantity
- * @returns {Promise<object>} - Updated cart
  */
-async function updateCartItem(userId, productId, quantity) {
+async function updateCartItem(userId, guestId, productId, quantity, variantId = null) {
     try {
-        const { data: cart, error } = await supabase.rpc('update_cart_item_atomic', {
-            p_user_id: userId,
-            p_product_id: productId,
-            p_quantity: quantity
-        });
+        const cart = await getUserCart(userId, guestId);
+
+        if (quantity <= 0) {
+            return removeFromCart(userId, guestId, productId, variantId);
+        }
+
+        // Find match to get ID (safe update) or update by composite key if permitted
+        // We'll update by cart_id + product_id + variant_id
+        let query = supabase
+            .from('cart_items')
+            .update({ quantity })
+            .eq('cart_id', cart.id)
+            .eq('product_id', productId);
+
+        if (variantId) {
+            query = query.eq('variant_id', variantId);
+        } else {
+            query = query.is('variant_id', null);
+        }
+
+        const { error } = await query;
 
         if (error) throw error;
 
-        // Ensure cart_items is an array and sorted
-        if (!cart.cart_items) cart.cart_items = [];
-        cart.cart_items.sort((a, b) => new Date(a.added_at) - new Date(b.added_at));
-
-        return cart;
+        return getUserCart(userId, guestId);
     } catch (error) {
         logger.error({ err: error }, 'Error updating cart item:');
         throw error;
@@ -106,23 +188,27 @@ async function updateCartItem(userId, productId, quantity) {
 
 /**
  * Remove an item from the cart
- * @param {string} userId - User ID
- * @param {string} productId - Product ID to remove
- * @returns {Promise<object>} - Updated cart
  */
-async function removeFromCart(userId, productId) {
+async function removeFromCart(userId, guestId, productId, variantId = null) {
     try {
-        const cart = await getUserCart(userId);
+        const cart = await getUserCart(userId, guestId);
 
-        const { error } = await supabase
+        let query = supabase
             .from('cart_items')
             .delete()
             .eq('cart_id', cart.id)
             .eq('product_id', productId);
 
+        if (variantId) {
+            query = query.eq('variant_id', variantId);
+        } else {
+            query = query.is('variant_id', null);
+        }
+
+        const { error } = await query;
         if (error) throw error;
 
-        return await getUserCart(userId);
+        return getUserCart(userId, guestId);
     } catch (error) {
         logger.error({ err: error }, 'Error removing from cart:');
         throw error;
@@ -131,24 +217,24 @@ async function removeFromCart(userId, productId) {
 
 /**
  * Apply a coupon to the cart
- * @param {string} userId - User ID
- * @param {string} couponCode - Coupon code
- * @returns {Promise<object>} - Validation result and updated cart
  */
-async function applyCouponToCart(userId, couponCode) {
+async function applyCouponToCart(userId, guestId, couponCode) {
     try {
-        const cart = await getUserCart(userId);
+        const cart = await getUserCart(userId, guestId);
 
         // Prepare cart items for validation
         const cartItems = cart.cart_items.map(item => ({
             product_id: item.product_id,
             quantity: item.quantity,
-            product: item.products
+            variant_id: item.variant_id,
+            product: item.products,
+            variant: item.product_variants
         }));
 
-        // Calculate cart total
+        // Calculate cart total (considering variants)
         const cartTotal = cartItems.reduce((sum, item) => {
-            return sum + (item.product.price * item.quantity);
+            const price = item.variant ? item.variant.selling_price : item.product.price;
+            return sum + (price * item.quantity);
         }, 0);
 
         // Validate coupon
@@ -166,7 +252,7 @@ async function applyCouponToCart(userId, couponCode) {
 
         if (error) throw error;
 
-        const updatedCart = await getUserCart(userId);
+        const updatedCart = await getUserCart(userId, guestId);
 
         return {
             success: true,
@@ -182,12 +268,10 @@ async function applyCouponToCart(userId, couponCode) {
 
 /**
  * Remove coupon from cart
- * @param {string} userId - User ID
- * @returns {Promise<object>} - Updated cart
  */
-async function removeCouponFromCart(userId) {
+async function removeCouponFromCart(userId, guestId) {
     try {
-        const cart = await getUserCart(userId);
+        const cart = await getUserCart(userId, guestId);
 
         const { error } = await supabase
             .from('carts')
@@ -196,7 +280,7 @@ async function removeCouponFromCart(userId) {
 
         if (error) throw error;
 
-        return await getUserCart(userId);
+        return await getUserCart(userId, guestId);
     } catch (error) {
         logger.error({ err: error }, 'Error removing coupon from cart:');
         throw error;
@@ -205,19 +289,17 @@ async function removeCouponFromCart(userId) {
 
 /**
  * Calculate all cart totals including discounts and delivery
- * @param {string} userId - User ID
- * @param {object} [existingCart] - Optional pre-fetched cart to avoid redundant query
- * @returns {Promise<object>} - Cart totals breakdown
  */
-async function calculateCartTotals(userId, existingCart = null) {
+async function calculateCartTotals(userId, guestId, existingCart = null) {
     try {
-        // PERFORMANCE: Use existing cart if provided, avoiding redundant database fetch
-        const cart = existingCart || await getUserCart(userId);
+        const cart = existingCart || await getUserCart(userId, guestId);
 
         const cartItems = cart.cart_items.map(item => ({
             product_id: item.product_id,
             quantity: item.quantity,
-            product: item.products
+            variant_id: item.variant_id,
+            product: item.products,
+            variant: item.product_variants
         }));
 
         // Calculate MRP and price totals
@@ -225,9 +307,11 @@ async function calculateCartTotals(userId, existingCart = null) {
         let totalPrice = 0;
 
         cartItems.forEach(item => {
-            const mrp = item.product.mrp || item.product.price;
+            const price = item.variant ? item.variant.selling_price : item.product.price;
+            const mrp = item.variant ? item.variant.mrp : (item.product.mrp || item.product.price);
+
             totalMrp += mrp * item.quantity;
-            totalPrice += item.product.price * item.quantity;
+            totalPrice += price * item.quantity;
         });
 
         const discount = totalMrp - totalPrice;
@@ -269,15 +353,12 @@ async function calculateCartTotals(userId, existingCart = null) {
 }
 
 /**
- * Clear all items from the cart (typically after order is placed)
- * @param {string} userId - User ID
- * @returns {Promise<void>}
+ * Clear all items from the cart
  */
-async function clearCart(userId) {
+async function clearCart(userId, guestId) {
     try {
-        const cart = await getUserCart(userId);
+        const cart = await getUserCart(userId, guestId);
 
-        // Delete all cart items
         const { error: deleteError } = await supabase
             .from('cart_items')
             .delete()
@@ -285,7 +366,6 @@ async function clearCart(userId) {
 
         if (deleteError) throw deleteError;
 
-        // Remove applied coupon
         const { error: updateError } = await supabase
             .from('carts')
             .update({ applied_coupon_code: null })
@@ -298,6 +378,59 @@ async function clearCart(userId) {
     }
 }
 
+/**
+ * Merge guest cart into user cart
+ * @param {string} userId
+ * @param {string} guestId
+ */
+async function mergeGuestCart(userId, guestId) {
+    if (!userId || !guestId) return;
+
+    try {
+        // 1. Get Guest Cart
+        const guestCart = await getUserCart(null, guestId);
+        if (!guestCart || guestCart.cart_items.length === 0) return;
+
+        // 2. Get (or create) User Cart
+        const userCart = await getUserCart(userId, null);
+
+        // 3. Merge Items
+        for (const item of guestCart.cart_items) {
+            // Check for existing item in user cart
+            const existingItem = userCart.cart_items.find(ui =>
+                ui.product_id === item.product_id &&
+                (ui.variant_id === item.variant_id || (!ui.variant_id && !item.variant_id))
+            );
+
+            if (existingItem) {
+                // Update quantity (add guest quantity to user quantity)
+                await updateCartItem(userId, null, item.product_id, existingItem.quantity + item.quantity, item.variant_id);
+            } else {
+                // Add new item
+                await addToCart(userId, null, item.product_id, item.quantity, item.variant_id);
+            }
+        }
+
+        // 4. Merge Coupon (if user has none but guest does)
+        if (guestCart.applied_coupon_code && !userCart.applied_coupon_code) {
+            await supabase
+                .from('carts')
+                .update({ applied_coupon_code: guestCart.applied_coupon_code })
+                .eq('id', userCart.id);
+        }
+
+        // 5. Delete Guest Cart Items & Cart
+        await clearCart(null, guestId);
+        await supabase.from('carts').delete().eq('id', guestCart.id);
+
+        logger.info({ userId, guestId }, 'Guest cart merged successfully');
+        return getUserCart(userId, null);
+    } catch (error) {
+        logger.error({ err: error, userId, guestId }, 'Error merging guest cart:');
+        // Don't throw, just log. Merging failure shouldn't block login.
+    }
+}
+
 module.exports = {
     getUserCart,
     addToCart,
@@ -306,5 +439,6 @@ module.exports = {
     applyCouponToCart,
     removeCouponFromCart,
     calculateCartTotals,
-    clearCart
+    clearCart,
+    mergeGuestCart
 };

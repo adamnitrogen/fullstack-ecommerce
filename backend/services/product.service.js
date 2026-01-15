@@ -131,7 +131,7 @@ class ProductService {
     }
 
     /**
-     * Get single product by ID
+     * Get single product by ID with variants
      */
     static async getProductById(id) {
         const { data, error } = await supabase
@@ -141,6 +141,23 @@ class ProductService {
             .single();
 
         if (error) throw error;
+
+        // Fetch variants for this product
+        const { data: variants, error: variantError } = await supabase
+            .from('product_variants')
+            .select('*')
+            .eq('product_id', id)
+            .order('size_value', { ascending: true });
+
+        if (!variantError && variants) {
+            data.variants = variants;
+            // Find default variant
+            const defaultVariant = variants.find(v => v.is_default) || variants[0];
+            data.defaultVariant = defaultVariant || null;
+        } else {
+            data.variants = [];
+            data.defaultVariant = null;
+        }
 
         // Fetch reviews
         const { data: reviews, error: reviewError } = await supabase
@@ -171,6 +188,7 @@ class ProductService {
 
     /**
      * Create product
+     * @param {Object} productData - Product data including variant_mode
      */
     static async createProduct(productData) {
         const { data, error } = await supabase
@@ -211,7 +229,15 @@ class ProductService {
 
         if (fetchError) throw fetchError;
 
-        // 2. Delete product from database
+        // 2. Get variants to find variant image URLs
+        const { data: variants, error: variantError } = await supabase
+            .from('product_variants')
+            .select('variant_image_url')
+            .eq('product_id', id);
+
+        if (variantError) logger.error('Error fetching variants for deletion:', variantError);
+
+        // 3. Delete product from database (cascade will remove variants data)
         const { error } = await supabase
             .from('products')
             .delete()
@@ -219,10 +245,29 @@ class ProductService {
 
         if (error) throw error;
 
-        // 3. Clean up product images
+        // 4. Collect all images to delete
+        const imagesToDelete = [];
+
+        // Add product images
         if (product && product.images && product.images.length > 0) {
-            deletePhotosByUrls(product.images).catch(err =>
-                logger.error('Error cleaning up product images:', err)
+            imagesToDelete.push(...product.images);
+        }
+
+        // Add variant images
+        if (variants && variants.length > 0) {
+            variants.forEach(v => {
+                if (v.variant_image_url) {
+                    imagesToDelete.push(v.variant_image_url);
+                }
+            });
+        }
+
+        // 5. Clean up all images from storage
+        if (imagesToDelete.length > 0) {
+            // Remove duplicates just in case
+            const uniqueImages = [...new Set(imagesToDelete)];
+            deletePhotosByUrls(uniqueImages).catch(err =>
+                logger.error('Error cleaning up product/variant images:', err)
             );
         }
 

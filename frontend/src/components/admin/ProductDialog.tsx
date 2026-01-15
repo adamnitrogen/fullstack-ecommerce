@@ -22,17 +22,25 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ImageUpload } from "./ImageUpload";
-import type { Product } from "@/types";
+import { VariantFormSection } from "./VariantFormSection";
+import type { Product, VariantFormData } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { X, Plus } from "lucide-react";
+import { X, Plus, Package, Loader2 } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 
 interface ProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   product: Product | null;
-  onSave: (product: Partial<Product> & { imageFiles?: (File | string)[] }) => void;
+  onSave: (product: Omit<Partial<Product>, 'variants'> & { imageFiles?: (File | string)[], variants?: VariantFormData[] }) => void;
+  isSaving?: boolean;
 }
 
 const AVAILABLE_TAGS = [
@@ -49,6 +57,7 @@ export function ProductDialog({
   onOpenChange,
   product,
   onSave,
+  isSaving = false,
 }: ProductDialogProps) {
   // Fetch categories dynamically
   const { data: categories = [] } = useQuery({
@@ -73,30 +82,65 @@ export function ProductDialog({
     returnDays: 3,
     isNew: false,
     createdAt: new Date().toISOString(),
+    variant_mode: 'UNIT',
   });
+  const [variants, setVariants] = useState<VariantFormData[]>([]);
+  const [variantsOpen, setVariantsOpen] = useState(true);
   const [benefitInput, setBenefitInput] = useState("");
   const [customTag, setCustomTag] = useState("");
   const [originalImages, setOriginalImages] = useState<string[]>([]);
   const [removedImages, setRemovedImages] = useState<string[]>([]);
 
+  // Fetch detailed product data when editing
+  const { data: detailedProduct, isLoading: isLoadingProduct } = useQuery({
+    queryKey: ["product", product?.id],
+    queryFn: async () => {
+      if (!product?.id) return null;
+      const { productService } = await import("@/services/product.service");
+      return productService.getById(product.id);
+    },
+    enabled: !!product?.id && open,
+  });
+
   useEffect(() => {
     if (open) {
       if (product) {
+        // Use detailedProduct if available, otherwise fallback to product prop
+        const productData = detailedProduct || product;
+
         // Store original images to track deletions
-        const originalImageUrls = product.images || [];
+        const originalImageUrls = productData.images || [];
         setOriginalImages(originalImageUrls);
         setRemovedImages([]);
 
         setFormData({
-          ...product,
-          mrp: product.mrp || product.price,
-          isReturnable: product.isReturnable !== false,
-          returnDays: product.returnDays || 3,
+          ...productData,
+          mrp: productData.mrp || productData.price,
+          isReturnable: productData.isReturnable !== false,
+          returnDays: productData.returnDays || 3,
           imageFiles: originalImageUrls,
         });
+
+        // Initialize variants from product
+        if (productData.variants && productData.variants.length > 0) {
+          setVariants(productData.variants.map((v: any) => ({
+            id: v.id,
+            size_label: v.size_label,
+            size_value: v.size_value,
+            unit: v.unit,
+            mrp: v.mrp,
+            selling_price: v.selling_price,
+            stock_quantity: v.stock_quantity,
+            variant_image_url: v.variant_image_url,
+            is_default: v.is_default,
+          })));
+        } else {
+          setVariants([]);
+        }
       } else {
         setOriginalImages([]);
         setRemovedImages([]);
+        setVariants([]);
 
         setFormData({
           title: "",
@@ -118,7 +162,18 @@ export function ProductDialog({
       setBenefitInput("");
       setCustomTag("");
     }
-  }, [product, open]);
+  }, [product, detailedProduct, open, categories]);
+
+  // Inventory Calculation Effect
+  useEffect(() => {
+    if (variants && variants.length > 0) {
+      const totalStock = variants.reduce((sum, v) => sum + (v.stock_quantity || 0), 0);
+      // Only update if different to avoid infinite loops
+      if (formData.inventory !== totalStock) {
+        setFormData(prev => ({ ...prev, inventory: totalStock }));
+      }
+    }
+  }, [variants, formData.inventory]); // Added formData.inventory to correct deps, but carefully managed inside
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,6 +183,14 @@ export function ProductDialog({
     if (!formData.title?.trim() || !formData.description?.trim()) {
       alert("Please fill in all required fields");
       return;
+    }
+
+    // Validate Price/MRP only if NO variants are present
+    if (variants.length === 0) {
+      if (!formData.price || !formData.mrp) {
+        alert("Price and MRP are required when no variants are added.");
+        return;
+      }
     }
 
     // Check for either existing images or new image files
@@ -152,10 +215,11 @@ export function ProductDialog({
       }
     }
 
-    // Pass imageFiles to parent - image upload will be handled in ProductsManagement
+    // Pass imageFiles and variants to parent
     onSave({
       ...formData,
       imageFiles: formData.imageFiles,
+      variants,
     });
   };
 
@@ -214,6 +278,12 @@ export function ProductDialog({
               : "Fill in the details to create a new product. Click save when you're done."}
           </DialogDescription>
         </DialogHeader>
+
+        {/* Loading Overlay for Save Operations */}
+        <LoadingOverlay
+          isLoading={isSaving}
+          message={product ? "Updating product..." : "Creating product..."}
+        />
 
         <ScrollArea className="max-h-[calc(90vh-120px)] pr-4">
           <form onSubmit={handleSubmit} className="space-y-6 py-2">
@@ -304,11 +374,16 @@ export function ProductDialog({
             {/* Pricing */}
             <div className="space-y-4 border rounded-lg p-4">
               <h3 className="text-base font-semibold">Pricing</h3>
+              {variants.length > 0 && (
+                <p className="text-xs text-muted-foreground -mt-2">
+                  💡 Pricing is optional. If left blank, it will be auto-set to the lowest variant price.
+                </p>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="mrp">
-                    MRP Price (₹) <span className="text-destructive">*</span>
+                    MRP Price (₹) {variants.length === 0 && <span className="text-destructive">*</span>}
                   </Label>
                   <Input
                     id="mrp"
@@ -316,22 +391,22 @@ export function ProductDialog({
                     type="number"
                     min="0"
                     step="0.01"
-                    value={formData.mrp}
+                    value={formData.mrp || ''}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
                         mrp: parseFloat(e.target.value) || 0,
                       })
                     }
-                    placeholder="Original price"
-                    required
+                    placeholder={variants.length > 0 ? "Auto-calculated if empty" : "Original price"}
+                    required={variants.length === 0}
                   />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="price">
                     Selling Price (₹){" "}
-                    <span className="text-destructive">*</span>
+                    {variants.length === 0 && <span className="text-destructive">*</span>}
                   </Label>
                   <Input
                     id="price"
@@ -339,15 +414,15 @@ export function ProductDialog({
                     type="number"
                     min="0"
                     step="0.01"
-                    value={formData.price}
+                    value={formData.price || ''}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
                         price: parseFloat(e.target.value) || 0,
                       })
                     }
-                    placeholder="Discounted price"
-                    required
+                    placeholder={variants.length > 0 ? "Auto-calculated if empty" : "Discounted price"}
+                    required={variants.length === 0}
                   />
                 </div>
               </div>
@@ -360,6 +435,92 @@ export function ProductDialog({
                 </div>
               )}
             </div>
+
+            {/* Variant Mode Selection */}
+            <div className="space-y-4 border rounded-lg p-4 bg-muted/10">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-semibold">Variant Configuration</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Choose how variants are defined for this product
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2 bg-background p-1 rounded-lg border">
+                  <Button
+                    type="button"
+                    variant={formData.variant_mode === 'UNIT' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => {
+                      // Clear variants if mode changes to avoid schema mismatch
+                      if (formData.variant_mode !== 'UNIT' && variants.length > 0) {
+                        if (confirm("Changing variant mode will clear existing variants. Continue?")) {
+                          setVariants([]);
+                          setFormData({ ...formData, variant_mode: 'UNIT' });
+                        }
+                      } else {
+                        setFormData({ ...formData, variant_mode: 'UNIT' });
+                      }
+                    }}
+                  >
+                    Weight/Unit Based
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={formData.variant_mode === 'SIZE' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => {
+                      if (formData.variant_mode !== 'SIZE' && variants.length > 0) {
+                        if (confirm("Changing variant mode will clear existing variants. Continue?")) {
+                          setVariants([]);
+                          setFormData({ ...formData, variant_mode: 'SIZE' });
+                        }
+                      } else {
+                        setFormData({ ...formData, variant_mode: 'SIZE' });
+                      }
+                    }}
+                  >
+                    Size/Description Based
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Size Variants */}
+            <Collapsible open={variantsOpen} onOpenChange={setVariantsOpen}>
+              <div className="space-y-4 border rounded-lg p-4">
+                <CollapsibleTrigger asChild>
+                  <div className="flex items-center justify-between cursor-pointer hover:bg-muted/50 -m-4 p-4 rounded-lg transition-colors">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-5 w-5 text-muted-foreground" />
+                      <h3 className="text-base font-semibold">
+                        {formData.variant_mode === 'SIZE' ? 'Size Variants' : 'Unit Variants'}
+                      </h3>
+                      {variants.length > 0 && (
+                        <Badge variant="secondary" className="ml-2">
+                          {variants.length} variant{variants.length > 1 ? "s" : ""}
+                        </Badge>
+                      )}
+                      {variants.length > 0 && !variants.some(v => v.is_default) && (
+                        <Badge variant="destructive" className="ml-1 text-xs">
+                          No default
+                        </Badge>
+                      )}
+                    </div>
+                    <Button type="button" variant="ghost" size="sm">
+                      {variantsOpen ? "Collapse" : "Expand"}
+                    </Button>
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-4">
+                  <VariantFormSection
+                    variants={variants}
+                    onChange={setVariants}
+                    mode={formData.variant_mode || 'UNIT'}
+                  />
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
+
 
             {/* Inventory */}
             <div className="space-y-4 border rounded-lg p-4">
@@ -455,7 +616,7 @@ export function ProductDialog({
                 </div>
                 {formData.benefits && formData.benefits.length > 0 && (
                   <div className="space-y-2">
-                    {formData.benefits.map((benefit, index) => (
+                    {(formData.benefits || []).map((benefit, index) => (
                       <div
                         key={index}
                         className="flex items-center justify-between p-2 bg-muted rounded-md border"
@@ -474,7 +635,7 @@ export function ProductDialog({
                           onClick={() => {
                             setFormData({
                               ...formData,
-                              benefits: formData.benefits?.filter(
+                              benefits: (formData.benefits || []).filter(
                                 (_, i) => i !== index
                               ),
                             });
@@ -548,7 +709,7 @@ export function ProductDialog({
               {/* Selected Tags Display */}
               {formData.tags && formData.tags.length > 0 && (
                 <div className="flex flex-wrap gap-2">
-                  {formData.tags.map((tag) => (
+                  {(formData.tags || []).map((tag) => (
                     <Badge
                       key={tag}
                       variant="default"
@@ -639,10 +800,12 @@ export function ProductDialog({
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
+                disabled={isSaving}
               >
                 Cancel
               </Button>
-              <Button type="submit">
+              <Button type="submit" disabled={isSaving}>
+                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {product ? "Update Product" : "Create Product"}
               </Button>
             </DialogFooter>
