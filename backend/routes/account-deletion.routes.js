@@ -235,7 +235,7 @@ router.post('/admin/process-pending', authenticateToken, async (req, res) => {
         }
 
         // Process specific job
-        const { supabase } = require('../config/supabase');
+        const supabase = require('../config/supabase');
         const { data: job, error: fetchError } = await supabase
             .from('account_deletion_jobs')
             .select('*')

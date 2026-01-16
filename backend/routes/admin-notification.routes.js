@@ -1,22 +1,20 @@
 const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
-const {
-    getAdminNotifications,
-    getUnreadCount,
-    markAsRead,
-    markAllAsRead,
-    archiveNotification
-} = require('../services/admin-notification.service');
+const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
 
 /**
  * Admin Notification Routes
  * Handle order notifications for admin users
  */
 
+// Use standard auth middleware
+router.use(authenticateToken);
+router.use(requireRole('admin', 'manager'));
+
 // Helper to get user ID
 const getUserId = (req) => {
-    return req.user?.id || req.headers['x-user-id'];
+    return req.user?.id;
 };
 
 // Get admin notifications

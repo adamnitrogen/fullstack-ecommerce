@@ -24,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Order, CartItem, Product, Address } from "@/types";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { TaxBreakdown } from "@/components/orders/TaxBreakdown";
 
 interface OrderResponse {
     id: string;
@@ -35,21 +36,25 @@ interface OrderResponse {
     subtotal?: number;
     total_amount: number;
     delivery_charge?: number;
-    shipping_address?: Address & { full_name?: string; address_line1?: string; address_line2?: string; postal_code?: string; }; // handling specific fields used
+    shipping_address?: Address & { full_name?: string; address_line1?: string; address_line2?: string; postal_code?: string; };
     billing_address?: Address & { full_name?: string; address_line1?: string; address_line2?: string; postal_code?: string; };
     payment_status?: string;
     paymentStatus?: string;
     payment_method?: string;
     payment_id?: string;
+    // GST Tax fields
+    total_taxable_amount?: number;
+    total_cgst?: number;
+    total_sgst?: number;
+    total_igst?: number;
     items: Array<{
         id: string;
         quantity: number;
         price_per_unit?: number;
         remaining_quantity?: number;
         product?: Product;
-        title?: string; // fallback if product is flattened
+        title?: string;
         price?: number;
-        // Variant fields
         variant_id?: string;
         variant?: {
             id: string;
@@ -58,7 +63,7 @@ interface OrderResponse {
             unit: string;
             variant_image_url?: string;
         };
-        size_label?: string; // Direct size label if variant is flattened
+        size_label?: string;
     }>;
     order_status_history?: Array<{
         status: string;
@@ -639,6 +644,17 @@ export default function UserOrderDetail() {
                                 </div>
                             </CardContent>
                         </Card>
+
+                        {/* Tax Summary */}
+                        <TaxBreakdown
+                            totalTaxableAmount={order.total_taxable_amount}
+                            totalCgst={order.total_cgst}
+                            totalSgst={order.total_sgst}
+                            totalIgst={order.total_igst}
+                            totalAmount={order.total_amount}
+                            showInvoiceLink={order.status === 'delivered' || !!order.invoice_url}
+                            invoiceUrl={order.invoice_url}
+                        />
                     </div>
                 </div>
             </div>

@@ -58,6 +58,7 @@ export interface Product {
   title: string;
   description: string;
   price: number;
+  delivery_charge?: number;
   mrp?: number;
   discount?: number;
   images: string[];
@@ -75,6 +76,11 @@ export interface Product {
   returnDays?: number;
   variants?: ProductVariant[];
   defaultVariant?: ProductVariant;
+  // GST Default fields
+  default_hsn_code?: string;
+  default_gst_rate?: number;
+  default_tax_applicable?: boolean;
+  default_price_includes_tax?: boolean;
 }
 
 export type VariantUnit = 'kg' | 'gm' | 'ltr' | 'ml' | 'pcs';
@@ -93,6 +99,12 @@ export interface ProductVariant {
   is_default: boolean;
   created_at: string;
   updated_at?: string;
+  delivery_charge?: number | null;
+  // GST fields
+  hsn_code?: string;
+  gst_rate?: number;
+  tax_applicable?: boolean;
+  price_includes_tax?: boolean;
 }
 
 export interface VariantFormData {
@@ -107,6 +119,12 @@ export interface VariantFormData {
   variant_image_url?: string;
   imageFile?: File | string;
   is_default: boolean;
+  // GST fields
+  hsn_code?: string;
+  gst_rate?: number;
+  tax_applicable?: boolean;
+  price_includes_tax?: boolean;
+  delivery_charge?: number | null;
 }
 
 export interface Event {
@@ -154,6 +172,9 @@ export interface CartItem {
   product: Product;
   variant?: ProductVariant;
   sizeLabel?: string;
+  delivery_charge?: number;
+  coupon_discount?: number;
+  coupon_code?: string;
 }
 
 export type OrderStatus =
@@ -418,7 +439,7 @@ export interface AboutUsContent {
 export interface Coupon {
   id: string;
   code: string;
-  type: 'product' | 'category' | 'cart';
+  type: 'product' | 'category' | 'cart' | 'variant';
   discount_percentage: number;
   target_id?: string;
   min_purchase_amount?: number;
@@ -434,7 +455,7 @@ export interface Coupon {
 
 export interface CreateCouponDto {
   code: string;
-  type: 'product' | 'category' | 'cart';
+  type: 'product' | 'category' | 'cart' | 'variant';
   discount_percentage: number;
   target_id?: string;
   min_purchase_amount?: number;
@@ -472,6 +493,24 @@ export interface CartTotals {
   deliveryCharge: number;
   finalAmount: number;
   coupon?: Coupon | null;
+  productDeliveryCharges?: number;
+  globalDeliveryCharge?: number;
+  itemBreakdown?: Array<{
+    product_id: string;
+    variant_id?: string;
+    coupon_discount?: number;
+    coupon_code?: string;
+    delivery_charge?: number;
+  }>;
+  tax?: {
+    totalTaxableAmount: number;
+    cgst: number;
+    sgst: number;
+    igst: number;
+    totalTax: number;
+    taxType: 'INTRA_STATE' | 'INTER_STATE';
+    isInterState: boolean;
+  };
 }
 
 export interface DeliverySettings {

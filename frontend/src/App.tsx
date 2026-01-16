@@ -104,6 +104,31 @@ const App = () => {
 
     // Initialize location data (countries & states)
     useLocationStore.getState().initializeStore();
+
+    // Coupon Management: Fetch active coupons and cache in session storage
+    const fetchCoupons = async () => {
+      try {
+        const { couponService } = await import("@/services/coupon.service");
+        // Only fetch if not already cached to avoid redundant calls on page refresh
+        // But the requirement says "fetch the coupon for every session starts", which mount effectively is.
+        // We will fetch regardless to ensure fresh data on app load.
+        const coupons = await couponService.getActive();
+        sessionStorage.setItem('active_coupons', JSON.stringify(coupons));
+        // console.debug('[App] Coupons fetched and cached:', coupons.length); // keep logs clean
+      } catch (error) {
+        // Gracefully handle error - log it but don't crash app
+        // Using console.error/warn here might be too noisy if it's just a network blip
+        // But better to know than not.
+        console.warn("[App] Failed to fetch active coupons:", error);
+      }
+    };
+
+    fetchCoupons();
+
+    // Poll every 3 hours (3 * 60 * 60 * 1000 = 10800000 ms)
+    const couponInterval = setInterval(fetchCoupons, 3 * 60 * 60 * 1000);
+
+    return () => clearInterval(couponInterval);
   }, [initializeAuth]);
 
   return (
@@ -211,11 +236,11 @@ const App = () => {
                   />
                 </Route>
 
-                {/* Admin Routes */}
+                {/* Admin Routes - Strictly for Admin */}
                 <Route
                   path="/admin"
                   element={
-                    <ProtectedRoute allowedRoles={["admin", "manager"]}>
+                    <ProtectedRoute allowedRoles={["admin"]}>
                       <AdminLayout />
                     </ProtectedRoute>
                   }
@@ -248,6 +273,46 @@ const App = () => {
                   <Route path="jobs" element={<JobsManagement />} />
 
                   <Route path="settings" element={<SettingsManagement />} />
+                </Route>
+
+                {/* Manager Routes - For Managers (and Admins if they visit) */}
+                <Route
+                  path="/manager"
+                  element={
+                    <ProtectedRoute allowedRoles={["manager", "admin"]}>
+                      <AdminLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  {/* Reuse same components but accessed via /manager/... */}
+                  <Route index element={<AdminDashboard />} />
+                  <Route path="products" element={<ProductsManagement />} />
+                  <Route
+                    path="categories"
+                    element={<AllCategoriesManagement />}
+                  />
+                  <Route path="orders" element={<OrdersManagement />} />
+                  <Route path="orders/:id" element={<OrderDetail />} />
+                  <Route path="events" element={<EventsManagement />} />
+                  <Route path="blogs" element={<BlogsManagement />} />
+                  <Route path="gallery" element={<GalleryManagement />} />
+                  <Route path="carousel" element={<CarouselManagement />} />
+                  {/* Managers don't manage users/managers usually, but let RBAC handle inside components if needed */}
+                  {/* UsersManagement removed from Manager routes to prevent Admin Management access */}
+                  {/* ManagerManagement likely SHOULD BE HIDDEN for managers - will handle in Sidebar/Layout */}
+                  <Route path="reviews" element={<ReviewsManagement />} />
+                  <Route path="comments" element={<FlaggedCommentsManagement />} />
+                  <Route path="faqs" element={<FAQsManagement />} />
+                  <Route
+                    path="contact-management"
+                    element={<ContactManagement />}
+                  />
+                  <Route path="contact-messages" element={<ContactMessages />} />
+                  <Route path="contact-messages/:id" element={<ContactMessageDetail />} />
+                  <Route path="about-us" element={<AboutUsManagement />} />
+                  <Route path="policies" element={<PolicyManagement />} />
+
+                  {/* Managers likely don't access creating managers or system settings */}
                 </Route>
 
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

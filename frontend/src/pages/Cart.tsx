@@ -27,6 +27,7 @@ const Cart = () => {
     applyCoupon,
     removeCoupon,
     deliverySettings,
+    isCalculating,
   } = useCartStore();
   const { isAuthenticated } = useAuthStore();
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
@@ -139,22 +140,42 @@ const Cart = () => {
           {/* Cart Items List */}
           <div className="lg:col-span-2 space-y-6 sm:space-y-8">
             <div className="space-y-6">
-              {items.map((item) => (
-                <CartItem
-                  key={item.productId}
-                  item={item}
-                  updateQuantity={updateQuantity}
-                  removeItem={removeItem}
-                  isLoading={isLoading}
-                  isFreeDelivery={totals?.deliveryCharge === 0}
-                />
-              ))}
+              {items.map((item) => {
+                const itemDetail = totals?.itemBreakdown?.find((id: any) =>
+                  (id.variant_id && id.variant_id === item.variantId) ||
+                  (!id.variant_id && id.product_id === item.productId)
+                );
+
+                return (
+                  <CartItem
+                    key={`${item.productId}-${item.variantId || 'base'}`}
+                    item={{
+                      ...item,
+                      delivery_charge: itemDetail?.delivery_charge || 0,
+                      coupon_discount: itemDetail?.coupon_discount || 0,
+                      coupon_code: itemDetail?.coupon_code || ''
+                    }}
+                    updateQuantity={updateQuantity}
+                    removeItem={removeItem}
+                    isLoading={isLoading}
+                    isCalculating={isCalculating}
+                    isFreeDelivery={totals?.deliveryCharge === 0}
+                  />
+                );
+              })}
             </div>
 
             <div className="mt-12 pt-8 border-t border-dashed border-border/60 flex items-center justify-between">
-              <p className="text-sm text-muted-foreground italic">
-                * Prices are inclusive of all taxes
-              </p>
+              {items.some(item => (item.variant?.tax_applicable ?? item.product?.default_tax_applicable ?? false)) && (
+                <p className="text-sm text-muted-foreground italic">
+                  {items.some(item =>
+                    (item.variant?.tax_applicable ?? item.product?.default_tax_applicable ?? false) &&
+                    !(item.variant?.price_includes_tax ?? item.product?.default_price_includes_tax ?? false)
+                  )
+                    ? "* Additional taxes will be calculated at checkout"
+                    : "* Prices are inclusive of all taxes"}
+                </p>
+              )}
             </div>
           </div>
 
@@ -170,6 +191,7 @@ const Cart = () => {
               onCheckout={handlePlaceOrder}
               availableCoupons={availableCoupons}
               deliverySettings={deliverySettings}
+              isCalculating={isCalculating}
             />
           </div>
         </div>

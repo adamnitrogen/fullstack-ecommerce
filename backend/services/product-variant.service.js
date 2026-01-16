@@ -1,5 +1,6 @@
 const supabase = require('../config/supabase');
 const { createModuleLogger } = require('../utils/logging-standards');
+const RazorpaySyncService = require('./razorpay-sync.service');
 
 const log = createModuleLogger('ProductVariantService');
 
@@ -140,15 +141,21 @@ async function createVariant(productId, variantData) {
         .from('product_variants')
         .insert({
             product_id: productId,
-            size_label: variantData.size_label,
-            size_value: variantData.size_value,
-            unit: variantData.unit || 'kg',
-            description: variantData.description || null, // Added description
-            mrp: variantData.mrp,
-            selling_price: variantData.selling_price,
-            stock_quantity: variantData.stock_quantity || 0,
-            variant_image_url: variantData.variant_image_url || null,
-            is_default: variantData.is_default || false
+            size_label: variant_data.size_label,
+            size_value: variant_data.size_value,
+            unit: variant_data.unit || 'kg',
+            description: variant_data.description || null, // Added description
+            mrp: variant_data.mrp,
+            selling_price: variant_data.selling_price,
+            stock_quantity: variant_data.stock_quantity || 0,
+            variant_image_url: variant_data.variant_image_url || null,
+            is_default: variant_data.is_default || false,
+            delivery_charge: variant_data.delivery_charge !== undefined ? variant_data.delivery_charge : null,
+            // GST Fields
+            hsn_code: variant_data.hsn_code || null,
+            gst_rate: variant_data.gst_rate !== undefined ? variant_data.gst_rate : 0,
+            tax_applicable: variant_data.tax_applicable !== undefined ? variant_data.tax_applicable : true,
+            price_includes_tax: variant_data.price_includes_tax !== undefined ? variant_data.price_includes_tax : true
         })
         .select()
         .single();
@@ -163,6 +170,30 @@ async function createVariant(productId, variantData) {
         productId,
         sizeLabel: data.size_label
     }, Date.now() - startTime);
+
+    // --- RAZORPAY SYNC START ---
+    try {
+        const { data: product } = await supabase.from('products').select('title').eq('id', productId).single();
+        const productName = product?.title || 'Product';
+
+        await RazorpaySyncService.createItem({
+            name: `${productName} - ${data.size_label}`,
+            description: data.description || `Variant: ${data.size_label}`,
+            amount: data.selling_price * 100,
+            currency: 'INR',
+            hsn_code: data.hsn_code,
+            tax_rate: data.gst_rate,
+            tax_inclusive: data.price_includes_tax
+        }).then(async (item) => {
+            if (item?.id) {
+                await supabase.from('product_variants').update({ razorpay_item_id: item.id }).eq('id', data.id);
+                data.razorpay_item_id = item.id;
+            }
+        });
+    } catch (err) {
+        log.error('RAZORPAY_SYNC_FAIL', 'Failed to sync variant to Razorpay', { error: err.message });
+    }
+    // --- RAZORPAY SYNC END ---
 
     return data;
 }
@@ -193,6 +224,16 @@ async function updateVariant(variantId, updates) {
     }
 
     log.operationSuccess('UPDATE_VARIANT', { variantId, sizeLabel: data.size_label }, Date.now() - startTime);
+
+    // --- RAZORPAY SYNC UPDATE ---
+    if (data.razorpay_item_id) {
+        RazorpaySyncService.updateItem(data.razorpay_item_id, {
+            amount: data.selling_price * 100,
+            description: data.description
+        }).catch(err => log.error('RAZORPAY_UPDATE_FAIL', err));
+    }
+    // ---------------------------
+
     return data;
 }
 
@@ -223,6 +264,14 @@ async function deleteVariant(variantId) {
         productId: variant?.product_id,
         sizeLabel: variant?.size_label
     }, Date.now() - startTime);
+
+    // --- RAZORPAY SYNC DELETE ---
+    if (variant?.razorpay_item_id) {
+        RazorpaySyncService.deleteItem(variant.razorpay_item_id).catch(err =>
+            log.error('RAZORPAY_DELETE_FAIL', err, { itemId: variant.razorpay_item_id })
+        );
+    }
+    // ---------------------------
 }
 
 /**
@@ -309,10 +358,58 @@ async function createProductWithVariants(productData, variants) {
     }
 
     log.operationSuccess('CREATE_PRODUCT_WITH_VARIANTS', {
-        productId: data.id,
-        variantIds: data.variant_ids,
-        variantCount: data.variant_ids?.length || 0
+        productId: data?.id,
+        variantIds: data?.variant_ids,
+        variantCount: data?.variant_ids?.length || 0
     }, Date.now() - startTime);
+
+    // --- POST-TRANSACTION RAZORPAY SYNC ---
+    // User Requirement: Sync only AFTER successful creation
+    if (data.variant_ids && data.variant_ids.length > 0) {
+        // Run asynchronously to not block response
+        (async () => {
+            try {
+                // Fetch the created variants to get price/tax details
+                const { data: createdVariants } = await supabase
+                    .from('product_variants')
+                    .select('*')
+                    .in('id', data.variant_ids);
+
+                if (createdVariants) {
+                    for (const variant of createdVariants) {
+                        try {
+                            // Reuse logic via service call wrapper or direct sync
+                            // Using direct sync here to avoid redundant fetch in createVariant (though createVariant has it too, this path bypasses createVariant)
+
+                            // Re-fetch product title if needed, or use productData.title
+                            const itemName = `${productData.title} - ${variant.size_label}`;
+
+                            const rzpItem = await RazorpaySyncService.createItem({
+                                name: itemName,
+                                description: variant.description || `Variant: ${variant.size_label}`,
+                                amount: variant.selling_price * 100,
+                                currency: 'INR',
+                                hsn_code: variant.hsn_code,
+                                tax_rate: variant.gst_rate,
+                                tax_inclusive: variant.price_includes_tax
+                            });
+
+                            if (rzpItem?.id) {
+                                await supabase.from('product_variants')
+                                    .update({ razorpay_item_id: rzpItem.id })
+                                    .eq('id', variant.id);
+                            }
+                        } catch (itemSyncErr) {
+                            log.error('SYNC_VARIANT_FAIL', itemSyncErr, { variantId: variant.id });
+                        }
+                    }
+                }
+            } catch (err) {
+                log.error('POST_CREATE_SYNC_FAIL', err);
+            }
+        })();
+    }
+    // -------------------------------------
 
     return data;
 }
@@ -372,10 +469,70 @@ async function updateProductWithVariants(productId, productData, variants) {
     }
 
     log.operationSuccess('UPDATE_PRODUCT_WITH_VARIANTS', {
-        productId: data.id,
-        updatedVariants: data.updated_variants?.length || 0,
-        newVariants: data.new_variants?.length || 0
+        productId: data?.id,
+        updatedVariants: data?.updated_variants?.length || 0,
+        newVariants: data?.new_variants?.length || 0
     }, Date.now() - startTime);
+
+    // --- POST-TRANSACTION RAZORPAY SYNC ---
+    const allAffectedVariantIds = [
+        ...(data.updated_variants || []),
+        ...(data.new_variants || [])
+    ];
+
+    if (allAffectedVariantIds.length > 0) {
+        (async () => {
+            try {
+                const { data: variants } = await supabase
+                    .from('product_variants')
+                    .select('*')
+                    .in('id', allAffectedVariantIds);
+
+                if (variants) {
+                    // We need product title for creating new items name
+                    const { data: product } = await supabase.from('products').select('title').eq('id', productId).single();
+                    const productTitle = product?.title || 'Product';
+
+                    for (const variant of variants) {
+                        try {
+                            // If it already has an ID, update it. If not, create it.
+                            // BUT, even "updated" variants might be new to Razorpay if they were made before this feature.
+                            // Logic: If razorpay_item_id exists, UPDATE. Else CREATE.
+
+                            const itemName = `${productTitle} - ${variant.size_label}`;
+                            const itemPayload = {
+                                name: itemName,
+                                description: variant.description || `Variant: ${variant.size_label}`,
+                                amount: variant.selling_price * 100,
+                                currency: 'INR',
+                                hsn_code: variant.hsn_code,
+                                tax_rate: variant.gst_rate,
+                                tax_inclusive: variant.price_includes_tax
+                            };
+
+                            if (variant.razorpay_item_id) {
+                                // UPDATE
+                                await RazorpaySyncService.updateItem(variant.razorpay_item_id, itemPayload);
+                            } else {
+                                // CREATE
+                                const rzpItem = await RazorpaySyncService.createItem(itemPayload);
+                                if (rzpItem?.id) {
+                                    await supabase.from('product_variants')
+                                        .update({ razorpay_item_id: rzpItem.id })
+                                        .eq('id', variant.id);
+                                }
+                            }
+                        } catch (err) {
+                            log.error('SYNC_UPDATE_VARIANT_FAIL', err, { variantId: variant.id });
+                        }
+                    }
+                }
+            } catch (err) {
+                log.error('POST_UPDATE_SYNC_FAIL', err);
+            }
+        })();
+    }
+    // -------------------------------------
 
     return data;
 }

@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const { deletePhotosByUrls } = require('../services/photo.service');
+const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
 
 // Get all folders with their first image
 router.get('/', async (req, res) => {
@@ -67,8 +68,8 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// Create new folder
-router.post('/', async (req, res) => {
+// Create new folder - Admin/Manager only
+router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('gallery_folders')
@@ -87,8 +88,8 @@ router.post('/', async (req, res) => {
     }
 });
 
-// Update folder
-router.put('/:id', async (req, res) => {
+// Update folder - Admin/Manager only
+router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('gallery_folders')
@@ -105,8 +106,8 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-// Set folder as home carousel
-router.put('/:id/set-carousel', async (req, res) => {
+// Set folder as home carousel - Admin/Manager only
+router.put('/:id/set-carousel', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         // First, set all folders is_home_carousel to false
         const { error: resetError } = await supabase
@@ -132,8 +133,8 @@ router.put('/:id/set-carousel', async (req, res) => {
     }
 });
 
-// Delete folder (cascades to items and videos)
-router.delete('/:id', async (req, res) => {
+// Delete folder (cascades to items and videos) - Admin/Manager only
+router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         // 1. Fetch all items in this folder to get their image URLs
         const { data: items, error: itemsError } = await supabase

@@ -97,6 +97,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       // Complete local storage wipe
       localStorage.clear();
+      sessionStorage.removeItem('active_coupons'); // Explicitly clear coupons
       sessionStorage.clear();
 
       logger.debug('[AuthStore] Logout completed with full storage wipe (no automatic refresh)');

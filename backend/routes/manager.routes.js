@@ -4,9 +4,10 @@ const router = express.Router();
 const supabase = require('../config/supabase');
 const crypto = require('crypto');
 const emailService = require('../services/email');
+const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
 
-// Get all managers with their permissions
-router.get('/', async (req, res) => {
+// Get all managers with their permissions - Admin only
+router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         // First get the manager role ID
         const { data: managerRole } = await supabase
@@ -53,8 +54,8 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Create a new manager
-router.post('/', async (req, res) => {
+// Create a new manager - Admin only
+router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const { email, name, permissions, created_by } = req.body;
 
@@ -161,8 +162,8 @@ router.post('/', async (req, res) => {
     }
 });
 
-// Update manager permissions
-router.put('/:id/permissions', async (req, res) => {
+// Update manager permissions - Admin only
+router.put('/:id/permissions', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const { id } = req.params;
         const permissions = req.body;
@@ -188,8 +189,8 @@ router.put('/:id/permissions', async (req, res) => {
     }
 });
 
-// Toggle manager active status
-router.put('/:id/toggle-status', async (req, res) => {
+// Toggle manager active status - Admin only
+router.put('/:id/toggle-status', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const { id } = req.params;
         const { is_active } = req.body;
@@ -213,8 +214,8 @@ router.put('/:id/toggle-status', async (req, res) => {
     }
 });
 
-// Delete a manager
-router.delete('/:id', async (req, res) => {
+// Delete a manager - Admin only
+router.delete('/:id', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -246,7 +247,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // Get permissions for a specific user (used by frontend to check logged-in user's permissions)
-router.get('/permissions/:userId', async (req, res) => {
+router.get('/permissions/:userId', authenticateToken, async (req, res) => {
     try {
         const { userId } = req.params;
 

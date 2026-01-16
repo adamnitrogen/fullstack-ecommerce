@@ -2,7 +2,7 @@ import { useState } from "react";
 import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/authStore";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Package,
@@ -66,115 +66,111 @@ export function AdminSidebar({
   // Sidebar is effectively expanded if pinned OR if collapsed but being hovered
   const isEffectivelyExpanded = isPinned || !isCollapsed || (isCollapsed && isHovered);
 
+  // Determine base path from current location
+  const location = useLocation();
+  const basePath = location.pathname.startsWith('/manager') ? '/manager' : '/admin';
+
   const allMenuItems = [
     {
       icon: LayoutDashboard,
       label: "Dashboard",
-      path: "/admin",
+      path: `${basePath}`,
       show: true // Always show dashboard
     },
     {
       icon: Package,
       label: "Products",
-      path: "/admin/products",
+      path: `${basePath}/products`,
       show: hasPermission("can_manage_products")
     },
     {
       icon: Folder,
       label: "Categories",
-      path: "/admin/categories",
+      path: `${basePath}/categories`,
       show: hasPermission("can_manage_categories")
     },
     {
       icon: Calendar,
       label: "Events",
-      path: "/admin/events",
+      path: `${basePath}/events`,
       show: hasPermission("can_manage_events")
     },
     {
       icon: FileText,
       label: "Blogs",
-      path: "/admin/blogs",
+      path: `${basePath}/blogs`,
       show: hasPermission("can_manage_blogs")
     },
     {
       icon: Image,
       label: "Gallery",
-      path: "/admin/gallery",
+      path: `${basePath}/gallery`,
       show: hasPermission("can_manage_gallery")
     },
     {
       icon: Image,
       label: "Carousel",
-      path: "/admin/carousel",
+      path: `${basePath}/carousel`,
       show: hasPermission("can_manage_carousel")
     },
     {
       icon: ShoppingCart,
       label: "Orders",
-      path: "/admin/orders",
+      path: `${basePath}/orders`,
       show: hasPermission("can_manage_orders")
     },
     {
       icon: Users,
       label: "Managers",
-      path: "/admin/managers",
+      path: `${basePath}/managers`,
       show: isAdmin // Only admins can manage managers
     },
     {
       icon: Star,
       label: "Reviews",
-      path: "/admin/reviews",
+      path: `${basePath}/reviews`,
       show: hasPermission("can_manage_products")
     },
     {
       icon: Flag,
       label: "Moderation",
-      path: "/admin/comments",
+      path: `${basePath}/comments`,
       show: hasPermission("can_manage_blogs"),
     },
-
     {
       icon: HelpCircle,
       label: "FAQs",
-      path: "/admin/faqs",
+      path: `${basePath}/faqs`,
       show: hasPermission("can_manage_faqs")
     },
     {
       icon: Contact,
       label: "Contact Info",
-      path: "/admin/contact-management",
+      path: `${basePath}/contact-management`,
       show: hasPermission("can_manage_contact_info") || hasPermission("can_manage_social_media") || hasPermission("can_manage_bank_details") || hasPermission("can_manage_newsletter")
     },
     {
       icon: Info,
       label: "About Us",
-      path: "/admin/about-us",
+      path: `${basePath}/about-us`,
       show: hasPermission("can_manage_about_us")
     },
-    // Coupons Management moved to Settings > Coupons
-    // {
-    //   icon: Tag,
-    //   label: "Coupons",
-    //   path: "/admin/coupons",
-    //   show: isAdmin // Only admins can manage coupons
-    // },
     {
       icon: Shield,
       label: "Policy Management",
-      path: "/admin/policies",
-      show: isAdmin || hasPermission("can_manage_about_us") // Assuming generic permission or admin for now, user didn't specify strict permission but implied Admin
+      path: `${basePath}/policies`,
+      show: isAdmin || hasPermission("can_manage_about_us")
     },
     {
       icon: Loader2,
       label: "Background Jobs",
-      path: "/admin/jobs",
+      path: `${basePath}/jobs`,
       show: isAdmin // Only admins can view jobs
     },
     {
       icon: Settings,
       label: "Settings",
-      path: "/admin/settings",
+      path: `${basePath}/settings`,
       show: isAdmin // Only admins can manage global settings
     },
   ];
@@ -247,7 +243,7 @@ export function AdminSidebar({
                 <li key={item.path}>
                   <NavLink
                     to={item.path}
-                    end={item.path === "/admin"}
+                    end={item.path === basePath}
                     className={({ isActive }) => `flex items-center rounded-lg py-2.5 text-sm font-medium transition-all duration-200 group relative overflow-hidden ${!isEffectivelyExpanded ? "justify-center px-2" : "gap-3 px-3"
                       } ${isActive
                         ? "bg-primary/10 text-primary"

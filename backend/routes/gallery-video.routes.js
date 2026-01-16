@@ -2,6 +2,7 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
+const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
 
 // Helper function to extract YouTube video ID from various URL formats
 function extractYouTubeId(url) {
@@ -90,8 +91,8 @@ router.get('/folder/:folderId', async (req, res) => {
     }
 });
 
-// Create new video
-router.post('/', async (req, res) => {
+// Create new video - Admin/Manager only
+router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { youtube_url } = req.body;
 
@@ -123,8 +124,8 @@ router.post('/', async (req, res) => {
     }
 });
 
-// Update video
-router.put('/:id', async (req, res) => {
+// Update video - Admin/Manager only
+router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         let updateData = { ...req.body };
 
@@ -153,8 +154,8 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-// Delete video
-router.delete('/:id', async (req, res) => {
+// Delete video - Admin/Manager only
+router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { error } = await supabase
             .from('gallery_videos')

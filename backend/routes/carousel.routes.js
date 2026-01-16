@@ -2,6 +2,7 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
+const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
 
 // Get all active slides (public)
 router.get('/', async (req, res) => {
@@ -21,7 +22,7 @@ router.get('/', async (req, res) => {
 });
 
 // Get all slides (admin)
-router.get('/admin', async (req, res) => {
+router.get('/admin', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('carousel_slides')
@@ -36,8 +37,8 @@ router.get('/admin', async (req, res) => {
     }
 });
 
-// Create new slide
-router.post('/', async (req, res) => {
+// Create new slide - Admin/Manager only
+router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('carousel_slides')
@@ -56,8 +57,8 @@ router.post('/', async (req, res) => {
     }
 });
 
-// Update slide
-router.put('/:id', async (req, res) => {
+// Update slide - Admin/Manager only
+router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('carousel_slides')
@@ -77,8 +78,8 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-// Delete slide
-router.delete('/:id', async (req, res) => {
+// Delete slide - Admin/Manager only
+router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { error } = await supabase
             .from('carousel_slides')

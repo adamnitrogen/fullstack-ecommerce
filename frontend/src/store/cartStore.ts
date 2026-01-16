@@ -13,6 +13,7 @@ interface CartState {
   items: CartItem[];
   totals: CartTotals | null;
   isLoading: boolean;
+  isCalculating: boolean; // True when price/coupon calculation is in progress
   initialized: boolean;
   deliverySettings: { threshold: number; charge: number };
 
@@ -44,9 +45,38 @@ const calculateOptimisticTotals = (items: CartItem[], currentTotals: CartTotals 
   const { threshold, charge } = useCartStore.getState().deliverySettings;
   const deliveryCharge = totalPrice >= threshold ? 0 : charge;
 
-  // Retain coupon info if available but recalculate discounts
+  // Recalculate coupon discount if percentage-based coupon is applied
   const coupon = currentTotals?.coupon || null;
-  const couponDiscount = currentTotals?.couponDiscount || 0;
+  let couponDiscount = 0;
+
+  if (coupon && coupon.discount_percentage) {
+    // For percentage-based coupons, recalculate discount proportionally
+    let eligibleAmount = totalPrice;
+
+    // For product/variant/category coupons, calculate eligible portion
+    if (coupon.type === 'product' && coupon.target_id) {
+      eligibleAmount = items
+        .filter(item => item.productId === coupon.target_id)
+        .reduce((acc, item) => acc + item.product.price * item.quantity, 0);
+    } else if (coupon.type === 'variant' && coupon.target_id) {
+      eligibleAmount = items
+        .filter(item => item.variantId === coupon.target_id)
+        .reduce((acc, item) => acc + item.product.price * item.quantity, 0);
+    }
+    // For 'cart' type, eligibleAmount is already totalPrice
+
+    couponDiscount = eligibleAmount * (coupon.discount_percentage / 100);
+
+    // Apply max discount cap if exists
+    if (coupon.max_discount_amount && couponDiscount > coupon.max_discount_amount) {
+      couponDiscount = coupon.max_discount_amount;
+    }
+
+    couponDiscount = Math.round(couponDiscount * 100) / 100;
+  } else if (currentTotals?.couponDiscount) {
+    // For flat amount coupons, keep the existing discount
+    couponDiscount = currentTotals.couponDiscount;
+  }
 
   const discount = totalMrp - totalPrice;
   const finalAmount = totalPrice + deliveryCharge - couponDiscount;
@@ -82,6 +112,7 @@ export const useCartStore = create<CartState>()((set, get) => {
     items: [],
     totals: null,
     isLoading: false,
+    isCalculating: false,
     initialized: false,
     deliverySettings: { threshold: 1500, charge: 50 }, // Default values
 
@@ -191,16 +222,22 @@ export const useCartStore = create<CartState>()((set, get) => {
       // 1. Optimistic Update
       const previousItems = [...get().items];
       const previousTotals = get().totals ? { ...get().totals! } : null;
-      const removedItem = previousItems.find(item =>
-        item.productId === productId && (item.variantId || null) === (variantId || null)
-      );
+      const removedItem = previousItems.find(item => {
+        const isProductMatch = String(item.productId).toLowerCase().trim() === String(productId).toLowerCase().trim();
+        const vId1 = item.variantId ? String(item.variantId).toLowerCase().trim() : null;
+        const vId2 = variantId ? String(variantId).toLowerCase().trim() : null;
+        return isProductMatch && vId1 === vId2;
+      });
 
       if (!removedItem) return;
 
       set((state) => {
-        const newItems = state.items.filter((item) =>
-          !(item.productId === productId && (item.variantId || null) === (variantId || null))
-        );
+        const newItems = state.items.filter((item) => {
+          const isProductMatch = String(item.productId).toLowerCase().trim() === String(productId).toLowerCase().trim();
+          const vId1 = item.variantId ? String(item.variantId).toLowerCase().trim() : null;
+          const vId2 = variantId ? String(variantId).toLowerCase().trim() : null;
+          return !(isProductMatch && vId1 === vId2);
+        });
         return {
           items: newItems,
           totals: calculateOptimisticTotals(newItems, state.totals)
@@ -236,20 +273,27 @@ export const useCartStore = create<CartState>()((set, get) => {
       // 1. Optimistic Update
       const previousItems = [...get().items];
       const previousTotals = get().totals ? { ...get().totals! } : null;
-      const itemToUpdate = previousItems.find(item =>
-        item.productId === productId && (item.variantId || null) === (variantId || null)
-      );
+      const itemToUpdate = previousItems.find(item => {
+        const isProductMatch = String(item.productId).toLowerCase().trim() === String(productId).toLowerCase().trim();
+        const vId1 = item.variantId ? String(item.variantId).toLowerCase().trim() : null;
+        const vId2 = variantId ? String(variantId).toLowerCase().trim() : null;
+        return isProductMatch && vId1 === vId2;
+      });
 
       if (!itemToUpdate) return;
       const quantityDiff = quantity - itemToUpdate.quantity;
       const itemKey = `${productId}:${variantId || 'no-variant'}`;
 
       set((state) => {
-        const newItems = state.items.map((item) =>
-          (item.productId === productId && (item.variantId || null) === (variantId || null))
+        const newItems = state.items.map((item) => {
+          const isProductMatch = String(item.productId).toLowerCase().trim() === String(productId).toLowerCase().trim();
+          const vId1 = item.variantId ? String(item.variantId).toLowerCase().trim() : null;
+          const vId2 = variantId ? String(variantId).toLowerCase().trim() : null;
+
+          return (isProductMatch && vId1 === vId2)
             ? { ...item, quantity }
-            : item
-        );
+            : item;
+        });
         return {
           items: newItems,
           totals: calculateOptimisticTotals(newItems, state.totals)
@@ -261,6 +305,9 @@ export const useCartStore = create<CartState>()((set, get) => {
         clearTimeout(updateTimeouts[itemKey]);
       }
 
+      // Set calculating state when debounce starts
+      set({ isCalculating: true });
+
       updateTimeouts[itemKey] = setTimeout(() => {
         queueAction(async () => {
           try {
@@ -268,10 +315,11 @@ export const useCartStore = create<CartState>()((set, get) => {
             const { items, totals } = CartDTO.fromResponse(response);
 
             if (pendingRequests === 1) {
-              set({ items, totals });
+              set({ items, totals, isCalculating: false });
             }
             delete updateTimeouts[itemKey];
           } catch (error: unknown) {
+            set({ isCalculating: false });
             await get().fetchCart();
             const isAuthenticated = useAuthStore.getState().isAuthenticated;
 
@@ -281,7 +329,7 @@ export const useCartStore = create<CartState>()((set, get) => {
               }
               // Guest users: suppress the toast
             } else {
-              toast.error("Failed to update quantity");
+              toast.error("Failed to update cart");
             }
             delete updateTimeouts[itemKey];
           }
@@ -296,16 +344,16 @@ export const useCartStore = create<CartState>()((set, get) => {
         return false;
       }
 
-      set({ isLoading: true });
+      set({ isLoading: true, isCalculating: true });
       try {
         const response = await cartService.applyCoupon(code);
         const { items, totals } = CartDTO.fromResponse(response);
 
-        set({ items, totals, isLoading: false });
+        set({ items, totals, isLoading: false, isCalculating: false });
         toast.success("Coupon applied successfully");
         return true;
       } catch (error: unknown) {
-        set({ isLoading: false });
+        set({ isLoading: false, isCalculating: false });
         const errorMessage = getErrorMessage(error, "Invalid coupon code");
         toast.error(errorMessage);
         return false;
@@ -313,15 +361,15 @@ export const useCartStore = create<CartState>()((set, get) => {
     },
 
     removeCoupon: async () => {
-      set({ isLoading: true });
+      set({ isLoading: true, isCalculating: true });
       try {
         const response = await cartService.removeCoupon();
         const { items, totals } = CartDTO.fromResponse(response);
 
-        set({ items, totals, isLoading: false });
+        set({ items, totals, isLoading: false, isCalculating: false });
         toast.success("Coupon removed");
       } catch (error) {
-        set({ isLoading: false });
+        set({ isLoading: false, isCalculating: false });
         toast.error("Failed to remove coupon");
       }
     },

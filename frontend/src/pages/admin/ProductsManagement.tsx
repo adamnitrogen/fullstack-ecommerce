@@ -1,5 +1,6 @@
 import { logger } from "@/lib/logger";
-import { useState } from "react";
+import React, { useState } from "react";
+import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,11 +14,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Edit, Trash2, Package, Download } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Package, Download, ChevronDown, ChevronRight } from "lucide-react";
 import { ProductDialog } from "@/components/admin/ProductDialog";
 import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
 import { toast } from "@/hooks/use-toast";
-import { getErrorMessage } from "@/lib/errorUtils";
+import { getErrorMessage, getErrorDetails } from "@/lib/errorUtils";
 import { downloadCSV, flattenObject } from "@/lib/exportUtils";
 import type { Product, VariantFormData } from "@/types";
 
@@ -27,6 +28,7 @@ export default function ProductsManagement() {
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -38,14 +40,19 @@ export default function ProductsManagement() {
   });
 
   const productMutation = useMutation({
-    mutationFn: async (productData: Omit<Partial<Product>, "variants"> & { imageFiles?: (File | string)[], variants?: VariantFormData[] }) => {
-      logger.debug("ProductMutation - Received product:", productData);
+    mutationFn: async (productData: Omit<Partial<Product>, "variants"> & { id?: string, imageFiles?: (File | string)[], variants?: VariantFormData[] }) => {
+      logger.debug("ProductMutation - Received data:", productData);
       const { productService } = await import("@/services/product.service");
       const { uploadService } = await import("@/services/upload.service");
 
       const { variants, imageFiles, ...finalProductData } = productData;
-      const finalProduct = { ...finalProductData } as any;
+      // Defensive ID check: check productData.id OR selectedProduct.id if editing
+      const productId = productData.id || selectedProduct?.id;
+      const finalProduct = { ...finalProductData, id: productId } as any;
       const newlyUploadedUrls: string[] = [];
+
+      logger.debug("ProductMutation - Final Product Data:", finalProduct);
+      logger.debug("ProductMutation - Detected Product ID:", productId);
 
       try {
         // 1. Handle main product image uploads
@@ -58,18 +65,11 @@ export default function ProductsManagement() {
               newlyUploadedUrls.push(response.url);
             } else if (typeof img === 'string') {
               if (img.startsWith('blob:')) {
-                // Convert blob URL to File and upload
-                try {
-                  const blob = await fetch(img).then(r => r.blob());
-                  const file = new File([blob], "image.jpg", { type: blob.type });
-                  const response = await uploadService.uploadImage(file, 'product');
-                  processedImages.push(response.url);
-                  newlyUploadedUrls.push(response.url);
-                } catch (err) {
-                  logger.error("Failed to process blob image:", err);
-                  // If conversion fails, try to proceed without it or throw
-                }
+                // Blob URLs are for browser previews only - they should not reach here
+                // Skip with warning (this indicates a state sync issue that should be investigated)
+                logger.warn("Skipping unexpected blob URL in imageFiles - previews should not leak into form data:", img);
               } else {
+                // Valid storage URL - pass through unchanged
                 processedImages.push(img);
               }
             }
@@ -86,17 +86,10 @@ export default function ProductsManagement() {
             newlyUploadedUrls.push(response.url);
           } else if (typeof v.imageFile === 'string') {
             if (v.imageFile.startsWith('blob:')) {
-              // Convert blob URL to File and upload
-              try {
-                const blob = await fetch(v.imageFile).then(r => r.blob());
-                const file = new File([blob], "variant-image.jpg", { type: blob.type });
-                const response = await uploadService.uploadImage(file, 'product');
-                variant.variant_image_url = response.url;
-                newlyUploadedUrls.push(response.url);
-              } catch (err) {
-                logger.error("Failed to process variant blob image:", err);
-              }
+              // Blob URLs are for browser previews only - skip with warning
+              logger.warn("Skipping unexpected blob URL in variant imageFile:", v.imageFile);
             } else {
+              // Valid storage URL - pass through unchanged
               variant.variant_image_url = v.imageFile;
             }
           }
@@ -152,9 +145,25 @@ export default function ProductsManagement() {
     },
     onError: (error: unknown) => {
       logger.error("Product mutation error:", error);
+      const message = getErrorMessage(error, "Failed to save product. Please check your connection and try again.");
+      const details = getErrorDetails(error);
+
       toast({
         title: "Error",
-        description: getErrorMessage(error, "Failed to save product. Please check your connection and try again."),
+        description: (
+          <div className="space-y-1">
+            <p>{message}</p>
+            {details && details.length > 0 && (
+              <ul className="text-xs list-disc pl-4 mt-1 opacity-90">
+                {details.map((detail, idx) => (
+                  <li key={idx}>
+                    <span className="font-semibold">{detail.path.join('.')}:</span> {detail.message}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ),
         variant: "destructive",
       });
     },
@@ -223,6 +232,16 @@ export default function ProductsManagement() {
   const handleDelete = (product: Product) => {
     setSelectedProduct(product);
     setDeleteDialogOpen(true);
+  };
+
+  const toggleExpand = (productId: string) => {
+    const newExpanded = new Set(expandedProducts);
+    if (newExpanded.has(productId)) {
+      newExpanded.delete(productId);
+    } else {
+      newExpanded.add(productId);
+    }
+    setExpandedProducts(newExpanded);
   };
 
   const handleExport = () => {
@@ -402,6 +421,7 @@ export default function ProductsManagement() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-[40px]"></TableHead>
                       <TableHead>Product</TableHead>
                       <TableHead>Category</TableHead>
                       <TableHead>MRP Price</TableHead>
@@ -414,56 +434,137 @@ export default function ProductsManagement() {
                   <TableBody>
                     {(data?.products || []).map((product) => {
                       const stockStatus = getStockStatus(product.inventory);
+                      const isExpanded = expandedProducts.has(product.id);
+                      const hasVariants = product.variants && product.variants.length > 0;
+
                       return (
-                        <TableRow key={product.id}>
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <img
-                                src={product.images && product.images.length > 0 ? product.images[0] : '/placeholder-image.jpg'}
-                                alt={product.title}
-                                loading="lazy"
-                                className="w-12 h-12 rounded object-cover"
-                              />
-                              <div>
-                                <p className="font-medium">{product.title}</p>
-                                <p className="text-sm text-muted-foreground truncate max-w-xs">
-                                  {product.description}
-                                </p>
+                        <React.Fragment key={product.id}>
+                          <TableRow className={cn(isExpanded && "border-b-0")}>
+                            <TableCell>
+                              {hasVariants && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => toggleExpand(product.id)}
+                                >
+                                  {isExpanded ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <img
+                                  src={product.images && product.images.length > 0 ? product.images[0] : '/placeholder-image.jpg'}
+                                  alt={product.title}
+                                  loading="lazy"
+                                  className="w-12 h-12 rounded object-cover"
+                                />
+                                <div>
+                                  <p className="font-medium">{product.title}</p>
+                                  <p className="text-sm text-muted-foreground truncate max-w-xs">
+                                    {product.description}
+                                  </p>
+                                </div>
                               </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>{product.category}</TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {product.mrp ? `₹${product.mrp}` : "-"}
-                          </TableCell>
-                          <TableCell className="font-semibold">
-                            ₹{product.price}
-                          </TableCell>
-                          <TableCell>{product.inventory ?? 0} units</TableCell>
-                          <TableCell>
-                            <Badge variant={stockStatus.variant}>
-                              {stockStatus.label}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleEditProduct(product)}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDelete(product)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
+                            </TableCell>
+                            <TableCell>{product.category}</TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {product.mrp ? `₹${product.mrp}` : "-"}
+                            </TableCell>
+                            <TableCell className="font-semibold">
+                              ₹{product.price}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-col">
+                                <span>{product.inventory ?? 0} units</span>
+                                {hasVariants && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    Total across {product.variants?.length} variants
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={stockStatus.variant}>
+                                {stockStatus.label}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleEditProduct(product)}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDelete(product)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                          {isExpanded && hasVariants && (
+                            <TableRow className="bg-muted/30">
+                              <TableCell colSpan={8} className="p-0">
+                                <div className="p-4 pl-12">
+                                  <Table className="border rounded-md bg-background">
+                                    <TableHeader className="bg-muted/50">
+                                      <TableRow>
+                                        <TableHead className="h-8 py-0">Variant</TableHead>
+                                        <TableHead className="h-8 py-0">MRP</TableHead>
+                                        <TableHead className="h-8 py-0">Price</TableHead>
+                                        <TableHead className="h-8 py-0">Stock</TableHead>
+                                        <TableHead className="h-8 py-0">Status</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {product.variants?.map((variant) => {
+                                        const variantStockStatus = getStockStatus(variant.stock_quantity);
+                                        return (
+                                          <TableRow key={variant.id} className="last:border-0">
+                                            <TableCell className="py-2">
+                                              <div className="flex items-center gap-2">
+                                                <img
+                                                  src={variant.variant_image_url || product.images?.[0] || '/placeholder-image.jpg'}
+                                                  alt={variant.size_label}
+                                                  className="w-8 h-8 rounded object-cover border"
+                                                />
+                                                <div className="flex flex-col">
+                                                  <span className="text-sm font-medium">{variant.size_label}</span>
+                                                  {variant.is_default && (
+                                                    <span className="text-[10px] bg-primary/10 text-primary px-1 rounded w-fit">Default</span>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            </TableCell>
+                                            <TableCell className="py-2 text-xs text-muted-foreground">₹{variant.mrp}</TableCell>
+                                            <TableCell className="py-2 text-sm font-medium">₹{variant.selling_price}</TableCell>
+                                            <TableCell className="py-2 text-sm">{variant.stock_quantity} units</TableCell>
+                                            <TableCell className="py-2">
+                                              <Badge variant={variantStockStatus.variant} className="text-[10px] h-5 px-1.5 uppercase">
+                                                {variantStockStatus.label.split(' - ')[0]}
+                                              </Badge>
+                                            </TableCell>
+                                          </TableRow>
+                                        );
+                                      })}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
                       );
                     })}
                   </TableBody>

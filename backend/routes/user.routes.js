@@ -3,8 +3,10 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 
-// Get all users
-router.get('/', async (req, res) => {
+const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+
+// Get all users - Admin/Manager only
+router.get('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { data: users, error } = await supabase
             .from('profiles')
@@ -20,8 +22,8 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Block/Unblock a user
-router.post('/:id/block', async (req, res) => {
+// Block/Unblock a user - Admin/Manager only
+router.post('/:id/block', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { id } = req.params;
         const { isBlocked } = req.body;

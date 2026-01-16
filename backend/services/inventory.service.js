@@ -11,8 +11,8 @@ const log = createModuleLogger('InventoryService');
  */
 
 /**
- * Check if all items have sufficient stock
- * @param {Array} items - Array of { product_id, quantity } or cart items with product.id
+ * Check if all items have sufficient stock (variant-aware)
+ * @param {Array} items - Array of { product_id, variant_id, quantity } or cart items
  * @returns {Promise<{ available: boolean, insufficientItems: Array }>}
  */
 const checkStockAvailability = async (items) => {
@@ -22,6 +22,7 @@ const checkStockAvailability = async (items) => {
 
     for (const item of items) {
         const productId = item.product_id || item.product?.id;
+        const variantId = item.variant_id || item.variant?.id || null;
         const quantity = item.quantity || 1;
 
         if (!productId) {
@@ -29,36 +30,72 @@ const checkStockAvailability = async (items) => {
             continue;
         }
 
-        const { data: product, error } = await supabase
-            .from('products')
-            .select('id, title, inventory')
-            .eq('id', productId)
-            .single();
+        let availableStock = 0;
+        let itemTitle = 'Product';
+        let variantLabel = null;
 
-        if (error || !product) {
-            log.warn('CHECK_STOCK', 'Product not found', { productId, error: error?.message });
-            insufficientItems.push({
-                product_id: productId,
-                requested: quantity,
-                available: 0,
-                message: 'Product not found'
-            });
-            continue;
+        if (variantId) {
+            // Check variant stock
+            const { data: variant, error: variantError } = await supabase
+                .from('product_variants')
+                .select('stock_quantity, size_label, products(title)')
+                .eq('id', variantId)
+                .single();
+
+            if (variantError || !variant) {
+                log.warn('CHECK_STOCK', 'Variant not found', { variantId, error: variantError?.message });
+                insufficientItems.push({
+                    product_id: productId,
+                    variant_id: variantId,
+                    requested: quantity,
+                    available: 0,
+                    message: 'Variant not found'
+                });
+                continue;
+            }
+
+            availableStock = variant.stock_quantity || 0;
+            itemTitle = variant.products?.title || 'Product';
+            variantLabel = variant.size_label;
+        } else {
+            // Check product inventory
+            const { data: product, error } = await supabase
+                .from('products')
+                .select('id, title, inventory')
+                .eq('id', productId)
+                .single();
+
+            if (error || !product) {
+                log.warn('CHECK_STOCK', 'Product not found', { productId, error: error?.message });
+                insufficientItems.push({
+                    product_id: productId,
+                    requested: quantity,
+                    available: 0,
+                    message: 'Product not found'
+                });
+                continue;
+            }
+
+            availableStock = product.inventory || 0;
+            itemTitle = product.title;
         }
 
-        if (product.inventory < quantity) {
+        if (availableStock < quantity) {
+            const label = variantLabel ? `${itemTitle} - ${variantLabel}` : itemTitle;
             log.debug('CHECK_STOCK', 'Insufficient stock', {
                 productId,
-                title: product.title,
+                variantId,
+                title: label,
                 requested: quantity,
-                available: product.inventory
+                available: availableStock
             });
             insufficientItems.push({
                 product_id: productId,
-                title: product.title,
+                variant_id: variantId,
+                title: label,
                 requested: quantity,
-                available: product.inventory,
-                message: `Only ${product.inventory} units available`
+                available: availableStock,
+                message: `Only ${availableStock} units available`
             });
         }
     }
@@ -73,7 +110,7 @@ const checkStockAvailability = async (items) => {
     } else {
         log.warn('CHECK_STOCK', 'Some items have insufficient stock', {
             insufficientCount: insufficientItems.length,
-            items: insufficientItems.map(i => ({ productId: i.product_id, requested: i.requested, available: i.available }))
+            items: insufficientItems.map(i => ({ productId: i.product_id, variantId: i.variant_id, requested: i.requested, available: i.available }))
         });
     }
 
@@ -103,11 +140,15 @@ const decreaseInventory = async (items) => {
             continue;
         }
 
-        // Use atomic PostgreSQL function with row-level locking
+        // Extract variant_id if present
+        const variantId = item.variant_id || item.variant?.id || null;
+
+        // Use variant-aware atomic PostgreSQL function with row-level locking
         const { data: rpcResult, error: rpcError } = await supabase
-            .rpc('decrement_inventory_atomic', {
+            .rpc('decrement_inventory_atomic_v2', {
                 p_product_id: productId,
                 p_quantity: quantity,
+                p_variant_id: variantId,
                 p_trace_id: trace.traceId
             });
 
@@ -189,11 +230,15 @@ const restoreInventory = async (items) => {
             continue;
         }
 
-        // Use atomic PostgreSQL function
+        // Extract variant_id if present
+        const variantId = item.variant_id || item.variant?.id || item.variant_snapshot?.variant_id || null;
+
+        // Use variant-aware atomic PostgreSQL function
         const { data: rpcResult, error: rpcError } = await supabase
-            .rpc('increment_inventory_atomic', {
+            .rpc('increment_inventory_atomic_v2', {
                 p_product_id: productId,
                 p_quantity: quantity,
+                p_variant_id: variantId,
                 p_trace_id: trace.traceId
             });
 

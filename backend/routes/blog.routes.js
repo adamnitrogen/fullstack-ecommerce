@@ -41,6 +41,8 @@ const mapToDb = (blog) => {
     return dbBlog;
 };
 
+const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+
 // Get all blogs (with optional pagination and search)
 router.get('/', async (req, res) => {
     try {
@@ -103,8 +105,8 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// Create blog
-router.post('/', async (req, res) => {
+// Create blog - Admin/Manager only
+router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const dbBlog = mapToDb(req.body);
         // Add created_at for new records
@@ -126,8 +128,8 @@ router.post('/', async (req, res) => {
     }
 });
 
-// Update blog
-router.put('/:id', async (req, res) => {
+// Update blog - Admin/Manager only
+router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const dbBlog = mapToDb(req.body);
 
@@ -146,8 +148,8 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-// Delete blog
-router.delete('/:id', async (req, res) => {
+// Delete blog - Admin/Manager only
+router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         // 1. Get blog to find image URL
         const { data: blog, error: fetchError } = await supabase

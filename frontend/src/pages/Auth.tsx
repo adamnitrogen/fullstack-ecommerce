@@ -105,8 +105,10 @@ export default function AuthPage({
         if (returnUrl) {
           sessionStorage.removeItem("authReturnUrl");
           navigate(returnUrl);
-        } else if (user.role === "admin" || user.role === "manager") {
+        } else if (user.role === "admin") {
           navigate("/admin");
+        } else if (user.role === "manager") {
+          navigate("/manager");
         } else {
           navigate("/");
         }

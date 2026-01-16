@@ -34,7 +34,9 @@ async function authenticateToken(req, res, next) {
             msg: '[AuthMiddleware] Request Details',
             method: req.method,
             url: req.originalUrl,
-            hasCookies: !!req.cookies?.access_token
+            hasAccessTokenCookie: !!req.cookies?.access_token,
+            hasRefreshTokenCookie: !!req.cookies?.refresh_token,
+            authHeader: req.headers.authorization ? 'Present' : 'Missing'
         });
 
         if (!token) {
@@ -48,7 +50,7 @@ async function authenticateToken(req, res, next) {
         }
 
         if (!token) {
-            logger.info('[AuthMiddleware] No token found');
+            logger.info('[AuthMiddleware] No token found in cookies or headers');
             return res.status(401).json({ error: 'Access token missing', code: 'TOKEN_MISSING' });
         }
 

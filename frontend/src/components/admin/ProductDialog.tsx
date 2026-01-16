@@ -83,6 +83,10 @@ export function ProductDialog({
     isNew: false,
     createdAt: new Date().toISOString(),
     variant_mode: 'UNIT',
+    default_tax_applicable: true,
+    default_price_includes_tax: true,
+    default_gst_rate: 0,
+    default_hsn_code: "",
   });
   const [variants, setVariants] = useState<VariantFormData[]>([]);
   const [variantsOpen, setVariantsOpen] = useState(true);
@@ -115,10 +119,15 @@ export function ProductDialog({
 
         setFormData({
           ...productData,
+          id: productData.id, // Ensure ID is explicitly kept
           mrp: productData.mrp || productData.price,
-          isReturnable: productData.isReturnable !== false,
-          returnDays: productData.returnDays || 3,
+          isReturnable: (productData as any).is_returnable !== undefined ? (productData as any).is_returnable : (productData.isReturnable !== false),
+          returnDays: (productData as any).return_days || productData.returnDays || 3,
           imageFiles: originalImageUrls,
+          default_hsn_code: productData.default_hsn_code || (productData as any).default_hsn_code || "",
+          default_gst_rate: productData.default_gst_rate ?? (productData as any).default_gst_rate ?? 0,
+          default_tax_applicable: (productData as any).default_tax_applicable !== undefined ? (productData as any).default_tax_applicable : (productData.default_tax_applicable !== false),
+          default_price_includes_tax: (productData as any).default_price_includes_tax !== undefined ? (productData as any).default_price_includes_tax : (productData.default_price_includes_tax !== false),
         });
 
         // Initialize variants from product
@@ -133,6 +142,10 @@ export function ProductDialog({
             stock_quantity: v.stock_quantity,
             variant_image_url: v.variant_image_url,
             is_default: v.is_default,
+            hsn_code: v.hsn_code || "",
+            gst_rate: v.gst_rate || 0,
+            tax_applicable: v.tax_applicable !== false,
+            price_includes_tax: v.price_includes_tax !== false,
           })));
         } else {
           setVariants([]);
@@ -157,6 +170,11 @@ export function ProductDialog({
           returnDays: 3,
           isNew: true,
           createdAt: new Date().toISOString(),
+          variant_mode: 'UNIT',
+          default_hsn_code: "",
+          default_gst_rate: 0,
+          default_tax_applicable: true,
+          default_price_includes_tax: true,
         });
       }
       setBenefitInput("");
@@ -425,6 +443,30 @@ export function ProductDialog({
                     required={variants.length === 0}
                   />
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="delivery_charge">
+                    Base Delivery Charge (₹)
+                  </Label>
+                  <Input
+                    id="delivery_charge"
+                    name="delivery_charge"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.delivery_charge ?? ''}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        delivery_charge: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0,
+                      })
+                    }
+                    placeholder="e.g. 50"
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    Per-unit delivery fee for this product (Default for all variants)
+                  </p>
+                </div>
               </div>
 
               {discountPercentage > 0 && (
@@ -432,6 +474,73 @@ export function ProductDialog({
                   <p className="text-sm font-medium text-green-800 dark:text-green-200">
                     Discount: {discountPercentage}% off
                   </p>
+                </div>
+              )}
+            </div>
+
+            {/* Tax Configuration */}
+            <div className="space-y-4 border rounded-lg p-4">
+              <h3 className="text-base font-semibold">Tax Configuration (Default)</h3>
+              <p className="text-sm text-muted-foreground">
+                Set default tax rates for this product. These apply when no variants are used, or as a fallback.
+              </p>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="default-tax-applicable"
+                  checked={formData.default_tax_applicable !== false}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, default_tax_applicable: checked as boolean })
+                  }
+                />
+                <Label htmlFor="default-tax-applicable">Tax Applicable</Label>
+              </div>
+
+              {formData.default_tax_applicable !== false && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="default-hsn">HSN Code</Label>
+                    <Input
+                      id="default-hsn"
+                      value={formData.default_hsn_code || ''}
+                      onChange={(e) =>
+                        setFormData({ ...formData, default_hsn_code: e.target.value })
+                      }
+                      placeholder="e.g. 1905"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="default-gst">GST Rate (%)</Label>
+                    <Select
+                      value={formData.default_gst_rate?.toString() || "0"}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, default_gst_rate: parseFloat(value) })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Rate" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[0, 5, 12, 18, 28].map((rate) => (
+                          <SelectItem key={rate} value={rate.toString()}>
+                            {rate}%
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center space-x-2 md:col-span-2">
+                    <Checkbox
+                      id="default-inc-tax"
+                      checked={formData.default_price_includes_tax !== false}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, default_price_includes_tax: checked as boolean })
+                      }
+                    />
+                    <Label htmlFor="default-inc-tax">Price includes Tax</Label>
+                  </div>
                 </div>
               )}
             </div>

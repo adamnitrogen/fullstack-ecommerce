@@ -27,6 +27,7 @@
         "mammoth": "^1.11.0",
         "multer": "^2.0.2",
         "newrelic": "^13.9.0",
+        "node-cron": "^4.2.1",
         "nodemailer": "^7.0.12",
         "pdf-parse": "^2.4.5",
         "pino": "^10.1.0",

@@ -48,12 +48,49 @@ const createVariantSchema = z.object({
         .nullable(),
     is_default: z
         .boolean()
-        .default(false)
+        .default(false),
+    // GST/Tax Fields
+    hsn_code: z
+        .string()
+        .max(8, 'HSN code must be 8 characters or less')
+        .regex(/^\d{4,8}$/, 'HSN code must be 4-8 digits')
+        .or(z.literal(''))
+        .optional()
+        .nullable(),
+    gst_rate: z
+        .number()
+        .refine(val => val === undefined || val === null || [0, 5, 12, 18, 28].includes(val), {
+            message: 'GST rate must be one of: 0, 5, 12, 18, 28'
+        })
+        .optional()
+        .nullable(),
+    tax_applicable: z
+        .boolean()
+        .default(false),
+    price_includes_tax: z
+        .boolean()
+        .default(true),
+    razorpay_item_id: z
+        .string()
+        .optional()
+        .nullable()
 }).refine(
     (data) => data.selling_price <= data.mrp,
     {
         message: 'Selling price must be less than or equal to MRP',
         path: ['selling_price']
+    }
+).refine(
+    (data) => {
+        // If tax_applicable is true, gst_rate should be provided
+        if (data.tax_applicable && (data.gst_rate === null || data.gst_rate === undefined)) {
+            return false;
+        }
+        return true;
+    },
+    {
+        message: 'GST rate is required when tax is applicable',
+        path: ['gst_rate']
     }
 );
 
@@ -64,6 +101,10 @@ const updateVariantSchema = z.object({
     id: z
         .string()
         .uuid('Invalid variant ID'),
+    razorpay_item_id: z
+        .string()
+        .optional()
+        .nullable(),
     size_label: z
         .string()
         .min(1)
@@ -99,6 +140,27 @@ const updateVariantSchema = z.object({
         .nullable(),
     is_default: z
         .boolean()
+        .optional(),
+    // GST/Tax Fields
+    hsn_code: z
+        .string()
+        .max(8)
+        .regex(/^\d{4,8}$/)
+        .or(z.literal(''))
+        .optional()
+        .nullable(),
+    gst_rate: z
+        .number()
+        .refine(val => val === undefined || val === null || [0, 5, 12, 18, 28].includes(val), {
+            message: 'GST rate must be one of: 0, 5, 12, 18, 28'
+        })
+        .optional()
+        .nullable(),
+    tax_applicable: z
+        .boolean()
+        .optional(),
+    price_includes_tax: z
+        .boolean()
         .optional()
 }).refine(
     (data) => {
@@ -130,6 +192,10 @@ const createProductWithVariantsSchema = z.object({
         benefits: z.array(z.string()).optional().default([]),
         isReturnable: z.boolean().optional().default(true),
         returnDays: z.number().int().min(0).optional().default(3),
+        default_hsn_code: z.string().max(8).regex(/^\d{4,8}$/).or(z.literal('')).optional().nullable(),
+        default_gst_rate: z.number().refine(val => val === undefined || val === null || [0, 5, 12, 18, 28].includes(val)).optional().nullable(),
+        default_tax_applicable: z.boolean().default(false).optional(),
+        default_price_includes_tax: z.boolean().default(true).optional(),
         createdAt: z.string().optional()
     }),
     variants: z
@@ -224,13 +290,17 @@ const updateProductWithVariantsSchema = z.object({
         benefits: z.array(z.string()).optional(),
         isReturnable: z.boolean().optional(),
         returnDays: z.number().int().min(0).optional(),
+        default_hsn_code: z.string().max(8).regex(/^\d{4,8}$/).or(z.literal('')).optional().nullable(),
+        default_gst_rate: z.number().refine(val => val === undefined || val === null || [0, 5, 12, 18, 28].includes(val)).optional().nullable(),
+        default_tax_applicable: z.boolean().optional(),
+        default_price_includes_tax: z.boolean().optional(),
         createdAt: z.string().optional()
     }).optional(),
     variants: z
         .array(
             z.union([
-                createVariantSchema,
-                updateVariantSchema
+                updateVariantSchema,
+                createVariantSchema
             ])
         )
         .optional()

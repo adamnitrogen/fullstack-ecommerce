@@ -2,15 +2,16 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
-const { getActiveCoupons } = require('../services/coupon.service');
+const { getActiveCoupons, invalidateCouponCache } = require('../services/coupon.service');
+const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
 
 /**
  * Coupon Routes
  * Admin-only endpoints for managing discount coupons
  */
 
-// Get all coupons (admin only)
-router.get('/', async (req, res) => {
+// Get all coupons (admin & manager)
+router.get('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { type, is_active, expired } = req.query;
 
@@ -59,8 +60,8 @@ router.get('/active', async (req, res) => {
     }
 });
 
-// Get single coupon by ID (admin only)
-router.get('/:id', async (req, res) => {
+// Get single coupon by ID (admin & manager)
+router.get('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('coupons')
@@ -80,8 +81,8 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// Create new coupon (admin only)
-router.post('/', async (req, res) => {
+// Create new coupon (admin & manager)
+router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const {
             code,
@@ -109,9 +110,9 @@ router.post('/', async (req, res) => {
             });
         }
 
-        if (!['product', 'category', 'cart'].includes(type)) {
+        if (!['product', 'category', 'cart', 'variant'].includes(type)) {
             return res.status(400).json({
-                error: 'Type must be one of: product, category, cart'
+                error: 'Type must be one of: product, category, cart, variant'
             });
         }
 
@@ -154,8 +155,8 @@ router.post('/', async (req, res) => {
     }
 });
 
-// Update coupon (admin only)
-router.put('/:id', async (req, res) => {
+// Update coupon (admin & manager)
+router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const {
             code,
@@ -206,14 +207,17 @@ router.put('/:id', async (req, res) => {
             return res.status(404).json({ error: 'Coupon not found' });
         }
 
+        // Invalidate cache on update
+        invalidateCouponCache(data.code);
+
         res.json(data);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// Delete coupon (soft delete - set inactive) (admin only)
-router.delete('/:id', async (req, res) => {
+// Delete coupon (soft delete - set inactive) (admin & manager)
+router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('coupons')
@@ -227,6 +231,9 @@ router.delete('/:id', async (req, res) => {
         if (!data) {
             return res.status(404).json({ error: 'Coupon not found' });
         }
+
+        // Invalidate cache on delete (deactivation)
+        invalidateCouponCache(data.code);
 
         res.json({ message: 'Coupon deactivated successfully', coupon: data });
     } catch (error) {

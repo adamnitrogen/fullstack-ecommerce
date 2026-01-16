@@ -27,7 +27,7 @@ export function getErrorMessage(error: unknown, defaultMessage: string = "An err
 export function getErrorDetails(error: unknown): Array<{ path: string[]; message: string }> | undefined {
     const apiError = getApiError(error);
     // Support both 'details' (new structure) and direct 'details' from error object (legacy/Supabase)
-    if (apiError?.details) {
+    if (apiError?.details && Array.isArray(apiError.details)) {
         // Map our ApiErrorResponse details (field/message) to a standard path/message if needed,
         // or just return as is if the component expects field/message.
         // Looking at Auth.tsx, it expects path/message.

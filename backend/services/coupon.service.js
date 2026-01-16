@@ -1,11 +1,87 @@
-const supabase = require('../config/supabase');
-const logger = require('../utils/logger');
-
 /**
  * Coupon Service
  * Handles all coupon-related business logic including validation, discount calculation, and usage tracking
  */
+const supabase = require('../config/supabase');
+const logger = require('../utils/logger');
 
+// In-memory cache for coupon rules (TTL: 60s)
+const couponCache = new Map();
+const CACHE_TTL = 60 * 1000;
+
+/**
+ * Get priority weight for a coupon type
+ * VARIANT (4) > PRODUCT (3) > CATEGORY (2) > CART (1)
+ */
+function getCouponPriority(type) {
+    const priorities = {
+        'variant': 4,
+        'product': 3,
+        'category': 2,
+        'cart': 1
+    };
+    return priorities[type] || 0;
+}
+
+/**
+ * Clear a specific coupon from the cache
+ */
+function invalidateCouponCache(code) {
+    if (code) {
+        couponCache.delete(code.toUpperCase());
+    }
+}
+
+/**
+ * Periodic cache cleanup (removes entries older than TTL)
+ */
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, value] of couponCache.entries()) {
+        if (now - value.timestamp > CACHE_TTL) {
+            couponCache.delete(key);
+        }
+    }
+}, 5 * 60 * 1000); // Run every 5 minutes
+
+/**
+ * Get a coupon from cache or database (without full validation)
+ * Used for quick discount recalculations when quantity changes
+ * @param {string} code - Coupon code
+ * @returns {Promise<object|null>} - Coupon object or null
+ */
+async function getCachedCoupon(code) {
+    if (!code || typeof code !== 'string') return null;
+
+    const cacheKey = code.toUpperCase();
+    const now = Date.now();
+
+    // Check cache first
+    if (couponCache.has(cacheKey)) {
+        const cached = couponCache.get(cacheKey);
+        if (now - cached.timestamp < CACHE_TTL) {
+            return cached.data;
+        }
+        couponCache.delete(cacheKey);
+    }
+
+    // Fetch from database
+    const { data, error } = await supabase
+        .from('coupons')
+        .select('*')
+        .ilike('code', cacheKey)
+        .single();
+
+    if (error || !data) return null;
+
+    // Cache the result
+    couponCache.set(cacheKey, {
+        data: data,
+        timestamp: now
+    });
+
+    return data;
+}
 
 /**
  * Validate if a coupon can be applied to the given cart
@@ -13,19 +89,63 @@ const logger = require('../utils/logger');
  * @param {string} userId - User ID
  * @param {Array} cartItems - Array of cart items with product details
  * @param {number} cartTotal - Total cart value before discount
+ * @param {boolean} forceLive - If true, skip cache (defaults to false)
  * @returns {Promise<{valid: boolean, coupon?: object, error?: string}>}
  */
-async function validateCoupon(code, userId, cartItems, cartTotal) {
+async function validateCoupon(code, userId, cartItems, cartTotal, forceLive = false) {
     try {
-        // Fetch coupon by code (case-insensitive)
-        const { data: coupon, error } = await supabase
-            .from('coupons')
-            .select('*')
-            .ilike('code', code.toUpperCase())
-            .single();
+        if (!code || typeof code !== 'string') {
+            return { valid: false, error: 'Coupon code is required' };
+        }
 
-        if (error || !coupon) {
-            return { valid: false, error: 'Invalid coupon code' };
+        const cacheKey = code.toUpperCase();
+        const now = Date.now();
+
+        let coupon;
+
+        // Try cache first unless forceLive is set
+        if (!forceLive && couponCache.has(cacheKey)) {
+            const cached = couponCache.get(cacheKey);
+            if (now - cached.timestamp < CACHE_TTL) {
+                coupon = cached.data;
+            } else {
+                couponCache.delete(cacheKey);
+            }
+        }
+
+        if (!coupon) {
+            // Fetch coupon by code (case-insensitive)
+            const { data, error } = await supabase
+                .from('coupons')
+                .select('*')
+                .ilike('code', code.toUpperCase())
+                .single();
+
+            if (error || !data) {
+                return { valid: false, error: 'Invalid coupon code' };
+            }
+            coupon = data;
+
+            // Cache the result
+            couponCache.set(cacheKey, {
+                data: coupon,
+                timestamp: now
+            });
+        }
+
+        // If it's a critical path (like order creation), we MUST get live usage_count
+        if (forceLive) {
+            const { data: liveData, error: liveError } = await supabase
+                .from('coupons')
+                .select('usage_count, is_active, valid_until')
+                .eq('id', coupon.id)
+                .single();
+
+            if (!liveError && liveData) {
+                coupon.usage_count = liveData.usage_count;
+                coupon.is_active = liveData.is_active;
+                coupon.valid_until = liveData.valid_until;
+            }
         }
 
         // Check if coupon is active
@@ -34,15 +154,15 @@ async function validateCoupon(code, userId, cartItems, cartTotal) {
         }
 
         // Check expiry date
-        const now = new Date();
+        const currentDate = new Date();
         const validFrom = new Date(coupon.valid_from);
         const validUntil = new Date(coupon.valid_until);
 
-        if (now < validFrom) {
+        if (currentDate < validFrom) {
             return { valid: false, error: 'This coupon is not yet valid' };
         }
 
-        if (now > validUntil) {
+        if (currentDate > validUntil) {
             return { valid: false, error: 'This coupon has expired' };
         }
 
@@ -60,6 +180,14 @@ async function validateCoupon(code, userId, cartItems, cartTotal) {
         }
 
         // Type-specific validation
+        if (coupon.type === 'variant') {
+            // Check if the specific variant is in the cart
+            const hasVariant = cartItems.some(item => item.variant_id && item.variant_id === coupon.target_id);
+            if (!hasVariant) {
+                return { valid: false, error: 'This coupon is only valid for a specific variant not in your cart' };
+            }
+        }
+
         if (coupon.type === 'product') {
             // Check if the specific product is in the cart
             const hasProduct = cartItems.some(item => item.product_id === coupon.target_id);
@@ -76,48 +204,127 @@ async function validateCoupon(code, userId, cartItems, cartTotal) {
             }
         }
 
-        return { valid: true, coupon };
+        return { valid: true, coupon, priority: getCouponPriority(coupon.type) };
     } catch (error) {
-        logger.error({ err: error }, 'Error validating coupon:');
-        return { valid: false, error: 'Error validating coupon' };
+        logger.error({ err: error, code }, 'Error validating coupon:');
+        return { valid: false, error: error.message || 'Error validating coupon' };
     }
 }
 
 /**
- * Calculate discount amount based on coupon type and cart items
+ * Calculate discount breakdown based on coupon type and cart items
  * @param {object} coupon - Coupon object
  * @param {Array} cartItems - Array of cart items with product details
- * @param {number} cartTotal - Total cart value
- * @returns {number} - Discount amount
+ * @param {number} cartTotal - Total cart value (sum of item prices)
+ * @returns {Object} - { totalDiscount, itemDiscounts: [{variant_id, product_id, discount, coupon_code}] }
  */
 function calculateCouponDiscount(coupon, cartItems, cartTotal) {
-    let applicableAmount = 0;
+    let totalDiscount = 0;
+    const itemDiscounts = [];
 
     if (coupon.type === 'cart') {
-        // Apply to entire cart
-        applicableAmount = cartTotal;
-    } else if (coupon.type === 'product') {
-        // Apply only to the specific product
-        const targetItem = cartItems.find(item => item.product_id === coupon.target_id);
-        if (targetItem && targetItem.product) {
-            applicableAmount = targetItem.product.price * targetItem.quantity;
+        // Apply to entire cart (weighted distribution or flat on total)
+        // For simplicity and matching current logic, we apply to total
+        totalDiscount = (cartTotal * coupon.discount_percentage) / 100;
+
+        if (coupon.max_discount_amount && totalDiscount > coupon.max_discount_amount) {
+            totalDiscount = coupon.max_discount_amount;
         }
+
+        // Distribute the cart discount proportionally across all items
+        cartItems.forEach(item => {
+            const price = item.variant ? item.variant.selling_price : item.product.price;
+            const itemSubtotal = price * item.quantity;
+            const itemProportion = cartTotal > 0 ? (itemSubtotal / cartTotal) : 0;
+            const itemDiscount = Math.round((totalDiscount * itemProportion) * 100) / 100;
+
+            itemDiscounts.push({
+                variant_id: item.variant_id,
+                product_id: item.product_id,
+                discount: itemDiscount,
+                coupon_code: coupon.code,
+                coupon_id: coupon.id,
+                type: 'cart'
+            });
+        });
+    } else if (coupon.type === 'variant' || coupon.type === 'product') {
+        // Apply only to the specific variant or product
+        cartItems.forEach(item => {
+            const matches = (coupon.type === 'variant' && item.variant_id === coupon.target_id) ||
+                (coupon.type === 'product' && item.product_id === coupon.target_id);
+
+            if (matches) {
+                const price = item.variant ? item.variant.selling_price : item.product.price;
+                const itemSubtotal = price * item.quantity;
+                let discount = (itemSubtotal * coupon.discount_percentage) / 100;
+
+                if (coupon.max_discount_amount && discount > coupon.max_discount_amount) {
+                    discount = coupon.max_discount_amount;
+                }
+
+                const roundedDiscount = Math.round(discount * 100) / 100;
+                totalDiscount += roundedDiscount;
+
+                itemDiscounts.push({
+                    variant_id: item.variant_id,
+                    product_id: item.product_id,
+                    discount: roundedDiscount,
+                    coupon_code: coupon.code,
+                    coupon_id: coupon.id,
+                    type: coupon.type
+                });
+            }
+        });
     } else if (coupon.type === 'category') {
         // Apply to all products in the category
-        applicableAmount = cartItems
-            .filter(item => item.product && item.product.category === coupon.target_id)
-            .reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+        cartItems.forEach(item => {
+            if (item.product && item.product.category === coupon.target_id) {
+                const price = item.variant ? item.variant.selling_price : item.product.price;
+                const itemSubtotal = price * item.quantity;
+                let discount = (itemSubtotal * coupon.discount_percentage) / 100;
+
+                // Note: Currently, the system seems to apply max_discount_amount per coupon application.
+                // If it's category-wide, does max_discount_amount apply to the sum or per item?
+                // Standard behavior is per coupon application (on the sum of eligible items).
+                // I'll calculate total eligible first to apply max cap correctly.
+            }
+        });
+
+        const eligibleItems = cartItems.filter(item => item.product && item.product.category === coupon.target_id);
+        const eligibleTotal = eligibleItems.reduce((sum, item) => {
+            const price = item.variant ? item.variant.selling_price : item.product.price;
+            return sum + (price * item.quantity);
+        }, 0);
+
+        let categoryTotalDiscount = (eligibleTotal * coupon.discount_percentage) / 100;
+        if (coupon.max_discount_amount && categoryTotalDiscount > coupon.max_discount_amount) {
+            categoryTotalDiscount = coupon.max_discount_amount;
+        }
+
+        totalDiscount = Math.round(categoryTotalDiscount * 100) / 100;
+
+        // Distribute the category discount proportionally across eligible items
+        eligibleItems.forEach(item => {
+            const price = item.variant ? item.variant.selling_price : item.product.price;
+            const itemSubtotal = price * item.quantity;
+            const itemProportion = eligibleTotal > 0 ? (itemSubtotal / eligibleTotal) : 0;
+            const itemDiscount = Math.round((totalDiscount * itemProportion) * 100) / 100;
+
+            itemDiscounts.push({
+                variant_id: item.variant_id,
+                product_id: item.product_id,
+                discount: itemDiscount,
+                coupon_code: coupon.code,
+                coupon_id: coupon.id,
+                type: 'category'
+            });
+        });
     }
 
-    // Calculate percentage discount
-    let discount = (applicableAmount * coupon.discount_percentage) / 100;
-
-    // Apply max discount cap if specified
-    if (coupon.max_discount_amount && discount > coupon.max_discount_amount) {
-        discount = coupon.max_discount_amount;
-    }
-
-    return Math.round(discount * 100) / 100; // Round to 2 decimal places
+    return {
+        totalDiscount: Math.round(totalDiscount * 100) / 100,
+        itemDiscounts
+    };
 }
 
 /**
@@ -126,10 +333,7 @@ function calculateCouponDiscount(coupon, cartItems, cartTotal) {
  */
 async function incrementUsageCount(couponId) {
     try {
-        const { error } = await supabase
-            .from('coupons')
-            .update({ usage_count: supabase.raw('usage_count + 1') })
-            .eq('id', couponId);
+        const { error } = await supabase.rpc('increment_coupon_usage', { p_coupon_id: couponId });
 
         if (error) {
             logger.error({ err: error }, 'Error incrementing coupon usage count:');
@@ -201,5 +405,8 @@ module.exports = {
     calculateCouponDiscount,
     incrementUsageCount,
     getActiveCoupons,
-    recordCouponUsage
+    recordCouponUsage,
+    getCouponPriority,
+    invalidateCouponCache,
+    getCachedCoupon
 };

@@ -33,14 +33,46 @@ export function ProductQuickView({
 
   if (!product) return null;
 
-  // Check if product is in cart
-  const cartItem = items.find((item) => item.productId === product.id);
-  const quantity = cartItem?.quantity || 0;
+  // Get the expected variantId for single-variant products
+  const expectedVariantId = product.variants?.[0]?.id;
 
+  // Normalize IDs for comparison
+  const normalizedProductId = String(product.id).toLowerCase().trim();
+  const normalizedExpectedVariantId = expectedVariantId ? String(expectedVariantId).toLowerCase().trim() : null;
+
+  // 1. Find specific cart item (for single-variant controls)
+  const specificCartItem = items.find((item) => {
+    const isProductMatch = String(item.productId).toLowerCase().trim() === normalizedProductId;
+    const vId = item.variantId ? String(item.variantId).toLowerCase().trim() : null;
+    return isProductMatch && vId === normalizedExpectedVariantId;
+  });
+  const specificQuantity = specificCartItem?.quantity || 0;
+
+  // 2. Find ALL items for this product (for total count in multi-variant scenarios)
+  const allProductItems = items.filter((item) =>
+    String(item.productId).toLowerCase().trim() === normalizedProductId
+  );
+  const totalProductQuantity = allProductItems.reduce((acc, item) => acc + item.quantity, 0);
+
+  // Check if product has multiple variants
+  const hasMultipleVariants = product.variants && product.variants.length > 1;
+
+  // Get effective stock (uses default variant or product inventory)
+  const effectiveStock = product.variants && product.variants.length > 0
+    ? product.variants[0].stock_quantity
+    : product.inventory;
 
   const handleAddToCart = async () => {
     try {
-      await addItem(product);
+      // For multi-variant products, close and let them go to PDP
+      if (hasMultipleVariants) {
+        onOpenChange(false);
+        return;
+      }
+
+      // For single-variant or no-variant products, add directly
+      const variantId = product.variants?.[0]?.id;
+      await addItem(product, 1, variantId);
       toast.success(`${product.title} added to cart`, {
         icon: <ShoppingCart size={16} className="text-[#B85C3C]" />,
       });
@@ -51,10 +83,11 @@ export function ProductQuickView({
 
   const handleIncreaseQuantity = async () => {
     try {
-      if (cartItem) {
-        await updateQuantity(product.id, quantity + 1);
+      if (specificCartItem) {
+        await updateQuantity(product.id, specificQuantity + 1, specificCartItem.variantId);
       } else {
-        await addItem(product);
+        const variantId = product.variants?.[0]?.id;
+        await addItem(product, 1, variantId);
       }
     } catch (error) {
       // Handled by store
@@ -62,12 +95,12 @@ export function ProductQuickView({
   };
 
   const handleDecreaseQuantity = async () => {
-    if (cartItem) {
+    if (specificCartItem) {
       try {
-        if (quantity > 1) {
-          await updateQuantity(product.id, quantity - 1);
+        if (specificQuantity > 1) {
+          await updateQuantity(product.id, specificQuantity - 1, specificCartItem.variantId);
         } else {
-          await removeItem(product.id);
+          await removeItem(product.id, specificCartItem.variantId);
           toast.success(`${product.title} removed from cart`);
         }
       } catch (error) {
@@ -82,15 +115,15 @@ export function ProductQuickView({
   };
 
   const getStockStatus = () => {
-    const inventory = product.inventory || 0;
-    if (inventory === 0) return { text: t("products.outOfStock"), color: "text-red-600" };
-    if (inventory < 5) return { text: "Only few left", color: "text-orange-600" };
-    if (inventory < 20) return { text: "Low stock", color: "text-orange-500" };
+    const stock = effectiveStock || 0;
+    if (stock === 0) return { text: t("products.outOfStock"), color: "text-red-600" };
+    if (stock < 5) return { text: "Only few left", color: "text-orange-600" };
+    if (stock < 20) return { text: "Low stock", color: "text-orange-500" };
     return { text: "In Stock", color: "text-green-600" };
   };
 
   const stockStatus = getStockStatus();
-  const hasRating = (product.ratingCount || 0) > 0;
+  const hasRating = (product.rating || 0) > 0 && (product.ratingCount || 0) > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -196,7 +229,7 @@ export function ProductQuickView({
                   <span className="text-base text-muted-foreground line-through font-light opacity-50">₹{product.mrp}</span>
                 )}
               </div>
-              <p className="text-[9px] text-muted-foreground font-medium tracking-wide">Inclusive of all taxes</p>
+
             </div>
 
             {/* Stock & Return */}
@@ -208,11 +241,11 @@ export function ProductQuickView({
                 </span>
               </div>
               <div className="flex items-center gap-1.5">
-                {product.isReturnable ? (
+                {(product as any).is_returnable !== undefined ? (product as any).is_returnable : product.isReturnable ? (
                   <>
                     <RotateCcw size={14} className="text-green-600" />
                     <span className="font-medium text-green-600">
-                      {product.returnDays} days return
+                      {(product as any).return_days ?? product.returnDays} days return
                     </span>
                   </>
                 ) : (
@@ -255,59 +288,96 @@ export function ProductQuickView({
 
             {/* Action Buttons */}
             <div className="space-y-2.5">
-              {quantity > 0 ? (
-                <>
-                  <div className="flex items-center justify-between bg-[#FAF7F2] p-2 rounded-xl border border-[#B85C3C]/10">
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground ml-2">Cart Quantity</span>
-                    <div className="flex items-center gap-3">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleDecreaseQuantity}
-                        className="h-7 w-7 rounded-full hover:bg-white transition-all shadow-sm"
-                      >
-                        <Minus size={12} />
-                      </Button>
-                      <span className="text-sm font-black text-[#2C1810] w-4 text-center">{quantity}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleIncreaseQuantity}
-                        disabled={product.inventory !== undefined && quantity >= product.inventory}
-                        className="h-7 w-7 rounded-full hover:bg-white transition-all shadow-sm"
-                      >
-                        <Plus size={12} />
-                      </Button>
+              {/* Multi-Variant Product Logic */}
+              {hasMultipleVariants ? (
+                totalProductQuantity > 0 ? (
+                  <>
+                    <div className="flex items-center justify-between bg-[#FAF7F2] p-2 rounded-xl border border-[#B85C3C]/10">
+                      <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground ml-2">In Your Cart</span>
+                      <span className="text-sm font-black text-[#2C1810]">{totalProductQuantity} item{totalProductQuantity > 1 ? 's' : ''}</span>
                     </div>
-                  </div>
-                  <Link to="/cart" className="block">
+                    <Link to="/cart" className="block">
+                      <Button
+                        variant="default"
+                        size="lg"
+                        className="w-full rounded-xl h-10 text-sm font-bold bg-[#B85C3C] hover:bg-[#2C1810] transition-colors"
+                        onClick={() => onOpenChange(false)}
+                      >
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        {t("cart.goToCart")}
+                      </Button>
+                    </Link>
+                  </>
+                ) : (
+                  <Link to={`/product/${product.id}`} className="block">
                     <Button
-                      variant="outline"
+                      className="w-full rounded-xl h-10 text-sm font-bold bg-[#B85C3C] hover:bg-[#2C1810] transition-all duration-300 shadow-lg shadow-[#B85C3C]/10"
                       size="lg"
-                      className="w-full rounded-xl h-10 text-sm font-bold border-2 border-[#B85C3C]/20 text-[#B85C3C] hover:text-[#2C1810] hover:bg-[#FAF7F2] transition-colors"
+                      disabled={!effectiveStock || effectiveStock === 0}
                       onClick={() => onOpenChange(false)}
                     >
-                      <ShoppingCart className="h-4 w-4 mr-2" />
-                      {t("cart.goToCart")}
+                      {!effectiveStock || effectiveStock === 0
+                        ? t("products.outOfStock")
+                        : t("products.selectOptions", "Select Options")}
                     </Button>
                   </Link>
-                </>
+                )
               ) : (
-                <Button
-                  onClick={handleAddToCart}
-                  className="w-full rounded-xl h-10 text-sm font-bold bg-[#B85C3C] hover:bg-[#2C1810] transition-all duration-300 shadow-lg shadow-[#B85C3C]/10"
-                  size="lg"
-                  disabled={!product.inventory || product.inventory === 0}
-                >
-                  {!product.inventory || product.inventory === 0 ? (
-                    t("products.outOfStock")
-                  ) : (
-                    <>
-                      <ShoppingCart className="mr-2 h-4 w-4" />
-                      {t("products.addToCart")}
-                    </>
-                  )}
-                </Button>
+                /* Single/No Variant Product Logic */
+                specificQuantity > 0 ? (
+                  <>
+                    <div className="flex items-center justify-between bg-[#FAF7F2] p-2 rounded-xl border border-[#B85C3C]/10">
+                      <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground ml-2">Cart Quantity</span>
+                      <div className="flex items-center gap-3">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleDecreaseQuantity}
+                          className="h-7 w-7 rounded-full hover:bg-white transition-all shadow-sm"
+                        >
+                          <Minus size={12} />
+                        </Button>
+                        <span className="text-sm font-black text-[#2C1810] w-4 text-center">{specificQuantity}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleIncreaseQuantity}
+                          disabled={effectiveStock !== undefined && specificQuantity >= effectiveStock}
+                          className="h-7 w-7 rounded-full hover:bg-white transition-all shadow-sm"
+                        >
+                          <Plus size={12} />
+                        </Button>
+                      </div>
+                    </div>
+                    <Link to="/cart" className="block">
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        className="w-full rounded-xl h-10 text-sm font-bold border-2 border-[#B85C3C]/20 text-[#B85C3C] hover:text-[#2C1810] hover:bg-[#FAF7F2] transition-colors"
+                        onClick={() => onOpenChange(false)}
+                      >
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        {t("cart.goToCart")}
+                      </Button>
+                    </Link>
+                  </>
+                ) : (
+                  <Button
+                    onClick={handleAddToCart}
+                    className="w-full rounded-xl h-10 text-sm font-bold bg-[#B85C3C] hover:bg-[#2C1810] transition-all duration-300 shadow-lg shadow-[#B85C3C]/10"
+                    size="lg"
+                    disabled={!effectiveStock || effectiveStock === 0}
+                  >
+                    {!effectiveStock || effectiveStock === 0 ? (
+                      t("products.outOfStock")
+                    ) : (
+                      <>
+                        <ShoppingCart className="mr-2 h-4 w-4" />
+                        {t("products.addToCart")}
+                      </>
+                    )}
+                  </Button>
+                )
               )}
 
               <Link to={`/product/${product.id}`} className="block">

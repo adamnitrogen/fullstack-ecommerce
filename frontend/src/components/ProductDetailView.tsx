@@ -36,7 +36,6 @@ export const ProductDetailView = ({
   const { user } = useAuthStore();
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
-  // Variant state - default to the is_default variant or first variant
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(
     () => {
       if (product.variants && product.variants.length > 0) {
@@ -68,13 +67,11 @@ export const ProductDetailView = ({
   );
 
   // Update display image when variant changes (if variant has specific image)
-  // Update display image when variant changes (if variant has specific image)
   useEffect(() => {
     if (selectedVariant?.variant_image_url) {
       setDisplayImage(selectedVariant.variant_image_url);
     } else {
       // Revert to main product image if variant has no specific image
-      // Use the current index or default to 0
       setDisplayImage(product.images[selectedImageIndex] || product.images[0]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -100,13 +97,13 @@ export const ProductDetailView = ({
     setDisplayImage(image);
   };
 
-  // Check if product is in cart (with variant match)
+  // Ultra-simple reactive lookup - use selected items directly
   const cartItem = items.find((item) => {
-    if (selectedVariant) {
-      return item.productId === product.id && item.variantId === selectedVariant.id;
-    }
-    return item.productId === product.id && !item.variantId;
+    const isProductMatch = String(item.productId) === String(product.id);
+    const isVariantMatch = (item.variantId || null) === (selectedVariant?.id || null);
+    return isProductMatch && isVariantMatch;
   });
+
   const quantity = cartItem?.quantity || 0;
 
   const handleVariantSelect = (variant: ProductVariant) => {
@@ -114,16 +111,17 @@ export const ProductDetailView = ({
     // The useEffect above will handle the image update
   };
 
-  const handleAddToCart = async () => {
-    try {
-      await addItem(product, 1, selectedVariant?.id);
-      const sizeLabel = selectedVariant ? ` (${selectedVariant.size_label})` : "";
-      toast.success(`${product.title}${sizeLabel} added to cart`, {
-        icon: <ShoppingCart size={16} className="text-primary" />,
-      });
-    } catch (error) {
-      // Error is handled in store (which shows toast)
-    }
+  const handleAddToCart = () => {
+    // Optimistic update - don't await
+    addItem(product, 1, selectedVariant?.id).catch((error) => {
+      // Store handles the error toast and rollback
+      console.error("Add to cart failed:", error);
+    });
+
+    const sizeLabel = selectedVariant ? ` (${selectedVariant.size_label})` : "";
+    toast.success(`${product.title}${sizeLabel} added to cart`, {
+      icon: <ShoppingCart size={16} className="text-primary" />,
+    });
   };
 
   const handleBuyNow = async () => {
@@ -185,9 +183,25 @@ export const ProductDetailView = ({
   };
 
   const stockStatus = getStockStatus();
-  const hasRating = (product.ratingCount || 0) > 0;
+  const hasRating = (product.rating || 0) > 0 && (product.ratingCount || 0) > 0;
   const hasVariants = product.variants && product.variants.length > 0;
   const discount = calculateDiscount(displayMrp || 0, displayPrice);
+
+  // Normalize Return Policy Data (Handle both camelCase and snake_case)
+  const isReturnable = (product as any).is_returnable !== undefined
+    ? (product as any).is_returnable
+    : product.isReturnable ?? false;
+
+  const returnDays = (product as any).return_days ?? product.returnDays ?? 3;
+
+  // Normalize Tax Data
+  const taxApplicable = selectedVariant
+    ? (selectedVariant.tax_applicable ?? false)
+    : (product.default_tax_applicable ?? false);
+
+  const priceIncludesTax = selectedVariant
+    ? (selectedVariant.price_includes_tax ?? false)
+    : (product.default_price_includes_tax ?? false);
 
   return (
     <div className={`${className} animate-in fade-in slide-in-from-bottom-4 duration-700`}>
@@ -294,7 +308,11 @@ export const ProductDetailView = ({
                 <span className="text-lg text-muted-foreground line-through font-light opacity-50">₹{displayMrp}</span>
               )}
             </div>
-            <p className="text-[10px] text-muted-foreground font-medium tracking-wide">Inclusive of all taxes</p>
+            {taxApplicable && (
+              <p className="text-[10px] text-muted-foreground font-medium tracking-wide">
+                {priceIncludesTax ? "Inclusive of all taxes" : "Price excludes taxes"}
+              </p>
+            )}
           </div>
 
           {/* Stock status without number */}
@@ -308,11 +326,11 @@ export const ProductDetailView = ({
 
             {/* Return Policy - Immediately below stock */}
             <div className="flex items-center gap-2">
-              {product.isReturnable ? (
+              {isReturnable ? (
                 <>
                   <RotateCcw className="h-4 w-4 text-green-600" />
                   <span className="text-xs font-medium text-green-600">
-                    {product.returnDays} days return available
+                    {returnDays} days return available
                   </span>
                 </>
               ) : (
@@ -364,7 +382,7 @@ export const ProductDetailView = ({
                 <Button
                   size="lg"
                   onClick={handleBuyNow}
-                  disabled={!product.inventory || product.inventory === 0}
+                  disabled={!displayStock || displayStock === 0}
                   className="w-full rounded-xl h-12 text-base font-bold bg-[#B85C3C] hover:bg-[#2C1810] transition-all duration-300 shadow-lg shadow-[#B85C3C]/10"
                 >
                   <Zap className="h-5 w-5 mr-3 fill-current" />
@@ -374,31 +392,29 @@ export const ProductDetailView = ({
                 {quantity > 0 ? (
                   <div className="space-y-2.5">
                     {/* Quantity Selector - Integrated with Buy Now context */}
-                    {product.inventory && product.inventory > 0 && (
-                      <div className="flex items-center justify-between bg-[#FAF7F2] p-2 rounded-xl border border-[#B85C3C]/10 mb-1">
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-2">Cart Quantity</span>
-                        <div className="flex items-center gap-3">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={handleDecreaseQuantity}
-                            className="h-8 w-8 rounded-full hover:bg-white transition-all shadow-sm"
-                          >
-                            <Minus size={14} />
-                          </Button>
-                          <span className="text-base font-black text-[#2C1810] w-4 text-center">{quantity}</span>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={handleIncreaseQuantity}
-                            disabled={product.inventory !== undefined && quantity >= product.inventory}
-                            className="h-8 w-8 rounded-full hover:bg-white transition-all shadow-sm"
-                          >
-                            <Plus size={14} />
-                          </Button>
-                        </div>
+                    <div className="flex items-center justify-between bg-[#FAF7F2] p-2 rounded-xl border border-[#B85C3C]/10 mb-1">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-2">Cart Quantity</span>
+                      <div className="flex items-center gap-3">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleDecreaseQuantity}
+                          className="h-8 w-8 rounded-full hover:bg-white transition-all shadow-sm"
+                        >
+                          <Minus size={14} />
+                        </Button>
+                        <span className="text-base font-black text-[#2C1810] w-4 text-center">{quantity}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleIncreaseQuantity}
+                          disabled={displayStock !== undefined && displayStock > 0 && quantity >= displayStock}
+                          className="h-8 w-8 rounded-full hover:bg-white transition-all shadow-sm"
+                        >
+                          <Plus size={14} />
+                        </Button>
                       </div>
-                    )}
+                    </div>
                     <Link to="/cart" className="block">
                       <Button variant="outline" size="lg" className="w-full rounded-xl h-12 text-base font-bold border-2 border-[#B85C3C]/20 text-[#B85C3C] hover:text-[#2C1810] hover:bg-[#FAF7F2] transition-colors">
                         <ShoppingCart className="h-5 w-5 mr-3" />
@@ -411,7 +427,7 @@ export const ProductDetailView = ({
                     variant="outline"
                     size="lg"
                     onClick={handleAddToCart}
-                    disabled={!product.inventory || product.inventory === 0}
+                    disabled={!displayStock || displayStock === 0}
                     className="w-full rounded-xl h-12 text-base font-bold border-2 border-[#B85C3C]/20 text-[#B85C3C] hover:text-[#2C1810] hover:bg-[#FAF7F2] transition-colors"
                   >
                     <ShoppingCart className="h-5 w-5 mr-3" />
@@ -423,6 +439,6 @@ export const ProductDetailView = ({
           </div>
         </div>
       </div>
-    </div>
+    </div >
   );
 };

@@ -3,10 +3,12 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 
+const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+
 // --- NEWSLETTER SUBSCRIBERS ---
 
-// Get subscriber stats (MUST be before /subscribers/:id)
-router.get('/subscribers/stats', async (req, res) => {
+// Get subscriber stats (MUST be before /subscribers/:id) - Admin/Manager only
+router.get('/subscribers/stats', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { count: totalCount, error: allError } = await supabase
             .from('newsletter_subscribers')
@@ -31,8 +33,8 @@ router.get('/subscribers/stats', async (req, res) => {
     }
 });
 
-// Get all subscribers (with optional filter)
-router.get('/subscribers', async (req, res) => {
+// Get all subscribers (with optional filter) - Admin/Manager only
+router.get('/subscribers', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { active } = req.query;
 
@@ -41,7 +43,7 @@ router.get('/subscribers', async (req, res) => {
             .select('*')
             .order('subscribed_at', { ascending: false });
 
-        // Filter by active status if provided
+        // Filter by active status for public users
         if (active !== undefined) {
             query = query.eq('is_active', active === 'true');
         }
@@ -56,7 +58,7 @@ router.get('/subscribers', async (req, res) => {
     }
 });
 
-// Add a new subscriber
+// Add a new subscriber - Public
 router.post('/subscribers', async (req, res) => {
     try {
         const { email, name } = req.body;
@@ -91,8 +93,8 @@ router.post('/subscribers', async (req, res) => {
     }
 });
 
-// Update a subscriber
-router.put('/subscribers/:id', async (req, res) => {
+// Update a subscriber - Authenticated
+router.put('/subscribers/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
         const { email, name, is_active } = req.body;
@@ -135,8 +137,8 @@ router.put('/subscribers/:id', async (req, res) => {
     }
 });
 
-// Delete a subscriber
-router.delete('/subscribers/:id', async (req, res) => {
+// Delete a subscriber - Authenticated
+router.delete('/subscribers/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -156,8 +158,8 @@ router.delete('/subscribers/:id', async (req, res) => {
 
 // --- NEWSLETTER CONFIG ---
 
-// Get newsletter configuration
-router.get('/config', async (req, res) => {
+// Get newsletter configuration - Admin/Manager only
+router.get('/config', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('newsletter_config')
@@ -182,8 +184,8 @@ router.get('/config', async (req, res) => {
     }
 });
 
-// Update newsletter configuration
-router.put('/config', async (req, res) => {
+// Update newsletter configuration - Admin/Manager only
+router.put('/config', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { sender_name, sender_email, footer_text } = req.body;
 

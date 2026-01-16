@@ -20,6 +20,7 @@ interface CartSummaryProps {
     onCheckout: () => void;
     availableCoupons?: Coupon[];
     deliverySettings?: { threshold: number; charge: number };
+    isCalculating?: boolean;
 }
 
 
@@ -32,6 +33,7 @@ export const CartSummary = ({
     onCheckout,
     availableCoupons = [],
     deliverySettings = { threshold: 1500, charge: 50 },
+    isCalculating = false,
 }: CartSummaryProps) => {
     const [couponCode, setCouponCode] = useState("");
     const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
@@ -108,30 +110,56 @@ export const CartSummary = ({
 
                 {/* Price Breakdown */}
                 <div className="space-y-3 text-sm">
-                    <div className="flex justify-between text-muted-foreground font-medium">
-                        <span>Items Total (MRP)</span>
-                        <span className="text-foreground">₹{totals?.totalMrp || 0}</span>
-                    </div>
-
-                    {totals && totals.discount > 0 && (
-                        <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold">
-                            <span className="flex items-center gap-1.5">
-                                <TagIcon className="w-3.5 h-3.5" />
-                                Product Discounts
-                            </span>
-                            <span>−₹{totals.discount}</span>
+                    <div className={cn(
+                        "space-y-4 relative transition-all duration-300",
+                        isCalculating && "opacity-50 blur-[1px] pointer-events-none"
+                    )}>
+                        <div className="flex justify-between text-muted-foreground font-medium">
+                            <span>Items Total (MRP)</span>
+                            <span className="text-foreground">₹{totals?.totalMrp || 0}</span>
                         </div>
-                    )}
 
-                    <div className="flex justify-between font-medium">
-                        <span className="text-muted-foreground">Delivery</span>
-                        <div className="text-right">
-                            {totals?.deliveryCharge === 0 ? (
-                                <span className="text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-tighter text-xs">Free</span>
-                            ) : (
-                                <span className="text-foreground">₹{totals?.deliveryCharge}</span>
+                        {totals && totals.discount > 0 && (
+                            <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold">
+                                <span className="flex items-center gap-1.5">
+                                    <TagIcon className="w-3.5 h-3.5" />
+                                    Product Discounts
+                                </span>
+                                <span>−₹{totals.discount}</span>
+                            </div>
+                        )}
+
+                        <div className="flex flex-col gap-1">
+                            <div className="flex justify-between font-medium">
+                                <span className="text-muted-foreground">Store Delivery</span>
+                                <div className="text-right text-xs">
+                                    {totals?.globalDeliveryCharge === 0 ? (
+                                        <span className="text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-tighter">Free</span>
+                                    ) : (
+                                        <span className="text-foreground">₹{totals?.globalDeliveryCharge || 0}</span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {totals && totals.productDeliveryCharges > 0 && (
+                                <div className="flex justify-between font-medium text-amber-600 dark:text-amber-400">
+                                    <span className="flex items-center gap-1">
+                                        <Truck className="w-3 h-3" />
+                                        Special Logistics Fees
+                                    </span>
+                                    <span>₹{totals.productDeliveryCharges}</span>
+                                </div>
                             )}
                         </div>
+
+                        {/* Relative Loader for Calculation */}
+                        {isCalculating && (
+                            <div className="absolute inset-0 flex items-center justify-center z-10">
+                                <span className="flex items-center gap-2 px-3 py-1 bg-background/80 backdrop-blur-sm rounded-full border shadow-sm text-[10px] font-bold uppercase tracking-widest animate-pulse">
+                                    Recalculating...
+                                </span>
+                            </div>
+                        )}
                     </div>
 
                     {/* Delivery Progress Bar for Free Shipping */}
@@ -220,7 +248,10 @@ export const CartSummary = ({
                 <Separator className="opacity-50" />
 
                 {/* Total & Checkout */}
-                <div className="space-y-5">
+                <div className={cn(
+                    "space-y-5 transition-all duration-300",
+                    isCalculating && "opacity-50 blur-[1px] pointer-events-none"
+                )}>
                     <div className="flex justify-between items-end">
                         <span className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Total Pay</span>
                         <div className="text-right">
@@ -238,31 +269,31 @@ export const CartSummary = ({
                             Congrats! You are saving ₹{totals.discount + totals.couponDiscount}
                         </div>
                     )}
+                </div>
 
-                    <Button
-                        size="lg"
-                        className="w-full h-14 text-lg font-black uppercase tracking-widest shadow-2xl shadow-primary/20 hover:shadow-primary/40 transition-all active:scale-95 rounded-2xl"
-                        onClick={onCheckout}
-                        disabled={isLoading || itemsCount === 0}
-                    >
-                        {isLoading ? <Loader2 className="animate-spin mr-2" /> : null}
-                        Checkout Securely
-                    </Button>
+                <Button
+                    size="lg"
+                    className="w-full h-14 text-lg font-black uppercase tracking-widest shadow-2xl shadow-primary/20 hover:shadow-primary/40 transition-all active:scale-95 rounded-2xl"
+                    onClick={onCheckout}
+                    disabled={isLoading || itemsCount === 0}
+                >
+                    {isLoading ? <Loader2 className="animate-spin mr-2" /> : null}
+                    Checkout Securely
+                </Button>
 
-                    {/* Trust Badges */}
-                    <div className="grid grid-cols-3 gap-2 pt-2">
-                        <div className="flex flex-col items-center justify-center text-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
-                            <ShieldCheck className="w-5 h-5 text-primary" />
-                            <span className="text-[10px] font-bold text-muted-foreground leading-tight uppercase tracking-tighter">Safe \u0026 Secure</span>
-                        </div>
-                        <div className="flex flex-col items-center justify-center text-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
-                            <Truck className="w-5 h-5 text-primary" />
-                            <span className="text-[10px] font-bold text-muted-foreground leading-tight uppercase tracking-tighter">Fast Shipping</span>
-                        </div>
-                        <div className="flex flex-col items-center justify-center text-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
-                            <RotateCcw className="w-5 h-5 text-primary" />
-                            <span className="text-[10px] font-bold text-muted-foreground leading-tight uppercase tracking-tighter">Easy Return</span>
-                        </div>
+                {/* Trust Badges */}
+                <div className="grid grid-cols-3 gap-2 pt-2">
+                    <div className="flex flex-col items-center justify-center text-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
+                        <ShieldCheck className="w-5 h-5 text-primary" />
+                        <span className="text-[10px] font-bold text-muted-foreground leading-tight uppercase tracking-tighter">Safe \u0026 Secure</span>
+                    </div>
+                    <div className="flex flex-col items-center justify-center text-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
+                        <Truck className="w-5 h-5 text-primary" />
+                        <span className="text-[10px] font-bold text-muted-foreground leading-tight uppercase tracking-tighter">Fast Shipping</span>
+                    </div>
+                    <div className="flex flex-col items-center justify-center text-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
+                        <RotateCcw className="w-5 h-5 text-primary" />
+                        <span className="text-[10px] font-bold text-muted-foreground leading-tight uppercase tracking-tighter">Easy Return</span>
                     </div>
                 </div>
             </CardContent>

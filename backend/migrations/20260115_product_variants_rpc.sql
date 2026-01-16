@@ -48,9 +48,13 @@ BEGIN
         inventory,
         tags,
         benefits,
-        "isReturnable",
-        "returnDays",
-        "createdAt"
+        is_returnable,
+        return_days,
+        default_hsn_code,
+        default_gst_rate,
+        default_tax_applicable,
+        default_price_includes_tax,
+        created_at
     ) VALUES (
         p_product_data->>'title',
         p_product_data->>'description',
@@ -72,6 +76,10 @@ BEGIN
         ),
         COALESCE((p_product_data->>'isReturnable')::boolean, true),
         COALESCE((p_product_data->>'returnDays')::integer, 3),
+        p_product_data->>'default_hsn_code',
+        COALESCE((p_product_data->>'default_gst_rate')::decimal, 0),
+        COALESCE((p_product_data->>'default_tax_applicable')::boolean, true),
+        COALESCE((p_product_data->>'default_price_includes_tax')::boolean, true),
         COALESCE((p_product_data->>'createdAt')::timestamptz, NOW())
     )
     RETURNING id INTO v_product_id;
@@ -87,17 +95,25 @@ BEGIN
             selling_price,
             stock_quantity,
             variant_image_url,
-            is_default
+            is_default,
+            hsn_code,
+            gst_rate,
+            tax_applicable,
+            price_includes_tax
         ) VALUES (
             v_product_id,
             v_variant->>'size_label',
-            (v_variant->>'size_value')::decimal,
+            COALESCE((v_variant->>'size_value')::decimal, 0),
             COALESCE(v_variant->>'unit', 'kg'),
-            (v_variant->>'mrp')::decimal,
-            (v_variant->>'selling_price')::decimal,
+            COALESCE((v_variant->>'mrp')::decimal, 0),
+            COALESCE((v_variant->>'selling_price')::decimal, 0),
             COALESCE((v_variant->>'stock_quantity')::integer, 0),
             v_variant->>'variant_image_url',
-            COALESCE((v_variant->>'is_default')::boolean, false)
+            COALESCE((v_variant->>'is_default')::boolean, false),
+            v_variant->>'hsn_code',
+            COALESCE((v_variant->>'gst_rate')::decimal, 0),
+            COALESCE((v_variant->>'tax_applicable')::boolean, true),
+            COALESCE((v_variant->>'price_includes_tax')::boolean, true)
         )
         RETURNING id INTO v_variant_id;
         
@@ -165,8 +181,12 @@ BEGIN
                 ARRAY(SELECT jsonb_array_elements_text(p_product_data->'benefits'))
             ELSE benefits 
         END,
-        "isReturnable" = COALESCE((p_product_data->>'isReturnable')::boolean, "isReturnable"),
-        "returnDays" = COALESCE((p_product_data->>'returnDays')::integer, "returnDays")
+        is_returnable = COALESCE((p_product_data->>'isReturnable')::boolean, is_returnable),
+        return_days = COALESCE((p_product_data->>'returnDays')::integer, return_days),
+        default_hsn_code = COALESCE(p_product_data->>'default_hsn_code', default_hsn_code),
+        default_gst_rate = COALESCE((p_product_data->>'default_gst_rate')::decimal, default_gst_rate),
+        default_tax_applicable = COALESCE((p_product_data->>'default_tax_applicable')::boolean, default_tax_applicable),
+        default_price_includes_tax = COALESCE((p_product_data->>'default_price_includes_tax')::boolean, default_price_includes_tax)
     WHERE id = p_product_id;
     
     -- 1. Identify IDs to keep and delete orphans FIRST 
@@ -202,12 +222,16 @@ BEGIN
                         ELSE variant_image_url
                     END,
                     is_default = COALESCE((v_variant->>'is_default')::boolean, is_default),
+                    hsn_code = COALESCE(v_variant->>'hsn_code', hsn_code),
+                    gst_rate = COALESCE((v_variant->>'gst_rate')::decimal, gst_rate),
+                    tax_applicable = COALESCE((v_variant->>'tax_applicable')::boolean, tax_applicable),
+                    price_includes_tax = COALESCE((v_variant->>'price_includes_tax')::boolean, price_includes_tax),
                     updated_at = NOW()
                 WHERE id = v_variant_id;
                 
                 v_updated_variant_ids := array_append(v_updated_variant_ids, v_variant_id);
             ELSE
-                -- Create new variant
+            -- Create new variant
                 INSERT INTO product_variants (
                     product_id,
                     size_label,
@@ -217,17 +241,25 @@ BEGIN
                     selling_price,
                     stock_quantity,
                     variant_image_url,
-                    is_default
+                    is_default,
+                    hsn_code,
+                    gst_rate,
+                    tax_applicable,
+                    price_includes_tax
                 ) VALUES (
                     p_product_id,
                     v_variant->>'size_label',
-                    (v_variant->>'size_value')::decimal,
+                    COALESCE((v_variant->>'size_value')::decimal, 0),
                     COALESCE(v_variant->>'unit', 'kg'),
-                    (v_variant->>'mrp')::decimal,
-                    (v_variant->>'selling_price')::decimal,
+                    COALESCE((v_variant->>'mrp')::decimal, 0),
+                    COALESCE((v_variant->>'selling_price')::decimal, 0),
                     COALESCE((v_variant->>'stock_quantity')::integer, 0),
                     v_variant->>'variant_image_url',
-                    COALESCE((v_variant->>'is_default')::boolean, false)
+                    COALESCE((v_variant->>'is_default')::boolean, false),
+                    v_variant->>'hsn_code',
+                    COALESCE((v_variant->>'gst_rate')::decimal, 0),
+                    COALESCE((v_variant->>'tax_applicable')::boolean, true),
+                    COALESCE((v_variant->>'price_includes_tax')::boolean, true)
                 )
                 RETURNING id INTO v_variant_id;
                 

@@ -25,33 +25,69 @@ export const ProductCard = ({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { addItem, items, updateQuantity, removeItem } = useCartStore();
-  const cartItem = items.find((item) => item.productId === product.id);
-  const quantity = cartItem?.quantity || 0;
+
+  // Get the expected variantId for single-variant products
+  const expectedVariantId = product.variants?.[0]?.id;
+
+  // Normalize IDs for comparison
+  const normalizedProductId = String(product.id).toLowerCase().trim();
+  const normalizedExpectedVariantId = expectedVariantId ? String(expectedVariantId).toLowerCase().trim() : null;
+
+  // 1. Find specific cart item (for single-variant controls)
+  const specificCartItem = items.find((item) => {
+    const isProductMatch = String(item.productId).toLowerCase().trim() === normalizedProductId;
+    const vId = item.variantId ? String(item.variantId).toLowerCase().trim() : null;
+    return isProductMatch && vId === normalizedExpectedVariantId;
+  });
+  const specificQuantity = specificCartItem?.quantity || 0;
+
+  // 2. Find ALL items for this product (for total count badge/indicator)
+  const allProductItems = items.filter((item) =>
+    String(item.productId).toLowerCase().trim() === normalizedProductId
+  );
+  const totalProductQuantity = allProductItems.reduce((acc, item) => acc + item.quantity, 0);
 
   const calculateDiscount = (mrp: number, price: number) => {
     return Math.round(((mrp - price) / mrp) * 100);
   };
 
+  // Check if product has multiple variants
+  const hasMultipleVariants = product.variants && product.variants.length > 1;
+
+  // Get effective stock (uses default variant or product inventory)
+  const effectiveStock = product.variants && product.variants.length > 0
+    ? product.variants[0].stock_quantity
+    : product.inventory;
+
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    addItem(product);
+
+    // For multi-variant products, navigate to PDP for variant selection
+    if (hasMultipleVariants) {
+      navigate(`/product/${product.id}`);
+      return;
+    }
+
+    // For single-variant or no-variant products, add directly
+    const variantId = product.variants?.[0]?.id;
+    addItem(product, 1, variantId);
     toast.success(`${product.title} added to cart`);
   };
 
   const handleIncreaseQuantity = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    updateQuantity(product.id, quantity + 1);
+    updateQuantity(product.id, specificQuantity + 1, expectedVariantId);
   };
 
   const handleDecreaseQuantity = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (quantity > 1) {
-      updateQuantity(product.id, quantity - 1);
+    if (specificQuantity > 1) {
+      updateQuantity(product.id, specificQuantity - 1, expectedVariantId);
     } else {
-      removeItem(product.id);
+      removeItem(product.id, expectedVariantId);
       toast.success(`${product.title} removed from cart`);
     }
   };
@@ -125,7 +161,12 @@ export const ProductCard = ({
           <div className="mt-auto pt-1">
             <div className="flex items-center justify-between">
               <div className="space-y-0">
-                <p className="text-lg font-bold text-[#2C1810]">₹{product.price}</p>
+                <p className="text-lg font-bold text-[#2C1810]">
+                  ₹{product.price}
+                  {product.default_tax_applicable && product.default_price_includes_tax === false && (
+                    <span className="text-[10px] font-normal text-muted-foreground ml-1">+ Tax</span>
+                  )}
+                </p>
                 {product.mrp && product.mrp > product.price && (
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground/60 line-through font-light">
@@ -138,7 +179,7 @@ export const ProductCard = ({
                 )}
               </div>
 
-              {(product.reviewCount || 0) > 0 && (
+              {Number(product.rating) > 0 && Number(product.reviewCount) > 0 && (
                 <div className="flex items-center gap-1 bg-muted/30 px-1.5 py-0.5 rounded-lg">
                   <Star className="h-3 w-3 fill-[#D4AF37] text-[#D4AF37]" />
                   <span className="text-[10px] font-bold text-[#2C1810]">{product.rating}</span>
@@ -150,58 +191,87 @@ export const ProductCard = ({
 
         {showAddToCart && (
           <CardFooter className="p-4 pt-0 mt-auto flex flex-col gap-1.5">
-            {quantity > 0 ? (
-              <>
-                <div className="flex items-center gap-2 w-full">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={handleDecreaseQuantity}
-                    className="h-8 w-8"
-                  >
-                    <span className="sr-only">Decrease</span>
-                    <Minus className="h-3 w-3" />
-                  </Button>
-                  <span className="flex-1 text-center font-bold text-sm">
-                    {quantity}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={handleIncreaseQuantity}
-                    className="h-8 w-8"
-                    disabled={
-                      product.inventory !== undefined &&
-                      quantity >= product.inventory
-                    }
-                  >
-                    <span className="sr-only">Increase</span>
-                    <Plus className="h-3 w-3" />
-                  </Button>
-                </div>
+            {/* Logic for Multi-Variant Products */}
+            {hasMultipleVariants ? (
+              totalProductQuantity > 0 ? (
                 <Button
                   variant="secondary"
-                  className="w-full text-[10px] h-7"
+                  className="w-full h-9 text-xs font-bold bg-primary/10 text-primary hover:bg-primary/20"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     navigate("/cart");
                   }}
                 >
-                  {t("cart.goToCart")}
+                  {t("products.viewInCart", "View in Cart")} ({totalProductQuantity})
                 </Button>
-              </>
+              ) : (
+                <Button
+                  variant="default"
+                  className="w-full h-9 text-xs"
+                  onClick={handleAddToCart}
+                  disabled={!effectiveStock || effectiveStock === 0}
+                >
+                  {!effectiveStock || effectiveStock === 0
+                    ? t("products.outOfStock")
+                    : t("products.selectOptions", "Select Options")}
+                </Button>
+              )
             ) : (
-              <Button
-                variant="default"
-                className="w-full h-9 text-xs"
-                onClick={handleAddToCart}
-                disabled={!product.inventory || product.inventory === 0}
-              >
-                {!product.inventory || product.inventory === 0
-                  ? t("products.outOfStock")
-                  : t("products.addToCart")}
-              </Button>
+              /* Logic for Single/No Variant Products */
+              specificQuantity > 0 ? (
+                <>
+                  <div className="flex items-center gap-2 w-full">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handleDecreaseQuantity}
+                      className="h-8 w-8"
+                    >
+                      <span className="sr-only">Decrease</span>
+                      <Minus className="h-3 w-3" />
+                    </Button>
+                    <span className="flex-1 text-center font-bold text-sm">
+                      {specificQuantity}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handleIncreaseQuantity}
+                      className="h-8 w-8"
+                      disabled={
+                        effectiveStock !== undefined &&
+                        specificQuantity >= effectiveStock
+                      }
+                    >
+                      <span className="sr-only">Increase</span>
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    className="w-full text-[10px] h-7"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      navigate("/cart");
+                    }}
+                  >
+                    {t("cart.goToCart")}
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="default"
+                  className="w-full h-9 text-xs"
+                  onClick={handleAddToCart}
+                  disabled={!effectiveStock || effectiveStock === 0}
+                >
+                  {!effectiveStock || effectiveStock === 0
+                    ? t("products.outOfStock")
+                    : t("products.addToCart")}
+                </Button>
+              )
             )}
           </CardFooter>
         )}

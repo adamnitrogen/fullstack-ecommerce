@@ -23,12 +23,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, MapPin, Phone, Mail, CreditCard, Package, Clock, Truck, User } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, Mail, CreditCard, Package, Clock, Truck, User, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { CheckoutAddress, Order, Product, CartItem, OrderItem, ReturnRequest } from "@/types";
+import { TaxBreakdown } from "@/components/orders/TaxBreakdown";
 
 interface OrderStatusHistory {
     status: string;
@@ -75,9 +76,32 @@ interface OrderDetail {
             variant_image_url?: string;
         };
         size_label?: string;
+        hsn_code?: string;
+        gst_rate?: number;
+        taxable_amount?: number;
+        cgst?: number;
+        sgst?: number;
+        igst?: number;
     })[];
     payment_id: string;
     order_status_history?: OrderStatusHistory[];
+    // GST Tax fields
+    total_taxable_amount?: number;
+    total_cgst?: number;
+    total_sgst?: number;
+    total_igst?: number;
+    invoice_id?: string;
+    invoice_url?: string;
+    invoice_status?: string;
+    email_logs?: {
+        id: string;
+        event_type: string;
+        recipient: string;
+        status: string;
+        created_at: string;
+        retry_count: number;
+        error_message?: string;
+    }[];
 }
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
@@ -203,6 +227,22 @@ export default function OrderDetail() {
         } finally {
             setUpdating(false);
             setPendingStatus(null);
+        }
+    };
+
+    const handleRetryInvoice = async () => {
+        try {
+            setUpdating(true);
+            toast.info("Retrying invoice generation...");
+            const response = await apiClient.post(`/invoices/orders/${id}/retry`, {});
+            if (response.data.success) {
+                toast.success("Invoice generated successfully");
+                fetchOrderDetail(); // Refresh
+            }
+        } catch (error) {
+            toast.error(getErrorMessage(error, "Failed to generate invoice"));
+        } finally {
+            setUpdating(false);
         }
     };
 
@@ -340,6 +380,16 @@ export default function OrderDetail() {
                                                 <p className="text-sm text-muted-foreground">
                                                     Qty: {item.quantity} × ₹{unitPrice}
                                                 </p>
+                                                {(item.gst_rate || 0) > 0 && (
+                                                    <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                                                        <p>Generic Tax: {item.gst_rate}% (HSN: {item.hsn_code || 'N/A'})</p>
+                                                        <div className="flex gap-2">
+                                                            {item.cgst ? <span>CGST: ₹{item.cgst}</span> : null}
+                                                            {item.sgst ? <span>SGST: ₹{item.sgst}</span> : null}
+                                                            {item.igst ? <span>IGST: ₹{item.igst}</span> : null}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="text-right font-medium">
                                                 ₹{(item.quantity * unitPrice).toFixed(2)}
@@ -452,6 +502,50 @@ export default function OrderDetail() {
                             </CardContent>
                         </Card>
                     )}
+
+                    {/* Email History */}
+                    {order.email_logs && order.email_logs.length > 0 && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Mail className="h-5 w-5" />
+                                    Email Notifications
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-4">
+                                    {order.email_logs.map((email, index) => (
+                                        <div key={index} className="flex gap-4 items-start border-l-2 border-muted pl-4 ml-2 pb-4 last:pb-0">
+                                            <div className="flex-1">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="font-medium text-sm">{email.event_type.replace(/_/g, ' ')}</span>
+                                                    <Badge
+                                                        variant={email.status === 'SENT' ? 'default' : email.status === 'FAILED' ? 'destructive' : 'secondary'}
+                                                        className={`text-xs ${email.status === 'SENT' ? 'bg-green-100 text-green-800 border-green-200 hover:bg-green-100' : ''}`}
+                                                    >
+                                                        {email.status}
+                                                    </Badge>
+                                                </div>
+                                                <div className="flex justify-between items-center mt-1">
+                                                    <p className="text-xs text-muted-foreground">
+                                                        To: {email.recipient}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {format(new Date(email.created_at), "MMM d, h:mm a")}
+                                                    </p>
+                                                </div>
+                                                {email.status === 'FAILED' && (
+                                                    <p className="text-xs text-red-600 mt-1">
+                                                        Error: {email.error_message || 'Unknown error'} (Retries: {email.retry_count})
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
 
                 {/* Right Column - Customer & Address */}
@@ -530,6 +624,33 @@ export default function OrderDetail() {
                             )}
                         </CardContent>
                     </Card>
+
+                    {/* Tax Summary */}
+                    <TaxBreakdown
+                        totalTaxableAmount={order.total_taxable_amount}
+                        totalCgst={order.total_cgst}
+                        totalSgst={order.total_sgst}
+                        totalIgst={order.total_igst}
+                        totalAmount={order.total_amount}
+                        showInvoiceLink={order.status === 'delivered' || order.invoice_url !== undefined}
+                        invoiceUrl={order.invoice_url}
+                    />
+
+                    {!order.invoice_url && order.payment_status === 'paid' && (
+                        <Card>
+                            <CardContent className="pt-6">
+                                <Button
+                                    variant="outline"
+                                    className="w-full"
+                                    onClick={handleRetryInvoice}
+                                    disabled={updating}
+                                >
+                                    <FileText className="mr-2 h-4 w-4" />
+                                    Generate / Retry Invoice
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
             </div>
 

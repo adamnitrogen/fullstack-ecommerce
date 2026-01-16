@@ -28,8 +28,10 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// Create event
-router.post('/', async (req, res) => {
+const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+
+// Create event - Admin/Manager only
+router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const event = await EventService.createEvent(req.body);
         res.status(201).json(event);
@@ -38,8 +40,8 @@ router.post('/', async (req, res) => {
     }
 });
 
-// Update event
-router.put('/:id', async (req, res) => {
+// Update event - Admin/Manager only
+router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const event = await EventService.updateEvent(req.params.id, req.body);
         res.json(event);
@@ -48,8 +50,8 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-// Delete event
-router.delete('/:id', async (req, res) => {
+// Delete event - Admin/Manager only
+router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         await EventService.deleteEvent(req.params.id);
         res.status(204).send();

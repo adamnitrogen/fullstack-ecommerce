@@ -27,11 +27,7 @@ export const uploadService = {
         if (userId) formData.append('userId', userId);
         formData.append('file', file);
 
-        const response = await apiClient.post('/upload', formData, {
-            headers: {
-                'Content-Type': 'multipart/form-data',
-            },
-        });
+        const response = await apiClient.post('/upload', formData);
         return response.data;
     },
 

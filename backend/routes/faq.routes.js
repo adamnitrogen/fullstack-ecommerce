@@ -3,10 +3,15 @@ const router = express.Router();
 const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
 
+const { authenticateToken, requireRole, optionalAuth } = require('../middleware/auth.middleware');
+
 // Get all FAQs (public - only active FAQs, admin - all FAQs)
-router.get('/', async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
     try {
-        const { category, isAdmin } = req.query;
+        const { category } = req.query;
+        // Check if user is admin/manager from optionalAuth
+        const isAdminUser = req.user && (req.user.role === 'admin' || req.user.role === 'manager');
+        const showAll = isAdminUser && req.query.isAdmin === 'true';
 
         let query = supabase
             .from('faqs')
@@ -19,8 +24,8 @@ router.get('/', async (req, res) => {
       `)
             .order('display_order', { ascending: true });
 
-        // Filter by active status for public users
-        if (isAdmin !== 'true') {
+        // Filter by active status for public users (or if admin didn't explicitly ask for all)
+        if (!showAll) {
             query = query.eq('is_active', true);
         }
 
@@ -71,7 +76,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create new FAQ (admin only)
-router.post('/', async (req, res) => {
+router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { question, answer, category_id, display_order, is_active } = req.body;
 
@@ -110,7 +115,7 @@ router.post('/', async (req, res) => {
 });
 
 // Update FAQ (admin only)
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { id } = req.params;
         const { question, answer, category_id, display_order, is_active } = req.body;
@@ -152,7 +157,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // Toggle FAQ active status (admin only)
-router.patch('/:id/toggle-active', async (req, res) => {
+router.patch('/:id/toggle-active', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -196,7 +201,7 @@ router.patch('/:id/toggle-active', async (req, res) => {
 });
 
 // Delete FAQ (admin only)
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { id } = req.params;
 

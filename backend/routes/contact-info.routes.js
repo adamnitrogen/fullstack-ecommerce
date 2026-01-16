@@ -13,6 +13,8 @@ const supabase = require('../config/supabase');
 // I'll check how other routes handle it. `social-media.routes.js` checks `isAdmin` query param or body?
 // Let's look at `social-media.routes.js` pattern.
 
+const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+
 // GET /api/contact-info - Fetch all contact info (public)
 router.get('/', async (req, res) => {
     try {
@@ -60,7 +62,7 @@ router.get('/', async (req, res) => {
 });
 
 // PUT /api/contact-info/address - Update address (admin only)
-router.put('/address', async (req, res) => {
+router.put('/address', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { address_line1, address_line2, city, state, pincode, country, google_maps_link } = req.body;
 
@@ -94,7 +96,7 @@ router.put('/address', async (req, res) => {
 // --- PHONES ---
 
 // POST /api/contact-info/phones - Add phone
-router.post('/phones', async (req, res) => {
+router.post('/phones', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { number, label, is_primary, display_order } = req.body;
         const { data, error } = await supabase
@@ -112,7 +114,7 @@ router.post('/phones', async (req, res) => {
 });
 
 // PUT /api/contact-info/phones/:id - Update phone
-router.put('/phones/:id', async (req, res) => {
+router.put('/phones/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { id } = req.params;
         const updates = req.body;
@@ -132,7 +134,7 @@ router.put('/phones/:id', async (req, res) => {
 });
 
 // DELETE /api/contact-info/phones/:id - Delete phone
-router.delete('/phones/:id', async (req, res) => {
+router.delete('/phones/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { id } = req.params;
         const { error } = await supabase
@@ -151,7 +153,7 @@ router.delete('/phones/:id', async (req, res) => {
 // --- EMAILS ---
 
 // POST /api/contact-info/emails - Add email
-router.post('/emails', async (req, res) => {
+router.post('/emails', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { email, label, is_primary, display_order } = req.body;
         const { data, error } = await supabase
@@ -169,7 +171,7 @@ router.post('/emails', async (req, res) => {
 });
 
 // PUT /api/contact-info/emails/:id - Update email
-router.put('/emails/:id', async (req, res) => {
+router.put('/emails/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { id } = req.params;
         const updates = req.body;
@@ -189,7 +191,7 @@ router.put('/emails/:id', async (req, res) => {
 });
 
 // DELETE /api/contact-info/emails/:id - Delete email
-router.delete('/emails/:id', async (req, res) => {
+router.delete('/emails/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { id } = req.params;
         const { error } = await supabase
@@ -208,7 +210,7 @@ router.delete('/emails/:id', async (req, res) => {
 // --- OFFICE HOURS ---
 
 // POST /api/contact-info/office-hours - Add office hours
-router.post('/office-hours', async (req, res) => {
+router.post('/office-hours', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { day_of_week, open_time, close_time, is_closed, display_order } = req.body;
         const { data, error } = await supabase
@@ -226,7 +228,7 @@ router.post('/office-hours', async (req, res) => {
 });
 
 // PUT /api/contact-info/office-hours/:id - Update office hours
-router.put('/office-hours/:id', async (req, res) => {
+router.put('/office-hours/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { id } = req.params;
         const { day_of_week, open_time, close_time, is_closed, display_order } = req.body;
@@ -261,7 +263,7 @@ router.put('/office-hours/:id', async (req, res) => {
 });
 
 // DELETE /api/contact-info/office-hours/:id - Delete office hours
-router.delete('/office-hours/:id', async (req, res) => {
+router.delete('/office-hours/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { id } = req.params;
         const { error } = await supabase

@@ -197,13 +197,16 @@ if (isProduction) {
             paths: [
                 'password', 'token', 'accessToken', 'refreshToken', 'cookie', 'authorization', 'secret',
                 'email', 'phone', 'phoneNumber', 'mobile', 'creditCard', 'card',
+                'gstin', 'pan',
                 'context.password', 'context.token', 'context.accessToken', 'context.refreshToken',
                 'context.cookie', 'context.authorization', 'context.secret',
+                'context.gstin', 'context.pan',
                 'req.headers.cookie', 'req.headers.authorization',
                 'context.req.headers.cookie', 'context.req.headers.authorization',
                 // Wildcards for deeply nested potential leaks
                 '*.password', '*.token', '*.accessToken', '*.refreshToken', '*.cookie', '*.authorization', '*.secret',
-                '*.email', '*.phone', '*.phoneNumber', '*.mobile', '*.creditCard', '*.card'
+                '*.email', '*.phone', '*.phoneNumber', '*.mobile', '*.creditCard', '*.card',
+                '*.gstin', '*.pan'
             ],
             remove: true
         },

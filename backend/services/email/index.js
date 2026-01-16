@@ -26,6 +26,10 @@ const { getContactFormEmail, getContactAutoReplyEmail } = require('./templates/c
 const { getAccountDeletedEmail, getAccountDeletionScheduledEmail, getAccountDeletionOTPEmail } = require('./templates/account.template');
 const { getOTPEmail, getPasswordResetEmail } = require('./templates/auth.template');
 const { getManagerWelcomeEmail } = require('./templates/manager.template');
+// New GST/Refund/Return Templates
+const { getGSTInvoiceEmail } = require('./templates/gst-invoice.template');
+const { getRefundInitiatedEmail, getRefundCompletedEmail } = require('./templates/refund-status.template');
+const { getReturnRequestedEmail, getReturnApprovedEmail, getReturnRejectedEmail } = require('./templates/return-status.template');
 
 class EmailService {
     constructor() {
@@ -122,6 +126,24 @@ class EmailService {
 
             case EmailEventTypes.MANAGER_WELCOME:
                 return getManagerWelcomeEmail(data);
+
+            // GST Invoice
+            case EmailEventTypes.GST_INVOICE_GENERATED:
+                return getGSTInvoiceEmail(data);
+
+            // Refund emails
+            case EmailEventTypes.REFUND_INITIATED:
+                return getRefundInitiatedEmail(data);
+            case EmailEventTypes.REFUND_COMPLETED:
+                return getRefundCompletedEmail(data);
+
+            // Return emails
+            case EmailEventTypes.RETURN_REQUESTED:
+                return getReturnRequestedEmail(data);
+            case EmailEventTypes.RETURN_APPROVED:
+                return getReturnApprovedEmail(data);
+            case EmailEventTypes.RETURN_REJECTED:
+                return getReturnRejectedEmail(data);
 
             default:
                 throw new Error(`Unknown email event type: ${eventType}`);

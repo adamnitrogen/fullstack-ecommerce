@@ -3,6 +3,8 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 
+const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+
 // Get reviews for a product
 router.get('/product/:productId', async (req, res) => {
     try {
@@ -44,7 +46,7 @@ router.get('/product/:productId', async (req, res) => {
 });
 
 // Get all reviews (Admin/Manager)
-router.get('/', async (req, res) => {
+router.get('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
@@ -96,8 +98,8 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Create a new review
-router.post('/', async (req, res) => {
+// Create a new review - Authenticated
+router.post('/', authenticateToken, async (req, res) => {
     try {
         const { productId, userId, rating, title, comment } = req.body;
 
@@ -130,16 +132,9 @@ router.post('/', async (req, res) => {
 });
 
 // Delete a review (Admin/Manager only)
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { id } = req.params;
-
-        // Note: RLS policies should handle user deletion of own reviews.
-        // For admin/manager deletion, we rely on the service role key if used,
-        // or we check the user's role here if we had the user's token.
-        // Since this is a backend route, we might be using the service role client
-        // or we assume the request is authorized.
-        // For now, we'll just attempt the delete.
 
         const { error } = await supabase
             .from('reviews')

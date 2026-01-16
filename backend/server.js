@@ -195,12 +195,16 @@ app.use('/api/policies', require('./routes/policy.routes'));
 app.use('/api/account/delete', require('./routes/account-deletion.routes'));
 app.use('/api/admin/jobs', require('./routes/jobs.routes'));
 app.use('/api', require('./routes/product-variant.routes')); // Product variants (admin + public)
+app.use('/api/webhooks', require('./routes/webhook.routes')); // Payment webhooks
+app.use('/api/invoices', require('./routes/invoice.routes')); // Invoice management
+app.use('/api/cron', require('./routes/cron.routes')); // Background job triggers
 
 // Global Error Handler (Must be last)
 app.use(require('./middleware/error.middleware'));
 
 const { bootstrapAdmin } = require('./lib/bootstrap');
 const { SupabaseLogger } = require('./services/supabase-logger');
+const { initScheduler, stopScheduler } = require('./lib/scheduler');
 
 let server;
 
@@ -233,6 +237,10 @@ async function initializeAndStart() {
         logger.info({ module: 'Server', operation: 'INIT' }, 'Database connection verified');
 
         await bootstrapAdmin();
+
+        // Initialize background job scheduler
+        initScheduler();
+
         startServer(PORT);
 
         // Graceful Shutdown Logic
@@ -240,6 +248,9 @@ async function initializeAndStart() {
             logger.info({ module: 'Server', operation: 'SHUTDOWN', context: { signal } }, `Received ${signal}. Shutting down gracefully...`);
 
             if (server) {
+                // Stop scheduled jobs first
+                stopScheduler();
+
                 server.close(() => {
                     logger.info({ module: 'Server', operation: 'SHUTDOWN' }, 'HTTP server closed.');
                     // Close other resources if any (e.g. database pools, redis) here

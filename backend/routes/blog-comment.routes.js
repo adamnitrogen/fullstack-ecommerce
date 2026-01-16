@@ -2,6 +2,7 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
+const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
 
 // Get comments for a blog
 router.get('/blog/:blogId', async (req, res) => {
@@ -239,7 +240,7 @@ router.post('/:id/flag', async (req, res) => {
 });
 
 // Get all flagged comments (Admin/Manager only)
-router.get('/flagged/all', async (req, res) => {
+router.get('/flagged/all', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('comments')
@@ -287,7 +288,7 @@ router.get('/flagged/all', async (req, res) => {
 });
 
 // Resolve flagged comment (unflag or delete)
-router.post('/:id/resolve', async (req, res) => {
+router.post('/:id/resolve', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { id } = req.params;
         const { action, userId } = req.body; // 'dismiss' or 'delete', and userId for audit

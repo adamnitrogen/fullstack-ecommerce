@@ -10,15 +10,25 @@ function getOrderConfirmationEmail({ order, customerName }) {
     const firstName = customerName ? customerName.split(' ')[0] : 'Customer';
 
     const itemsHtml = order.items?.map(item => {
-        const title = item.product?.title || item.title || item.name || 'Product';
-        const price = item.product?.price || item.price || 0;
+        // Handle both flat structure and new snapshot structure
+        const product = item.product || {};
+        const variant = item.variant_snapshot || item.variant || {};
+
+        const title = product.title || item.title || item.name || 'Product';
+        const variantLabel = variant.size_label ? ` <span style="color: #666; font-size: 12px;">(${variant.size_label})</span>` : '';
+        const price = item.price_per_unit || item.price || variant.selling_price || 0;
         const quantity = item.quantity || 1;
-        const itemTotal = price * quantity;
+        const itemTotal = item.total_amount || (price * quantity);
+
+        // Tax Info (if applicable)
+        const taxInfo = (item.gst_rate || item.gstRate) ?
+            `<br><span style="color: #888; font-size: 10px;">GST: ${item.gst_rate || item.gstRate}% (HSN: ${item.hsn_code || 'N/A'})</span>` : '';
 
         return `
         <tr>
             <td style="padding: 10px; border-bottom: 1px solid #eee;">
-                ${title}
+                <strong>${title}</strong>${variantLabel}
+                ${taxInfo}
             </td>
             <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: center;">
                 ${quantity}
@@ -99,6 +109,16 @@ function getOrderConfirmationEmail({ order, customerName }) {
                 <tr>
                     <td colspan="2" style="padding: 10px; text-align: right; color: green;">Discount:</td>
                     <td style="padding: 10px; text-align: right; color: green;">-₹${order.coupon_discount.toFixed(2)}</td>
+                </tr>
+                ` : ''}
+                ${order.tax ? `
+                <tr>
+                    <td colspan="2" style="padding: 10px; text-align: right; color: #666; font-size: 12px;">
+                        Tax (${order.tax.taxType === 'INTER' ? 'IGST' : 'CGST+SGST'}):
+                    </td>
+                    <td style="padding: 10px; text-align: right; color: #666; font-size: 12px;">
+                        ₹${(order.tax.totalTax || 0).toFixed(2)}
+                    </td>
                 </tr>
                 ` : ''}
                 <tr style="font-weight: bold; font-size: 16px;">

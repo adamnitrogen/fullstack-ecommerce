@@ -131,6 +131,7 @@ export function VariantSelector({
                                 )}
                             >
                                 ₹{variant.selling_price}
+                                {variant.price_includes_tax === false && <span className="text-[9px] ml-0.5 opacity-80">+ Tax</span>}
                             </span>
 
                             {/* Discount Indicator */}

@@ -2,6 +2,7 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
+const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
 
 // GET all bank details
 router.get('/', async (req, res) => {
@@ -47,8 +48,8 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// POST create new bank account
-router.post('/', async (req, res) => {
+// POST create new bank account - Admin only
+router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const {
             account_name,
@@ -97,8 +98,8 @@ router.post('/', async (req, res) => {
     }
 });
 
-// PUT update bank account
-router.put('/:id', async (req, res) => {
+// PUT update bank account - Admin only
+router.put('/:id', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const { id } = req.params;
         const updates = req.body;
@@ -127,8 +128,8 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-// DELETE bank details
-router.delete('/:id', async (req, res) => {
+// DELETE bank details - Admin only
+router.delete('/:id', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const { id } = req.params;
 

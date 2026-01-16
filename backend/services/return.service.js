@@ -1,6 +1,13 @@
 const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
 const Razorpay = require('razorpay');
+const { PricingCalculator } = require('./pricing-calculator.service');
+const { RefundCalculator } = require('./refund-calculator.service');
+const { FinancialEventLogger } = require('./financial-event-logger.service');
+const emailService = require('./email');
+const { createModuleLogger } = require('../utils/logging-standards');
+
+const log = createModuleLogger('ReturnService');
 
 // Initialize Razorpay
 const razorpay = new Razorpay({
@@ -103,11 +110,14 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
         }
     }
 
-    // 2. Calculate Refund Amount (Estimate)
-    let estimatedRefund = 0;
-    returnItems.forEach(reqItem => {
-        const validItem = availableItems.find(i => i.id === reqItem.orderItemId);
-        estimatedRefund += validItem.price_per_unit * reqItem.quantity;
+    // 2. Calculate Refund Amount with Tax using RefundCalculator
+    const refundBreakdown = RefundCalculator.calculateReturnTotal(availableItems, returnItems);
+    const estimatedRefund = refundBreakdown.summary.totalRefund;
+
+    log.info('RETURN_REFUND_CALCULATED', 'Calculated refund for return request', {
+        orderId,
+        estimatedRefund,
+        taxRefund: refundBreakdown.summary.totalTaxRefund
     });
 
     // 3. Create Return Record
@@ -118,7 +128,9 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
             user_id: userId,
             status: 'requested',
             refund_amount: estimatedRefund,
-            reason: reason
+            reason: reason,
+            // Store tax refund breakdown
+            refund_breakdown: refundBreakdown.summary
         })
         .select()
         .single();
@@ -147,18 +159,45 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
     // 6. Log History
     await logStatusHistory(orderId, 'return_requested', userId, `Return requested for items: ${returnItems.map(i => i.quantity + 'x Item').join(', ')}. Reason: ${reason}`);
 
+    // 7. Log Financial Event
+    FinancialEventLogger.logReturnRequested(orderId, returnRequest.id, returnItems, userId)
+        .catch(err => log.warn('AUDIT_LOG_ERROR', 'Failed to log return request', { error: err.message }));
+
+    // 8. Get user email and send RETURN_REQUESTED email
+    const { data: order } = await supabase
+        .from('orders')
+        .select('user_id, profiles(email, name)')
+        .eq('id', orderId)
+        .single();
+
+    if (order?.profiles?.email) {
+        emailService.send('RETURN_REQUESTED', order.profiles.email, {
+            customerName: order.profiles.name,
+            order: { id: orderId, order_number: orderId.slice(0, 8).toUpperCase() },
+            returnItems: returnItems.map((ri, i) => ({
+                title: availableItems.find(a => a.id === ri.orderItemId)?.title || 'Product',
+                quantity: ri.quantity,
+                variantLabel: availableItems.find(a => a.id === ri.orderItemId)?.variant_snapshot?.size_label
+            })),
+            reason
+        }, userId, returnRequest.id).catch(err => log.warn('EMAIL_ERROR', 'Failed to send return requested email', { error: err.message }));
+    }
+
     return returnRequest;
 };
 
 const processReturnApproval = async (returnId, adminId) => {
-    // 1. Fetch Return Details with Items
+    // 1. Fetch Return Details with Items and User Info
     const { data: returnRequest, error: fetchError } = await supabase
         .from('returns')
         .select(`
             *,
             orders (
+                id,
                 payment_id,
-                paymentStatus
+                paymentStatus,
+                user_id,
+                profiles(email, name)
             ),
             return_items (
                 quantity,
@@ -167,7 +206,12 @@ const processReturnApproval = async (returnId, adminId) => {
                     price_per_unit,
                     product_id,
                     quantity,
-                    returned_quantity
+                    returned_quantity,
+                    taxable_amount,
+                    cgst,
+                    sgst,
+                    igst,
+                    total_amount
                 )
             )
         `)
@@ -177,12 +221,11 @@ const processReturnApproval = async (returnId, adminId) => {
     if (fetchError || !returnRequest) throw new Error('Return request not found');
     if (returnRequest.status !== 'requested') throw new Error('Return request is not in requested state');
 
-    // 2. Calculate Final Refund Amount
-    let refundAmount = 0;
+    // 2. Calculate Final Refund Amount (use stored breakdown if available)
+    let refundAmount = returnRequest.refund_amount || 0;
     const itemsToUpdate = [];
 
     for (const item of returnRequest.return_items) {
-        refundAmount += item.order_items.price_per_unit * item.quantity;
         itemsToUpdate.push({
             id: item.order_item_id,
             returned_quantity: item.order_items.returned_quantity + item.quantity
@@ -190,17 +233,15 @@ const processReturnApproval = async (returnId, adminId) => {
     }
 
     // 3. Update Status (Status update only, refund happens on physical return verification)
+    log.info('RETURN_APPROVAL', `Return Approved: ID=${returnId}, Order=${returnRequest.order_id}`);
 
-    // B. Logs
-    logger.info(`Return Approved: ID=${returnId}, Order=${returnRequest.order_id}`);
-
-    // B. Update Return Status
+    // Update Return Status
     await supabase.from('returns').update({
         status: 'approved',
         updated_at: new Date().toISOString()
     }).eq('id', returnId);
 
-    // C. Update Order Items returned_quantity
+    // Update Order Items returned_quantity
     for (const update of itemsToUpdate) {
         await supabase
             .from('order_items')
@@ -208,25 +249,50 @@ const processReturnApproval = async (returnId, adminId) => {
             .eq('id', update.id);
     }
 
-    // D. Update Order Status (Check if all items returned? For now set to return_approved)
-    // Optional: Check if full order is returned to set 'returned' or 'refunded'.
-    // Keeping simple: set to return_approved.
-    // D. Update Order Status
+    // Update Order Status
     await supabase
         .from('orders')
-        .update({
-            status: 'return_approved'
-            // paymentStatus remains 'paid' until actual refund on 'returned' status
-        })
+        .update({ status: 'return_approved' })
         .eq('id', returnRequest.order_id);
 
-    // E. Log History
+    // Log History
     await logStatusHistory(returnRequest.order_id, 'return_approved', adminId, `Return approved. Waiting for return.`);
+
+    // Log Financial Event
+    FinancialEventLogger.logReturnApproved(returnId, returnRequest.order_id, adminId, refundAmount)
+        .catch(err => log.warn('AUDIT_LOG_ERROR', 'Failed to log return approval', { error: err.message }));
+
+    // Send RETURN_APPROVED Email
+    const userEmail = returnRequest.orders?.profiles?.email;
+    const userName = returnRequest.orders?.profiles?.name;
+    if (userEmail) {
+        emailService.send('RETURN_APPROVED', userEmail, {
+            customerName: userName,
+            order: { id: returnRequest.order_id, order_number: returnRequest.order_id.slice(0, 8).toUpperCase() },
+            estimatedRefund: refundAmount
+        }, returnRequest.orders?.user_id, returnRequest.id)
+            .catch(err => log.warn('EMAIL_ERROR', 'Failed to send return approved email', { error: err.message }));
+    }
 
     return { success: true };
 };
 
 const processReturnRejection = async (returnId, adminId, reason) => {
+    // Fetch return with user info before updating
+    const { data: returnRequest, error: fetchError } = await supabase
+        .from('returns')
+        .select(`
+            order_id,
+            orders (
+                user_id,
+                profiles(email, name)
+            )
+        `)
+        .eq('id', returnId)
+        .single();
+
+    if (fetchError) throw fetchError;
+
     const { error } = await supabase
         .from('returns')
         .update({
@@ -238,19 +304,30 @@ const processReturnRejection = async (returnId, adminId, reason) => {
 
     if (error) throw error;
 
-    // Update order status back to delivered or return_rejected
-    // User flow: Admin rejects -> RETURN_REJECTED
-
-    // Fetch orderId
-    const { data: ret } = await supabase.from('returns').select('order_id').eq('id', returnId).single();
-
-    if (ret) {
+    // Update order status back to return_rejected
+    if (returnRequest) {
         await supabase
             .from('orders')
             .update({ status: 'return_rejected' })
-            .eq('id', ret.order_id);
+            .eq('id', returnRequest.order_id);
 
-        await logStatusHistory(ret.order_id, 'return_rejected', adminId, `Return rejected. Reason: ${reason}`);
+        await logStatusHistory(returnRequest.order_id, 'return_rejected', adminId, `Return rejected. Reason: ${reason}`);
+
+        // Log Financial Event
+        FinancialEventLogger.logReturnRejected(returnId, returnRequest.order_id, adminId, reason)
+            .catch(err => log.warn('AUDIT_LOG_ERROR', 'Failed to log return rejection', { error: err.message }));
+
+        // Send RETURN_REJECTED Email
+        const userEmail = returnRequest.orders?.profiles?.email;
+        const userName = returnRequest.orders?.profiles?.name;
+        if (userEmail) {
+            emailService.send('RETURN_REJECTED', userEmail, {
+                customerName: userName,
+                order: { id: returnRequest.order_id, order_number: returnRequest.order_id.slice(0, 8).toUpperCase() },
+                reason
+            }, returnRequest.orders?.user_id, returnId)
+                .catch(err => log.warn('EMAIL_ERROR', 'Failed to send return rejected email', { error: err.message }));
+        }
     }
 
     return { success: true };

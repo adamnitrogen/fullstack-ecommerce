@@ -46,8 +46,10 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// Create category
-router.post('/', async (req, res) => {
+const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+
+// Create category - Admin/Manager only
+router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { name, type = 'product' } = req.body;
 
@@ -74,8 +76,8 @@ router.post('/', async (req, res) => {
     }
 });
 
-// Update category
-router.put('/:id', async (req, res) => {
+// Update category - Admin/Manager only
+router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { name, type } = req.body;
 
@@ -107,8 +109,8 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-// Delete category
-router.delete('/:id', async (req, res) => {
+// Delete category - Admin/Manager only
+router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { error } = await supabase
             .from('categories')

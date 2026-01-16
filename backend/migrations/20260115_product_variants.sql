@@ -40,6 +40,12 @@ CREATE TABLE IF NOT EXISTS product_variants (
     CONSTRAINT unique_product_size_label UNIQUE (product_id, size_label)
 );
 
+-- Ensure products table has return policy and timestamp fields (Required for RPC)
+ALTER TABLE products ADD COLUMN IF NOT EXISTS is_returnable BOOLEAN DEFAULT true;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS return_days INTEGER DEFAULT 3;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
 -- ============================================================================
 -- 2. CREATE INDEXES FOR PERFORMANCE
 -- ============================================================================

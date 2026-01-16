@@ -2,6 +2,7 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
+const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
 
 // Get all social media links
 router.get('/', async (req, res) => {
@@ -30,7 +31,7 @@ router.get('/', async (req, res) => {
 });
 
 // Create new social media link (admin only)
-router.post('/', async (req, res) => {
+router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { platform, url, icon, display_order, is_active } = req.body;
 
@@ -60,7 +61,7 @@ router.post('/', async (req, res) => {
 });
 
 // Update social media link (admin only)
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { id } = req.params;
         const { platform, url, icon, display_order, is_active } = req.body;
@@ -96,7 +97,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // Delete social media link (admin only)
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -115,7 +116,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // Reorder links (admin only)
-router.put('/reorder/bulk', async (req, res) => {
+router.put('/reorder/bulk', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { links } = req.body;
 

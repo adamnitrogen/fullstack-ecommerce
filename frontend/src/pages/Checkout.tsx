@@ -6,6 +6,7 @@ import { checkoutService } from "@/services/checkout.service";
 import { AddressSelector } from "@/components/checkout/AddressSelector";
 import { OrderSummary } from "@/components/checkout/OrderSummary";
 import { PriceBreakdown } from "@/components/checkout/PriceBreakdown";
+import { OutOfStockModal } from "@/components/checkout/OutOfStockModal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -40,12 +41,22 @@ export default function Checkout() {
   const [billingAddress, setBillingAddress] = useState<CheckoutAddress | null>(null);
   const [billingSameAsShipping, setBillingSameAsShipping] = useState(true);
   const [showPhoneWarning, setShowPhoneWarning] = useState(false);
+  const [stockIssues, setStockIssues] = useState<Array<{
+    productId: string;
+    variantId: string | null;
+    title: string;
+    variantLabel: string | null;
+    requestedQty: number;
+    availableStock: number;
+    image: string | null;
+  }>>([]);
+  const [showStockModal, setShowStockModal] = useState(false);
 
   // Moved fetchCheckoutSummary definition up
-  const fetchCheckoutSummary = useCallback(async () => {
+  const fetchCheckoutSummary = useCallback(async (addressId?: string) => {
     try {
       setLoading(true);
-      const data = await checkoutService.getSummary();
+      const data = await checkoutService.getSummary(addressId);
 
       if (!data.cart || !data.cart.cart_items || data.cart.cart_items.length === 0) {
         toast.error("Your cart is empty");
@@ -97,6 +108,15 @@ export default function Checkout() {
 
     try {
       setProcessing(true);
+
+      // Pre-payment stock validation
+      const stockValidation = await checkoutService.validateStock();
+      if (!stockValidation.valid) {
+        setStockIssues(stockValidation.items);
+        setShowStockModal(true);
+        setProcessing(false);
+        return;
+      }
 
       // 1. Create Payment Order on Backend
       const orderData = await checkoutService.createPaymentOrder(summary.totals.finalAmount);
@@ -253,7 +273,10 @@ export default function Checkout() {
                 <AddressSelector
                   type="shipping"
                   selectedAddressId={shippingAddress?.id}
-                  onSelect={setShippingAddress}
+                  onSelect={(address) => {
+                    setShippingAddress(address);
+                    fetchCheckoutSummary(address.id);
+                  }}
                 />
               </CardContent>
             </Card>
@@ -352,6 +375,12 @@ export default function Checkout() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <OutOfStockModal
+        open={showStockModal}
+        onClose={() => setShowStockModal(false)}
+        items={stockIssues}
+      />
     </div>
   );
 }

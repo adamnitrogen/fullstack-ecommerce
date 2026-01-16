@@ -28,6 +28,11 @@ router.patch('/delivery', authenticateToken, authorizeRole('admin', 'manager'), 
     try {
         const { threshold, charge } = req.body;
         const result = await settingsService.updateDeliverySettings({ threshold, charge });
+
+        // Invalidate delivery settings cache in cart service
+        const { invalidateDeliverySettingsCache } = require('../services/cart.service');
+        invalidateDeliverySettingsCache();
+
         res.json(result);
     } catch (error) {
         logger.error({ err: error }, 'Error in PATCH /settings/delivery');

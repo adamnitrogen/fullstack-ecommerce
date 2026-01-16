@@ -2,6 +2,7 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
+const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
 
 // Get all testimonials
 router.get('/', async (req, res) => {
@@ -36,8 +37,8 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// Create testimonial
-router.post('/', async (req, res) => {
+// Create testimonial - Admin/Manager only
+router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('testimonials')
@@ -57,8 +58,8 @@ router.post('/', async (req, res) => {
     }
 });
 
-// Update testimonial
-router.put('/:id', async (req, res) => {
+// Update testimonial - Admin/Manager only
+router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('testimonials')
@@ -75,8 +76,8 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-// Delete testimonial
-router.delete('/:id', async (req, res) => {
+// Delete testimonial - Admin/Manager only
+router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { error } = await supabase
             .from('testimonials')

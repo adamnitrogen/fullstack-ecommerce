@@ -42,7 +42,7 @@ const ProductDetail = () => {
           <BackButton to="/shop" label="Back to Collection" className="w-fit text-[10px] text-[#B85C3C] hover:text-[#2C1810] font-black uppercase tracking-[0.2em] border-none py-2 h-auto bg-transparent hover:bg-transparent transition-all duration-300" />
         </div>
 
-        <ProductDetailView product={product} />
+        <ProductDetailView product={product} key={product.id} />
 
         {/* Reviews Section with Premium Card Styling */}
         <div className="mt-16">

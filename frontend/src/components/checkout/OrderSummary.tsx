@@ -40,6 +40,11 @@ export function OrderSummary({ items }: OrderSummaryProps) {
                                 <h4 className="text-sm font-semibold line-clamp-1 text-foreground group-hover:text-primary transition-colors">
                                     {item.product.title}
                                 </h4>
+                                {item.sizeLabel && (
+                                    <p className="text-xs text-muted-foreground">
+                                        {item.sizeLabel}
+                                    </p>
+                                )}
                                 <div className="flex justify-between items-center text-xs">
                                     <p className="text-muted-foreground font-medium">
                                         Qty: <span className="text-foreground">{item.quantity}</span>

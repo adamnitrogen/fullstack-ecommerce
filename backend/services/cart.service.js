@@ -3,10 +3,31 @@ const logger = require('../utils/logger');
 const { validateCoupon, calculateCouponDiscount } = require('./coupon.service');
 const settingsService = require('./settings.service');
 
+// Delivery settings cache (5-minute TTL)
+let deliverySettingsCache = null;
+let deliverySettingsCacheTime = 0;
+const DELIVERY_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 /**
- * Cart Service
- * Handles all shopping cart operations including adding/removing items, coupon application, and total calculations
+ * Get cached delivery settings
  */
+async function getCachedDeliverySettings() {
+    const now = Date.now();
+    if (deliverySettingsCache && (now - deliverySettingsCacheTime) < DELIVERY_CACHE_TTL) {
+        return deliverySettingsCache;
+    }
+    deliverySettingsCache = await settingsService.getDeliverySettings();
+    deliverySettingsCacheTime = now;
+    return deliverySettingsCache;
+}
+
+/**
+ * Invalidate delivery settings cache (call when settings are updated)
+ */
+function invalidateDeliverySettingsCache() {
+    deliverySettingsCache = null;
+    deliverySettingsCacheTime = 0;
+}
 
 /**
  * Get or create a cart for the user
@@ -119,12 +140,50 @@ async function addToCart(userId, guestId, productId, quantity = 1, variantId = n
     try {
         const cart = await getUserCart(userId, guestId);
 
-        // Check if item exists
-        // Need to match variant_id as well (null matches null)
+        // Stock validation - check available stock before adding
+        let availableStock = 0;
+        let productTitle = 'Product';
+
+        if (variantId) {
+            // Check variant stock
+            const { data: variant, error: variantError } = await supabase
+                .from('product_variants')
+                .select('stock_quantity, size_label, products(title)')
+                .eq('id', variantId)
+                .single();
+
+            if (variantError || !variant) {
+                throw new Error('Variant not found');
+            }
+            availableStock = variant.stock_quantity || 0;
+            productTitle = `${variant.products?.title || 'Product'} - ${variant.size_label}`;
+        } else {
+            // Check product inventory
+            const { data: product, error: productError } = await supabase
+                .from('products')
+                .select('inventory, title')
+                .eq('id', productId)
+                .single();
+
+            if (productError || !product) {
+                throw new Error('Product not found');
+            }
+            availableStock = product.inventory || 0;
+            productTitle = product.title;
+        }
+
+        // Check if item already exists in cart to calculate total quantity
         const existingItem = cart.cart_items.find(item =>
             item.product_id === productId &&
             (item.variant_id === variantId || (!item.variant_id && !variantId))
         );
+
+        const currentCartQty = existingItem ? existingItem.quantity : 0;
+        const requestedTotal = currentCartQty + quantity;
+
+        if (requestedTotal > availableStock) {
+            throw new Error(`Insufficient stock for ${productTitle}. Available: ${availableStock}, Requested: ${requestedTotal}`);
+        }
 
         if (existingItem) {
             // Update quantity
@@ -159,6 +218,42 @@ async function updateCartItem(userId, guestId, productId, quantity, variantId = 
 
         if (quantity <= 0) {
             return removeFromCart(userId, guestId, productId, variantId);
+        }
+
+        // Stock validation - check available stock before updating
+        let availableStock = 0;
+        let productTitle = 'Product';
+
+        if (variantId) {
+            // Check variant stock
+            const { data: variant, error: variantError } = await supabase
+                .from('product_variants')
+                .select('stock_quantity, size_label, products(title)')
+                .eq('id', variantId)
+                .single();
+
+            if (variantError || !variant) {
+                throw new Error('Variant not found');
+            }
+            availableStock = variant.stock_quantity || 0;
+            productTitle = `${variant.products?.title || 'Product'} - ${variant.size_label}`;
+        } else {
+            // Check product inventory
+            const { data: product, error: productError } = await supabase
+                .from('products')
+                .select('inventory, title')
+                .eq('id', productId)
+                .single();
+
+            if (productError || !product) {
+                throw new Error('Product not found');
+            }
+            availableStock = product.inventory || 0;
+            productTitle = product.title;
+        }
+
+        if (quantity > availableStock) {
+            throw new Error(`Insufficient stock for ${productTitle}. Available: ${availableStock}, Requested: ${quantity}`);
         }
 
         // Find match to get ID (safe update) or update by composite key if permitted
@@ -289,8 +384,13 @@ async function removeCouponFromCart(userId, guestId) {
 
 /**
  * Calculate all cart totals including discounts and delivery
+ * @param {string|null} userId
+ * @param {string|null} guestId
+ * @param {object|null} existingCart - Optional pre-fetched cart
+ * @param {object} options - Optimization options
+ * @param {boolean} options.skipValidation - If true, skip full coupon validation (use for quantity updates)
  */
-async function calculateCartTotals(userId, guestId, existingCart = null) {
+async function calculateCartTotals(userId, guestId, existingCart = null, { skipValidation = false } = {}) {
     try {
         const cart = existingCart || await getUserCart(userId, guestId);
 
@@ -302,49 +402,104 @@ async function calculateCartTotals(userId, guestId, existingCart = null) {
             variant: item.product_variants
         }));
 
-        // Calculate MRP and price totals
+        // Calculate MRP, price totals, and product-specific delivery charges
         let totalMrp = 0;
         let totalPrice = 0;
+        let productDeliveryCharge = 0;
+        const itemLevelBreakdown = [];
 
         cartItems.forEach(item => {
             const price = item.variant ? item.variant.selling_price : item.product.price;
             const mrp = item.variant ? item.variant.mrp : (item.product.mrp || item.product.price);
 
+            // Per-product delivery charge (Variant takes precedence over Product)
+            const itemDeliveryChargeRate = (item.variant && item.variant.delivery_charge !== null)
+                ? item.variant.delivery_charge
+                : (item.product.delivery_charge || 0);
+
+            const itemDeliveryTotal = itemDeliveryChargeRate * item.quantity;
+
             totalMrp += mrp * item.quantity;
             totalPrice += price * item.quantity;
+            productDeliveryCharge += itemDeliveryTotal;
+
+            itemLevelBreakdown.push({
+                product_id: item.product_id,
+                variant_id: item.variant_id,
+                quantity: item.quantity,
+                mrp: mrp,
+                price: price,
+                delivery_charge: itemDeliveryTotal,
+                coupon_discount: 0,
+                coupon_code: null
+            });
         });
 
-        const discount = totalMrp - totalPrice;
+        const autoDiscount = totalMrp - totalPrice;
 
         // Calculate coupon discount
         let couponDiscount = 0;
         let coupon = null;
+        let itemDiscountsBreakdown = [];
 
         if (cart.applied_coupon_code) {
-            const validation = await validateCoupon(cart.applied_coupon_code, userId, cartItems, totalPrice);
+            if (skipValidation) {
+                // OPTIMIZATION: Skip full validation, just fetch coupon and recalculate discount
+                // Use the coupon cache from coupon.service.js (already has 60s TTL)
+                const { getCachedCoupon } = require('./coupon.service');
+                coupon = await getCachedCoupon(cart.applied_coupon_code);
 
-            if (validation.valid) {
-                coupon = validation.coupon;
-                couponDiscount = calculateCouponDiscount(validation.coupon, cartItems, totalPrice);
+                if (coupon && coupon.is_active) {
+                    const result = calculateCouponDiscount(coupon, cartItems, totalPrice);
+                    couponDiscount = result.totalDiscount;
+                    itemDiscountsBreakdown = result.itemDiscounts;
+                }
+            } else {
+                // Full validation (includes expiry, usage limits, target checks)
+                const validation = await validateCoupon(cart.applied_coupon_code, userId, cartItems, totalPrice);
+
+                if (validation.valid) {
+                    coupon = validation.coupon;
+                    const result = calculateCouponDiscount(validation.coupon, cartItems, totalPrice);
+                    couponDiscount = result.totalDiscount;
+                    itemDiscountsBreakdown = result.itemDiscounts;
+                }
             }
+
+            // Update itemLevelBreakdown with coupon discounts
+            itemDiscountsBreakdown.forEach(disc => {
+                const item = itemLevelBreakdown.find(i =>
+                    (disc.variant_id ? (i.variant_id === disc.variant_id) : (i.product_id === disc.product_id))
+                );
+                if (item) {
+                    item.coupon_discount += disc.discount;
+                    item.coupon_code = disc.coupon_code;
+                }
+            });
         }
 
-        // Calculate delivery charge
-        const settings = await settingsService.getDeliverySettings();
-        const deliveryCharge = totalPrice >= settings.delivery_threshold ? 0 : settings.delivery_charge;
+        // Calculate global delivery charge (uses cached settings)
+        const settings = await getCachedDeliverySettings();
+        const globalDeliveryCharge = totalPrice >= settings.delivery_threshold ? 0 : settings.delivery_charge;
+
+        // Total delivery charge = Product specific + Global residual
+        const totalDeliveryCharge = productDeliveryCharge + globalDeliveryCharge;
 
         // Calculate final amount
-        const finalAmount = (totalPrice - couponDiscount) + deliveryCharge;
+        const finalAmount = (totalPrice - couponDiscount) + totalDeliveryCharge;
 
         return {
             itemsCount: cartItems.reduce((sum, item) => sum + item.quantity, 0),
             totalMrp: Math.round(totalMrp * 100) / 100,
             totalPrice: Math.round(totalPrice * 100) / 100,
-            discount: Math.round(discount * 100) / 100,
+            discount: Math.round(autoDiscount * 100) / 100,
             couponDiscount: Math.round(couponDiscount * 100) / 100,
-            deliveryCharge: Math.round(deliveryCharge * 100) / 100,
+            productDeliveryCharges: Math.round(productDeliveryCharge * 100) / 100,
+            globalDeliveryCharge: Math.round(globalDeliveryCharge * 100) / 100,
+            deliveryCharge: Math.round(totalDeliveryCharge * 100) / 100,
             finalAmount: Math.round(finalAmount * 100) / 100,
-            coupon
+            coupon,
+            itemBreakdown: itemLevelBreakdown
         };
     } catch (error) {
         logger.error({ err: error }, 'Error calculating cart totals:');
@@ -440,5 +595,6 @@ module.exports = {
     removeCouponFromCart,
     calculateCartTotals,
     clearCart,
-    mergeGuestCart
+    mergeGuestCart,
+    invalidateDeliverySettingsCache
 };

@@ -3,8 +3,26 @@ import type { CheckoutSummary, RazorpayOrderResponse, Order } from '@/types';
 
 export const checkoutService = {
     // Get checkout summary (cart + addresses + totals)
-    getSummary: async (): Promise<CheckoutSummary> => {
-        const response = await apiClient.get('/checkout/summary');
+    getSummary: async (addressId?: string): Promise<CheckoutSummary> => {
+        const url = addressId ? `/checkout/summary?addressId=${addressId}` : '/checkout/summary';
+        const response = await apiClient.get(url);
+        return response.data;
+    },
+
+    // Validate stock availability before payment
+    validateStock: async (): Promise<{
+        valid: boolean;
+        items: Array<{
+            productId: string;
+            variantId: string | null;
+            title: string;
+            variantLabel: string | null;
+            requestedQty: number;
+            availableStock: number;
+            image: string | null;
+        }>;
+    }> => {
+        const response = await apiClient.get('/checkout/validate-stock');
         return response.data;
     },
 

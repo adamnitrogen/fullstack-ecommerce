@@ -7,6 +7,9 @@ const { formatAddress } = require('./address.service');
 // PERFORMANCE: Moved to top-level to avoid require() overhead on each function call
 const inventoryService = require('./inventory.service');
 const checkoutService = require('./checkout.service');
+// GST Invoice and Audit
+const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
+const { FinancialEventLogger } = require('./financial-event-logger.service');
 
 const ORDER_STATUS = {
     PENDING: 'pending',
@@ -306,6 +309,54 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
             }
         }
 
+        // 7. Generate GST Invoice on DELIVERED (non-blocking)
+        if (newStatus === ORDER_STATUS.DELIVERED) {
+            InvoiceOrchestrator.generateInvoiceForOrder(orderId)
+                .then(result => {
+                    if (result.success) {
+                        logger.info(`[Order ${orderId}] GST Invoice generated: ${result.invoiceId}`);
+                    } else {
+                        logger.error(`[Order ${orderId}] GST Invoice generation failed: ${result.error}`);
+                    }
+                })
+                .catch(err => logger.error(`[Order ${orderId}] Invoice generation error:`, err.message));
+        }
+
+        // 8. Send Refund Email notifications
+        if (newStatus === ORDER_STATUS.RETURNED && refundInitiated) {
+            // Get user info and send REFUND_INITIATED email
+            const { data: orderWithUser } = await supabase
+                .from('orders')
+                .select('user_id, profiles:user_id(email, name), total_taxable_amount, total_cgst, total_sgst, total_igst')
+                .eq('id', orderId)
+                .single();
+
+            if (orderWithUser?.profiles?.email) {
+                // Get return info for refund breakdown
+                const { data: returnReq } = await supabase
+                    .from('returns')
+                    .select('refund_amount, refund_breakdown')
+                    .eq('order_id', orderId)
+                    .eq('status', 'approved')
+                    .single();
+
+                emailService.send('REFUND_INITIATED', orderWithUser.profiles.email, {
+                    customerName: orderWithUser.profiles.name,
+                    order: { id: orderId, order_number: finalOrder.order_number },
+                    refundBreakdown: returnReq?.refund_breakdown || { totalRefund: returnReq?.refund_amount || 0 }
+                }, orderWithUser.user_id, orderId)
+                    .catch(err => logger.error(`[Order ${orderId}] Failed to send refund email:`, err.message));
+
+                // Log financial event
+                FinancialEventLogger.logRefundInitiated(orderId, returnReq?.refund_breakdown || { totalRefund: returnReq?.refund_amount })
+                    .catch(err => logger.error(`[Order ${orderId}] Failed to log refund event:`, err.message));
+            }
+        }
+
+        // 9. Log order status update for audit
+        FinancialEventLogger.logOrderUpdated(orderId, previousStatus, newStatus, isAdminOrManager ? userId : null)
+            .catch(err => logger.warn(`[Order ${orderId}] Failed to log status update:`, err.message));
+
         return { success: true, order: finalOrder, refundInitiated };
 
     } catch (error) {
@@ -532,14 +583,26 @@ async function getOrderById(id, user) {
         );
     }
 
+    // 5. Email Logs (Admin/Manager only)
+    if (isAdminOrManager) {
+        promises.push(
+            supabase.from('email_notifications')
+                .select('*')
+                .eq('order_id', id) // Ensure email_notifications table has order_id column populated!
+                .order('created_at', { ascending: false })
+                .then(({ data }) => ({ type: 'email_logs', data }))
+        );
+    }
+
     const results = await Promise.all(promises);
-    let profile = {}, dbShippingAddress = null, dbBillingAddress = null, paymentDetails = null;
+    let profile = {}, dbShippingAddress = null, dbBillingAddress = null, paymentDetails = null, emailLogs = [];
 
     results.forEach(res => {
         if (res.type === 'profile' && res.data) profile = res.data;
         if (res.type === 'shipping') dbShippingAddress = res.data;
         if (res.type === 'billing') dbBillingAddress = res.data;
         if (res.type === 'payment') paymentDetails = res.data;
+        if (res.type === 'email_logs') emailLogs = res.data || [];
     });
 
     // Process Addresses
@@ -586,7 +649,9 @@ async function getOrderById(id, user) {
         payment_status: data.payment_status || data.paymentStatus || 'pending',
         // Return readable Razorpay ID if available, otherwise internal ID
         payment_id: paymentDetails?.razorpay_payment_id || data.payment_id,
-        payment_method: paymentDetails?.method
+        payment_id: paymentDetails?.razorpay_payment_id || data.payment_id,
+        payment_method: paymentDetails?.method,
+        email_logs: emailLogs
     };
 }
 

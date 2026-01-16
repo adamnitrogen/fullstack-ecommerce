@@ -53,6 +53,35 @@ export function PriceBreakdown({ totals }: PriceBreakdownProps) {
                         <span className="font-medium">₹{totals.deliveryCharge.toFixed(2)}</span>
                     )}
                 </div>
+
+                {/* Tax Breakdown */}
+                {totals.tax && totals.tax.totalTax > 0 && (
+                    <div className="pt-2 border-t border-dashed space-y-1">
+                        {totals.tax.isInterState ? (
+                            <div className="flex justify-between items-center text-xs text-muted-foreground">
+                                <span>IGST</span>
+                                <span>₹{totals.tax.igst.toFixed(2)}</span>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="flex justify-between items-center text-xs text-muted-foreground">
+                                    <span>CGST</span>
+                                    <span>₹{totals.tax.cgst.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-xs text-muted-foreground">
+                                    <span>SGST</span>
+                                    <span>₹{totals.tax.sgst.toFixed(2)}</span>
+                                </div>
+                            </>
+                        )}
+                        <div className="flex justify-between items-center text-muted-foreground">
+                            <span className="flex items-center gap-1.5 text-xs">
+                                <span>Included Taxes</span>
+                            </span>
+                            <span className="font-medium text-xs">₹{totals.tax.totalTax.toFixed(2)}</span>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <Separator className="bg-border/60" />

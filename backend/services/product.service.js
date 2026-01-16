@@ -1,6 +1,7 @@
 const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
 const { deletePhotosByUrls } = require('./photo.service');
+const RazorpaySyncService = require('./razorpay-sync.service');
 
 /**
  * Product Service
@@ -18,7 +19,7 @@ class ProductService {
         // 1. Build Products Query
         let query = supabase
             .from('products')
-            .select('*', { count: 'exact' });
+            .select('*, variants:product_variants(*)', { count: 'exact' });
 
         if (search) {
             query = query.ilike('title', `%${search}%`);
@@ -191,6 +192,19 @@ class ProductService {
      * @param {Object} productData - Product data including variant_mode
      */
     static async createProduct(productData) {
+        if (productData.isReturnable !== undefined) {
+            productData.is_returnable = productData.isReturnable;
+            delete productData.isReturnable;
+        }
+        if (productData.returnDays !== undefined) {
+            productData.return_days = productData.returnDays;
+            delete productData.returnDays;
+        }
+        if (productData.deliveryCharge !== undefined) {
+            productData.delivery_charge = productData.deliveryCharge;
+            delete productData.deliveryCharge;
+        }
+
         const { data, error } = await supabase
             .from('products')
             .insert([productData])
@@ -198,6 +212,10 @@ class ProductService {
             .single();
 
         if (error) throw error;
+
+        // Note: Variants are created separately via ProductVariantService
+        // We only trigger sync when variants are added/updated
+
         return data;
     }
 
@@ -205,6 +223,19 @@ class ProductService {
      * Update product
      */
     static async updateProduct(id, productData) {
+        if (productData.isReturnable !== undefined) {
+            productData.is_returnable = productData.isReturnable;
+            delete productData.isReturnable;
+        }
+        if (productData.returnDays !== undefined) {
+            productData.return_days = productData.returnDays;
+            delete productData.returnDays;
+        }
+        if (productData.deliveryCharge !== undefined) {
+            productData.delivery_charge = productData.deliveryCharge;
+            delete productData.deliveryCharge;
+        }
+
         const { data, error } = await supabase
             .from('products')
             .update(productData)
@@ -232,7 +263,7 @@ class ProductService {
         // 2. Get variants to find variant image URLs
         const { data: variants, error: variantError } = await supabase
             .from('product_variants')
-            .select('variant_image_url')
+            .select('variant_image_url, razorpay_item_id')
             .eq('product_id', id);
 
         if (variantError) logger.error('Error fetching variants for deletion:', variantError);
@@ -269,6 +300,17 @@ class ProductService {
             deletePhotosByUrls(uniqueImages).catch(err =>
                 logger.error('Error cleaning up product/variant images:', err)
             );
+        }
+
+        // 6. Cleanup Razorpay Items
+        if (variants && variants.length > 0) {
+            variants.forEach(v => {
+                if (v.razorpay_item_id) {
+                    RazorpaySyncService.deleteItem(v.razorpay_item_id).catch(err =>
+                        logger.error('RAZORPAY_ITEM_DELETE_FAIL', err, { itemId: v.razorpay_item_id })
+                    );
+                }
+            });
         }
 
         return true;

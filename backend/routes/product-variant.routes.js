@@ -9,7 +9,9 @@ const {
     updateProductWithVariantsSchema
 } = require('../schemas/product-variant.schema');
 const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
-const { validateBody, validateParams } = require('../middleware/validation.middleware');
+const validate = require('../middleware/validate.middleware');
+const validateBody = (schema) => validate(schema, 'body');
+const validateParams = (schema) => validate(schema, 'params');
 const { z } = require('zod');
 
 const log = createModuleLogger('ProductVariantRoutes');
@@ -70,7 +72,7 @@ router.post(
             // Validate request body
             const validationResult = createVariantSchema.safeParse(req.body);
             if (!validationResult.success) {
-                const errors = validationResult.error.errors.map(e => ({
+                const errors = (validationResult.error.issues || []).map(e => ({
                     field: e.path.join('.'),
                     message: e.message
                 }));
@@ -245,7 +247,7 @@ router.post(
             // Validate request body
             const validationResult = createProductWithVariantsSchema.safeParse(req.body);
             if (!validationResult.success) {
-                const errors = validationResult.error.errors.map(e => ({
+                const errors = (validationResult.error.issues || []).map(e => ({
                     field: e.path.join('.'),
                     message: e.message
                 }));
@@ -286,7 +288,7 @@ router.put(
             // Validate request body
             const validationResult = updateProductWithVariantsSchema.safeParse(req.body);
             if (!validationResult.success) {
-                const errors = validationResult.error.errors.map(e => ({
+                const errors = (validationResult.error.issues || []).map(e => ({
                     field: e.path.join('.'),
                     message: e.message
                 }));

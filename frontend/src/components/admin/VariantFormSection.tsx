@@ -39,17 +39,24 @@ const SIZE_PRESETS: { value: number; unit: VariantUnit; label: string }[] = [
     { value: 5, unit: "kg", label: "5 KG" },
 ];
 
+const GST_RATES = [0, 5, 12, 18, 28];
+
 const SIZE_LABELS_PRESETS = ["Small", "Medium", "Large", "XL", "XXL", "Pack of 2", "Pack of 5"];
 
 const createEmptyVariant = (mode: "UNIT" | "SIZE" = "UNIT"): VariantFormData => ({
     size_label: mode === "SIZE" ? "Small" : "",
     size_value: 1,
     unit: "kg",
-    description: "", // Added description
+    description: "",
     mrp: 0,
     selling_price: 0,
     stock_quantity: 0,
     is_default: false,
+    hsn_code: "",
+    gst_rate: 0,
+    tax_applicable: true,
+    price_includes_tax: true,
+    delivery_charge: null,
 });
 
 export function VariantFormSection({
@@ -82,7 +89,7 @@ export function VariantFormSection({
     const handleVariantChange = (
         index: number,
         field: keyof VariantFormData,
-        value: string | number | boolean | File
+        value: string | number | boolean | File | null
     ) => {
         const updated = [...variants];
         updated[index] = { ...updated[index], [field]: value };
@@ -454,6 +461,30 @@ export function VariantFormSection({
                                             />
                                         </div>
 
+                                        {/* Delivery Charge */}
+                                        <div className="space-y-1">
+                                            <Label htmlFor={`variant-delivery-${index}`} className="text-xs">
+                                                Delivery (₹)
+                                            </Label>
+                                            <Input
+                                                id={`variant-delivery-${index}`}
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={variant.delivery_charge ?? ''}
+                                                onChange={(e) =>
+                                                    handleVariantChange(
+                                                        index,
+                                                        "delivery_charge",
+                                                        e.target.value === '' ? null : parseFloat(e.target.value) || 0
+                                                    )
+                                                }
+                                                placeholder="Use Product Default"
+                                                disabled={disabled}
+                                                className="h-9"
+                                            />
+                                        </div>
+
                                         {/* Variant Image Upload */}
                                         <div className="space-y-1 md:col-span-1">
                                             <Label className="text-xs">
@@ -498,6 +529,80 @@ export function VariantFormSection({
                                                         disabled={disabled}
                                                     />
                                                 </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Tax Information */}
+                                    <div className="mt-4 pt-4 border-t border-dashed">
+                                        <Label className="text-xs font-semibold mb-3 block">Tax Information (GST)</Label>
+                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                            {/* Tax Applicable Toggle */}
+                                            <div className="flex items-center space-x-2 h-9">
+                                                <input
+                                                    type="checkbox"
+                                                    id={`tax-app-${index}`}
+                                                    checked={variant.tax_applicable !== false}
+                                                    onChange={(e) => handleVariantChange(index, "tax_applicable", e.target.checked)}
+                                                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                                    disabled={disabled}
+                                                />
+                                                <Label htmlFor={`tax-app-${index}`} className="text-xs font-normal cursor-pointer">
+                                                    Tax Applicable
+                                                </Label>
+                                            </div>
+
+                                            {variant.tax_applicable !== false && (
+                                                <>
+                                                    {/* HSN Code */}
+                                                    <div className="space-y-1">
+                                                        <Label htmlFor={`hsn-${index}`} className="text-xs">HSN Code</Label>
+                                                        <Input
+                                                            id={`hsn-${index}`}
+                                                            value={variant.hsn_code || ''}
+                                                            onChange={(e) => handleVariantChange(index, "hsn_code", e.target.value)}
+                                                            placeholder="e.g. 1905"
+                                                            className="h-8 text-xs"
+                                                            disabled={disabled}
+                                                        />
+                                                    </div>
+
+                                                    {/* GST Rate */}
+                                                    <div className="space-y-1">
+                                                        <Label htmlFor={`gst-${index}`} className="text-xs">GST Rate (%)</Label>
+                                                        <Select
+                                                            value={variant.gst_rate?.toString() || "0"}
+                                                            onValueChange={(value) => handleVariantChange(index, "gst_rate", parseFloat(value))}
+                                                            disabled={disabled}
+                                                        >
+                                                            <SelectTrigger className="h-8 text-xs">
+                                                                <SelectValue placeholder="Select Rate" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                {GST_RATES.map((rate) => (
+                                                                    <SelectItem key={rate} value={rate.toString()}>
+                                                                        {rate}%
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+
+                                                    {/* Price Includes Tax Toggle */}
+                                                    <div className="flex items-center space-x-2 h-9 md:col-start-4">
+                                                        <input
+                                                            type="checkbox"
+                                                            id={`inc-tax-${index}`}
+                                                            checked={variant.price_includes_tax !== false}
+                                                            onChange={(e) => handleVariantChange(index, "price_includes_tax", e.target.checked)}
+                                                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                                            disabled={disabled}
+                                                        />
+                                                        <Label htmlFor={`inc-tax-${index}`} className="text-xs font-normal cursor-pointer">
+                                                            Price includes Tax
+                                                        </Label>
+                                                    </div>
+                                                </>
                                             )}
                                         </div>
                                     </div>

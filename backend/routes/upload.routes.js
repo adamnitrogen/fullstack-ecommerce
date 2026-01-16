@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const multer = require('multer');
 const supabase = require('../config/supabase');
+const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
 
 // Configure multer for memory storage
 const upload = multer({
@@ -19,8 +20,8 @@ const upload = multer({
     }
 });
 
-// Upload file endpoint
-router.post('/', upload.single('file'), async (req, res) => {
+// Upload file endpoint - Admin/Manager/User (requires auth)
+router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: 'No file uploaded' });
@@ -171,8 +172,8 @@ router.get('/user/:userId', async (req, res) => {
     }
 });
 
-// Delete image by URL - MUST come before /:id route
-router.delete('/by-url', async (req, res) => {
+// Delete image by URL - MUST come before /:id route - Admin/Manager only
+router.delete('/by-url', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { url } = req.body;
 
@@ -248,8 +249,8 @@ router.delete('/by-url', async (req, res) => {
     }
 });
 
-// Delete image by ID
-router.delete('/:id', async (req, res) => {
+// Delete image by ID - Admin/Manager only
+router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         // 1. Get image path and bucket from DB
         const { data: photo, error: fetchError } = await supabase

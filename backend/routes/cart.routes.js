@@ -103,7 +103,8 @@ router.put('/items/:product_id', validate(updateCartSchema), async (req, res) =>
         const { variant_id } = req.query; // Support variant_id in query for updates
 
         const cart = await updateCartItem(userId, guestId, product_id, quantity, variant_id);
-        const totals = await calculateCartTotals(userId, guestId);
+        // OPTIMIZATION: Skip full coupon validation on quantity changes, just recalculate discount
+        const totals = await calculateCartTotals(userId, guestId, null, { skipValidation: true });
 
         res.json({
             message: 'Cart updated',

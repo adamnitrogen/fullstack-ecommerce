@@ -18,11 +18,16 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import { Search, Check, Sparkles, Tag as TagIcon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errorUtils";
-import { Coupon, CreateCouponDto } from "@/types";
+import { Coupon, CreateCouponDto, Product } from "@/types";
 import { couponService } from "@/services/coupon.service";
+import { productService } from "@/services/product.service";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 interface CouponDialogProps {
     open: boolean;
@@ -47,6 +52,13 @@ export function CouponDialog({
         valid_until: "",
         is_active: true,
     });
+
+    // Search states
+    const [searchTerm, setSearchTerm] = useState("");
+    const [searchResults, setSearchResults] = useState<Product[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [openSelector, setOpenSelector] = useState(false);
+    const [selectedEntityName, setSelectedEntityName] = useState("");
 
     // Fetch product categories on mount
     useEffect(() => {
@@ -97,6 +109,67 @@ export function CouponDialog({
             });
         }
     }, [coupon, open]);
+
+    // Entity search logic
+    useEffect(() => {
+        const delayDebounceFn = setTimeout(async () => {
+            if (open && (formData.type === 'product' || formData.type === 'variant')) {
+                if (searchTerm.length >= 2) {
+                    setIsSearching(true);
+                    try {
+                        const data = await productService.getAll({ search: searchTerm, limit: 10 });
+                        setSearchResults(data.products || []);
+                    } catch (error) {
+                        logger.error("Error searching products:", error);
+                    } finally {
+                        setIsSearching(false);
+                    }
+                } else if (searchTerm.length === 0) {
+                    // Fetch initial products
+                    try {
+                        const data = await productService.getAll({ limit: 10 });
+                        setSearchResults(data.products || []);
+                    } catch (error) { }
+                }
+            }
+        }, 300);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchTerm, open, formData.type]);
+
+    // Initial load for search results
+    useEffect(() => {
+        if (open && (formData.type === 'product' || formData.type === 'variant') && searchResults.length === 0) {
+            const fetchInitial = async () => {
+                try {
+                    const data = await productService.getAll({ limit: 10 });
+                    setSearchResults(data.products || []);
+                } catch (error) { }
+            };
+            fetchInitial();
+        }
+    }, [open, formData.type, searchResults.length]);
+
+    // Set entity name for display when editing
+    useEffect(() => {
+        if (coupon && (coupon.type === 'product' || coupon.type === 'variant') && coupon.target_id) {
+            const fetchEntity = async () => {
+                try {
+                    const product = await productService.getById(coupon.target_id!.split(':')[0]);
+                    if (coupon.type === 'variant') {
+                        const variantId = coupon.target_id;
+                        const variant = product.variants?.find(v => v.id === variantId);
+                        setSelectedEntityName(variant ? `${product.title} (${variant.size_label})` : product.title);
+                    } else {
+                        setSelectedEntityName(product.title);
+                    }
+                } catch (error) { }
+            };
+            fetchEntity();
+        } else {
+            setSelectedEntityName("");
+        }
+    }, [coupon]);
 
     const handleChange = (field: keyof CreateCouponDto, value: string | number | boolean | undefined) => {
         setFormData((prev) => ({ ...prev, [field]: value }));
@@ -184,12 +257,10 @@ export function CouponDialog({
                         </Label>
                         <Select
                             value={formData.type}
-                            onValueChange={(value: "cart" | "category" | "product") => {
+                            onValueChange={(value: "cart" | "category" | "product" | "variant") => {
                                 handleChange("type", value);
                                 // Clear target_id when switching types
-                                if (value === "cart") {
-                                    handleChange("target_id", undefined);
-                                }
+                                handleChange("target_id", undefined);
                             }}
                             disabled={loading}
                         >
@@ -200,24 +271,122 @@ export function CouponDialog({
                                 <SelectItem value="cart">Cart-Level (Apply to entire cart)</SelectItem>
                                 <SelectItem value="category">Category-Level (Apply to a category)</SelectItem>
                                 <SelectItem value="product">Product-Level (Apply to specific product)</SelectItem>
+                                <SelectItem value="variant">Variant-Level (Apply to specific variant)</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
 
-                    {/* Target ID (for product or category) */}
-                    {formData.type === "product" && (
+                    {/* Target ID (for product, variant or category) */}
+                    {(formData.type === "product" || formData.type === "variant") && (
                         <div className="grid gap-2">
                             <Label htmlFor="target_id">
-                                Product ID <span className="text-destructive">*</span>
+                                {formData.type === "product" ? "Select Product" : "Select Variant"} <span className="text-destructive">*</span>
                             </Label>
-                            <Input
-                                id="target_id"
-                                value={formData.target_id || ""}
-                                onChange={(e) => handleChange("target_id", e.target.value)}
-                                placeholder="Enter product ID"
-                                disabled={loading}
-                                required
-                            />
+
+                            <Popover open={openSelector} onOpenChange={setOpenSelector}>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        role="combobox"
+                                        aria-expanded={openSelector}
+                                        className="w-full justify-between font-normal h-11 rounded-xl"
+                                        disabled={loading}
+                                    >
+                                        <div className="flex items-center gap-2 truncate">
+                                            {formData.target_id ? (
+                                                <>
+                                                    <div className="w-2 h-2 rounded-full bg-primary" />
+                                                    <span className="truncate">{selectedEntityName || formData.target_id}</span>
+                                                </>
+                                            ) : (
+                                                <span className="text-muted-foreground">Search for a {formData.type}...</span>
+                                            )}
+                                        </div>
+                                        <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0 rounded-xl shadow-2xl border-primary/10">
+                                    <Command shouldFilter={false}>
+                                        <CommandInput
+                                            placeholder={`Search for ${formData.type}...`}
+                                            onValueChange={setSearchTerm}
+                                            value={searchTerm}
+                                        />
+                                        <CommandList className="max-h-[300px]">
+                                            <CommandEmpty className="py-6 text-center text-sm">
+                                                {isSearching ? (
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                                        <span>Searching...</span>
+                                                    </div>
+                                                ) : (
+                                                    "No results found."
+                                                )}
+                                            </CommandEmpty>
+                                            <CommandGroup>
+                                                {searchResults.map((product) => (
+                                                    <div key={product.id}>
+                                                        {formData.type === 'product' ? (
+                                                            <CommandItem
+                                                                value={product.id}
+                                                                onSelect={() => {
+                                                                    handleChange("target_id", product.id);
+                                                                    setSelectedEntityName(product.title);
+                                                                    setOpenSelector(false);
+                                                                }}
+                                                                className="flex items-center gap-2 p-3"
+                                                            >
+                                                                <Check
+                                                                    className={cn(
+                                                                        "h-4 w-4 text-primary",
+                                                                        formData.target_id === product.id ? "opacity-100" : "opacity-0"
+                                                                    )}
+                                                                />
+                                                                <div className="flex-1">
+                                                                    <div className="font-bold">{product.title}</div>
+                                                                    <div className="text-[10px] text-muted-foreground uppercase">{product.category}</div>
+                                                                </div>
+                                                            </CommandItem>
+                                                        ) : (
+                                                            // For Variants, show product and its variants
+                                                            <div className="px-2 py-1.5">
+                                                                <div className="text-[10px] font-black text-primary/50 uppercase px-2 mb-1">{product.title} Variants</div>
+                                                                {product.variants && product.variants.length > 0 ? (
+                                                                    product.variants.map((v) => (
+                                                                        <CommandItem
+                                                                            key={v.id}
+                                                                            value={v.id}
+                                                                            onSelect={() => {
+                                                                                handleChange("target_id", v.id);
+                                                                                setSelectedEntityName(`${product.title} (${v.size_label})`);
+                                                                                setOpenSelector(false);
+                                                                            }}
+                                                                            className="flex items-center gap-2 p-2 ml-2 rounded-lg"
+                                                                        >
+                                                                            <Check
+                                                                                className={cn(
+                                                                                    "h-4 w-4 text-primary",
+                                                                                    formData.target_id === v.id ? "opacity-100" : "opacity-0"
+                                                                                )}
+                                                                            />
+                                                                            <div className="flex-1">
+                                                                                <div className="font-medium">{v.size_label}</div>
+                                                                                <div className="text-[10px] text-muted-foreground">₹{v.selling_price} • Stock: {v.stock_quantity}</div>
+                                                                            </div>
+                                                                        </CommandItem>
+                                                                    ))
+                                                                ) : (
+                                                                    <div className="text-[10px] italic text-muted-foreground px-4 py-1">No variants available</div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
                         </div>
                     )}
 

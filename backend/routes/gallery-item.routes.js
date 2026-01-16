@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const { deletePhotoByUrl } = require('../services/photo.service');
+const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
 
 // Get all items with optional filters
 router.get('/', async (req, res) => {
@@ -68,8 +69,8 @@ router.get('/folder/:folderId', async (req, res) => {
     }
 });
 
-// Create new item
-router.post('/', async (req, res) => {
+// Create new item - Admin/Manager only
+router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('gallery_items')
@@ -88,8 +89,8 @@ router.post('/', async (req, res) => {
     }
 });
 
-// Update item
-router.put('/:id', async (req, res) => {
+// Update item - Admin/Manager only
+router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('gallery_items')
@@ -106,8 +107,8 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-// Delete item (also removes from storage)
-router.delete('/:id', async (req, res) => {
+// Delete item (also removes from storage) - Admin/Manager only
+router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         // Fetch the item to get the image URL
         const { data: item, error: fetchError } = await supabase
