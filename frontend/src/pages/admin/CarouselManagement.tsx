@@ -19,7 +19,9 @@ import {
 } from "@/components/ui/card";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errorUtils";
-import { Check, Image as ImageIcon, Loader2 } from "lucide-react";
+import { Check, Image as ImageIcon, Loader2, EyeOff, Eye } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 export default function CarouselManagement() {
     const queryClient = useQueryClient();
@@ -49,6 +51,28 @@ export default function CarouselManagement() {
 
     const handleSetFolder = (folderId: string) => {
         setCarouselMutation.mutate(folderId);
+    };
+
+    // Mutation to toggle hidden status
+    const toggleHiddenMutation = useMutation({
+        mutationFn: ({ id, is_hidden }: { id: string; is_hidden: boolean }) =>
+            galleryFolderService.update(id, { is_hidden }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["gallery-folders"] });
+            toast.success("Folder visibility updated");
+        },
+        onError: (error: unknown) => {
+            toast.error(getErrorMessage(error, "Failed to update folder visibility"));
+        },
+    });
+
+    const handleToggleHidden = (checked: boolean) => {
+        if (currentCarouselFolder) {
+            toggleHiddenMutation.mutate({
+                id: currentCarouselFolder.id,
+                is_hidden: checked,
+            });
+        }
     };
 
     return (
@@ -105,10 +129,39 @@ export default function CarouselManagement() {
                                         <Check className="h-4 w-4" />
                                         Currently Active: {currentCarouselFolder.name}
                                     </div>
-                                    <p className="text-sm text-muted-foreground">
+                                    <p className="text-sm text-muted-foreground mb-4">
                                         This folder's contents are currently being shown on the
                                         homepage carousel.
                                     </p>
+
+                                    <div className="flex items-center justify-between pt-4 border-t">
+                                        <div className="flex items-center gap-2">
+                                            {currentCarouselFolder.is_hidden ? (
+                                                <EyeOff className="h-4 w-4 text-orange-500" />
+                                            ) : (
+                                                <Eye className="h-4 w-4 text-blue-500" />
+                                            )}
+                                            <div className="space-y-0.5">
+                                                <Label htmlFor="hide-from-gallery" className="text-sm font-medium">
+                                                    Hide from Gallery
+                                                </Label>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Hide this folder from the public gallery page while it's in the carousel.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {toggleHiddenMutation.isPending && (
+                                                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                                            )}
+                                            <Switch
+                                                id="hide-from-gallery"
+                                                checked={currentCarouselFolder.is_hidden || false}
+                                                onCheckedChange={handleToggleHidden}
+                                                disabled={toggleHiddenMutation.isPending}
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 

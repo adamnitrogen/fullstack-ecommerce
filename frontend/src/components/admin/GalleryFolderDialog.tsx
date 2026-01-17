@@ -49,6 +49,7 @@ export function GalleryFolderDialog({
     slug: "",
     folder_type: "general",
     is_active: true,
+    is_hidden: false,
     order_index: 0,
   });
 
@@ -62,6 +63,7 @@ export function GalleryFolderDialog({
         slug: "",
         folder_type: "general",
         is_active: true,
+        is_hidden: false,
         order_index: 0,
       });
     }
@@ -213,6 +215,22 @@ export function GalleryFolderDialog({
                 checked={formData.is_active}
                 onCheckedChange={(checked) =>
                   setFormData({ ...formData, is_active: checked })
+                }
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="is_hidden">Hide from Gallery</Label>
+                <p className="text-xs text-muted-foreground">
+                  Folder will be accessible via direct link but not listed in gallery
+                </p>
+              </div>
+              <Switch
+                id="is_hidden"
+                checked={formData.is_hidden}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, is_hidden: checked })
                 }
               />
             </div>

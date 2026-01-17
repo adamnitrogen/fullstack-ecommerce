@@ -46,8 +46,8 @@ export default function Gallery() {
     setLightboxOpen(true);
   };
 
-  // Filter active folders only
-  const activeFolders = folders.filter((f) => f.is_active);
+  // Filter active and non-hidden folders only
+  const activeFolders = folders.filter((f) => f.is_active && !f.is_hidden);
 
   if (loadingFolders) {
     return (

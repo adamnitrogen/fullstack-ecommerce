@@ -9,6 +9,7 @@ export interface GalleryFolder {
     cover_image?: string;
     order_index: number;
     is_active: boolean;
+    is_hidden?: boolean;
     is_home_carousel?: boolean;
     created_at: string;
     updated_at: string;
