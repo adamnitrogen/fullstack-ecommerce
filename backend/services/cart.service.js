@@ -407,21 +407,22 @@ async function calculateCartTotals(userId, guestId, existingCart = null, { skipV
         let totalPrice = 0;
         let productDeliveryCharge = 0;
         const itemLevelBreakdown = [];
+        const seenProductIds = new Set();
 
         cartItems.forEach(item => {
             const price = item.variant ? item.variant.selling_price : item.product.price;
             const mrp = item.variant ? item.variant.mrp : (item.product.mrp || item.product.price);
 
-            // Per-product delivery charge (Variant takes precedence over Product)
-            const itemDeliveryChargeRate = (item.variant && item.variant.delivery_charge !== null)
-                ? item.variant.delivery_charge
-                : (item.product.delivery_charge || 0);
-
-            const itemDeliveryTotal = itemDeliveryChargeRate * item.quantity;
+            // Per-product delivery charge (Centralized at Product Level)
+            let itemEntryDeliveryCharge = 0;
+            if (!seenProductIds.has(item.product_id)) {
+                itemEntryDeliveryCharge = item.product.delivery_charge || 0;
+                productDeliveryCharge += itemEntryDeliveryCharge;
+                seenProductIds.add(item.product_id);
+            }
 
             totalMrp += mrp * item.quantity;
             totalPrice += price * item.quantity;
-            productDeliveryCharge += itemDeliveryTotal;
 
             itemLevelBreakdown.push({
                 product_id: item.product_id,
@@ -429,7 +430,7 @@ async function calculateCartTotals(userId, guestId, existingCart = null, { skipV
                 quantity: item.quantity,
                 mrp: mrp,
                 price: price,
-                delivery_charge: itemDeliveryTotal,
+                delivery_charge: itemEntryDeliveryCharge,
                 coupon_discount: 0,
                 coupon_code: null
             });

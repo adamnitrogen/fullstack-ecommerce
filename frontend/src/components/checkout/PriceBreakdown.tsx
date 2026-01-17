@@ -54,6 +54,24 @@ export function PriceBreakdown({ totals }: PriceBreakdownProps) {
                     )}
                 </div>
 
+                {/* Delivery Breakdown - Only show if there's a mix or specific product charges */}
+                {totals.deliveryCharge > 0 && (totals.productDeliveryCharges ?? 0) > 0 && (
+                    <div className="pl-6 space-y-1 -mt-1 mb-2">
+                        <div className="flex justify-between items-center text-xs text-muted-foreground">
+                            <span>Standard Delivery</span>
+                            <span>
+                                {(totals.globalDeliveryCharge ?? 0) > 0
+                                    ? `₹${totals.globalDeliveryCharge?.toFixed(2)}`
+                                    : <span className="text-emerald-600">FREE</span>}
+                            </span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs text-muted-foreground">
+                            <span>Item Surcharges</span>
+                            <span>₹{totals.productDeliveryCharges?.toFixed(2)}</span>
+                        </div>
+                    </div>
+                )}
+
                 {/* Tax Breakdown */}
                 {totals.tax && totals.tax.totalTax > 0 && (
                     <div className="pt-2 border-t border-dashed space-y-1">

@@ -52,6 +52,8 @@ const AVAILABLE_TAGS = [
   "fresh",
 ];
 
+const EMPTY_CATEGORIES: any[] = [];
+
 export function ProductDialog({
   open,
   onOpenChange,
@@ -60,7 +62,7 @@ export function ProductDialog({
   isSaving = false,
 }: ProductDialogProps) {
   // Fetch categories dynamically
-  const { data: categories = [] } = useQuery({
+  const { data: categories = EMPTY_CATEGORIES } = useQuery({
     queryKey: ["categories", "product"],
     queryFn: async () => {
       const { categoryService } = await import("@/services/category.service");
@@ -177,6 +179,34 @@ export function ProductDialog({
           default_price_includes_tax: true,
         });
       }
+      setBenefitInput("");
+      setCustomTag("");
+    } else {
+      // Reset state on close to prevent stale data and blob URL errors
+      setOriginalImages([]);
+      setRemovedImages([]);
+      setVariants([]);
+      setFormData({
+        title: "",
+        description: "",
+        price: 0,
+        mrp: 0,
+        images: [],
+        imageFiles: [],
+        category: categories.length > 0 ? categories[0].name : "Dairy",
+        tags: [],
+        inventory: 0,
+        benefits: [],
+        isReturnable: true,
+        returnDays: 3,
+        isNew: false,
+        createdAt: new Date().toISOString(),
+        variant_mode: 'UNIT',
+        default_tax_applicable: true,
+        default_price_includes_tax: true,
+        default_gst_rate: 0,
+        default_hsn_code: "",
+      });
       setBenefitInput("");
       setCustomTag("");
     }
@@ -369,7 +399,7 @@ export function ProductDialog({
                     setFormData({ ...formData, category: value })
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="category">
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -518,7 +548,7 @@ export function ProductDialog({
                         setFormData({ ...formData, default_gst_rate: parseFloat(value) })
                       }
                     >
-                      <SelectTrigger>
+                      <SelectTrigger id="default-gst">
                         <SelectValue placeholder="Select Rate" />
                       </SelectTrigger>
                       <SelectContent>

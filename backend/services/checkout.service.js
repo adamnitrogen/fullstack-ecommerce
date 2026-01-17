@@ -729,16 +729,94 @@ async function processPaymentAndOrder(userId, {
         );
 
         if (!isValid) {
-            // Update payment as failed
-            if (payment_id) {
-                await updatePaymentRecord(payment_id, {
-                    status: 'failed',
-                    error_description: 'Invalid payment signature'
-                });
+            logger.warn({
+                razorpay_payment_id,
+                razorpay_order_id,
+                received_signature: razorpay_signature
+            }, 'Signature verification failed. Attempting S2S verification.');
+
+            try {
+                // Server-to-Server Verification (Source of Truth)
+                const payment = await razorpay.payments.fetch(razorpay_payment_id);
+
+                logger.info({
+                    fetched_order_id: payment.order_id,
+                    expected_order_id: razorpay_order_id,
+                    status: payment.status
+                }, 'S2S Payment Fetched');
+
+                // Check 1: Is payment successful?
+                if (payment.status !== 'captured' && payment.status !== 'authorized') {
+                    throw new Error(`Payment status is ${payment.status} (not captured)`);
+                }
+
+                // Check 2: Does Order ID match?
+                // If we didn't have an order_id (nullish), we accept the one from payment
+                // If we did have one, it must match
+                if (razorpay_order_id && payment.order_id !== razorpay_order_id) {
+                    // MISMATCH: User paid for Order A, but trying to verify Order B.
+                    // We must REFUND this payment to be safe.
+                    logger.warn('Order ID mismatch in S2S check. Initiating Refund.');
+                    throw new Error(`Order ID mismatch: Payment is for ${payment.order_id}, expected ${razorpay_order_id}`);
+                }
+
+                // If we are here, S2S is valid!
+                // We can proceed. We trust Razorpay API more than client signature.
+                logger.info('S2S verification passed. Proceeding with order creation.');
+
+                // Update our local variable if needed (for consistency in DB)
+                // razorpay_order_id = payment.order_id; // (const, can't reassign, but downstream uses it?)
+                // processPaymentAndOrder uses destructuring, so we can't easily change `razorpay_order_id` variable without let.
+                // However, the DB transaction uses `razorpay_order_id` from the scope? 
+                // No, it uses `payment_id` record.
+                // We should ensure the payment record is updated with correct Razorpay IDs.
+
+                if (payment_id) {
+                    await updatePaymentRecord(payment_id, {
+                        razorpay_payment_id,
+                        razorpay_signature: 's2s_verified', // Mark as S2S verified
+                        status: 'captured',
+                        razorpay_order_id: payment.order_id // Ensure correct order ID is stored
+                    });
+                }
+
+            } catch (s2sError) {
+                // S2S Failed or Mismatch -> REFUND
+                logger.error({ err: s2sError }, 'S2S Verification Failed.');
+
+                // Attempt Auto-Refund if payment was captured
+                try {
+                    const payment = await razorpay.payments.fetch(razorpay_payment_id);
+                    if (payment.status === 'captured' || payment.status === 'authorized') {
+                        logger.info('Auto-Refunding failed/mismatched payment...');
+                        await razorpay.payments.refund(razorpay_payment_id, {
+                            reason: `Validation/Verification Failed: ${s2sError.message}`
+                        });
+
+                        if (payment_id) {
+                            await updatePaymentRecord(payment_id, { status: 'refunded', error_description: s2sError.message });
+                        }
+
+                        const refundError = new Error('Payment verification failed and your amount has been refunded. Please try again.');
+                        refundError.status = 400;
+                        throw refundError;
+                    }
+                } catch (refundErr) {
+                    // Start of refund error handling (if refund fails, or if it was thrown above)
+                    if (refundErr.message.includes('has been refunded')) throw refundErr;
+                }
+
+                // Update payment as failed
+                if (payment_id) {
+                    await updatePaymentRecord(payment_id, {
+                        status: 'failed',
+                        error_description: s2sError.message || 'Invalid payment signature'
+                    });
+                }
+                const error = new Error('Invalid payment signature and verification failed.');
+                error.status = 400;
+                throw error;
             }
-            const error = new Error('Invalid payment signature');
-            error.status = 400;
-            throw error;
         }
 
         // --- PAYMENT SIGNATURE VERIFIED ---
@@ -788,6 +866,26 @@ async function processPaymentAndOrder(userId, {
         }
     }
 
+    // --- PAYMENT ID RECOVERY ---
+    // If frontend failed to pass payment_id (e.g. old code or bug), try to find it via Razorpay Order ID
+    if (!payment_id && razorpay_order_id) {
+        try {
+            const { data: existingPayment } = await supabase
+                .from('payments')
+                .select('id')
+                .eq('razorpay_order_id', razorpay_order_id)
+                .single();
+
+            if (existingPayment) {
+                payment_id = existingPayment.id;
+                logger.info({ recovered_payment_id: payment_id }, 'Recovered missing payment_id via razorpay_order_id');
+            }
+        } catch (e) {
+            // Log warning but proceed - this is a recovery attempt, not critical path
+            logger.warn({ err: e, razorpay_order_id }, 'Failed to recover payment_id via razorpay_order_id');
+        }
+    }
+
     // --- DB TRANSACTION PHASE ---
     try {
         // Create order via atomic PostgreSQL transaction
@@ -797,6 +895,10 @@ async function processPaymentAndOrder(userId, {
             payment_id,
             notes
         });
+
+        // Log functionality for Timeline (Fix for missing history)
+        const { logStatusHistory } = require('./order.service');
+        await logStatusHistory(order.id, 'pending', userId, 'Order placed successfully');
 
         // --- DB SUCCESS ---
         // Payment was already captured, so we don't need to do anything else.
@@ -875,6 +977,307 @@ async function processPaymentAndOrder(userId, {
     }
 }
 
+/**
+ * Process Buy Now Order
+ * Creates an order for a single item without using the cart
+ */
+const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
+    const {
+        razorpay_order_id,
+        razorpay_payment_id,
+        razorpay_signature,
+        payment_id,
+        shipping_address_id,
+        billing_address_id,
+        notes
+    } = paymentData;
+
+    const { productId, variantId, quantity = 1 } = buyNowData;
+
+    log.info('BUY_NOW_START', 'Processing Buy Now order', { userId, productId, variantId, quantity });
+
+    // Verify payment signature
+    const isValidSignature = verifyRazorpayPayment(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+    if (!isValidSignature) {
+        log.error('BUY_NOW_INVALID_SIGNATURE', 'Invalid payment signature');
+        const error = new Error('Payment verification failed. Please contact support if money was deducted.');
+        error.status = 400;
+        throw error;
+    }
+
+    // Update payment record
+    if (payment_id) {
+        await updatePaymentRecord(payment_id, {
+            razorpay_payment_id,
+            razorpay_signature,
+            status: 'captured'
+        });
+    }
+
+    try {
+        // Fetch product
+        const { data: product, error: productError } = await supabase
+            .from('products')
+            .select('*')
+            .eq('id', productId)
+            .single();
+
+        if (productError || !product) {
+            const error = new Error('This product is no longer available.');
+            error.status = 404;
+            throw error;
+        }
+
+        // Fetch variant if provided
+        let variant = null;
+        if (variantId) {
+            const { data: v } = await supabase
+                .from('product_variants')
+                .select('*')
+                .eq('id', variantId)
+                .single();
+            variant = v;
+        }
+
+        // Check stock
+        const stockCheck = await checkStockAvailability([{
+            product_id: productId,
+            variant_id: variantId,
+            quantity,
+            products: product,
+            product_variants: variant
+        }]);
+
+        if (!stockCheck.available) {
+            const error = new Error(`Sorry, "${product.title}" is currently out of stock. Your payment will be refunded.`);
+            error.status = 400;
+            throw error;
+        }
+
+        // Get user profile
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('name, email, phone')
+            .eq('id', userId)
+            .single();
+
+        if (!profile) {
+            const error = new Error('Please complete your profile before placing an order.');
+            error.status = 400;
+            throw error;
+        }
+
+        // Get addresses
+        const { data: shippingAddrData } = await supabase
+            .from('addresses')
+            .select('*, phone_numbers(phone_number)')
+            .eq('id', shipping_address_id)
+            .single();
+
+        if (!shippingAddrData) {
+            const error = new Error('Shipping address not found. Please add an address to continue.');
+            error.status = 400;
+            throw error;
+        }
+
+        const shippingAddr = {
+            ...shippingAddrData,
+            phone: shippingAddrData.phone_numbers?.phone_number
+        };
+
+        const { data: billingAddrData } = await supabase
+            .from('addresses')
+            .select('*, phone_numbers(phone_number)')
+            .eq('id', billing_address_id)
+            .single();
+
+        const billingAddr = billingAddrData ? {
+            ...billingAddrData,
+            phone: billingAddrData.phone_numbers?.phone_number
+        } : shippingAddr;
+
+        // Calculate totals
+        const unitPrice = variant?.selling_price || product.price;
+        const unitMrp = variant?.mrp || product.mrp || unitPrice;
+        const subtotal = unitPrice * quantity;
+
+        // Fetch delivery settings
+        const settingsService = require('./settings.service');
+        const { delivery_charge: globalCharge, delivery_threshold: threshold } = await settingsService.getDeliverySettings();
+
+        // Product-specific delivery charge
+        const productCharge = variant?.delivery_charge ?? product.delivery_charge ?? 0;
+
+        // Calculate total delivery charge (Product + Global if under threshold)
+        const applicableGlobalCharge = subtotal >= threshold ? 0 : globalCharge;
+        const deliveryCharge = productCharge + applicableGlobalCharge;
+
+        const totalAmount = subtotal + deliveryCharge;
+
+        // Build virtual cart item for tax calculation
+        const virtualCartItem = {
+            product_id: productId,
+            variant_id: variantId,
+            quantity,
+            products: product,
+            product_variants: variant
+        };
+
+        // Calculate taxes
+        let taxResult = null;
+        try {
+            taxResult = TaxEngine.calculateOrderTax([virtualCartItem], shippingAddr);
+        } catch (err) {
+            log.warn('BUY_NOW_TAX_ERROR', 'Failed to calculate taxes', { error: err.message });
+        }
+
+        // Prepare order data
+        const orderData = {
+            customerName: profile?.name,
+            customerEmail: profile?.email,
+            customerPhone: profile?.phone,
+            shipping_address_id,
+            billing_address_id,
+            shippingAddress: shippingAddr,
+            totalAmount,
+            subtotal,
+            coupon_code: null,
+            coupon_discount: 0,
+            delivery_charge: deliveryCharge,
+            status: 'pending',
+            paymentStatus: 'paid',
+            notes: notes || 'Buy Now Order',
+            total_taxable_amount: taxResult?.summary.totalTaxableAmount || 0,
+            total_cgst: taxResult?.summary.totalCgst || 0,
+            total_sgst: taxResult?.summary.totalSgst || 0,
+            total_igst: taxResult?.summary.totalIgst || 0
+        };
+
+        // Prepare order item
+        const taxBreakdown = taxResult?.items[0]?.taxBreakdown || {};
+        const orderItems = [{
+            product_id: productId,
+            variant_id: variantId,
+            quantity,
+            product: {
+                id: product.id,
+                title: product.title,
+                price: unitPrice,
+                images: product.images || [],
+                isReturnable: product.isReturnable ?? product.is_returnable ?? true
+            },
+            delivery_charge: deliveryCharge,
+            coupon_id: null,
+            coupon_code: null,
+            coupon_discount: 0,
+            taxable_amount: taxBreakdown.taxableAmount || null,
+            cgst: taxBreakdown.cgst || 0,
+            sgst: taxBreakdown.sgst || 0,
+            igst: taxBreakdown.igst || 0,
+            hsn_code: taxBreakdown.hsnCode || null,
+            gst_rate: taxBreakdown.gstRate || null,
+            total_amount: taxBreakdown.totalAmount || null,
+            variant_snapshot: variant ? {
+                variant_id: variant.id,
+                size_label: variant.size_label,
+                selling_price: variant.selling_price,
+                mrp: variant.mrp,
+                description: variant.description,
+                tax_applicable: variant.tax_applicable || false,
+                price_includes_tax: variant.price_includes_tax ?? true
+            } : null
+        }];
+
+        log.info('BUY_NOW_CREATE_ORDER', 'Creating Buy Now order via RPC', { userId, itemCount: 1 });
+
+        // Use transactional RPC (skip cart clearing since we're not using cart)
+        const { data: rpcResult, error: rpcError } = await supabase
+            .rpc('create_order_transactional', {
+                p_user_id: userId,
+                p_order_data: orderData,
+                p_order_items: orderItems,
+                p_cart_id: null, // No cart to clear
+                p_payment_id: payment_id,
+                p_razorpay_payment_id: razorpay_payment_id
+            });
+
+        if (rpcError) {
+            log.error('BUY_NOW_RPC_ERROR', 'Buy Now order creation failed', { error: rpcError.message });
+            throw rpcError;
+        }
+
+        const order = rpcResult;
+
+        // Log functionality for Timeline (Fix for missing history)
+        const { logStatusHistory } = require('./order.service');
+        await logStatusHistory(order.id, 'pending', userId, 'Order placed successfully');
+
+        log.info('BUY_NOW_SUCCESS', 'Buy Now order created successfully', { orderId: order?.id });
+
+        // Send confirmation email
+        try {
+            await emailService.sendOrderConfirmation(
+                profile.email,
+                profile.name,
+                order,
+                orderItems.map(i => ({
+                    ...i,
+                    title: i.product.title,
+                    price: unitPrice,
+                    quantity: i.quantity
+                })),
+                shippingAddr
+            );
+        } catch (emailErr) {
+            log.warn('BUY_NOW_EMAIL_ERROR', 'Failed to send confirmation email', { error: emailErr.message });
+        }
+
+        return {
+            success: true,
+            order: {
+                id: order.id,
+                orderNumber: order.orderNumber || order.order_number,
+                totalAmount: order.totalAmount || order.total_amount,
+                status: order.status
+            }
+        };
+
+    } catch (error) {
+        log.error('BUY_NOW_ERROR', 'Buy Now order failed', { error: error.message });
+
+        // Refund payment if order creation failed
+        if (razorpay_payment_id) {
+            try {
+                const { refundPayment } = require('../utils/razorpay-helper');
+                await refundPayment(razorpay_payment_id, null, {
+                    reason: `Buy Now order failed: ${error.message}`
+                });
+
+                if (payment_id) {
+                    await updatePaymentRecord(payment_id, {
+                        status: 'refunded',
+                        error_description: 'Buy Now order failed - payment refunded'
+                    });
+                }
+
+                const userError = new Error('Order creation failed and payment has been refunded. Please try again.');
+                userError.status = 500;
+                throw userError;
+            } catch (refundError) {
+                if (refundError.message.includes('Order creation failed')) {
+                    throw refundError;
+                }
+                log.error('BUY_NOW_REFUND_ERROR', 'Failed to refund payment', { error: refundError.message });
+                const criticalError = new Error('Order failed and we encountered an issue processing your refund. Please contact support immediately with your payment ID.');
+                criticalError.status = 500;
+                throw criticalError;
+            }
+        }
+
+        throw error;
+    }
+};
+
 module.exports = {
     getCheckoutSummary,
     createRazorpayInvoice,
@@ -883,6 +1286,8 @@ module.exports = {
     updatePaymentRecord,
     createOrder,
     processPaymentAndOrder,
+    processBuyNowOrder,
     handleWebhookEvent,
     processRefund
 };
+

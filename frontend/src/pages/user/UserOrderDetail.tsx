@@ -78,6 +78,8 @@ interface ReturnableItem {
     title: string;
     price_per_unit: number;
     remaining_quantity: number;
+    return_days?: number;
+    return_deadline?: string;
 }
 
 export default function UserOrderDetail() {
@@ -358,10 +360,18 @@ export default function UserOrderDetail() {
                                                                 />
                                                                 <div className="flex-1">
                                                                     <p className="text-sm font-medium">{item.title}</p>
-                                                                    <div className="flex items-center gap-2 mt-1">
+                                                                    <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 mt-1">
                                                                         <span className="text-xs text-muted-foreground">₹{item.price_per_unit}</span>
                                                                         <span className="text-xs text-muted-foreground">•</span>
                                                                         <span className="text-xs text-muted-foreground">Max: {item.remaining_quantity}</span>
+                                                                        {item.return_deadline && (
+                                                                            <>
+                                                                                <span className="text-xs text-muted-foreground">•</span>
+                                                                                <span className="text-xs text-orange-600">
+                                                                                    Return by: {format(new Date(item.return_deadline), "MMM d")}
+                                                                                </span>
+                                                                            </>
+                                                                        )}
                                                                     </div>
                                                                 </div>
                                                                 {isSelected && (

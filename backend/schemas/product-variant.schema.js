@@ -73,6 +73,11 @@ const createVariantSchema = z.object({
     razorpay_item_id: z
         .string()
         .optional()
+        .nullable(),
+    delivery_charge: z
+        .number()
+        .min(0, 'Delivery charge cannot be negative')
+        .optional()
         .nullable()
 }).refine(
     (data) => data.selling_price <= data.mrp,
@@ -161,7 +166,12 @@ const updateVariantSchema = z.object({
         .optional(),
     price_includes_tax: z
         .boolean()
+        .optional(),
+    delivery_charge: z
+        .number()
+        .min(0)
         .optional()
+        .nullable()
 }).refine(
     (data) => {
         if (data.selling_price !== undefined && data.mrp !== undefined) {
@@ -196,6 +206,7 @@ const createProductWithVariantsSchema = z.object({
         default_gst_rate: z.number().refine(val => val === undefined || val === null || [0, 5, 12, 18, 28].includes(val)).optional().nullable(),
         default_tax_applicable: z.boolean().default(false).optional(),
         default_price_includes_tax: z.boolean().default(true).optional(),
+        delivery_charge: z.number().min(0).optional().nullable(),
         createdAt: z.string().optional()
     }),
     variants: z
@@ -294,6 +305,7 @@ const updateProductWithVariantsSchema = z.object({
         default_gst_rate: z.number().refine(val => val === undefined || val === null || [0, 5, 12, 18, 28].includes(val)).optional().nullable(),
         default_tax_applicable: z.boolean().optional(),
         default_price_includes_tax: z.boolean().optional(),
+        delivery_charge: z.number().min(0).optional().nullable(),
         createdAt: z.string().optional()
     }).optional(),
     variants: z

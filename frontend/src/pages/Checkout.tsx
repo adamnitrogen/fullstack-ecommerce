@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
 import { useCartStore } from "@/store/cartStore";
 import { checkoutService } from "@/services/checkout.service";
@@ -15,7 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { Loader2, Lock, ShieldCheck, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
-import type { CheckoutSummary, CheckoutAddress } from "@/types";
+import type { CheckoutSummary, CheckoutAddress, Product } from "@/types";
 import { getErrorMessage } from "@/lib/errorUtils";
 import {
   AlertDialog,
@@ -29,13 +29,31 @@ import {
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { BackButton } from "@/components/ui/BackButton";
 
+// Type for Buy Now navigation state
+interface BuyNowState {
+  buyNowItem?: {
+    product: Product;
+    quantity: number;
+    variantId?: string;
+  };
+}
+
 export default function Checkout() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, user } = useAuthStore();
   const { fetchCart } = useCartStore();
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [summary, setSummary] = useState<CheckoutSummary | null>(null);
+
+  // Buy Now state
+  const [isBuyNow, setIsBuyNow] = useState(false);
+  const [buyNowData, setBuyNowData] = useState<{
+    productId: string;
+    variantId?: string;
+    quantity: number;
+  } | null>(null);
 
   const [shippingAddress, setShippingAddress] = useState<CheckoutAddress | null>(null);
   const [billingAddress, setBillingAddress] = useState<CheckoutAddress | null>(null);
@@ -79,13 +97,56 @@ export default function Checkout() {
   }, [navigate]);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      toast.error("Please login to checkout");
-      navigate("/auth?returnUrl=/checkout");
-      return;
-    }
-    fetchCheckoutSummary();
-  }, [isAuthenticated, navigate, fetchCheckoutSummary]);
+    const initCheckout = async () => {
+      if (!isAuthenticated) {
+        toast.error("Please login to checkout");
+        navigate("/auth?returnUrl=/checkout");
+        return;
+      }
+
+      // Check for Buy Now flow
+      const state = location.state as BuyNowState | undefined;
+      if (state?.buyNowItem) {
+        const { product, quantity, variantId } = state.buyNowItem;
+
+        // Set Buy Now mode
+        setIsBuyNow(true);
+        const buyNowInfo = {
+          productId: product.id,
+          variantId: variantId,
+          quantity
+        };
+        setBuyNowData(buyNowInfo);
+
+        // Clear the state to prevent re-loading on refresh
+        navigate(location.pathname, { replace: true, state: {} });
+
+        // Fetch Buy Now summary (not cart-based)
+        try {
+          setLoading(true);
+          const data = await checkoutService.getSummaryForBuyNow(buyNowInfo);
+          setSummary(data);
+
+          // Pre-select addresses if available
+          if (data.shipping_address) setShippingAddress(data.shipping_address);
+          if (data.billing_address) setBillingAddress(data.billing_address);
+        } catch (error) {
+          logger.error("Buy Now checkout error", error);
+          const errorMsg = getErrorMessage(error) || "Unable to load checkout. Please try again.";
+          toast.error(errorMsg);
+          navigate("/shop");
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
+
+      // Regular cart checkout flow
+      fetchCheckoutSummary();
+    };
+
+    initCheckout();
+  }, [isAuthenticated, navigate, fetchCheckoutSummary, location]);
 
   const handlePayment = async () => {
     if (!shippingAddress) {
@@ -109,8 +170,14 @@ export default function Checkout() {
     try {
       setProcessing(true);
 
-      // Pre-payment stock validation
-      const stockValidation = await checkoutService.validateStock();
+      // Pre-payment stock validation (different endpoints for buy now vs cart)
+      let stockValidation;
+      if (isBuyNow && buyNowData) {
+        stockValidation = await checkoutService.validateStockForBuyNow(buyNowData);
+      } else {
+        stockValidation = await checkoutService.validateStock();
+      }
+
       if (!stockValidation.valid) {
         setStockIssues(stockValidation.items);
         setShowStockModal(true);
@@ -118,52 +185,71 @@ export default function Checkout() {
         return;
       }
 
-      // 1. Create Payment Order on Backend
-      const orderData = await checkoutService.createPaymentOrder(summary.totals.finalAmount);
+      // 1. Create Payment Order on Backend (different endpoints for buy now vs cart)
+      let orderData;
+      if (isBuyNow && buyNowData) {
+        orderData = await checkoutService.createPaymentOrderForBuyNow(buyNowData);
+      } else {
+        orderData = await checkoutService.createPaymentOrder(summary.totals.finalAmount);
+      }
 
       // 2. Initialize Razorpay Options
       const options = {
-        key: orderData.key_id, // Enter the Key ID generated from the Dashboard
-        amount: orderData.amount, // Amount is in currency subunits. Default currency is INR. Hence, 50000 refers to 50000 paise
+        key: orderData.key_id,
+        amount: orderData.amount,
         currency: orderData.currency,
         name: "MeriGauMata",
-        description: "Order Payment",
-        image: "https://lovable.dev/opengraph-image-p98pqg.png", // Optional: Add your logo
-        order_id: orderData.order_id, // This is a sample Order ID. Pass the `id` obtained in the response of Step 1
+        description: isBuyNow ? "Buy Now Order" : "Order Payment",
+        image: "https://lovable.dev/opengraph-image-p98pqg.png",
+        order_id: orderData.order_id,
         handler: async function (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) {
           // Show full screen loader during verification
           setLoading(true);
           setProcessing(true);
 
           try {
-            // 3. Verify Payment on Backend
-            const result = await checkoutService.verifyPayment({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-              payment_id: orderData.payment_id,
-              shipping_address_id: shippingAddress.id,
-              billing_address_id: billingSameAsShipping ? shippingAddress.id : billingAddress!.id,
-            });
+            // 3. Verify Payment on Backend (different endpoints for buy now vs cart)
+            let result;
+            if (isBuyNow && buyNowData) {
+              result = await checkoutService.verifyPaymentForBuyNow({
+                razorpay_order_id: response.razorpay_order_id || orderData.order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                payment_id: orderData.payment_id,
+                shipping_address_id: shippingAddress.id,
+                billing_address_id: billingSameAsShipping ? shippingAddress.id : billingAddress!.id,
+                buyNowData
+              });
+            } else {
+              result = await checkoutService.verifyPayment({
+                razorpay_order_id: response.razorpay_order_id || orderData.order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                payment_id: orderData.payment_id,
+                shipping_address_id: shippingAddress.id,
+                billing_address_id: billingSameAsShipping ? shippingAddress.id : billingAddress!.id,
+              });
+              // Refresh cart only for regular checkout (not buy now)
+              await fetchCart();
+            }
 
             if (result.success) {
-              // Refresh cart to clear items from UI (backend already cleared it)
-              await fetchCart();
               toast.success("Order placed successfully!");
               navigate(`/order-confirmation/${result.order.id}`, { state: { order: result.order } });
             }
           } catch (error: unknown) {
             logger.error("Order creation error", error);
 
-            // User friendly error message
-            let userMsg = "Payment verified but order creation failed. Please contact support.";
+            // Use server error message - it's now user-friendly
             const serverMsg = getErrorMessage(error);
 
-            if (serverMsg && (serverMsg.includes('refunded') || serverMsg.includes('Order creation failed'))) {
-              userMsg = "Payment successful but order creation failed. \nYour payment has been automatically refunded. \nPlease try again.";
-            }
+            // The backend now provides user-friendly messages
+            let userMsg = serverMsg || "Unable to complete your order. Please try again or contact support.";
 
-            toast.error(userMsg, { duration: 6000 });
+            // Extend duration for important messages
+            const duration = serverMsg?.includes('refund') || serverMsg?.includes('contact support') ? 8000 : 5000;
+
+            toast.error(userMsg, { duration });
           } finally {
             setProcessing(false);
             setLoading(false);

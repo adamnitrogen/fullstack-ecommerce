@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -83,16 +84,19 @@ export function AddressSelector({ type, selectedAddressId, onSelect }: AddressSe
                 const remaining = addresses.filter(a => a.id !== deletedId);
                 if (remaining.length > 0) onSelect(remaining[0]);
             }
+            setDeletingId(null);
         },
-        onError: () => toast.error("Failed to delete address"),
-        onSettled: () => setDeletingId(null),
+        onError: () => {
+            toast.error("Failed to delete address");
+            setDeletingId(null);
+        },
     });
 
     const handleSubmit = async (data: CreateAddressDto) => {
         if (editingAddress) {
-            updateMutation.mutate({ id: editingAddress.id, data });
+            await updateMutation.mutateAsync({ id: editingAddress.id, data });
         } else {
-            createMutation.mutate(data);
+            await createMutation.mutateAsync(data);
         }
     };
 
@@ -116,14 +120,17 @@ export function AddressSelector({ type, selectedAddressId, onSelect }: AddressSe
         setDeletingId(id);
     };
 
-    if (isLoading) {
-        return <div className="text-center py-8">Loading addresses...</div>;
-    }
+    const isMutationLoading = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
-    const saving = createMutation.isPending || updateMutation.isPending;
+    const mutationMessage =
+        createMutation.isPending ? "Creating new address..." :
+            updateMutation.isPending ? "Updating address..." :
+                deleteMutation.isPending ? "Deleting address..." :
+                    "Loading addresses...";
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-4 relative min-h-[200px]">
+            <LoadingOverlay isLoading={isLoading || isMutationLoading} message={mutationMessage} />
             <RadioGroup value={selectedAddressId} onValueChange={(id) => {
                 const addr = addresses.find(a => a.id === id);
                 if (addr) onSelect(addr);

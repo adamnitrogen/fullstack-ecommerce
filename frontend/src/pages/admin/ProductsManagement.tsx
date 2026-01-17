@@ -476,8 +476,15 @@ export default function ProductsManagement() {
                             <TableCell className="text-muted-foreground">
                               {product.mrp ? `₹${product.mrp}` : "-"}
                             </TableCell>
-                            <TableCell className="font-semibold">
-                              ₹{product.price}
+                            <TableCell>
+                              <div className="flex flex-col">
+                                <span className="font-semibold">₹{product.price}</span>
+                                {product.delivery_charge ? (
+                                  <span className="text-[10px] text-orange-600 font-medium">
+                                    + ₹{product.delivery_charge} delivery
+                                  </span>
+                                ) : null}
+                              </div>
                             </TableCell>
                             <TableCell>
                               <div className="flex flex-col">
@@ -548,7 +555,9 @@ export default function ProductsManagement() {
                                               </div>
                                             </TableCell>
                                             <TableCell className="py-2 text-xs text-muted-foreground">₹{variant.mrp}</TableCell>
-                                            <TableCell className="py-2 text-sm font-medium">₹{variant.selling_price}</TableCell>
+                                            <TableCell className="py-2">
+                                              <span className="text-sm font-medium">₹{variant.selling_price}</span>
+                                            </TableCell>
                                             <TableCell className="py-2 text-sm">{variant.stock_quantity} units</TableCell>
                                             <TableCell className="py-2">
                                               <Badge variant={variantStockStatus.variant} className="text-[10px] h-5 px-1.5 uppercase">

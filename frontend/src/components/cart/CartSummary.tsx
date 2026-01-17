@@ -1,12 +1,10 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Tag as TagIcon, X, ShieldCheck, Truck, RotateCcw, Loader2, Gift, Sparkles } from "lucide-react";
 import { CartTotals, Coupon } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { Tag } from "@/components/ui/Tag";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -16,7 +14,6 @@ interface CartSummaryProps {
     isLoading: boolean;
     onApplyCoupon: (code: string) => Promise<boolean>;
     onRemoveCoupon: () => Promise<void>;
-    isAuthenticated: boolean;
     onCheckout: () => void;
     availableCoupons?: Coupon[];
     deliverySettings?: { threshold: number; charge: number };
@@ -116,7 +113,7 @@ export const CartSummary = ({
                     )}>
                         <div className="flex justify-between text-muted-foreground font-medium">
                             <span>Items Total (MRP)</span>
-                            <span className="text-foreground">₹{totals?.totalMrp || 0}</span>
+                            <span className="text-foreground">₹{(totals?.totalMrp || 0).toFixed(2)}</span>
                         </div>
 
                         {totals && totals.discount > 0 && (
@@ -125,29 +122,36 @@ export const CartSummary = ({
                                     <TagIcon className="w-3.5 h-3.5" />
                                     Product Discounts
                                 </span>
-                                <span>−₹{totals.discount}</span>
+                                <span>-₹{totals.discount.toFixed(2)}</span>
                             </div>
                         )}
 
-                        <div className="flex flex-col gap-1">
-                            <div className="flex justify-between font-medium">
-                                <span className="text-muted-foreground">Store Delivery</span>
-                                <div className="text-right text-xs">
+                        <div className="flex flex-col gap-2 pt-1">
+                            <div className="flex justify-between items-center group/delivery">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100/50">
+                                        <Truck className="w-3.5 h-3.5" />
+                                    </div>
+                                    <span className="text-muted-foreground font-medium">Standard Delivery</span>
+                                </div>
+                                <div className="text-right">
                                     {totals?.globalDeliveryCharge === 0 ? (
-                                        <span className="text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-tighter">Free</span>
+                                        <span className="text-emerald-600 font-black text-[10px] uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">Free</span>
                                     ) : (
-                                        <span className="text-foreground">₹{totals?.globalDeliveryCharge || 0}</span>
+                                        <span className="font-bold text-foreground">₹{totals?.globalDeliveryCharge?.toFixed(2) || '0.00'}</span>
                                     )}
                                 </div>
                             </div>
 
-                            {totals && totals.productDeliveryCharges > 0 && (
-                                <div className="flex justify-between font-medium text-amber-600 dark:text-amber-400">
-                                    <span className="flex items-center gap-1">
-                                        <Truck className="w-3 h-3" />
-                                        Special Logistics Fees
-                                    </span>
-                                    <span>₹{totals.productDeliveryCharges}</span>
+                            {totals && (totals.productDeliveryCharges || 0) > 0 && (
+                                <div className="flex justify-between items-center animate-in slide-in-from-left-2 duration-500">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-6 h-6 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center border border-orange-100/50">
+                                            <Truck className="w-3.5 h-3.5" />
+                                        </div>
+                                        <span className="text-muted-foreground font-medium">Item Surcharges</span>
+                                    </div>
+                                    <span className="font-bold text-orange-600 animate-pulse">₹{(totals.productDeliveryCharges || 0).toFixed(2)}</span>
                                 </div>
                             )}
                         </div>
@@ -163,7 +167,7 @@ export const CartSummary = ({
                     </div>
 
                     {/* Delivery Progress Bar for Free Shipping */}
-                    {totals && totals.deliveryCharge > 0 && (
+                    {totals && (totals.globalDeliveryCharge || 0) > 0 && (
                         <div className="mt-2 space-y-2 pb-1">
                             <div className="h-1.5 w-full bg-muted/60 rounded-full overflow-hidden border border-border/10">
                                 <div
@@ -172,7 +176,7 @@ export const CartSummary = ({
                                 />
                             </div>
                             <p className="text-[11px] text-muted-foreground text-center italic">
-                                Add <span className="font-bold text-foreground">₹{remainingForFreeDelivery}</span> more for <span className="text-emerald-600 font-bold uppercase tracking-tighter">Free Delivery</span>
+                                Add <span className="font-bold text-foreground">₹{remainingForFreeDelivery.toFixed(2)}</span> more for <span className="text-emerald-600 font-bold uppercase tracking-tighter">Free Delivery</span>
                             </p>
                         </div>
                     )}
@@ -183,7 +187,7 @@ export const CartSummary = ({
                                 <Sparkles className="w-3.5 h-3.5" />
                                 Coupon ({totals.coupon.code})
                             </span>
-                            <span>−₹{totals.couponDiscount}</span>
+                            <span>-₹{(totals.couponDiscount || 0).toFixed(2)}</span>
                         </div>
                     )}
                 </div>
@@ -256,7 +260,7 @@ export const CartSummary = ({
                         <span className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Total Pay</span>
                         <div className="text-right">
                             <span className="text-3xl font-black text-primary block leading-none tracking-tighter">
-                                ₹{totals?.finalAmount || 0}
+                                ₹{totals?.finalAmount?.toFixed(2) || '0.00'}
                             </span>
                             <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest">
                                 Including GST & Fees
@@ -265,8 +269,8 @@ export const CartSummary = ({
                     </div>
 
                     {totals && (totals.discount + totals.couponDiscount) > 0 && (
-                        <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-[11px] p-3 rounded-xl text-center font-bold animate-pulse-subtle">
-                            Congrats! You are saving ₹{totals.discount + totals.couponDiscount}
+                        <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-[11px] p-3 rounded-xl text-center font-bold animate-pulse">
+                            Congrats! You are saving ₹{(totals.discount + totals.couponDiscount).toFixed(2)}
                         </div>
                     )}
                 </div>
@@ -285,7 +289,7 @@ export const CartSummary = ({
                 <div className="grid grid-cols-3 gap-2 pt-2">
                     <div className="flex flex-col items-center justify-center text-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
                         <ShieldCheck className="w-5 h-5 text-primary" />
-                        <span className="text-[10px] font-bold text-muted-foreground leading-tight uppercase tracking-tighter">Safe \u0026 Secure</span>
+                        <span className="text-[10px] font-bold text-muted-foreground leading-tight uppercase tracking-tighter">Safe & Secure</span>
                     </div>
                     <div className="flex flex-col items-center justify-center text-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
                         <Truck className="w-5 h-5 text-primary" />

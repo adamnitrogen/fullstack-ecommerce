@@ -187,7 +187,6 @@ const Cart = () => {
               isLoading={isLoading}
               onApplyCoupon={applyCoupon}
               onRemoveCoupon={removeCoupon}
-              isAuthenticated={isAuthenticated}
               onCheckout={handlePlaceOrder}
               availableCoupons={availableCoupons}
               deliverySettings={deliverySettings}

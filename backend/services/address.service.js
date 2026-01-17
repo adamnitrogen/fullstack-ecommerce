@@ -252,12 +252,11 @@ const setPrimaryAddress = async (id, userId, type, correlationId = null) => {
         if (error.code === 'PGRST202') {
             logger.warn({ id, userId, type }, 'RPC set_primary_address missing, performing manual fallback update');
 
-            // 1. Unset existing primary for this type
+            // 1. Unset existing primary for this user (globally)
             const { error: unsetError } = await supabase
                 .from('addresses')
                 .update({ is_primary: false, updated_at: new Date().toISOString() })
                 .eq('user_id', userId)
-                .eq('type', type)
                 .eq('is_primary', true);
 
             if (unsetError) {

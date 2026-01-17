@@ -581,6 +581,13 @@ async function getOrderById(id, user) {
             supabase.from('payments').select('razorpay_payment_id, method, status').eq('id', data.payment_id).single()
                 .then(({ data }) => ({ type: 'payment', data }))
         );
+    } else {
+        // Fallback: Try to find payment linked to this order
+        promises.push(
+            supabase.from('payments').select('razorpay_payment_id, method, status').eq('order_id', id).single()
+                .then(({ data }) => ({ type: 'payment', data }))
+                .catch(() => ({ type: 'payment', data: null }))
+        );
     }
 
     // 5. Email Logs (Admin/Manager only)

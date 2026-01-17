@@ -190,7 +190,7 @@ const OrderSummary = () => {
                       Discount Price
                     </span>
                     <span className="font-medium text-green-600">
-                      −₹{discount}
+                      -₹{discount.toFixed(2)}
                     </span>
                   </div>
                 )}

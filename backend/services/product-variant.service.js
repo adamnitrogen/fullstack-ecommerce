@@ -5,6 +5,38 @@ const RazorpaySyncService = require('./razorpay-sync.service');
 const log = createModuleLogger('ProductVariantService');
 
 /**
+ * Helper to delete image from Supabase Storage by URL
+ * @param {string} url - Full public URL of the image
+ */
+async function deleteImageFromStorage(url) {
+    if (!url) return;
+
+    try {
+        // Extract path from URL
+        // URL format: https://{supabase-url}/storage/v1/object/public/{bucket}/{path}
+        const urlParts = url.split('/storage/v1/object/public/');
+        if (urlParts.length < 2) return;
+
+        const pathWithBucket = urlParts[1];
+        const firstSlashIndex = pathWithBucket.indexOf('/');
+        const bucketName = pathWithBucket.substring(0, firstSlashIndex);
+        const imagePath = pathWithBucket.substring(firstSlashIndex + 1);
+
+        log.debug('DELETE_IMAGE_STORAGE', 'Deleting orphaned image', { bucketName, imagePath });
+
+        const { error } = await supabase.storage
+            .from(bucketName)
+            .remove([imagePath]);
+
+        if (error) {
+            log.error('DELETE_IMAGE_STORAGE_FAIL', error, { url });
+        }
+    } catch (err) {
+        log.error('DELETE_IMAGE_STORAGE_FAIL', err, { url });
+    }
+}
+
+/**
  * Product Variant Service
  * Handles CRUD operations for product size variants with proper logging
  */
@@ -23,6 +55,7 @@ const log = createModuleLogger('ProductVariantService');
  * @property {boolean} is_default
  * @property {string} created_at
  * @property {string} updated_at
+ * @property {number|null} delivery_charge
  */
 
 /**
@@ -36,6 +69,7 @@ const log = createModuleLogger('ProductVariantService');
  * @property {number} stock_quantity
  * @property {string} [variant_image_url]
  * @property {boolean} [is_default]
+ * @property {number} [delivery_charge]
  */
 
 /**
@@ -141,21 +175,21 @@ async function createVariant(productId, variantData) {
         .from('product_variants')
         .insert({
             product_id: productId,
-            size_label: variant_data.size_label,
-            size_value: variant_data.size_value,
-            unit: variant_data.unit || 'kg',
-            description: variant_data.description || null, // Added description
-            mrp: variant_data.mrp,
-            selling_price: variant_data.selling_price,
-            stock_quantity: variant_data.stock_quantity || 0,
-            variant_image_url: variant_data.variant_image_url || null,
-            is_default: variant_data.is_default || false,
-            delivery_charge: variant_data.delivery_charge !== undefined ? variant_data.delivery_charge : null,
+            size_label: variantData.size_label,
+            size_value: variantData.size_value,
+            unit: variantData.unit || 'kg',
+            description: variantData.description || null,
+            mrp: variantData.mrp,
+            selling_price: variantData.selling_price,
+            stock_quantity: variantData.stock_quantity || 0,
+            variant_image_url: variantData.variant_image_url || null,
+            is_default: variantData.is_default || false,
+            delivery_charge: variantData.delivery_charge !== undefined ? variantData.delivery_charge : null,
             // GST Fields
-            hsn_code: variant_data.hsn_code || null,
-            gst_rate: variant_data.gst_rate !== undefined ? variant_data.gst_rate : 0,
-            tax_applicable: variant_data.tax_applicable !== undefined ? variant_data.tax_applicable : true,
-            price_includes_tax: variant_data.price_includes_tax !== undefined ? variant_data.price_includes_tax : true
+            hsn_code: variantData.hsn_code || null,
+            gst_rate: variantData.gst_rate !== undefined ? variantData.gst_rate : 0,
+            tax_applicable: variantData.tax_applicable !== undefined ? variantData.tax_applicable : true,
+            price_includes_tax: variantData.price_includes_tax !== undefined ? variantData.price_includes_tax : true
         })
         .select()
         .single();
@@ -208,6 +242,18 @@ async function updateVariant(variantId, updates) {
     log.operationStart('UPDATE_VARIANT', { variantId, updateFields: Object.keys(updates) });
     const startTime = Date.now();
 
+    // Fetch existing for image cleanup check
+    const existingVariant = await getVariantById(variantId);
+
+    // Check if image is being replaced
+    if (existingVariant?.variant_image_url && updates.variant_image_url &&
+        existingVariant.variant_image_url !== updates.variant_image_url) {
+        // Run asynchronously
+        deleteImageFromStorage(existingVariant.variant_image_url).catch(err =>
+            log.error('IMG_CLEANUP_FAIL', err, { variantId })
+        );
+    }
+
     const { data, error } = await supabase
         .from('product_variants')
         .update({
@@ -248,6 +294,13 @@ async function deleteVariant(variantId) {
 
     // Get variant info for logging before deletion
     const variant = await getVariantById(variantId);
+
+    // Delete image from storage if exists
+    if (variant?.variant_image_url) {
+        deleteImageFromStorage(variant.variant_image_url).catch(err =>
+            log.error('IMG_CLEANUP_FAIL', err, { variantId })
+        );
+    }
 
     const { error } = await supabase
         .from('product_variants')
@@ -346,6 +399,12 @@ async function createProductWithVariants(productData, variants) {
         }
     }
 
+    // Normalize delivery_charge
+    if (productData.deliveryCharge !== undefined) {
+        productData.delivery_charge = productData.deliveryCharge;
+        delete productData.deliveryCharge;
+    }
+
 
     const { data, error } = await supabase.rpc('create_product_with_variants', {
         p_product_data: productData,
@@ -428,6 +487,19 @@ async function updateProductWithVariants(productId, productData, variants) {
     });
     const startTime = Date.now();
 
+    // 1. Fetch CURRENT variants to detect deletions and replaced images
+    // We do this BEFORE the RPC call which modifies the DB
+    let existingVariants = [];
+    try {
+        const { data } = await supabase
+            .from('product_variants')
+            .select('id, variant_image_url')
+            .eq('product_id', productId);
+        existingVariants = data || [];
+    } catch (err) {
+        log.warn('UPDATE_PRODUCT_WITH_VARIANTS', 'Failed to fetch existing variants for cleanup', err);
+    }
+
     // Constraint: Inventory must match sum of variant stocks if variants exist
     if (variants && variants.length > 0) {
         const totalStock = variants.reduce((sum, v) => sum + (v.stock_quantity || 0), 0);
@@ -457,6 +529,12 @@ async function updateProductWithVariants(productId, productData, variants) {
         log.info('UPDATE_PRODUCT_WITH_VARIANTS', `Calculated total inventory from ${variants.length} variants: ${totalStock}`);
     }
 
+    // Normalize delivery_charge
+    if (productData && productData.deliveryCharge !== undefined) {
+        productData.delivery_charge = productData.deliveryCharge;
+        delete productData.deliveryCharge;
+    }
+
     const { data, error } = await supabase.rpc('update_product_with_variants', {
         p_product_id: productId,
         p_product_data: productData,
@@ -467,6 +545,38 @@ async function updateProductWithVariants(productId, productData, variants) {
         log.operationError('UPDATE_PRODUCT_WITH_VARIANTS', error, { productId });
         throw error;
     }
+
+    // Image Cleanup Logic (Run asynchronously)
+    (async () => {
+        try {
+            const incomingVariantIds = new Set(variants.filter(v => v.id).map(v => v.id));
+            const incomingMap = new Map(variants.filter(v => v.id).map(v => [v.id, v]));
+
+            // A. Detect Deleted Variants (Exist in DB but NOT in incoming)
+            // Assumes RPC deletes missing variants (sync behavior)
+            const deletedVariants = existingVariants.filter(v => !incomingVariantIds.has(v.id));
+
+            for (const v of deletedVariants) {
+                if (v.variant_image_url) {
+                    await deleteImageFromStorage(v.variant_image_url);
+                }
+            }
+
+            // B. Detect Updated Variants with Changed Images
+            const updatedVariants = existingVariants.filter(v => incomingVariantIds.has(v.id));
+
+            for (const oldVariant of updatedVariants) {
+                const newVariant = incomingMap.get(oldVariant.id);
+                // If old had image, and new has DIFFERENT image (including null)
+                if (oldVariant.variant_image_url &&
+                    oldVariant.variant_image_url !== newVariant.variant_image_url) {
+                    await deleteImageFromStorage(oldVariant.variant_image_url);
+                }
+            }
+        } catch (cleanupErr) {
+            log.error('VARIANT_IMAGE_CLEANUP_FAIL', cleanupErr);
+        }
+    })();
 
     log.operationSuccess('UPDATE_PRODUCT_WITH_VARIANTS', {
         productId: data?.id,

@@ -1,8 +1,7 @@
 import { Link } from "react-router-dom";
-import { Minus, Plus, Trash2, RotateCcw, Package, Star, Heart, Truck } from "lucide-react";
+import { Minus, Plus, Trash2, RotateCcw, Package, Star, Heart, Truck, Tag } from "lucide-react";
 import { CartItem as CartItemType } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Tag } from "@/components/ui/Tag";
 import { cn } from "@/lib/utils";
 
 interface CartItemProps {
@@ -37,149 +36,144 @@ export const CartItem = ({ item, updateQuantity, removeItem, isLoading, isCalcul
 
     return (
         <div className={cn(
-            "group relative flex flex-col sm:flex-row gap-3 sm:gap-4 p-3 sm:p-4 bg-card/60 backdrop-blur-sm hover:bg-card/80 border border-border/50 rounded-2xl transition-all duration-300 shadow-sm hover:shadow-md animate-in fade-in slide-in-from-bottom-2",
-            "sm:h-48"
+            "group relative flex flex-col sm:flex-row gap-4 p-4 bg-card/40 backdrop-blur-md hover:bg-card/60 border border-border/40 rounded-3xl transition-all duration-500 shadow-sm hover:shadow-xl hover:-translate-y-1 animate-in fade-in slide-in-from-bottom-4",
+            "sm:min-h-[180px]"
         )}>
             {/* Recalculating Overlay */}
             {isCalculating && (
-                <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/40 backdrop-blur-[1px] rounded-2xl transition-all animate-in fade-in duration-300">
-                    <span className="flex items-center gap-2 px-4 py-1.5 bg-background/90 rounded-full border shadow-sm text-[10px] font-black uppercase tracking-[0.2em] text-primary animate-pulse">
-                        Recalculating...
-                    </span>
+                <div className="absolute inset-0 z-30 flex items-center justify-center bg-background/60 backdrop-blur-md rounded-3xl transition-all animate-in fade-in duration-500">
+                    <div className="flex flex-col items-center gap-3">
+                        <div className="h-8 w-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+                        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary animate-pulse">
+                            Syncing
+                        </span>
+                    </div>
                 </div>
             )}
-            {/* Product Image */}
-            <Link to={`/product/${item.productId}`} className="shrink-0 relative overflow-hidden rounded-xl aspect-square w-full sm:w-40 h-auto sm:h-full bg-muted shadow-inner border border-border/30">
-                <img
-                    src={displayImage}
-                    alt={product.title}
-                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
-                    loading="lazy"
-                />
+
+            {/* Product Image Section */}
+            <div className="relative shrink-0 w-full sm:w-44 aspect-square">
+                <Link to={`/product/${item.productId}`} className="block h-full w-full overflow-hidden rounded-2xl shadow-inner border border-border/20 group/img">
+                    <img
+                        src={displayImage}
+                        alt={product.title}
+                        className="h-full w-full object-cover transition-transform duration-1000 ease-out group-hover/img:scale-110"
+                        loading="lazy"
+                    />
+                </Link>
+
                 {isDiscounted && (
-                    <div className="absolute top-2 left-2">
-                        <Tag variant="discount" size="sm" className="shadow-lg backdrop-blur-md bg-destructive/90 text-white border-0 text-[10px] px-1.5 py-0.5">
+                    <div className="absolute top-2.5 left-2.5 z-10">
+                        <div className="bg-destructive/90 text-white text-[10px] font-black px-2 py-1 rounded-lg backdrop-blur-md shadow-lg border border-white/20">
                             -{discountPercentage}%
-                        </Tag>
+                        </div>
                     </div>
                 )}
-            </Link>
+            </div>
 
-            {/* Content */}
-            <div className="flex flex-1 flex-col justify-between min-w-0 py-1 sm:py-2">
-                <div>
-                    <div className="flex justify-between items-start gap-2">
-                        <div className="space-y-1.5 flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-0.5">
-                                <span className="text-[9px] uppercase tracking-wider font-bold text-primary/70 bg-primary/5 px-1.5 py-0.5 rounded-full border border-primary/10">
-                                    {product.category}
+            {/* Content Section */}
+            <div className="flex flex-1 flex-col min-w-0">
+                <div className="flex justify-between items-start gap-4">
+                    <div className="space-y-1.5 flex-1 min-w-0 pt-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[10px] uppercase tracking-widest font-black text-primary/80 bg-primary/10 px-2.5 py-1 rounded-full border border-primary/10">
+                                {product.category}
+                            </span>
+                            {(sizeLabel || variant?.size_label) && (
+                                <span className="text-[10px] uppercase tracking-widest font-black text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-100">
+                                    {sizeLabel || variant?.size_label}
                                 </span>
-                                {(sizeLabel || variant?.size_label) && (
-                                    <span className="text-[9px] uppercase tracking-wider font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 px-1.5 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
-                                        {sizeLabel || variant?.size_label}
-                                    </span>
-                                )}
-                            </div>
-                            <Link
-                                to={`/product/${item.productId}`}
-                                className="font-bold text-base sm:text-lg hover:text-primary transition-colors line-clamp-1 leading-tight tracking-tight"
-                            >
-                                {product.title}
-                            </Link>
-
-                            <div className="flex items-center gap-3 mt-1">
-                                {isOutOfStock ? (
-                                    <span className="text-destructive font-bold text-[10px] uppercase flex items-center gap-1">
-                                        <div className="w-1 h-1 rounded-full bg-destructive animate-pulse" />
-                                        Out of Stock
-                                    </span>
-                                ) : (
-                                    <span className="text-emerald-600 dark:text-emerald-400 font-bold text-[10px] uppercase flex items-center gap-1">
-                                        <div className="w-1 h-1 rounded-full bg-emerald-500" />
-                                        In Stock
-                                    </span>
-                                )}
-                                {Number(product.rating) > 0 && (
-                                    <div className="flex items-center gap-1 text-amber-500 font-bold text-[10px]">
-                                        <Star className="w-3 h-3 fill-current" />
-                                        <span>{product.rating}</span>
-                                    </div>
-                                )}
-                            </div>
+                            )}
+                            {isOutOfStock ? (
+                                <span className="text-[9px] font-black uppercase text-destructive flex items-center gap-1.5 ml-1">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse" />
+                                    Out of Stock
+                                </span>
+                            ) : (
+                                <span className="text-[9px] font-black uppercase text-emerald-600 flex items-center gap-1.5 ml-1">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                    In Stock
+                                </span>
+                            )}
                         </div>
 
-                        <div className="flex items-center gap-0.5 -mt-1">
-                            <button
-                                onClick={() => removeItem(item.productId, variantId)}
-                                disabled={isLoading}
-                                className="text-muted-foreground hover:text-destructive transition-colors p-1.5 hover:bg-destructive/10 rounded-full"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                            </button>
+                        <Link
+                            to={`/product/${item.productId}`}
+                            className="block font-bold text-lg sm:text-xl hover:text-primary transition-all duration-300 line-clamp-1 leading-tight tracking-tight mt-1"
+                        >
+                            {product.title}
+                        </Link>
+
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1">
+                            {((product as any).is_returnable !== undefined ? (product as any).is_returnable : product.isReturnable) ? (
+                                <div className="flex items-center gap-1.5 text-muted-foreground/80">
+                                    <RotateCcw className="w-3.5 h-3.5 text-emerald-500" />
+                                    <span className="text-[10px] font-medium">{(product as any).return_days ?? product.returnDays ?? 7}d Return</span>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-1.5 text-muted-foreground/60">
+                                    <Package className="w-3.5 h-3.5" />
+                                    <span className="text-[10px] font-medium">No Returns</span>
+                                </div>
+                            )}
+
+                            {(item.delivery_charge ?? 0) > 0 ? (
+                                <div className="flex items-center gap-1.5 px-2 py-1 bg-orange-50 rounded-lg text-[10px] font-bold text-orange-700 border border-orange-100">
+                                    <Truck className="w-3.5 h-3.5" />
+                                    <span>₹{item.delivery_charge.toFixed(2)} Delivery</span>
+                                </div>
+                            ) : isFreeDelivery && (
+                                <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 rounded-lg text-[10px] font-bold text-emerald-700 border border-emerald-100">
+                                    <Truck className="w-3.5 h-3.5" />
+                                    <span>Free Delivery</span>
+                                </div>
+                            )}
+
+                            {(item.coupon_discount ?? 0) > 0 && (
+                                <div className="flex items-center gap-1.5 px-2 py-1 bg-primary/5 rounded-lg text-[10px] font-black text-primary border border-primary/20">
+                                    <Tag className="w-3.5 h-3.5" />
+                                    <span>-₹{(item.coupon_discount || 0).toFixed(2)} Saved</span>
+                                </div>
+                            )}
                         </div>
                     </div>
 
-                    {/* Compact Badges */}
-                    <div className="flex flex-wrap gap-2 mt-3">
-                        {(item.delivery_charge ?? 0) > 0 ? (
-                            <div className="flex items-center gap-1 px-2 py-0.5 bg-amber-50 dark:bg-amber-950/20 rounded-md text-[9px] font-bold text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/30">
-                                <Truck className="w-2.5 h-2.5" />
-                                <span>Delivery Fee: ₹{item.delivery_charge}</span>
-                            </div>
-                        ) : isFreeDelivery && (
-                            <div className="flex items-center gap-1 px-2 py-0.5 bg-green-50 dark:bg-green-950/20 rounded-md text-[9px] font-bold text-green-700 dark:text-green-400 border border-green-100 dark:border-green-900/30">
-                                <Truck className="w-2.5 h-2.5" />
-                                <span>Free Delivery</span>
-                            </div>
-                        )}
-
-                        {(item.coupon_discount ?? 0) > 0 && (
-                            <div className="flex items-center gap-1 px-2 py-0.5 bg-primary/10 rounded-md text-[9px] font-black text-primary border border-primary/20">
-                                <Tag className="w-2.5 h-2.5" />
-                                <span>Coupon Applied: -₹{item.coupon_discount}</span>
-                            </div>
-                        )}
-
-                        {((product as any).is_returnable !== undefined ? (product as any).is_returnable : product.isReturnable) ? (
-                            <div className="flex items-center gap-1 px-2 py-0.5 bg-green-50 dark:bg-green-950/20 rounded-md text-[9px] font-bold text-green-700 dark:text-green-400 border border-green-100 dark:border-green-900/30">
-                                <RotateCcw className="w-2.5 h-2.5" />
-                                <span>{(product as any).return_days ?? product.returnDays ?? 7}d Return</span>
-                            </div>
-                        ) : (
-                            <div className="flex items-center gap-1 px-2 py-0.5 bg-muted/50 rounded-md text-[9px] font-bold text-muted-foreground border border-border/50">
-                                <Package className="w-2.5 h-2.5" />
-                                <span>No Returns</span>
-                            </div>
-                        )}
-                    </div>
+                    <button
+                        onClick={() => removeItem(item.productId, variantId)}
+                        disabled={isLoading}
+                        className="text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 rounded-xl p-2.5 transition-all duration-300"
+                    >
+                        <Trash2 className="w-5 h-5" />
+                    </button>
                 </div>
 
                 {/* Price and Quantity Footer */}
-                <div className="flex items-end justify-between gap-4 mt-auto">
+                <div className="flex items-center justify-between gap-4 mt-auto pt-4 border-t border-border/10">
                     <div className="flex flex-col">
-                        <div className="flex items-baseline gap-2">
-                            <span className="text-xl font-black text-primary tracking-tight">₹{itemPrice}</span>
+                        <div className="flex items-baseline gap-2.5">
+                            <span className="text-2xl font-black text-foreground tracking-tighter">
+                                ₹{itemPrice.toFixed(2)}
+                            </span>
                             {isDiscounted && (
-                                <span className="text-[11px] text-muted-foreground line-through font-medium">
-                                    ₹{itemMRP}
+                                <span className="text-sm text-muted-foreground/60 line-through font-medium">
+                                    ₹{itemMRP.toFixed(2)}
                                 </span>
                             )}
                         </div>
                         {isTaxApplicable && (
-                            <span className="text-[9px] text-muted-foreground/80 font-medium leading-none">
-                                {priceIncludesTax ? "Inclusive of taxes" : "Excl. taxes"}
+                            <span className="text-[10px] text-muted-foreground/60 font-medium">
+                                {priceIncludesTax ? "Inclusive of all taxes" : "Exclusive of taxes"}
                             </span>
                         )}
                     </div>
 
-                    {/* Quantity Controls */}
-                    <div className="flex items-center gap-2 bg-muted/40 p-1 rounded-lg border border-border/40">
+                    <div className="flex items-center gap-1 bg-muted/30 p-1.5 rounded-xl border border-border/20 shadow-inner">
                         <Button
                             variant="ghost"
                             size="icon"
                             className={cn(
-                                "h-7 w-7 rounded-md transition-colors",
-                                quantity === 1 ? "hover:bg-destructive/10 hover:text-destructive" : "hover:bg-background shadow-sm"
+                                "h-8 w-8 rounded-lg transition-all duration-300",
+                                quantity === 1 ? "hover:bg-destructive/10 hover:text-destructive" : "hover:bg-background hover:shadow-md"
                             )}
                             onClick={() => {
                                 if (quantity > 1) updateQuantity(item.productId, quantity - 1, variantId);
@@ -187,19 +181,19 @@ export const CartItem = ({ item, updateQuantity, removeItem, isLoading, isCalcul
                             }}
                             disabled={isLoading}
                         >
-                            {quantity === 1 ? <Trash2 className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                            {quantity === 1 ? <Trash2 className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />}
                         </Button>
-                        <div className="w-6 text-center font-black text-sm tabular-nums">
+                        <div className="w-8 text-center font-black text-base tabular-nums text-foreground/80">
                             {quantity}
                         </div>
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 rounded-md bg-background shadow-sm hover:bg-muted transition-colors border border-border/20"
+                            className="h-8 w-8 rounded-lg hover:bg-background hover:shadow-md transition-all duration-300"
                             onClick={() => updateQuantity(item.productId, quantity + 1, variantId)}
                             disabled={isLoading || quantity >= itemStock}
                         >
-                            <Plus className="w-3 h-3" />
+                            <Plus className="w-3.5 h-3.5" />
                         </Button>
                     </div>
                 </div>

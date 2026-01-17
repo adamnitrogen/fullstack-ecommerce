@@ -5,13 +5,13 @@ const createPaymentOrderSchema = z.object({
 });
 
 const verifyPaymentSchema = z.object({
-    razorpay_order_id: z.string().min(1, 'Razorpay Order ID is required'),
+    razorpay_order_id: z.string().nullish(),
     razorpay_payment_id: z.string().min(1, 'Razorpay Payment ID is required'),
-    razorpay_signature: z.string().min(1, 'Razorpay Signature is required'),
-    payment_id: z.string().optional(),
-    shipping_address_id: z.string().uuid('Invalid Shipping Address ID'),
-    billing_address_id: z.string().uuid('Invalid Billing Address ID'),
-    notes: z.string().optional()
+    razorpay_signature: z.string().nullish(),
+    payment_id: z.string().nullish(),
+    shipping_address_id: z.string().nullish(),
+    billing_address_id: z.string().nullish(),
+    notes: z.string().nullish()
 });
 
 module.exports = {

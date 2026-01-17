@@ -38,12 +38,32 @@ let pendingRequests = 0;
 // Helper to calculate totals optimistically
 const calculateOptimisticTotals = (items: CartItem[], currentTotals: CartTotals | null): CartTotals => {
   const itemsCount = items.reduce((acc, item) => acc + item.quantity, 0);
-  const totalMrp = items.reduce((acc, item) => acc + (item.product.mrp || item.product.price) * item.quantity, 0);
-  const totalPrice = items.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
+  const totalMrp = items.reduce((acc, item) => {
+    const mrp = item.variant?.mrp ?? item.product.mrp ?? item.product.price;
+    return acc + (mrp * item.quantity);
+  }, 0);
+  const totalPrice = items.reduce((acc, item) => {
+    const price = item.variant?.selling_price ?? item.product.price;
+    return acc + (price * item.quantity);
+  }, 0);
 
   // Apply delivery charge threshold from dynamic settings
   const { threshold, charge } = useCartStore.getState().deliverySettings;
-  const deliveryCharge = totalPrice >= threshold ? 0 : charge;
+
+  // Calculate product-specific delivery charges (once per unique product)
+  let productDeliveryCharges = 0;
+  const processedProducts = new Set<string>();
+
+  items.forEach(item => {
+    if (!processedProducts.has(item.productId)) {
+      const charge = item.product.delivery_charge || 0;
+      productDeliveryCharges += charge;
+      processedProducts.add(item.productId);
+    }
+  });
+
+  const globalDeliveryCharge = totalPrice >= threshold ? 0 : charge;
+  const deliveryCharge = productDeliveryCharges + globalDeliveryCharge;
 
   // Recalculate coupon discount if percentage-based coupon is applied
   const coupon = currentTotals?.coupon || null;
@@ -88,8 +108,23 @@ const calculateOptimisticTotals = (items: CartItem[], currentTotals: CartTotals 
     discount,
     couponDiscount,
     deliveryCharge,
+    productDeliveryCharges,
+    globalDeliveryCharge,
     finalAmount,
-    coupon
+    coupon,
+    itemBreakdown: (() => {
+      const seen = new Set<string>();
+      return items.map(item => {
+        const showCharge = !seen.has(item.productId);
+        seen.add(item.productId);
+        return {
+          product_id: item.productId,
+          variant_id: item.variantId,
+          delivery_charge: showCharge ? (item.product.delivery_charge || 0) : 0,
+          coupon_discount: 0
+        };
+      });
+    })()
   };
 };
 
@@ -182,7 +217,8 @@ export const useCartStore = create<CartState>()((set, get) => {
             quantity,
             product,
             variant,
-            sizeLabel: variant?.size_label
+            sizeLabel: variant?.size_label,
+            delivery_charge: product.delivery_charge ?? 0
           }];
         }
 

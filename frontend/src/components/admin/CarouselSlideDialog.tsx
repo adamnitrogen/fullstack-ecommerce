@@ -148,7 +148,7 @@ export function CarouselSlideDialog({
                 onChange={(images) => {
                   const img = images[0];
                   if (img instanceof File) {
-                    setFormData((prev) => ({ ...prev, image: URL.createObjectURL(img), imageFile: img }));
+                    setFormData((prev) => ({ ...prev, image: "", imageFile: img }));
                   } else {
                     setFormData((prev) => ({ ...prev, image: img || "", imageFile: undefined }));
                   }

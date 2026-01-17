@@ -161,6 +161,8 @@ export default function Profile() {
   const addAddressMutation = useMutation({
     mutationFn: addressService.createAddress,
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["addresses"] });
       toast({
         title: "Success",
         description: "Address added successfully",
@@ -173,16 +175,14 @@ export default function Profile() {
         variant: "destructive",
       });
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
-      queryClient.invalidateQueries({ queryKey: ["addresses"] });
-    },
   });
 
   const updateAddressMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: CreateAddressDto }) =>
       addressService.updateAddress(id, data),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["addresses"] });
       toast({
         title: "Success",
         description: "Address updated successfully",
@@ -195,15 +195,13 @@ export default function Profile() {
         variant: "destructive",
       });
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
-      queryClient.invalidateQueries({ queryKey: ["addresses"] });
-    },
   });
 
   const deleteAddressMutation = useMutation({
     mutationFn: addressService.deleteAddress,
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["addresses"] });
       toast({
         title: "Success",
         description: "Address deleted successfully",
@@ -216,16 +214,14 @@ export default function Profile() {
         variant: "destructive",
       });
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
-      queryClient.invalidateQueries({ queryKey: ["addresses"] });
-    },
   });
 
   const setPrimaryMutation = useMutation({
     mutationFn: ({ id, type }: { id: string; type: 'home' | 'work' | 'other' }) =>
       addressService.setPrimary(id, type),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["addresses"] });
       toast({
         title: "Success",
         description: "Primary address updated",
@@ -237,11 +233,6 @@ export default function Profile() {
         description: getErrorMessage(error, "Failed to set primary address"),
         variant: "destructive",
       });
-    },
-    onSettled: () => {
-      // Always refetch after error or success to guarantee we're in sync with the server
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
-      queryClient.invalidateQueries({ queryKey: ["addresses"] });
     },
   });
 
@@ -267,9 +258,25 @@ export default function Profile() {
   };
   const setShowPasswordDialog = (open: boolean) => setPasswordDialogOpen(open);
 
+  const isAddressActionLoading =
+    addAddressMutation.isPending ||
+    updateAddressMutation.isPending ||
+    deleteAddressMutation.isPending ||
+    setPrimaryMutation.isPending;
+
+  const addressActionMessage =
+    addAddressMutation.isPending ? "Creating new sanctuary..." :
+      updateAddressMutation.isPending ? "Updating your sanctuary..." :
+        deleteAddressMutation.isPending ? "Removing sanctuary..." :
+          setPrimaryMutation.isPending ? "Setting primary sanctuary..." :
+            "Loading your profile...";
+
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <LoadingOverlay isLoading={false} message="Loading your profile..." />
+      <LoadingOverlay
+        isLoading={isLoading || isAddressActionLoading}
+        message={addressActionMessage}
+      />
 
       {/* Premium Compact Hero Section */}
       <section className="bg-[#2C1810] text-white py-12 md:py-16 relative overflow-hidden shadow-2xl">

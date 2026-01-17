@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Plus, Trash2, GripVertical, ImageIcon, Check, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,7 +56,6 @@ const createEmptyVariant = (mode: "UNIT" | "SIZE" = "UNIT"): VariantFormData => 
     gst_rate: 0,
     tax_applicable: true,
     price_includes_tax: true,
-    delivery_charge: null,
 });
 
 export function VariantFormSection({
@@ -115,7 +114,7 @@ export function VariantFormSection({
         updated[index] = {
             ...updated[index],
             imageFile: undefined,
-            variant_image_url: undefined
+            variant_image_url: null
         };
         onChange(updated);
     };
@@ -158,9 +157,58 @@ export function VariantFormSection({
         return variant.selling_price <= variant.mrp;
     };
 
+    // State to force re-render when URLs change/load
+    const [, setUrlTrigger] = useState(0);
+
+    // Ref to track active object URLs for variant images
+    // Map<File, string>
+    const activeUrlsRef = useRef<Map<File, string>>(new Map());
+
+    // Effect to manage object URLs lifecycle
+    useEffect(() => {
+        const filesInUse = new Set<File>();
+        let changed = false;
+
+        // 1. Identify files currently in use
+        variants.forEach(v => {
+            if (v.imageFile instanceof File) {
+                filesInUse.add(v.imageFile);
+                if (!activeUrlsRef.current.has(v.imageFile)) {
+                    const url = URL.createObjectURL(v.imageFile);
+                    activeUrlsRef.current.set(v.imageFile, url);
+                    changed = true;
+                }
+            }
+        });
+
+        // 2. Revoke URLs for files no longer in use
+        for (const [file, url] of activeUrlsRef.current.entries()) {
+            if (!filesInUse.has(file)) {
+                URL.revokeObjectURL(url);
+                activeUrlsRef.current.delete(file);
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            setUrlTrigger(prev => prev + 1);
+        }
+
+    }, [variants]);
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            for (const url of activeUrlsRef.current.values()) {
+                URL.revokeObjectURL(url);
+            }
+            activeUrlsRef.current.clear();
+        };
+    }, []);
+
     const getImagePreview = (variant: VariantFormData): string | null => {
         if (variant.imageFile instanceof File) {
-            return URL.createObjectURL(variant.imageFile);
+            return activeUrlsRef.current.get(variant.imageFile) || null;
         }
         if (variant.variant_image_url) {
             return variant.variant_image_url;
@@ -320,7 +368,7 @@ export function VariantFormSection({
                                                         }
                                                         disabled={disabled}
                                                     >
-                                                        <SelectTrigger className="h-9">
+                                                        <SelectTrigger id={`variant-unit-${index}`} className="h-9">
                                                             <SelectValue />
                                                         </SelectTrigger>
                                                         <SelectContent>
@@ -461,29 +509,6 @@ export function VariantFormSection({
                                             />
                                         </div>
 
-                                        {/* Delivery Charge */}
-                                        <div className="space-y-1">
-                                            <Label htmlFor={`variant-delivery-${index}`} className="text-xs">
-                                                Delivery (₹)
-                                            </Label>
-                                            <Input
-                                                id={`variant-delivery-${index}`}
-                                                type="number"
-                                                min="0"
-                                                step="0.01"
-                                                value={variant.delivery_charge ?? ''}
-                                                onChange={(e) =>
-                                                    handleVariantChange(
-                                                        index,
-                                                        "delivery_charge",
-                                                        e.target.value === '' ? null : parseFloat(e.target.value) || 0
-                                                    )
-                                                }
-                                                placeholder="Use Product Default"
-                                                disabled={disabled}
-                                                className="h-9"
-                                            />
-                                        </div>
 
                                         {/* Variant Image Upload */}
                                         <div className="space-y-1 md:col-span-1">
@@ -575,7 +600,7 @@ export function VariantFormSection({
                                                             onValueChange={(value) => handleVariantChange(index, "gst_rate", parseFloat(value))}
                                                             disabled={disabled}
                                                         >
-                                                            <SelectTrigger className="h-8 text-xs">
+                                                            <SelectTrigger id={`gst-${index}`} className="h-8 text-xs">
                                                                 <SelectValue placeholder="Select Rate" />
                                                             </SelectTrigger>
                                                             <SelectContent>

@@ -11,12 +11,15 @@ import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import { getErrorMessage } from "@/lib/errorUtils";
 import type { CheckoutAddress, Address } from "@/types";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 
 export function AddressBook() {
   const { t } = useTranslation();
   const { user } = useAuthStore();
   const [addresses, setAddresses] = useState<CheckoutAddress[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionMessage, setActionMessage] = useState("");
   const [addressDialogOpen, setAddressDialogOpen] = useState(false);
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
 
@@ -67,17 +70,24 @@ export function AddressBook() {
 
   const handleDeleteAddress = async (addressId: string) => {
     try {
+      setActionLoading(true);
+      setActionMessage("Deleting address...");
       await addressService.deleteAddress(addressId);
       toast.success("Address deleted successfully");
       fetchAddresses();
     } catch (error) {
       logger.error("Failed to delete address", error);
       toast.error(getErrorMessage(error, "Failed to delete address"));
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const handleSaveAddress = async (addressData: Address) => {
     try {
+      setActionLoading(true);
+      setActionMessage(editingAddress ? "Updating address..." : "Creating new address...");
+
       const payload = {
         id: addressData.id,
         full_name: addressData.name,
@@ -104,22 +114,29 @@ export function AddressBook() {
     } catch (error: unknown) {
       logger.error("Failed to save address", error);
       toast.error(getErrorMessage(error, "Failed to save address"));
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const handleSetDefault = async (addressId: string, type: 'home' | 'work' | 'other') => {
     try {
+      setActionLoading(true);
+      setActionMessage("Setting primary address...");
       await addressService.setPrimary(addressId, type);
       toast.success("Primary address updated");
       fetchAddresses();
     } catch (error) {
       logger.error("Failed to set primary address", error);
       toast.error(getErrorMessage(error, "Failed to update primary address"));
+    } finally {
+      setActionLoading(false);
     }
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 relative min-h-[200px]">
+      <LoadingOverlay isLoading={loading || actionLoading} message={actionLoading ? actionMessage : "Loading addresses..."} />
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -134,11 +151,7 @@ export function AddressBook() {
           </div>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <div className="flex justify-center p-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : !addresses || addresses.length === 0 ? (
+          {!loading && (!addresses || addresses.length === 0) ? (
             <div className="text-center py-12 text-muted-foreground">
               <MapPin className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>No addresses saved yet</p>

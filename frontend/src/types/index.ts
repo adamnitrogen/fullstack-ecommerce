@@ -99,7 +99,6 @@ export interface ProductVariant {
   is_default: boolean;
   created_at: string;
   updated_at?: string;
-  delivery_charge?: number | null;
   // GST fields
   hsn_code?: string;
   gst_rate?: number;
@@ -116,7 +115,7 @@ export interface VariantFormData {
   mrp: number;
   selling_price: number;
   stock_quantity: number;
-  variant_image_url?: string;
+  variant_image_url?: string | null;
   imageFile?: File | string;
   is_default: boolean;
   // GST fields
@@ -124,7 +123,6 @@ export interface VariantFormData {
   gst_rate?: number;
   tax_applicable?: boolean;
   price_includes_tax?: boolean;
-  delivery_charge?: number | null;
 }
 
 export interface Event {

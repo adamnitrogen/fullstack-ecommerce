@@ -34,15 +34,34 @@ const getReturnableItems = async (orderId, userId) => {
         throw new Error('Order must be delivered or have a rejected return to request a return');
     }
 
-    // 2. Fetch Order Items
+    // 2. Fetch Order Items with Product return_days
     const { data: items, error: itemsError } = await supabase
         .from('order_items')
-        .select('*')
+        .select(`
+            *,
+            products:product_id (
+                return_days
+            )
+        `)
         .eq('order_id', orderId);
 
     if (itemsError) throw itemsError;
 
-    // 3. Filter Returnable Items
+    // 3. Get delivery date from status history for return window calculation
+    const { data: deliveryHistory } = await supabase
+        .from('order_status_history')
+        .select('created_at')
+        .eq('order_id', orderId)
+        .eq('status', 'delivered')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+    const deliveryDate = deliveryHistory?.created_at
+        ? new Date(deliveryHistory.created_at)
+        : null;
+
+    // 4. Filter Returnable Items
     // Must exclude items that are already in a PENDING return request to avoid double dipping
     const { data: pendingReturns, error: pendingError } = await supabase
         .from('returns')
@@ -70,16 +89,33 @@ const getReturnableItems = async (orderId, userId) => {
         });
     }
 
-    // Filter logic: (quantity - returned_quantity - pending_quantity) > 0
+    // Filter logic: (quantity - returned_quantity - pending_quantity) > 0 AND within return window
+    const now = new Date();
     const returnableItems = items.filter(item => {
         const pendingQty = pendingQuantityMap[item.id] || 0;
         const available = item.quantity - item.returned_quantity - pendingQty;
-        return item.is_returnable && available > 0;
+
+        // Check if within return window
+        let withinReturnWindow = true;
+        if (deliveryDate) {
+            const returnDays = item.products?.return_days ?? 7; // Default 7 days if not specified
+            const returnDeadline = new Date(deliveryDate.getTime() + (returnDays * 24 * 60 * 60 * 1000));
+            withinReturnWindow = now <= returnDeadline;
+        }
+
+        return item.is_returnable && available > 0 && withinReturnWindow;
     }).map(item => {
         const pendingQty = pendingQuantityMap[item.id] || 0;
+        const returnDays = item.products?.return_days ?? 7;
+        let returnDeadline = null;
+        if (deliveryDate) {
+            returnDeadline = new Date(deliveryDate.getTime() + (returnDays * 24 * 60 * 60 * 1000));
+        }
         return {
             ...item,
-            remaining_quantity: item.quantity - item.returned_quantity - pendingQty
+            remaining_quantity: item.quantity - item.returned_quantity - pendingQty,
+            return_days: returnDays,
+            return_deadline: returnDeadline?.toISOString() || null
         };
     });
 

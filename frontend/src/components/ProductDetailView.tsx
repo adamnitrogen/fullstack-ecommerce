@@ -10,6 +10,7 @@ import {
   Zap,
   RotateCcw,
   X,
+  Truck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/ui/Tag";
@@ -60,6 +61,8 @@ export const ProductDetailView = ({
     if (selectedVariant) return selectedVariant.stock_quantity;
     return product.inventory || 0;
   }, [selectedVariant, product.inventory]);
+  // Computed delivery charge
+  const deliveryCharge = product.delivery_charge || 0;
 
   // State for the currently displayed image
   const [displayImage, setDisplayImage] = useState<string>(
@@ -131,15 +134,18 @@ export const ProductDetailView = ({
       });
       return;
     }
-    if (!cartItem) {
-      try {
-        await addItem(product, 1, selectedVariant?.id);
-      } catch (error) {
-        // Error toast shown by store
-        return;
+
+    // Navigate to checkout with buy now item in state
+    // This ensures only this item is checked out, not the entire cart
+    navigate("/checkout", {
+      state: {
+        buyNowItem: {
+          product,
+          quantity: 1,
+          variantId: selectedVariant?.id
+        }
       }
-    }
-    navigate("/checkout");
+    });
   };
 
   const handleIncreaseQuantity = async () => {
@@ -312,6 +318,12 @@ export const ProductDetailView = ({
               <p className="text-[10px] text-muted-foreground font-medium tracking-wide">
                 {priceIncludesTax ? "Inclusive of all taxes" : "Price excludes taxes"}
               </p>
+            )}
+            {deliveryCharge > 0 && (
+              <div className="flex items-center gap-2 text-[10px] text-[#B85C3C] font-semibold mt-1">
+                <Truck className="h-3 w-3" />
+                <span>₹{deliveryCharge} Delivery Charge applicable</span>
+              </div>
             )}
           </div>
 

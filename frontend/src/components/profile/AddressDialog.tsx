@@ -113,7 +113,6 @@ export function AddressDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave(formData as Address);
-    onOpenChange(false);
   };
 
   return (
