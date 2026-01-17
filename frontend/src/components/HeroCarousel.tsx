@@ -1,13 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { getCarouselSlides } from "@/lib/services/carousel.service";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export const HeroCarousel = () => {
   const { t } = useTranslation();
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const touchStartX = useRef<number | null>(null);
+  const touchEndX = useRef<number | null>(null);
 
   // Fetch carousel slides from Backend
   const { data: slides = [] } = useQuery({
@@ -15,45 +19,84 @@ export const HeroCarousel = () => {
     queryFn: getCarouselSlides,
   });
 
-  useEffect(() => {
+  const handleNext = useCallback(() => {
     if (slides.length > 0) {
-      const timer = setInterval(() => {
-        setCurrentSlide((prev) => (prev + 1) % slides.length);
-      }, 5000);
-      return () => clearInterval(timer);
+      setCurrentSlide((prev) => (prev + 1) % slides.length);
     }
   }, [slides.length]);
 
+  const handlePrev = useCallback(() => {
+    if (slides.length > 0) {
+      setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
+    }
+  }, [slides.length]);
+
+  useEffect(() => {
+    if (slides.length > 0 && !isPaused) {
+      const timer = setInterval(() => {
+        handleNext();
+      }, 5000);
+      return () => clearInterval(timer);
+    }
+  }, [slides.length, isPaused, handleNext]);
+
+  // Swipe handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.targetTouches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.targetTouches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStartX.current || !touchEndX.current) return;
+    const diff = touchStartX.current - touchEndX.current;
+    const threshold = 50;
+
+    if (Math.abs(diff) > threshold) {
+      if (diff > 0) {
+        handleNext(); // Swipe left
+      } else {
+        handlePrev(); // Swipe right
+      }
+    }
+
+    touchStartX.current = null;
+    touchEndX.current = null;
+  };
+
   if (slides.length === 0) {
-    return null; // Or a loading skeleton / default placeholder
+    return null;
   }
 
-  // Check if current slide has title or subtitle
-  const hasContent =
-    slides[currentSlide]?.title || slides[currentSlide]?.subtitle;
-
   return (
-    <div className="relative h-[500px] md:h-[600px] overflow-hidden">
+    <div
+      className="relative h-[500px] md:h-[600px] overflow-hidden group"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       {slides.map((slide, index) => {
         const slideHasContent = slide.title || slide.subtitle;
 
         return (
           <div
             key={slide.id}
-            className={`absolute inset-0 transition-opacity duration-1000 ${index === currentSlide ? "opacity-100" : "opacity-0"
+            className={`absolute inset-0 transition-opacity duration-1000 ${index === currentSlide ? "opacity-100 z-10" : "opacity-0 pointer-events-none"
               }`}
           >
             <img
               src={slide.image}
               alt={slide.title || "Hero carousel slide"}
-              loading="lazy"
+              loading="eager"
               className="w-full h-full object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-black/20" />
 
-            {/* Content positioning based on whether title/subtitle exist */}
             {slideHasContent ? (
-              // Default: Content on left side with text
               <div className="absolute inset-0 flex items-center">
                 <div className="container mx-auto px-4 sm:px-6 lg:px-8">
                   <div className="max-w-2xl animate-fade-in">
@@ -68,51 +111,54 @@ export const HeroCarousel = () => {
                       </p>
                     )}
                     <div className="flex flex-col sm:flex-row gap-4">
-                      <Link to="/shop" className="w-full sm:w-auto">
-                        <Button
-                          variant="hero"
-                          size="lg"
-                          className="w-full sm:w-auto"
-                        >
+                      <Button
+                        asChild
+                        variant="hero"
+                        size="lg"
+                        className="w-full sm:w-auto"
+                      >
+                        <Link to="/shop">
                           {t("hero.exploreProducts")}
-                        </Button>
-                      </Link>
-                      <Link to="/donate" className="w-full sm:w-auto">
-                        <Button
-                          variant="donate"
-                          size="lg"
-                          className="w-full sm:w-auto"
-                        >
+                        </Link>
+                      </Button>
+                      <Button
+                        asChild
+                        variant="donate"
+                        size="lg"
+                        className="w-full sm:w-auto"
+                      >
+                        <Link to="/donate">
                           {t("hero.donate")}
-                        </Button>
-                      </Link>
+                        </Link>
+                      </Button>
                     </div>
                   </div>
                 </div>
               </div>
             ) : (
-              // No content: Buttons at bottom center
               <div className="absolute inset-0 flex items-end justify-center pb-16">
                 <div className="animate-fade-in">
                   <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                    <Link to="/shop">
-                      <Button
-                        variant="hero"
-                        size="lg"
-                        className="w-full sm:w-auto min-w-[200px]"
-                      >
+                    <Button
+                      asChild
+                      variant="hero"
+                      size="lg"
+                      className="w-full sm:w-auto min-w-[200px]"
+                    >
+                      <Link to="/shop">
                         {t("hero.exploreProducts")}
-                      </Button>
-                    </Link>
-                    <Link to="/donate">
-                      <Button
-                        variant="donate"
-                        size="lg"
-                        className="w-full sm:w-auto min-w-[200px]"
-                      >
+                      </Link>
+                    </Button>
+                    <Button
+                      asChild
+                      variant="donate"
+                      size="lg"
+                      className="w-full sm:w-auto min-w-[200px]"
+                    >
+                      <Link to="/donate">
                         {t("hero.donate")}
-                      </Button>
-                    </Link>
+                      </Link>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -121,8 +167,28 @@ export const HeroCarousel = () => {
         );
       })}
 
+      {/* Manual Controls - Arrows */}
+      {slides.length > 1 && (
+        <>
+          <button
+            onClick={handlePrev}
+            className="absolute left-4 top-1/2 -translate-y-1/2 z-30 p-2 rounded-full bg-black/20 text-white backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all hover:bg-black/40 hidden md:flex"
+            aria-label="Previous slide"
+          >
+            <ChevronLeft className="h-8 w-8" />
+          </button>
+          <button
+            onClick={handleNext}
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-30 p-2 rounded-full bg-black/20 text-white backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all hover:bg-black/40 hidden md:flex"
+            aria-label="Next slide"
+          >
+            <ChevronRight className="h-8 w-8" />
+          </button>
+        </>
+      )}
+
       {/* Indicators */}
-      <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex space-x-2">
+      <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex space-x-2 z-30">
         {slides.map((_, index) => (
           <button
             key={index}
