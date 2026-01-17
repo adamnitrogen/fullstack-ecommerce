@@ -119,15 +119,15 @@ export const CartItem = ({ item, updateQuantity, removeItem, isLoading, isCalcul
 
                             {(item.delivery_charge ?? 0) > 0 ? (
                                 <div className="flex flex-col items-start gap-0.5 w-full">
-                                    <div className="flex items-center gap-1.5 font-bold">
-                                        <Truck className="w-3.5 h-3.5" />
+                                    <div className="flex items-center gap-1.5 font-bold text-[11px] text-primary/90">
+                                        <Truck className="w-3 h-3" />
                                         <span>
                                             ₹{(item.delivery_charge ?? 0).toFixed(2)} Delivery
                                             {(item.delivery_gst ?? 0) > 0 && ` + ₹${(item.delivery_gst ?? 0).toFixed(2)} GST`}
                                         </span>
                                     </div>
                                     {item.delivery_meta && (
-                                        <span className="text-[9px] text-orange-600/90 font-medium pl-5 tracking-wide">
+                                        <span className="text-[10px] text-primary/70 font-medium pl-4.5 tracking-wide">
                                             {item.delivery_meta.calculation_type === 'PER_ITEM' && `(₹${item.delivery_meta.base_charge} / item)`}
                                             {item.delivery_meta.calculation_type === 'FLAT_PER_ORDER' && `(Flat ₹${item.delivery_meta.base_charge} / order)`}
                                             {item.delivery_meta.calculation_type === 'PER_PACKAGE' && `(₹${item.delivery_meta.base_charge} / package of ${item.delivery_meta.max_items_per_package})`}
@@ -136,15 +136,15 @@ export const CartItem = ({ item, updateQuantity, removeItem, isLoading, isCalcul
                                     )}
                                 </div>
                             ) : isFreeDelivery && (
-                                <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 rounded-lg text-[10px] font-bold text-emerald-700 border border-emerald-100">
-                                    <Truck className="w-3.5 h-3.5" />
+                                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 rounded-md text-[10px] font-bold text-emerald-700 border border-emerald-100">
+                                    <Truck className="w-3 h-3" />
                                     <span>Free Delivery</span>
                                 </div>
                             )}
 
                             {(item.coupon_discount ?? 0) > 0 && (
-                                <div className="flex items-center gap-1.5 px-2 py-1 bg-primary/5 rounded-lg text-[10px] font-black text-primary border border-primary/20">
-                                    <Tag className="w-3.5 h-3.5" />
+                                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-primary/5 rounded-md text-[10px] font-black text-primary border border-primary/20">
+                                    <Tag className="w-3 h-3" />
                                     <span>-₹{(item.coupon_discount || 0).toFixed(2)} Saved</span>
                                 </div>
                             )}
@@ -179,36 +179,36 @@ export const CartItem = ({ item, updateQuantity, removeItem, isLoading, isCalcul
                             </span>
                         )}
                     </div>
-                </div>
 
-                <div className="flex items-center gap-1 bg-muted/30 p-1.5 rounded-xl border border-border/20 shadow-inner">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className={cn(
-                            "h-8 w-8 rounded-lg transition-all duration-300",
-                            quantity === 1 ? "hover:bg-destructive/10 hover:text-destructive" : "hover:bg-background hover:shadow-md"
-                        )}
-                        onClick={() => {
-                            if (quantity > 1) updateQuantity(item.productId, quantity - 1, variantId);
-                            else removeItem(item.productId, variantId);
-                        }}
-                        disabled={isLoading}
-                    >
-                        {quantity === 1 ? <Trash2 className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />}
-                    </Button>
-                    <div className="w-8 text-center font-black text-base tabular-nums text-foreground/80">
-                        {quantity}
+                    <div className="flex items-center gap-1 bg-muted/30 p-1 rounded-lg border border-border/10 shadow-sm self-end">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className={cn(
+                                "h-7 w-7 rounded-md transition-all duration-300",
+                                quantity === 1 ? "hover:bg-destructive/10 hover:text-destructive" : "hover:bg-background hover:shadow-sm"
+                            )}
+                            onClick={() => {
+                                if (quantity > 1) updateQuantity(item.productId, quantity - 1, variantId);
+                                else removeItem(item.productId, variantId);
+                            }}
+                            disabled={isLoading}
+                        >
+                            {quantity === 1 ? <Trash2 className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                        </Button>
+                        <div className="w-6 text-center font-bold text-sm tabular-nums text-foreground/80">
+                            {quantity}
+                        </div>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 rounded-md hover:bg-background hover:shadow-sm transition-all duration-300"
+                            onClick={() => updateQuantity(item.productId, quantity + 1, variantId)}
+                            disabled={isLoading || quantity >= itemStock}
+                        >
+                            <Plus className="w-3 h-3" />
+                        </Button>
                     </div>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 rounded-lg hover:bg-background hover:shadow-md transition-all duration-300"
-                        onClick={() => updateQuantity(item.productId, quantity + 1, variantId)}
-                        disabled={isLoading || quantity >= itemStock}
-                    >
-                        <Plus className="w-3.5 h-3.5" />
-                    </Button>
                 </div>
             </div>
         </div>
