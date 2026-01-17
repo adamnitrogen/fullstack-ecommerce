@@ -81,6 +81,7 @@ export interface Product {
   default_gst_rate?: number;
   default_tax_applicable?: boolean;
   default_price_includes_tax?: boolean;
+  delivery_refund_policy?: 'REFUNDABLE' | 'NON_REFUNDABLE';
 }
 
 export type VariantUnit = 'kg' | 'gm' | 'ltr' | 'ml' | 'pcs';
@@ -489,6 +490,7 @@ export interface CartTotals {
   discount: number;
   couponDiscount: number;
   deliveryCharge: number;
+  deliveryGST?: number;
   finalAmount: number;
   coupon?: Coupon | null;
   productDeliveryCharges?: number;
@@ -499,6 +501,7 @@ export interface CartTotals {
     coupon_discount?: number;
     coupon_code?: string;
     delivery_charge?: number;
+    delivery_gst?: number;
   }>;
   tax?: {
     totalTaxableAmount: number;
@@ -640,4 +643,18 @@ export interface CancellationJobStatus {
   batch_size: number;
   last_processed_at?: string;
   completed_at?: string;
+}
+
+export interface DeliveryConfig {
+  id: string;
+  product_id: string | null;
+  variant_id: string | null;
+  calculation_type: 'PER_PACKAGE' | 'WEIGHT_BASED' | 'FLAT_PER_ORDER' | 'PER_ITEM';
+  base_delivery_charge: number;
+  weight_brackets?: any;
+  gst_percentage: number;
+  delivery_refund_policy: 'REFUNDABLE' | 'NON_REFUNDABLE';
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }

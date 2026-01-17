@@ -82,6 +82,8 @@ interface OrderDetail {
         cgst?: number;
         sgst?: number;
         igst?: number;
+        delivery_gst?: number;
+        delivery_calculation_snapshot?: any;
     })[];
     payment_id: string;
     order_status_history?: OrderStatusHistory[];
@@ -358,42 +360,62 @@ export default function OrderDetail() {
                                     const unitPrice = item.price_per_unit || item.price || item.product?.price || 0;
 
                                     return (
-                                        <div key={index} className="flex gap-4 items-start border-b pb-4 last:border-0 last:pb-0">
-                                            <div className="w-16 h-16 bg-muted rounded-md overflow-hidden">
-                                                {displayImage && (
-                                                    <img
-                                                        src={displayImage}
-                                                        alt={item.product?.title}
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                )}
-                                            </div>
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-2">
-                                                    <h4 className="font-medium">{item.product?.title || "Product"}</h4>
-                                                    {sizeLabel && (
-                                                        <Badge variant="secondary" className="text-xs font-normal">
-                                                            {sizeLabel}
-                                                        </Badge>
+                                        <div key={index} className="border-b pb-4 last:border-0 last:pb-0">
+                                            <div className="flex gap-4 items-start">
+                                                <div className="w-16 h-16 bg-muted rounded-md overflow-hidden">
+                                                    {displayImage && (
+                                                        <img
+                                                            src={displayImage}
+                                                            alt={item.product?.title}
+                                                            className="w-full h-full object-cover"
+                                                        />
                                                     )}
                                                 </div>
-                                                <p className="text-sm text-muted-foreground">
-                                                    Qty: {item.quantity} × ₹{unitPrice}
-                                                </p>
-                                                {(item.gst_rate || 0) > 0 && (
-                                                    <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                                                        <p>Generic Tax: {item.gst_rate}% (HSN: {item.hsn_code || 'N/A'})</p>
-                                                        <div className="flex gap-2">
-                                                            {item.cgst ? <span>CGST: ₹{item.cgst}</span> : null}
-                                                            {item.sgst ? <span>SGST: ₹{item.sgst}</span> : null}
-                                                            {item.igst ? <span>IGST: ₹{item.igst}</span> : null}
-                                                        </div>
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <h4 className="font-medium">{item.product?.title || "Product"}</h4>
+                                                        {sizeLabel && (
+                                                            <Badge variant="secondary" className="text-xs font-normal">
+                                                                {sizeLabel}
+                                                            </Badge>
+                                                        )}
                                                     </div>
-                                                )}
+                                                    <p className="text-sm text-muted-foreground">
+                                                        Qty: {item.quantity} × ₹{unitPrice}
+                                                    </p>
+                                                    {(item.gst_rate || 0) > 0 && (
+                                                        <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                                                            <p>Generic Tax: {item.gst_rate}% (HSN: {item.hsn_code || 'N/A'})</p>
+                                                            <div className="flex gap-2">
+                                                                {item.cgst ? <span>CGST: ₹{item.cgst}</span> : null}
+                                                                {item.sgst ? <span>SGST: ₹{item.sgst}</span> : null}
+                                                                {item.igst ? <span>IGST: ₹{item.igst}</span> : null}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="text-right font-medium">
+                                                    ₹{(item.quantity * unitPrice).toFixed(2)}
+                                                </div>
                                             </div>
-                                            <div className="text-right font-medium">
-                                                ₹{(item.quantity * unitPrice).toFixed(2)}
-                                            </div>
+                                            {item.delivery_calculation_snapshot && (
+                                                <div className="ml-20 mt-2 text-xs text-muted-foreground bg-muted/30 p-2 rounded border border-dashed border-muted-foreground/20 max-w-md">
+                                                    <div className="flex items-center gap-1.5 font-medium text-[10px] uppercase tracking-wider mb-1 text-primary">
+                                                        <Truck className="h-3 w-3" />
+                                                        Delivery Details
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                                                        <p>Method: <span className="font-medium">{item.delivery_calculation_snapshot.method?.replace(/_/g, ' ')}</span></p>
+                                                        <p>Charge: <span className="font-medium">₹{item.delivery_calculation_snapshot.charge}</span></p>
+                                                        {item.delivery_gst ? <p>GST (18%): <span className="font-medium">₹{item.delivery_gst}</span></p> : null}
+                                                        {item.delivery_calculation_snapshot.policy && (
+                                                            <p className={item.delivery_calculation_snapshot.policy === 'NON_REFUNDABLE' ? 'text-orange-600 font-medium' : 'text-green-600 font-medium'}>
+                                                                {item.delivery_calculation_snapshot.policy === 'NON_REFUNDABLE' ? 'Non-Refundable' : 'Refundable'}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}

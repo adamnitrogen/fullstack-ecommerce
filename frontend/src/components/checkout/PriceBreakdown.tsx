@@ -72,6 +72,17 @@ export function PriceBreakdown({ totals }: PriceBreakdownProps) {
                     </div>
                 )}
 
+                {/* Delivery GST */}
+                {totals.deliveryGST && totals.deliveryGST > 0 && (
+                    <div className="flex justify-between items-center">
+                        <span className="flex items-center gap-1.5 text-muted-foreground">
+                            <Tag className="w-3.5 h-3.5" />
+                            Delivery GST (18%)
+                        </span>
+                        <span className="font-medium">₹{totals.deliveryGST.toFixed(2)}</span>
+                    </div>
+                )}
+
                 {/* Tax Breakdown */}
                 {totals.tax && totals.tax.totalTax > 0 && (
                     <div className="pt-2 border-t border-dashed space-y-1">

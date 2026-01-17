@@ -337,21 +337,35 @@ export const ProductDetailView = ({
             </div>
 
             {/* Return Policy - Immediately below stock */}
-            <div className="flex items-center gap-2">
-              {isReturnable ? (
-                <>
-                  <RotateCcw className="h-4 w-4 text-green-600" />
-                  <span className="text-xs font-medium text-green-600">
-                    {returnDays} days return available
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-2">
+                {isReturnable ? (
+                  <>
+                    <RotateCcw className="h-4 w-4 text-green-600" />
+                    <span className="text-xs font-medium text-green-600">
+                      {returnDays} days return available
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <X className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">
+                      Non-returnable
+                    </span>
+                  </>
+                )}
+              </div>
+
+              {/* Delivery Refund Policy Badge */}
+              {product.delivery_refund_policy === 'NON_REFUNDABLE' && (
+                <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-500">
+                  <div className="w-4 h-4 rounded-full bg-orange-100 flex items-center justify-center">
+                    <Truck className="h-2.5 w-2.5 text-orange-600" />
+                  </div>
+                  <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wide">
+                    Non-refundable Delivery
                   </span>
-                </>
-              ) : (
-                <>
-                  <X className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">
-                    Non-returnable
-                  </span>
-                </>
+                </div>
               )}
             </div>
           </div>

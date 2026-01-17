@@ -13,6 +13,7 @@ const { capturePayment, voidAuthorization } = require('../utils/razorpay-helper'
 const { TaxEngine } = require('./tax-engine.service');
 const { PricingCalculator } = require('./pricing-calculator.service');
 const { FinancialEventLogger } = require('./financial-event-logger.service');
+const { DeliveryChargeService } = require('./delivery-charge.service');
 
 // Create module-specific logger
 const log = createModuleLogger('CheckoutService');
@@ -26,8 +27,9 @@ const log = createModuleLogger('CheckoutService');
 const key_id = process.env.RAZORPAY_KEY_ID;
 const key_secret = process.env.RAZORPAY_KEY_SECRET;
 
-// logger.info('Razorpay Init - Key ID:', key_id ? `...${key_id.slice(-4)}` : 'MISSING');
-// logger.info({ data: !!key_secret }, 'Razorpay Init - Secret exists:');
+if (!key_secret) {
+    logger.error('RAZORPAY_KEY_SECRET is missing in environment variables. Payment verification will fail.');
+}
 
 const razorpay = new Razorpay({
     key_id: key_id,
@@ -107,24 +109,34 @@ const createRazorpayInvoice = async (amount, receipt, customer, lineItems) => {
     const startTime = Date.now();
 
     try {
-        // Construct Invoice Payload
-        // Razorpay balancing logic: Exclude product-level delivery charges from line items 
-        // but add a balancing line item to ensure the total is correct.
-        const productDeliveryCharge = lineItems.reduce((sum, item) => sum + (item.product_delivery_charge || 0), 0);
+        // Extract delivery charge and GST from metadata
+        let deliveryCharge = 0;
+        let deliveryGST = 0;
+        let deliveryGSTRate = 18;
 
+        // Check if first item has delivery metadata
+        if (lineItems.length > 0 && lineItems[0].deliveryCharge !== undefined) {
+            deliveryCharge = lineItems[0].deliveryCharge || 0;
+            deliveryGST = lineItems[0].deliveryGST || 0;
+            deliveryGSTRate = lineItems[0].deliveryGSTRate || 18;
+        }
+
+        // Clean line items (remove delivery metadata)
         const cleanLineItems = lineItems.map(item => {
-            const { product_delivery_charge, ...rest } = item;
+            const { deliveryCharge, deliveryGST, deliveryGSTRate, ...rest } = item;
             return rest;
         });
 
-        if (productDeliveryCharge > 0) {
+        // Add delivery charges as separate Razorpay line item (GST-compliant)
+        if (deliveryCharge > 0) {
             cleanLineItems.push({
-                name: "Logistics & Handling Fee",
-                description: "Special per-product delivery and handling charges",
-                amount: Math.round(productDeliveryCharge * 100),
+                name: "Delivery Charges",
+                description: "Courier and handling charges",
+                amount: Math.round(deliveryCharge * 100), // Paisa (before GST)
                 currency: "INR",
                 quantity: 1,
-                tax_rate: 0 // Internal charges are not taxable in this flow
+                tax_rate: deliveryGSTRate,
+                hsn_code: "996812" // SAC code for courier services
             });
         }
 
@@ -333,6 +345,7 @@ const createOrder = async (userId, checkoutData) => {
         coupon_code: totals.coupon?.code || null,
         coupon_discount: totals.couponDiscount || 0,
         delivery_charge: totals.deliveryCharge || 0,
+        delivery_gst: totals.deliveryGST || 0,
         status: 'pending', // Orders start as pending until admin/manager confirms
         paymentStatus: 'paid',
         notes: notes || null,
@@ -343,19 +356,48 @@ const createOrder = async (userId, checkoutData) => {
         total_igst: taxResult?.summary.totalIgst || 0
     };
 
-    // Prepare order items with tax snapshot for transactional RPC
-    const orderItems = cart.cart_items.map((item, index) => {
+    // Prepare order items with tax and delivery snapshots
+    const orderItems = [];
+    for (const [index, item] of cart.cart_items.entries()) {
         const taxBreakdown = taxResult?.items[index]?.taxBreakdown || {};
         const variant = item.product_variants || item.variant || {};
         const product = item.products || item.product || {};
 
-        // Find applicable discount and delivery for this item from totals
+        // Find applicable discount for this item
         const itemDetail = totals.itemBreakdown?.find(id =>
             (id.variant_id && id.variant_id === item.variant_id) ||
             (!id.variant_id && id.product_id === item.product_id)
         );
 
-        return {
+        // Calculate delivery charge for this item
+        let itemDeliveryCharge = 0;
+        let itemDeliveryGST = 0;
+        let deliverySnapshot = null;
+
+        try {
+            // Determine if free delivery applies based on totals
+            // We use the same logic as cart service: if total delivery is 0 and subtotal > 0, it's likely free delivery
+            // But to be precise, we should check against threshold or if totals.deliveryCharge is 0
+            // Since we trust calculateCartTotals, if totals.deliveryCharge is 0, then for FLAT_PER_ORDER it means free delivery.
+            // However, to be 100% safe and consistent with DeliveryChargeService signature:
+            const settingsService = require('./settings.service');
+            const globalSettings = await settingsService.getDeliverySettings();
+            const isFreeDelivery = totals.totalPrice >= (globalSettings.delivery_threshold || 0);
+
+            const deliveryResult = await DeliveryChargeService.calculateDeliveryCharge(
+                item.product_id,
+                item.variant_id,
+                item.quantity,
+                isFreeDelivery
+            );
+            itemDeliveryCharge = deliveryResult.deliveryCharge;
+            itemDeliveryGST = deliveryResult.deliveryGST;
+            deliverySnapshot = deliveryResult.snapshot;
+        } catch (error) {
+            logger.warn({ err: error, product_id: item.product_id }, 'Failed to calculate item delivery');
+        }
+
+        orderItems.push({
             product_id: item.product_id,
             variant_id: item.variant_id || null,
             quantity: item.quantity,
@@ -367,7 +409,9 @@ const createOrder = async (userId, checkoutData) => {
                 isReturnable: product.isReturnable ?? product.is_returnable ?? true
             },
             // Financial details
-            delivery_charge: itemDetail?.delivery_charge || 0,
+            delivery_charge: itemDeliveryCharge,
+            delivery_gst: itemDeliveryGST,
+            delivery_calculation_snapshot: deliverySnapshot,
             coupon_id: totals.coupon?.id || null,
             coupon_code: totals.coupon?.code || null,
             coupon_discount: itemDetail?.coupon_discount || 0,
@@ -388,8 +432,8 @@ const createOrder = async (userId, checkoutData) => {
                 tax_applicable: variant.tax_applicable || false,
                 price_includes_tax: variant.price_includes_tax ?? true
             } : null
-        };
-    });
+        });
+    }
 
     logger.info({ userId, itemCount: orderItems.length, hasTax: !!taxResult }, '[Checkout] Creating order via transactional RPC');
 

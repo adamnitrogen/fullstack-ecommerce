@@ -4,6 +4,7 @@ const Razorpay = require('razorpay');
 const { PricingCalculator } = require('./pricing-calculator.service');
 const { RefundCalculator } = require('./refund-calculator.service');
 const { FinancialEventLogger } = require('./financial-event-logger.service');
+const { DeliveryChargeService } = require('./delivery-charge.service');
 const emailService = require('./email');
 const { createModuleLogger } = require('../utils/logging-standards');
 
@@ -247,7 +248,10 @@ const processReturnApproval = async (returnId, adminId) => {
                     cgst,
                     sgst,
                     igst,
-                    total_amount
+                    total_amount,
+                    delivery_charge,
+                    delivery_gst,
+                    delivery_calculation_snapshot
                 )
             )
         `)
@@ -258,9 +262,81 @@ const processReturnApproval = async (returnId, adminId) => {
     if (returnRequest.status !== 'requested') throw new Error('Return request is not in requested state');
 
     // 2. Calculate Final Refund Amount (use stored breakdown if available)
-    let refundAmount = returnRequest.refund_amount || 0;
-    const itemsToUpdate = [];
+    const orderItemsData = returnRequest.return_items.map(ri => ({
+        ...ri.order_items,
+        id: ri.order_item_id
+    }));
+    const returnItems = returnRequest.return_items.map(ri => ({
+        orderItemId: ri.order_item_id,
+        quantity: ri.quantity
+    }));
 
+    // Calculate product refund
+    const refundCalc = RefundCalculator.calculateReturnTotal(orderItemsData, returnItems);
+    const productRefundAmount = refundCalc.summary.totalRefund;
+
+    // Calculate delivery refund with policy enforcement
+    let deliveryRefundAmount = 0;
+    let deliveryGSTRefundAmount = 0;
+    let deliveryPolicyDetails = [];
+
+    try {
+        const deliveryRefund = await DeliveryChargeService.calculateRefundDelivery(
+            orderItemsData,
+            returnItems
+        );
+
+        deliveryRefundAmount = deliveryRefund.refundDeliveryCharge;
+        deliveryGSTRefundAmount = deliveryRefund.refundDeliveryGST;
+        deliveryPolicyDetails = deliveryRefund.policyDetails;
+
+        log.info('RETURN_DELIVERY_REFUND', 'Delivery refund calculated', {
+            refundDelivery: deliveryRefundAmount,
+            refundDeliveryGST: deliveryGSTRefundAmount,
+            isRefundable: deliveryRefund.isRefundable
+        });
+    } catch (error) {
+        log.warn('RETURN_DELIVERY_REFUND_ERROR', 'Failed to calculate delivery refund', { error: error.message });
+    }
+
+    // Calculate total refund amount including delivery
+    const totalRefundAmount = productRefundAmount + deliveryRefundAmount + deliveryGSTRefundAmount;
+
+    // 3. Process Razorpay Refund
+    const { data: payment } = await supabase
+        .from('payments')
+        .select('razorpay_payment_id')
+        .eq('id', returnRequest.orders.payment_id)
+        .single();
+
+    if (!payment?.razorpay_payment_id) {
+        throw new Error('Razorpay payment ID not found for this order');
+    }
+
+    log.info('RAZORPAY_REFUND_START', 'Initiating Razorpay refund', {
+        paymentId: payment.razorpay_payment_id,
+        amount: totalRefundAmount
+    });
+
+    const refund = await razorpay.payments.refund(
+        payment.razorpay_payment_id,
+        {
+            amount: Math.round(totalRefundAmount * 100), // Amount in paise
+            notes: {
+                return_id: returnId,
+                product_refund: productRefundAmount,
+                delivery_refund: deliveryRefundAmount,
+                delivery_gst_refund: deliveryGSTRefundAmount,
+                delivery_policies: JSON.stringify(deliveryPolicyDetails.map(p => ({
+                    product_id: p.product_id,
+                    policy: p.policy
+                })))
+            }
+        }
+    );
+
+    // 4. Update Status and Records
+    const itemsToUpdate = [];
     for (const item of returnRequest.return_items) {
         itemsToUpdate.push({
             id: item.order_item_id,
@@ -268,14 +344,22 @@ const processReturnApproval = async (returnId, adminId) => {
         });
     }
 
-    // 3. Update Status (Status update only, refund happens on physical return verification)
-    log.info('RETURN_APPROVAL', `Return Approved: ID=${returnId}, Order=${returnRequest.order_id}`);
-
     // Update Return Status
     await supabase.from('returns').update({
         status: 'approved',
+        refund_amount: totalRefundAmount,
         updated_at: new Date().toISOString()
     }).eq('id', returnId);
+
+    // Create refund log
+    await supabase.from('refunds').insert({
+        return_id: returnId,
+        order_id: returnRequest.order_id,
+        razorpay_refund_id: refund.id,
+        amount: totalRefundAmount,
+        status: refund.status,
+        created_at: new Date().toISOString()
+    });
 
     // Update Order Items returned_quantity
     for (const update of itemsToUpdate) {
@@ -292,10 +376,10 @@ const processReturnApproval = async (returnId, adminId) => {
         .eq('id', returnRequest.order_id);
 
     // Log History
-    await logStatusHistory(returnRequest.order_id, 'return_approved', adminId, `Return approved. Waiting for return.`);
+    await logStatusHistory(returnRequest.order_id, 'return_approved', adminId, `Return approved and refund of ₹${totalRefundAmount} processed via Razorpay.`);
 
     // Log Financial Event
-    FinancialEventLogger.logReturnApproved(returnId, returnRequest.order_id, adminId, refundAmount)
+    FinancialEventLogger.logReturnApproved(returnId, returnRequest.order_id, adminId, totalRefundAmount)
         .catch(err => log.warn('AUDIT_LOG_ERROR', 'Failed to log return approval', { error: err.message }));
 
     // Send RETURN_APPROVED Email
@@ -305,12 +389,12 @@ const processReturnApproval = async (returnId, adminId) => {
         emailService.send('RETURN_APPROVED', userEmail, {
             customerName: userName,
             order: { id: returnRequest.order_id, order_number: returnRequest.order_id.slice(0, 8).toUpperCase() },
-            estimatedRefund: refundAmount
+            estimatedRefund: totalRefundAmount
         }, returnRequest.orders?.user_id, returnRequest.id)
             .catch(err => log.warn('EMAIL_ERROR', 'Failed to send return approved email', { error: err.message }));
     }
 
-    return { success: true };
+    return { success: true, refundId: refund.id, amount: totalRefundAmount };
 };
 
 const processReturnRejection = async (returnId, adminId, reason) => {

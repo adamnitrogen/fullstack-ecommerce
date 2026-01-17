@@ -154,6 +154,18 @@ export const CartSummary = ({
                                     <span className="font-bold text-orange-600 animate-pulse">₹{(totals.productDeliveryCharges || 0).toFixed(2)}</span>
                                 </div>
                             )}
+
+                            {totals && (totals.deliveryGST || 0) > 0 && (
+                                <div className="flex justify-between items-center animate-in slide-in-from-left-2 duration-500">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100/50">
+                                            <TagIcon className="w-3.5 h-3.5" />
+                                        </div>
+                                        <span className="text-muted-foreground font-medium">Delivery GST (18%)</span>
+                                    </div>
+                                    <span className="font-bold text-blue-600">₹{(totals.deliveryGST || 0).toFixed(2)}</span>
+                                </div>
+                            )}
                         </div>
 
                         {/* Relative Loader for Calculation */}

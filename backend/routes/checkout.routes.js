@@ -23,7 +23,7 @@ router.use(authenticateToken);
 
 // Helper to get user ID
 const getUserId = (req) => {
-    return req.user?.id || req.headers['x-user-id'];
+    return req.user?.id;
 };
 
 // Get checkout summary (cart + addresses + totals)
@@ -151,37 +151,37 @@ router.post('/create-payment-order', validate(createPaymentOrderSchema), request
 
         // 4. Map Cart Items to Razorpay Line Items
         // This is where "Phase 20" logic shines: Using synced Item IDs
-        const lineItems = cart.cart_items.map(item => {
+        const lineItems = cart.cart_items.map((item, index) => {
             const variant = item.product_variants;
             const product = item.products;
 
+            let razorpayItem;
             if (variant && variant.razorpay_item_id) {
                 // Synced Item: Use ID
-                return {
+                razorpayItem = {
                     item_id: variant.razorpay_item_id,
                     quantity: item.quantity
                 };
             } else {
                 // Unsynced / Old Item: Fallback to manual details
                 // (This ensures checkout doesn't break for old products)
-                return {
+                razorpayItem = {
                     name: `${product.title} - ${variant?.size_label || 'Default'}`,
                     amount: Math.round((variant?.selling_price || product.price) * 100),
                     currency: 'INR',
                     quantity: item.quantity
                 };
             }
-        });
 
-        // Add Delivery Charge as a line item if applicable
-        if (totals.deliveryCharge > 0) {
-            lineItems.push({
-                name: 'Delivery Charge',
-                amount: Math.round(totals.deliveryCharge * 100),
-                currency: 'INR',
-                quantity: 1
-            });
-        }
+            // Attach delivery metadata to the first item for createRazorpayInvoice to extract
+            if (index === 0) {
+                razorpayItem.deliveryCharge = totals.deliveryCharge || 0;
+                razorpayItem.deliveryGST = totals.deliveryGST || 0;
+                razorpayItem.deliveryGSTRate = 18; // Default GST rate for delivery
+            }
+
+            return razorpayItem;
+        });
 
         // Add Discount as negative line item? No, Razorpay API handles discounts differently via discount_amount?
         // Or we just rely on the fact that line items should sum up to total?
@@ -507,18 +507,21 @@ router.post('/buy-now/create-payment-order', requestLock('create-payment-order')
         // Calculate totals
         const unitPrice = variant?.selling_price || product.price;
         const subtotal = unitPrice * quantity;
-        // Fetch delivery settings
-        const settingsService = require('../services/settings.service');
-        const { delivery_charge: globalCharge, delivery_threshold: threshold } = await settingsService.getDeliverySettings();
 
-        // Product-specific delivery charge
-        const productCharge = variant?.delivery_charge ?? product.delivery_charge ?? 0;
+        // NEW DYNAMIC DELIVERY LOGIC for Buy Now
+        const { DeliveryChargeService } = require('../services/delivery-charge.service');
+        let deliveryCharge = 0;
+        let deliveryGST = 0;
 
-        // Calculate total delivery charge (Product + Global if under threshold)
-        // Note: For Buy Now, we check subtotal against threshold
-        const applicableGlobalCharge = subtotal >= threshold ? 0 : globalCharge;
-        const deliveryCharge = productCharge + applicableGlobalCharge;
-        const amount = subtotal + deliveryCharge;
+        try {
+            const deliveryResult = await DeliveryChargeService.calculateDeliveryCharge(productId, variantId, quantity);
+            deliveryCharge = deliveryResult.deliveryCharge;
+            deliveryGST = deliveryResult.deliveryGST;
+        } catch (error) {
+            logger.warn({ err: error }, 'Failed to calculate Buy Now delivery, using 0');
+        }
+
+        const amount = subtotal + deliveryCharge + deliveryGST;
 
         // Receipt ID
         const receipt = `buynow_${Date.now()}_${userId.substring(0, 8)}`;
@@ -526,29 +529,27 @@ router.post('/buy-now/create-payment-order', requestLock('create-payment-order')
         // Build line items
         const lineItems = [];
 
+        let razorpayItem;
         if (variant?.razorpay_item_id) {
-            lineItems.push({
+            razorpayItem = {
                 item_id: variant.razorpay_item_id,
                 quantity
-            });
+            };
         } else {
-            lineItems.push({
+            razorpayItem = {
                 name: `${product.title}${variant ? ` - ${variant.size_label}` : ''}`,
                 amount: Math.round(unitPrice * 100),
                 currency: 'INR',
                 quantity
-            });
+            };
         }
 
-        // Add delivery charge if applicable
-        if (deliveryCharge > 0) {
-            lineItems.push({
-                name: 'Delivery Charge',
-                amount: Math.round(deliveryCharge * 100),
-                currency: 'INR',
-                quantity: 1
-            });
-        }
+        // Attach delivery metadata to the first item for createRazorpayInvoice to extract
+        razorpayItem.deliveryCharge = deliveryCharge;
+        razorpayItem.deliveryGST = deliveryGST;
+        razorpayItem.deliveryGSTRate = 18;
+
+        lineItems.push(razorpayItem);
 
         // Create Razorpay Invoice
         const razorpayResponse = await createRazorpayInvoice(amount, receipt, profile, lineItems);

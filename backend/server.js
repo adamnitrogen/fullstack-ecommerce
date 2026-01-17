@@ -198,6 +198,7 @@ app.use('/api', require('./routes/product-variant.routes')); // Product variants
 app.use('/api/webhooks', require('./routes/webhook.routes')); // Payment webhooks
 app.use('/api/invoices', require('./routes/invoice.routes')); // Invoice management
 app.use('/api/cron', require('./routes/cron.routes')); // Background job triggers
+app.use('/api/admin/delivery-configs', require('./routes/delivery-configs.routes')); // Delivery config management
 
 // Global Error Handler (Must be last)
 app.use(require('./middleware/error.middleware'));

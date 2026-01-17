@@ -479,15 +479,25 @@ async function calculateCartTotals(userId, guestId, existingCart = null, { skipV
             });
         }
 
-        // Calculate global delivery charge (uses cached settings)
-        const settings = await getCachedDeliverySettings();
-        const globalDeliveryCharge = totalPrice >= settings.delivery_threshold ? 0 : settings.delivery_charge;
+        // NEW DYNAMIC DELIVERY LOGIC
+        // Calculate delivery charges using DeliveryChargeService
+        const { DeliveryChargeService } = require('./delivery-charge.service');
 
-        // Total delivery charge = Product specific + Global residual
-        const totalDeliveryCharge = productDeliveryCharge + globalDeliveryCharge;
+        let totalDeliveryCharge = 0;
+        let totalDeliveryGST = 0;
 
-        // Calculate final amount
-        const finalAmount = (totalPrice - couponDiscount) + totalDeliveryCharge;
+        try {
+            const deliveryResult = await DeliveryChargeService.calculateCartDelivery(cartItems, totalPrice);
+            totalDeliveryCharge = deliveryResult.totalDeliveryCharge;
+            totalDeliveryGST = deliveryResult.totalDeliveryGST;
+        } catch (error) {
+            logger.warn({ err: error }, 'Failed to calculate delivery, using 0');
+            totalDeliveryCharge = 0;
+            totalDeliveryGST = 0;
+        }
+
+        // Calculate final amount (including delivery GST)
+        const finalAmount = (totalPrice - couponDiscount) + totalDeliveryCharge + totalDeliveryGST;
 
         return {
             itemsCount: cartItems.reduce((sum, item) => sum + item.quantity, 0),
@@ -495,9 +505,8 @@ async function calculateCartTotals(userId, guestId, existingCart = null, { skipV
             totalPrice: Math.round(totalPrice * 100) / 100,
             discount: Math.round(autoDiscount * 100) / 100,
             couponDiscount: Math.round(couponDiscount * 100) / 100,
-            productDeliveryCharges: Math.round(productDeliveryCharge * 100) / 100,
-            globalDeliveryCharge: Math.round(globalDeliveryCharge * 100) / 100,
             deliveryCharge: Math.round(totalDeliveryCharge * 100) / 100,
+            deliveryGST: Math.round(totalDeliveryGST * 100) / 100,
             finalAmount: Math.round(finalAmount * 100) / 100,
             coupon,
             itemBreakdown: itemLevelBreakdown

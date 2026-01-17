@@ -23,6 +23,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { ImageUpload } from "./ImageUpload";
 import { VariantFormSection } from "./VariantFormSection";
+import { DeliveryConfigForm } from "./DeliveryConfigForm";
 import type { Product, VariantFormData } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
@@ -623,6 +624,18 @@ export function ProductDialog({
                 </div>
               </div>
             </div>
+
+            {/* Delivery Configuration - Only available in Edit Mode */}
+            {product?.id && (
+              <div className="space-y-4 border rounded-lg p-4 bg-muted/10">
+                <DeliveryConfigForm productId={product.id} />
+              </div>
+            )}
+            {!product?.id && (
+              <div className="p-4 border rounded-lg bg-muted/10 text-center text-sm text-muted-foreground">
+                <p>Save the product first to configure advanced delivery rules.</p>
+              </div>
+            )}
 
             {/* Size Variants */}
             <Collapsible open={variantsOpen} onOpenChange={setVariantsOpen}>
