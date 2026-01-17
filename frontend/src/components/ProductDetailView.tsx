@@ -21,6 +21,8 @@ import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
 import { toast } from "sonner";
 import { VariantSelector } from "@/components/VariantSelector";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { logger } from "@/lib/logger";
 
 interface ProductDetailViewProps {
   product: Product;
@@ -36,6 +38,7 @@ export const ProductDetailView = ({
   const { addItem, items, updateQuantity, removeItem } = useCartStore();
   const { user } = useAuthStore();
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [isBuying, setIsBuying] = useState(false);
 
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(
     () => {
@@ -77,7 +80,7 @@ export const ProductDetailView = ({
       setDisplayImage(product.images[selectedImageIndex] || product.images[0]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedVariant, product.images]);
+  }, [selectedVariant, product.images, selectedImageIndex]);
 
 
   // Combine all images (product images + variant images)
@@ -132,6 +135,17 @@ export const ProductDetailView = ({
         description: "Please add your email address in profile settings before making a purchase.",
       });
       return;
+    }
+
+    // Add to cart first (ensures item is in cart even if checkout is abandoned)
+    try {
+      setIsBuying(true);
+      await addItem(product, 1, selectedVariant?.id);
+    } catch (error) {
+      logger.error("Add to cart during Buy Now failed:", error);
+      // Logic continues even if cart add fails (e.g. if it was already there)
+    } finally {
+      setIsBuying(false);
     }
 
     // Navigate to checkout with buy now item in state
@@ -210,6 +224,7 @@ export const ProductDetailView = ({
 
   return (
     <div className={`${className} animate-in fade-in slide-in-from-bottom-4 duration-700`}>
+      <LoadingOverlay isLoading={isBuying} message="Preparing your purchase..." />
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
         {/* Left Side: Product Image Gallery */}
         <div className="lg:col-span-5 space-y-4">

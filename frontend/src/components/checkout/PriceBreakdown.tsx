@@ -7,7 +7,7 @@ interface PriceBreakdownProps {
 }
 
 export function PriceBreakdown({ totals }: PriceBreakdownProps) {
-    const totalSavings = totals.discount + totals.couponDiscount;
+    const totalSavings = (totals.discount || 0) + (totals.couponDiscount || 0);
 
     return (
         <div className="space-y-3 pt-2">
@@ -19,7 +19,7 @@ export function PriceBreakdown({ totals }: PriceBreakdownProps) {
             <div className="space-y-2 text-sm">
                 <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Subtotal (MRP)</span>
-                    <span className="font-medium">₹{totals.totalMrp?.toFixed(2) || totals.totalPrice.toFixed(2)}</span>
+                    <span className="font-medium">₹{totals.totalMrp?.toFixed(2) || totals.totalPrice?.toFixed(2) || "0.00"}</span>
                 </div>
 
                 {totals.discount > 0 && (
@@ -28,7 +28,7 @@ export function PriceBreakdown({ totals }: PriceBreakdownProps) {
                             <Tag className="w-3.5 h-3.5" />
                             Product Discount
                         </span>
-                        <span className="font-medium">-₹{totals.discount.toFixed(2)}</span>
+                        <span className="font-medium">-₹{(totals.discount || 0).toFixed(2)}</span>
                     </div>
                 )}
 
@@ -38,7 +38,7 @@ export function PriceBreakdown({ totals }: PriceBreakdownProps) {
                             <Sparkles className="h-3.5 w-3.5" />
                             Coupon ({totals.coupon?.code})
                         </span>
-                        <span className="font-medium">-₹{totals.couponDiscount.toFixed(2)}</span>
+                        <span className="font-medium">-₹{(totals.couponDiscount || 0).toFixed(2)}</span>
                     </div>
                 )}
 
@@ -50,7 +50,7 @@ export function PriceBreakdown({ totals }: PriceBreakdownProps) {
                     {totals.deliveryCharge === 0 ? (
                         <span className="text-emerald-600 font-bold text-[10px] uppercase tracking-wide bg-emerald-100 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded">FREE</span>
                     ) : (
-                        <span className="font-medium">₹{totals.deliveryCharge.toFixed(2)}</span>
+                        <span className="font-medium">₹{(totals.deliveryCharge || 0).toFixed(2)}</span>
                     )}
                 </div>
 
@@ -79,7 +79,7 @@ export function PriceBreakdown({ totals }: PriceBreakdownProps) {
                             <Tag className="w-3.5 h-3.5" />
                             Delivery GST (18%)
                         </span>
-                        <span className="font-medium">₹{totals.deliveryGST.toFixed(2)}</span>
+                        <span className="font-medium">₹{(totals.deliveryGST || 0).toFixed(2)}</span>
                     </div>
                 )}
 
@@ -89,17 +89,17 @@ export function PriceBreakdown({ totals }: PriceBreakdownProps) {
                         {totals.tax.isInterState ? (
                             <div className="flex justify-between items-center text-xs text-muted-foreground">
                                 <span>IGST</span>
-                                <span>₹{totals.tax.igst.toFixed(2)}</span>
+                                <span>₹{(totals.tax?.igst || 0).toFixed(2)}</span>
                             </div>
                         ) : (
                             <>
                                 <div className="flex justify-between items-center text-xs text-muted-foreground">
                                     <span>CGST</span>
-                                    <span>₹{totals.tax.cgst.toFixed(2)}</span>
+                                    <span>₹{(totals.tax?.cgst || 0).toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-xs text-muted-foreground">
                                     <span>SGST</span>
-                                    <span>₹{totals.tax.sgst.toFixed(2)}</span>
+                                    <span>₹{(totals.tax?.sgst || 0).toFixed(2)}</span>
                                 </div>
                             </>
                         )}
@@ -107,7 +107,7 @@ export function PriceBreakdown({ totals }: PriceBreakdownProps) {
                             <span className="flex items-center gap-1.5 text-xs">
                                 <span>Included Taxes</span>
                             </span>
-                            <span className="font-medium text-xs">₹{totals.tax.totalTax.toFixed(2)}</span>
+                            <span className="font-medium text-xs">₹{(totals.tax?.totalTax || 0).toFixed(2)}</span>
                         </div>
                     </div>
                 )}
@@ -117,7 +117,7 @@ export function PriceBreakdown({ totals }: PriceBreakdownProps) {
 
             <div className="flex justify-between items-end">
                 <span className="text-base font-bold text-foreground/80">Total Payable</span>
-                <span className="text-xl font-bold font-playfair text-primary">₹{totals.finalAmount.toFixed(2)}</span>
+                <span className="text-xl font-bold font-playfair text-primary">₹{(totals.finalAmount || 0).toFixed(2)}</span>
             </div>
 
             {totalSavings > 0 && (

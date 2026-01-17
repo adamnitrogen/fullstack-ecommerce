@@ -131,7 +131,7 @@ export function AddressSelector({ type, selectedAddressId, onSelect }: AddressSe
     return (
         <div className="space-y-4 relative min-h-[200px]">
             <LoadingOverlay isLoading={isLoading || isMutationLoading} message={mutationMessage} />
-            <RadioGroup value={selectedAddressId} onValueChange={(id) => {
+            <RadioGroup value={selectedAddressId || ""} onValueChange={(id) => {
                 const addr = addresses.find(a => a.id === id);
                 if (addr) onSelect(addr);
             }}>

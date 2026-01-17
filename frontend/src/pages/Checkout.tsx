@@ -310,7 +310,8 @@ export default function Checkout() {
 
     } catch (error) {
       logger.error("Payment initiation error", error);
-      toast.error("Failed to initiate payment. Please try again.");
+      const serverMsg = getErrorMessage(error);
+      toast.error(serverMsg || "Failed to initiate payment. Please try again.");
       setProcessing(false);
     }
   };

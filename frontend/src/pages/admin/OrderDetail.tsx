@@ -405,8 +405,8 @@ export default function OrderDetail() {
                                                         Delivery Details
                                                     </div>
                                                     <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                                                        <p>Method: <span className="font-medium">{item.delivery_calculation_snapshot.method?.replace(/_/g, ' ')}</span></p>
-                                                        <p>Charge: <span className="font-medium">₹{item.delivery_calculation_snapshot.charge}</span></p>
+                                                        <p>Method: <span className="font-medium">{item.delivery_calculation_snapshot.calculation_type?.replace(/_/g, ' ')}</span></p>
+                                                        <p>Charge: <span className="font-medium">₹{item.delivery_calculation_snapshot.delivery_charge}</span></p>
                                                         {item.delivery_gst ? <p>GST (18%): <span className="font-medium">₹{item.delivery_gst}</span></p> : null}
                                                         {item.delivery_calculation_snapshot.policy && (
                                                             <p className={item.delivery_calculation_snapshot.policy === 'NON_REFUNDABLE' ? 'text-orange-600 font-medium' : 'text-green-600 font-medium'}>
@@ -585,7 +585,7 @@ export default function OrderDetail() {
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                                     <Phone className="h-4 w-4" />
-                                    {order.customer_phone}
+                                    {order.customer_phone || 'N/A'}
                                 </div>
                             </div>
                         </CardContent>
@@ -648,15 +648,45 @@ export default function OrderDetail() {
                     </Card>
 
                     {/* Tax Summary */}
-                    <TaxBreakdown
-                        totalTaxableAmount={order.total_taxable_amount}
-                        totalCgst={order.total_cgst}
-                        totalSgst={order.total_sgst}
-                        totalIgst={order.total_igst}
-                        totalAmount={order.total_amount}
-                        showInvoiceLink={order.status === 'delivered' || order.invoice_url !== undefined}
-                        invoiceUrl={order.invoice_url}
-                    />
+                    {/* Tax Summary - Smart Handling for Legacy vs New Data */}
+                    {(() => {
+                        // Calculate stored tax sum logic
+                        const storedTaxable = order.total_taxable_amount || 0;
+                        const storedTax = (order.total_cgst || 0) + (order.total_sgst || 0) + (order.total_igst || 0);
+                        const storedSum = storedTaxable + storedTax;
+
+                        // Calculate expected total including delivery
+                        const deliveryCharge = order.delivery_charge || 0;
+                        const deliveryGST = ((order as any).delivery_gst || 0); // Type assertion needed if not in interface yet
+                        const totalAmount = order.total_amount || 0;
+
+                        // Check mismatch (Legacy: storedSum ~= ProductTotal vs TotalAmount ~= ProductTotal + Delivery)
+                        const isLegacyMismatch = Math.abs(totalAmount - storedSum) > 1.0;
+
+                        // If mismatch, we inject delivery components to make visual math work
+                        // This ensures: Taxable (Product + Delivery) + Tax (Product + Delivery) = Grand Total
+                        const effectiveTaxable = isLegacyMismatch ? (storedTaxable + deliveryCharge) : storedTaxable;
+
+                        // For tax breakdown, we need to distribute delivery GST appropriately
+                        // If IGST > 0, assume interstate. Else intrastate.
+                        const isInterstate = (order.total_igst || 0) > 0;
+
+                        const effectiveCgst = isLegacyMismatch && !isInterstate ? ((order.total_cgst || 0) + (deliveryGST / 2)) : (order.total_cgst || 0);
+                        const effectiveSgst = isLegacyMismatch && !isInterstate ? ((order.total_sgst || 0) + (deliveryGST / 2)) : (order.total_sgst || 0);
+                        const effectiveIgst = isLegacyMismatch && isInterstate ? ((order.total_igst || 0) + deliveryGST) : (order.total_igst || 0);
+
+                        return (
+                            <TaxBreakdown
+                                totalTaxableAmount={effectiveTaxable}
+                                totalCgst={effectiveCgst}
+                                totalSgst={effectiveSgst}
+                                totalIgst={effectiveIgst}
+                                totalAmount={totalAmount}
+                                showInvoiceLink={order.status === 'delivered' || !!order.invoice_url}
+                                invoiceUrl={order.invoice_url}
+                            />
+                        );
+                    })()}
 
                     {!order.invoice_url && order.payment_status === 'paid' && (
                         <Card>

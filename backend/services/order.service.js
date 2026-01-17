@@ -384,8 +384,8 @@ async function getAllOrders(user, {
     // Start building query
     let query = supabase
         .from('orders')
-        .select('id, order_number, totalAmount, status, paymentStatus, createdAt, user_id, items', { count: 'exact' })
-        .order('createdAt', { ascending: false });
+        .select('id, order_number, total_amount, status, payment_status, created_at, user_id, items', { count: 'exact' })
+        .order('created_at', { ascending: false });
 
     // Admin/Manager logic
     if (user.role === 'admin' || user.role === 'manager') {
@@ -408,13 +408,13 @@ async function getAllOrders(user, {
         query = query.eq('status', status);
     }
     if (payment_status && payment_status !== 'all') {
-        query = query.eq('paymentStatus', payment_status);
+        query = query.eq('payment_status', payment_status);
     }
     if (startDate) {
-        query = query.gte('createdAt', startDate);
+        query = query.gte('created_at', startDate);
     }
     if (endDate) {
-        query = query.lte('createdAt', endDate);
+        query = query.lte('created_at', endDate);
     }
 
     // Apply Pagination
@@ -445,12 +445,12 @@ async function getAllOrders(user, {
     const ordersWithProfiles = orders.map(order => ({
         ...order,
         user: profilesMap[order.user_id] || { name: 'Unknown', email: 'N/A' },
-        customer_name: (profilesMap[order.user_id]?.name) || order.customerName || 'Unknown',
-        total_amount: order.totalAmount || 0,
-        total: order.totalAmount || 0,
+        customer_name: (profilesMap[order.user_id]?.name) || order.customer_name || 'Unknown',
+        total_amount: order.total_amount || 0,
+        total: order.total_amount || 0,
         status: order.status || 'pending',
-        payment_status: order.paymentStatus || 'pending',
-        created_at: order.createdAt
+        payment_status: order.payment_status || 'pending',
+        created_at: order.created_at
     }));
 
     return {
@@ -644,9 +644,9 @@ async function getOrderById(id, user) {
 
     return {
         ...data,
-        customer_name: profile.full_name || data.customerName || 'Unknown',
-        customer_email: profile.email || data.customerEmail || data.customer_email || data.user_email,
-        customer_phone: profile.phone || data.customerPhone || data.customer_phone || data.user_phone,
+        customer_name: profile.full_name || data.customer_name || data.customerName || 'Unknown',
+        customer_email: profile.email || data.customer_email || data.customerEmail || data.user_email,
+        customer_phone: profile.phone || data.customer_phone || data.customerPhone || data.user_phone || shippingAddress?.phone,
         shipping_address: shippingAddress,
         billing_address: billingAddress,
         items: mappedItems,

@@ -231,7 +231,7 @@ router.post('/create-payment-order', validate(createPaymentOrderSchema), request
         });
     } catch (error) {
         logger.error({ err: error }, 'Error creating Razorpay invoice/order:');
-        res.status(500).json({ error: 'Failed to create payment order' });
+        res.status(500).json({ error: error.message || 'Failed to create payment order' });
     }
 });
 
@@ -313,17 +313,19 @@ router.post('/buy-now/summary', async (req, res) => {
         const mrpTotal = unitMrp * quantity;
         const discount = mrpTotal - subtotal;
 
-        // Delivery charge (variant > product > 0)
-        // Fetch delivery settings
-        const settingsService = require('../services/settings.service');
-        const { delivery_charge: globalCharge, delivery_threshold: threshold } = await settingsService.getDeliverySettings();
+        // Calculate totals using legacy logic? No, use DeliveryChargeService for accuracy
+        const { DeliveryChargeService } = require('../services/delivery-charge.service');
+        let deliveryCharge = 0;
+        let deliveryGST = 0;
+        let deliveryResult = null;
 
-        // Product-specific delivery charge
-        const productCharge = variant?.delivery_charge ?? product.delivery_charge ?? 0;
-
-        // Calculate total delivery charge (Product + Global if under threshold)
-        const applicableGlobalCharge = subtotal >= threshold ? 0 : globalCharge;
-        const deliveryCharge = productCharge + applicableGlobalCharge;
+        try {
+            deliveryResult = await DeliveryChargeService.calculateDeliveryCharge(productId, variantId, quantity);
+            deliveryCharge = deliveryResult.deliveryCharge;
+            deliveryGST = deliveryResult.deliveryGST;
+        } catch (deliveryError) {
+            logger.warn({ err: deliveryError }, 'Failed to calculate Buy Now delivery, using defaults');
+        }
 
         // Fetch addresses
         let shippingAddress = null;
@@ -346,19 +348,37 @@ router.post('/buy-now/summary', async (req, res) => {
             product_variants: variant
         };
 
+        const totals = {
+            totalMrp: Math.round(mrpTotal * 100) / 100,
+            totalPrice: Math.round(subtotal * 100) / 100,
+            discount: Math.round(discount * 100) / 100,
+            couponDiscount: 0,
+            deliveryCharge: Math.round(deliveryCharge * 100) / 100,
+            deliveryGST: Math.round(deliveryGST * 100) / 100,
+            finalAmount: Math.round((subtotal + deliveryCharge + deliveryGST) * 100) / 100,
+            itemsCount: quantity,
+            globalDeliveryCharge: deliveryResult?.snapshot?.calculation_type === 'FLAT_PER_ORDER' ? deliveryCharge : 0,
+            productDeliveryCharges: deliveryResult?.snapshot?.calculation_type !== 'FLAT_PER_ORDER' ? deliveryCharge : 0,
+            itemBreakdown: [
+                {
+                    product_id: productId,
+                    variant_id: variantId,
+                    quantity,
+                    mrp: unitMrp,
+                    price: unitPrice,
+                    delivery_charge: deliveryCharge,
+                    delivery_gst: deliveryGST,
+                    delivery_meta: deliveryResult?.snapshot
+                }
+            ]
+        };
+
         const summary = {
             cart: {
                 id: 'buy-now',
                 cart_items: [mockCartItem]
             },
-            totals: {
-                mrpTotal,
-                subtotal,
-                discount,
-                couponDiscount: 0, // No coupons for buy now
-                deliveryCharge,
-                finalAmount: subtotal + deliveryCharge
-            },
+            totals,
             shipping_address: shippingAddress,
             billing_address: billingAddress,
             isBuyNow: true

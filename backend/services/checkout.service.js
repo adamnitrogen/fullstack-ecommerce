@@ -148,7 +148,7 @@ const createRazorpayInvoice = async (amount, receipt, customer, lineItems) => {
             customer: {
                 name: customer.name,
                 email: customer.email,
-                contact: customer.phone // Format: +919999999999 usually required
+                ...(customer.phone && { contact: customer.phone })
             },
             line_items: cleanLineItems,
             receipt: receipt,
@@ -240,7 +240,7 @@ const updatePaymentRecord = async (paymentId, updates) => {
 
 // Create order with all details - TRANSACTIONAL VERSION
 // All database operations are executed atomically via PostgreSQL function
-const createOrder = async (userId, checkoutData) => {
+const createOrder = async (userId, checkoutData, cart) => {
     const {
         shipping_address_id,
         billing_address_id,
@@ -248,8 +248,7 @@ const createOrder = async (userId, checkoutData) => {
         notes
     } = checkoutData;
 
-    // Get cart and totals
-    const cart = await getUserCart(userId);
+
     // PERFORMANCE: Pass existing cart to avoid refetching in calculateCartTotals
     const totals = await calculateCartTotals(userId, null, cart);
 
@@ -334,26 +333,26 @@ const createOrder = async (userId, checkoutData) => {
 
     // Prepare order data for transactional RPC
     const orderData = {
-        customerName: profile.name,
-        customerEmail: profile.email,
-        customerPhone: profile.phone,
+        customer_name: profile.name,
+        customer_email: profile.email,
+        customer_phone: profile.phone || shippingAddr?.phone,
         shipping_address_id,
         billing_address_id,
-        shippingAddress: shippingAddr,
-        totalAmount: totals.finalAmount,
+        shipping_address: shippingAddr,
+        total_amount: totals.finalAmount,
         subtotal: totals.totalPrice,
         coupon_code: totals.coupon?.code || null,
         coupon_discount: totals.couponDiscount || 0,
         delivery_charge: totals.deliveryCharge || 0,
         delivery_gst: totals.deliveryGST || 0,
         status: 'pending', // Orders start as pending until admin/manager confirms
-        paymentStatus: 'paid',
+        payment_status: 'paid',
         notes: notes || null,
-        // Tax summary
-        total_taxable_amount: taxResult?.summary.totalTaxableAmount || 0,
-        total_cgst: taxResult?.summary.totalCgst || 0,
-        total_sgst: taxResult?.summary.totalSgst || 0,
-        total_igst: taxResult?.summary.totalIgst || 0
+        // Tax summary - Include Delivery logic
+        total_taxable_amount: (taxResult?.summary.totalTaxableAmount || 0) + (totals.deliveryCharge || 0),
+        total_cgst: (taxResult?.summary.totalCgst || 0) + ((!taxResult?.summary.isInterState && totals.deliveryGST) ? (totals.deliveryGST / 2) : 0),
+        total_sgst: (taxResult?.summary.totalSgst || 0) + ((!taxResult?.summary.isInterState && totals.deliveryGST) ? (totals.deliveryGST / 2) : 0),
+        total_igst: (taxResult?.summary.totalIgst || 0) + ((taxResult?.summary.isInterState && totals.deliveryGST) ? totals.deliveryGST : 0)
     };
 
     // Prepare order items with tax and delivery snapshots
@@ -466,7 +465,7 @@ const createOrder = async (userId, checkoutData) => {
         order_number: rpcResult.order_number || rpcResult.orderNumber,
         orderNumber: rpcResult.order_number || rpcResult.orderNumber,
         status: rpcResult.status,
-        totalAmount: rpcResult.totalAmount,
+        totalAmount: rpcResult.totalAmount || rpcResult.total_amount,
         customerName: profile.name,
         customerEmail: profile.email,
         items: orderItems,
@@ -933,12 +932,16 @@ async function processPaymentAndOrder(userId, {
     // --- DB TRANSACTION PHASE ---
     try {
         // Create order via atomic PostgreSQL transaction
-        const order = await createOrder(userId, {
-            shipping_address_id,
-            billing_address_id,
-            payment_id,
-            notes
-        });
+        const order = await createOrder(
+            userId,
+            {
+                shipping_address_id,
+                billing_address_id,
+                payment_id,
+                notes
+            },
+            cart
+        );
 
         // Log functionality for Timeline (Fix for missing history)
         const { logStatusHistory } = require('./order.service');
@@ -994,7 +997,7 @@ async function processPaymentAndOrder(userId, {
                     razorpay_order_id
                 }, '[Checkout] Payment refunded successfully');
 
-                const userError = new Error('Order creation failed and payment has been refunded. Please try again.');
+                const userError = new Error(`Order creation failed (${systemError.message}) and payment has been refunded. Please try again.`);
                 userError.status = 500;
                 throw userError;
 
@@ -1145,18 +1148,24 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
         const unitMrp = variant?.mrp || product.mrp || unitPrice;
         const subtotal = unitPrice * quantity;
 
-        // Fetch delivery settings
+        // Fetch delivery settings and calculate charge via Service
+        const { DeliveryChargeService } = require('./delivery-charge.service');
         const settingsService = require('./settings.service');
-        const { delivery_charge: globalCharge, delivery_threshold: threshold } = await settingsService.getDeliverySettings();
+        const globalSettings = await settingsService.getDeliverySettings();
 
-        // Product-specific delivery charge
-        const productCharge = variant?.delivery_charge ?? product.delivery_charge ?? 0;
+        // Determine isFreeDelivery based on threshold
+        const isFreeDelivery = subtotal >= (globalSettings.delivery_threshold || 0);
 
-        // Calculate total delivery charge (Product + Global if under threshold)
-        const applicableGlobalCharge = subtotal >= threshold ? 0 : globalCharge;
-        const deliveryCharge = productCharge + applicableGlobalCharge;
+        const deliveryResult = await DeliveryChargeService.calculateDeliveryCharge(
+            productId,
+            variantId,
+            quantity,
+            isFreeDelivery
+        );
 
-        const totalAmount = subtotal + deliveryCharge;
+        const deliveryCharge = deliveryResult.deliveryCharge;
+        const deliveryGST = deliveryResult.deliveryGST;
+        const totalAmount = subtotal + deliveryResult.totalDelivery;
 
         // Build virtual cart item for tax calculation
         const virtualCartItem = {
@@ -1177,24 +1186,26 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
 
         // Prepare order data
         const orderData = {
-            customerName: profile?.name,
-            customerEmail: profile?.email,
-            customerPhone: profile?.phone,
+            customer_name: profile?.name,
+            customer_email: profile?.email,
+            customer_phone: profile?.phone || shippingAddr?.phone,
             shipping_address_id,
             billing_address_id,
-            shippingAddress: shippingAddr,
-            totalAmount,
+            shipping_address: shippingAddr,
+            total_amount: totalAmount,
             subtotal,
             coupon_code: null,
             coupon_discount: 0,
             delivery_charge: deliveryCharge,
+            delivery_gst: deliveryGST, // Add missing delivery GST field
             status: 'pending',
-            paymentStatus: 'paid',
+            payment_status: 'paid',
             notes: notes || 'Buy Now Order',
-            total_taxable_amount: taxResult?.summary.totalTaxableAmount || 0,
-            total_cgst: taxResult?.summary.totalCgst || 0,
-            total_sgst: taxResult?.summary.totalSgst || 0,
-            total_igst: taxResult?.summary.totalIgst || 0
+            // Tax summary including delivery
+            total_taxable_amount: (taxResult?.summary.totalTaxableAmount || 0) + deliveryCharge,
+            total_cgst: (taxResult?.summary.totalCgst || 0) + ((!taxResult?.summary.isInterState && deliveryGST) ? (deliveryGST / 2) : 0),
+            total_sgst: (taxResult?.summary.totalSgst || 0) + ((!taxResult?.summary.isInterState && deliveryGST) ? (deliveryGST / 2) : 0),
+            total_igst: (taxResult?.summary.totalIgst || 0) + ((taxResult?.summary.isInterState && deliveryGST) ? deliveryGST : 0)
         };
 
         // Prepare order item
@@ -1211,6 +1222,8 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
                 isReturnable: product.isReturnable ?? product.is_returnable ?? true
             },
             delivery_charge: deliveryCharge,
+            delivery_gst: deliveryGST, // Add delivery GST
+            delivery_calculation_snapshot: deliveryResult.snapshot, // Add snapshot
             coupon_id: null,
             coupon_code: null,
             coupon_discount: 0,
@@ -1242,7 +1255,7 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
                 p_order_items: orderItems,
                 p_cart_id: null, // No cart to clear
                 p_payment_id: payment_id,
-                p_razorpay_payment_id: razorpay_payment_id
+                p_coupon_code: null
             });
 
         if (rpcError) {
@@ -1260,17 +1273,13 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
 
         // Send confirmation email
         try {
-            await emailService.sendOrderConfirmation(
+            await emailService.sendOrderConfirmationEmail(
                 profile.email,
-                profile.name,
-                order,
-                orderItems.map(i => ({
-                    ...i,
-                    title: i.product.title,
-                    price: unitPrice,
-                    quantity: i.quantity
-                })),
-                shippingAddr
+                {
+                    order: order,
+                    customerName: profile.name
+                },
+                userId
             );
         } catch (emailErr) {
             log.warn('BUY_NOW_EMAIL_ERROR', 'Failed to send confirmation email', { error: emailErr.message });
