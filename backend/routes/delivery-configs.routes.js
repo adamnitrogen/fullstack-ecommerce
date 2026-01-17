@@ -128,13 +128,38 @@ router.post('/', authenticateToken, requireRole(['admin', 'manager']), async (re
         };
 
         // Upsert (insert or update)
-        const { data, error } = await supabase
-            .from('delivery_configs')
-            .upsert(configData, {
-                onConflict: scope === 'PRODUCT' ? 'product_id' : 'variant_id'
-            })
-            .select()
-            .single();
+        // Check if config exists (manual upsert to handle partial indexes)
+        let query = supabase.from('delivery_configs').select('id');
+
+        if (scope === 'PRODUCT') {
+            query = query.eq('scope', 'PRODUCT').eq('product_id', product_id);
+        } else {
+            query = query.eq('scope', 'VARIANT').eq('variant_id', variant_id);
+        }
+
+        const { data: existing, error: fetchError } = await query.maybeSingle();
+
+        if (fetchError) throw fetchError;
+
+        let result;
+        if (existing) {
+            // Update existing config
+            result = await supabase
+                .from('delivery_configs')
+                .update(configData)
+                .eq('id', existing.id)
+                .select()
+                .single();
+        } else {
+            // Insert new config
+            result = await supabase
+                .from('delivery_configs')
+                .insert(configData)
+                .select()
+                .single();
+        }
+
+        const { data, error } = result;
 
         if (error) throw error;
 

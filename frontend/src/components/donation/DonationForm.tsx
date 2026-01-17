@@ -21,6 +21,7 @@ import {
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { cn } from "@/lib/utils";
+import { loadRazorpay } from "@/lib/razorpay";
 
 export const DonationForm = () => {
     const { t } = useTranslation();
@@ -110,6 +111,19 @@ export const DonationForm = () => {
         setLoading(true);
 
         try {
+            // Load Razorpay first
+            const isLoaded = await loadRazorpay();
+            if (!isLoaded) {
+                setStatusDialog({
+                    open: true,
+                    title: "Connection Error",
+                    message: "Failed to load payment gateway. Please check your internet connection.",
+                    type: "error"
+                });
+                setLoading(false);
+                return;
+            }
+
             if (donationType === "one_time") {
                 // One-time donation flow
                 const orderData = await donationService.createOrder({

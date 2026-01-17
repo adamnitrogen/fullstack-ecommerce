@@ -82,6 +82,7 @@ export interface Product {
   default_tax_applicable?: boolean;
   default_price_includes_tax?: boolean;
   delivery_refund_policy?: 'REFUNDABLE' | 'NON_REFUNDABLE';
+  delivery_config?: DeliveryConfig;
 }
 
 export type VariantUnit = 'kg' | 'gm' | 'ltr' | 'ml' | 'pcs';
@@ -105,6 +106,7 @@ export interface ProductVariant {
   gst_rate?: number;
   tax_applicable?: boolean;
   price_includes_tax?: boolean;
+  delivery_config?: DeliveryConfig;
 }
 
 export interface VariantFormData {
@@ -172,6 +174,8 @@ export interface CartItem {
   variant?: ProductVariant;
   sizeLabel?: string;
   delivery_charge?: number;
+  delivery_gst?: number;
+  delivery_meta?: any;
   coupon_discount?: number;
   coupon_code?: string;
 }
@@ -502,6 +506,7 @@ export interface CartTotals {
     coupon_code?: string;
     delivery_charge?: number;
     delivery_gst?: number;
+    delivery_meta?: any;
   }>;
   tax?: {
     totalTaxableAmount: number;
@@ -649,12 +654,14 @@ export interface DeliveryConfig {
   id: string;
   product_id: string | null;
   variant_id: string | null;
+  scope: 'PRODUCT' | 'VARIANT';
   calculation_type: 'PER_PACKAGE' | 'WEIGHT_BASED' | 'FLAT_PER_ORDER' | 'PER_ITEM';
   base_delivery_charge: number;
   weight_brackets?: any;
   gst_percentage: number;
   delivery_refund_policy: 'REFUNDABLE' | 'NON_REFUNDABLE';
   is_active: boolean;
+  max_items_per_package?: number;
   created_at: string;
   updated_at: string;
 }

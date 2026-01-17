@@ -152,6 +152,8 @@ const Cart = () => {
                     item={{
                       ...item,
                       delivery_charge: itemDetail?.delivery_charge || 0,
+                      delivery_gst: itemDetail?.delivery_gst || 0,
+                      delivery_meta: itemDetail?.delivery_meta,
                       coupon_discount: itemDetail?.coupon_discount || 0,
                       coupon_code: itemDetail?.coupon_code || ''
                     }}

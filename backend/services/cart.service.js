@@ -413,16 +413,9 @@ async function calculateCartTotals(userId, guestId, existingCart = null, { skipV
             const price = item.variant ? item.variant.selling_price : item.product.price;
             const mrp = item.variant ? item.variant.mrp : (item.product.mrp || item.product.price);
 
-            // Per-product delivery charge (Centralized at Product Level)
-            let itemEntryDeliveryCharge = 0;
-            if (!seenProductIds.has(item.product_id)) {
-                itemEntryDeliveryCharge = item.product.delivery_charge || 0;
-                productDeliveryCharge += itemEntryDeliveryCharge;
-                seenProductIds.add(item.product_id);
-            }
-
-            totalMrp += mrp * item.quantity;
+            // Accumulate totals
             totalPrice += price * item.quantity;
+            totalMrp += mrp * item.quantity;
 
             itemLevelBreakdown.push({
                 product_id: item.product_id,
@@ -430,7 +423,7 @@ async function calculateCartTotals(userId, guestId, existingCart = null, { skipV
                 quantity: item.quantity,
                 mrp: mrp,
                 price: price,
-                delivery_charge: itemEntryDeliveryCharge,
+                delivery_charge: 0, // Will be updated below
                 coupon_discount: 0,
                 coupon_code: null
             });
@@ -485,15 +478,54 @@ async function calculateCartTotals(userId, guestId, existingCart = null, { skipV
 
         let totalDeliveryCharge = 0;
         let totalDeliveryGST = 0;
+        let deliveryResult;
 
         try {
-            const deliveryResult = await DeliveryChargeService.calculateCartDelivery(cartItems, totalPrice);
+            deliveryResult = await DeliveryChargeService.calculateCartDelivery(cartItems, totalPrice);
             totalDeliveryCharge = deliveryResult.totalDeliveryCharge;
             totalDeliveryGST = deliveryResult.totalDeliveryGST;
+
+            // Map delivery charges back to items for breakdown
+            if (deliveryResult.items) {
+                deliveryResult.items.forEach(delItem => {
+                    const item = itemLevelBreakdown.find(i =>
+                        (delItem.variant_id ? (i.variant_id === delItem.variant_id) : (i.product_id === delItem.product_id))
+                    );
+                    if (item) {
+                        item.delivery_charge = delItem.deliveryCharge;
+                        item.delivery_gst = delItem.deliveryGST;
+                        item.delivery_meta = delItem.snapshot;
+                    }
+                });
+            }
         } catch (error) {
-            logger.warn({ err: error }, 'Failed to calculate delivery, using 0');
-            totalDeliveryCharge = 0;
             totalDeliveryGST = 0;
+        }
+
+        // Separate Global vs Product Delivery Charges
+        let globalDeliveryCharge = 0;
+        let productDeliveryCharges = 0;
+
+        if (itemLevelBreakdown.length > 0) {
+            itemLevelBreakdown.forEach(item => {
+                // If it's a specific calculation type usually associated with items (Weight, Package, Item)
+                // we treat it as product delivery charge.
+                // If it is 'FLAT_PER_ORDER' (default), we treat it as global/standard.
+                // However, since we don't have the config type here easily without looking at deliveryResult again...
+                // let's look at deliveryResult.items matched to this item.
+            });
+
+            // Better: Iterate deliveryResult.items directly if available
+            if (typeof deliveryResult !== 'undefined' && deliveryResult.items) {
+                deliveryResult.items.forEach(delItem => {
+                    const type = delItem.snapshot?.calculation_type;
+                    if (type === 'FLAT_PER_ORDER') {
+                        globalDeliveryCharge += delItem.deliveryCharge;
+                    } else {
+                        productDeliveryCharges += delItem.deliveryCharge;
+                    }
+                });
+            }
         }
 
         // Calculate final amount (including delivery GST)
@@ -507,6 +539,8 @@ async function calculateCartTotals(userId, guestId, existingCart = null, { skipV
             couponDiscount: Math.round(couponDiscount * 100) / 100,
             deliveryCharge: Math.round(totalDeliveryCharge * 100) / 100,
             deliveryGST: Math.round(totalDeliveryGST * 100) / 100,
+            globalDeliveryCharge: Math.round(globalDeliveryCharge * 100) / 100,
+            productDeliveryCharges: Math.round(productDeliveryCharges * 100) / 100,
             finalAmount: Math.round(finalAmount * 100) / 100,
             coupon,
             itemBreakdown: itemLevelBreakdown

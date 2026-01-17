@@ -118,9 +118,22 @@ export const CartItem = ({ item, updateQuantity, removeItem, isLoading, isCalcul
                             )}
 
                             {(item.delivery_charge ?? 0) > 0 ? (
-                                <div className="flex items-center gap-1.5 px-2 py-1 bg-orange-50 rounded-lg text-[10px] font-bold text-orange-700 border border-orange-100">
-                                    <Truck className="w-3.5 h-3.5" />
-                                    <span>₹{item.delivery_charge.toFixed(2)} Delivery</span>
+                                <div className="flex flex-col items-start gap-0.5 w-full">
+                                    <div className="flex items-center gap-1.5 font-bold">
+                                        <Truck className="w-3.5 h-3.5" />
+                                        <span>
+                                            ₹{(item.delivery_charge ?? 0).toFixed(2)} Delivery
+                                            {(item.delivery_gst ?? 0) > 0 && ` + ₹${(item.delivery_gst ?? 0).toFixed(2)} GST`}
+                                        </span>
+                                    </div>
+                                    {item.delivery_meta && (
+                                        <span className="text-[9px] text-orange-600/90 font-medium pl-5 tracking-wide">
+                                            {item.delivery_meta.calculation_type === 'PER_ITEM' && `(₹${item.delivery_meta.base_charge} / item)`}
+                                            {item.delivery_meta.calculation_type === 'FLAT_PER_ORDER' && `(Flat ₹${item.delivery_meta.base_charge} / order)`}
+                                            {item.delivery_meta.calculation_type === 'PER_PACKAGE' && `(₹${item.delivery_meta.base_charge} / package of ${item.delivery_meta.max_items_per_package})`}
+                                            {item.delivery_meta.calculation_type === 'WEIGHT_BASED' && `(Weight Based)`}
+                                        </span>
+                                    )}
                                 </div>
                             ) : isFreeDelivery && (
                                 <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 rounded-lg text-[10px] font-bold text-emerald-700 border border-emerald-100">
@@ -166,36 +179,36 @@ export const CartItem = ({ item, updateQuantity, removeItem, isLoading, isCalcul
                             </span>
                         )}
                     </div>
+                </div>
 
-                    <div className="flex items-center gap-1 bg-muted/30 p-1.5 rounded-xl border border-border/20 shadow-inner">
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className={cn(
-                                "h-8 w-8 rounded-lg transition-all duration-300",
-                                quantity === 1 ? "hover:bg-destructive/10 hover:text-destructive" : "hover:bg-background hover:shadow-md"
-                            )}
-                            onClick={() => {
-                                if (quantity > 1) updateQuantity(item.productId, quantity - 1, variantId);
-                                else removeItem(item.productId, variantId);
-                            }}
-                            disabled={isLoading}
-                        >
-                            {quantity === 1 ? <Trash2 className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />}
-                        </Button>
-                        <div className="w-8 text-center font-black text-base tabular-nums text-foreground/80">
-                            {quantity}
-                        </div>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 rounded-lg hover:bg-background hover:shadow-md transition-all duration-300"
-                            onClick={() => updateQuantity(item.productId, quantity + 1, variantId)}
-                            disabled={isLoading || quantity >= itemStock}
-                        >
-                            <Plus className="w-3.5 h-3.5" />
-                        </Button>
+                <div className="flex items-center gap-1 bg-muted/30 p-1.5 rounded-xl border border-border/20 shadow-inner">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                            "h-8 w-8 rounded-lg transition-all duration-300",
+                            quantity === 1 ? "hover:bg-destructive/10 hover:text-destructive" : "hover:bg-background hover:shadow-md"
+                        )}
+                        onClick={() => {
+                            if (quantity > 1) updateQuantity(item.productId, quantity - 1, variantId);
+                            else removeItem(item.productId, variantId);
+                        }}
+                        disabled={isLoading}
+                    >
+                        {quantity === 1 ? <Trash2 className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />}
+                    </Button>
+                    <div className="w-8 text-center font-black text-base tabular-nums text-foreground/80">
+                        {quantity}
                     </div>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-lg hover:bg-background hover:shadow-md transition-all duration-300"
+                        onClick={() => updateQuantity(item.productId, quantity + 1, variantId)}
+                        disabled={isLoading || quantity >= itemStock}
+                    >
+                        <Plus className="w-3.5 h-3.5" />
+                    </Button>
                 </div>
             </div>
         </div>

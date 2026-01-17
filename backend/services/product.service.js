@@ -38,7 +38,7 @@ class ProductService {
                 break;
             case 'newest':
             default:
-                query = query.order('createdAt', { ascending: false });
+                query = query.order('created_at', { ascending: false });
                 break;
         }
 
@@ -76,14 +76,36 @@ class ProductService {
             };
         }
 
-        // Get IDs of fetched products to optimize review fetching
+        // Get IDs of fetched products to optimize review and config fetching
         const productIds = products.map(p => p.id);
 
-        // Fetch reviews only for relevant products
-        const { data: relevantReviews, error: reviewError } = await supabase
-            .from('reviews')
-            .select('product_id, rating')
-            .in('product_id', productIds);
+        // Parallel fetch for Reviews and Delivery Configs
+        const [reviewsResult, configsResult] = await Promise.all([
+            supabase
+                .from('reviews')
+                .select('product_id, rating')
+                .in('product_id', productIds),
+            supabase
+                .from('delivery_configs')
+                .select('*')
+                .eq('scope', 'PRODUCT')
+                .eq('is_active', true)
+                .in('product_id', productIds)
+        ]);
+
+        const { data: relevantReviews, error: reviewError } = reviewsResult;
+        const { data: deliveryConfigs, error: configError } = configsResult;
+
+        // Map Delivery Configs
+        if (!configError && deliveryConfigs) {
+            const configMap = {};
+            deliveryConfigs.forEach(c => {
+                configMap[c.product_id] = c;
+            });
+            products.forEach(p => {
+                p.delivery_config = configMap[p.id] || null;
+            });
+        }
 
         if (!reviewError && relevantReviews && relevantReviews.length > 0) {
             const ratingsByProduct = {};
@@ -178,6 +200,28 @@ class ProductService {
             data.ratingCount = 0;
         }
 
+        // Fetch Delivery Configs (Product and Variant level)
+        const { data: deliveryConfigs, error: configError } = await supabase
+            .from('delivery_configs')
+            .select('*')
+            .eq('is_active', true)
+            .or(`product_id.eq.${id},variant_id.in.(${variants && variants.length > 0 ? variants.map(v => v.id).join(',') : '00000000-0000-0000-0000-000000000000'})`);
+
+        if (!configError && deliveryConfigs) {
+            // Attach product-level config
+            const productConfig = deliveryConfigs.find(c => c.scope === 'PRODUCT' && c.product_id === id);
+            data.delivery_config = productConfig || null;
+
+            // Attach variant-level configs to variants
+            if (data.variants && data.variants.length > 0) {
+                data.variants = data.variants.map(v => {
+                    const variantConfig = deliveryConfigs.find(c => c.scope === 'VARIANT' && c.variant_id === v.id);
+                    return { ...v, delivery_config: variantConfig || null };
+                });
+            }
+        }
+
+
         // Calculate isNew
         const createdDateStr = data.createdAt || data.created_at;
         const thirtyDaysAgo = new Date();
@@ -192,6 +236,14 @@ class ProductService {
      * @param {Object} productData - Product data including variant_mode
      */
     static async createProduct(productData) {
+        // Extract delivery config if present
+        let deliveryConfig = null;
+        if (productData.delivery_config) {
+            deliveryConfig = productData.delivery_config;
+            delete productData.delivery_config;
+        }
+
+        // Normalize Return Policy fields for database
         if (productData.isReturnable !== undefined) {
             productData.is_returnable = productData.isReturnable;
             delete productData.isReturnable;
@@ -200,9 +252,26 @@ class ProductService {
             productData.return_days = productData.returnDays;
             delete productData.returnDays;
         }
+        if (productData.isNew !== undefined) {
+            productData.is_new = productData.isNew;
+            delete productData.isNew;
+        }
+        if (productData.createdAt !== undefined) {
+            productData.created_at = productData.createdAt;
+            delete productData.createdAt;
+        }
+        if (productData.updatedAt !== undefined) {
+            productData.updated_at = productData.updatedAt;
+            delete productData.updatedAt;
+        }
+
+        // DEPRECATED: delivery_charge is no longer used directly on product
+        // We ensure it's removed from payload to avoid schema errors if column remains
         if (productData.deliveryCharge !== undefined) {
-            productData.delivery_charge = productData.deliveryCharge;
             delete productData.deliveryCharge;
+        }
+        if (productData.delivery_charge !== undefined) {
+            delete productData.delivery_charge;
         }
 
         const { data, error } = await supabase
@@ -212,6 +281,27 @@ class ProductService {
             .single();
 
         if (error) throw error;
+
+        // Handle Delivery Config Creation
+        if (deliveryConfig && data?.id) {
+            try {
+                const { error: configError } = await supabase
+                    .from('delivery_configs')
+                    .insert([{
+                        ...deliveryConfig,
+                        product_id: data.id,
+                        scope: 'PRODUCT',
+                        variant_id: null
+                    }]);
+
+                if (configError) {
+                    logger.error('Error creating delivery config for new product:', configError);
+                    // We don't throw here to avoid failing entire product creation, but logging is critical
+                }
+            } catch (err) {
+                logger.error('Exception creating delivery config:', err);
+            }
+        }
 
         // Note: Variants are created separately via ProductVariantService
         // We only trigger sync when variants are added/updated
@@ -223,6 +313,7 @@ class ProductService {
      * Update product
      */
     static async updateProduct(id, productData) {
+        // Normalize Return Policy fields for database
         if (productData.isReturnable !== undefined) {
             productData.is_returnable = productData.isReturnable;
             delete productData.isReturnable;
@@ -231,9 +322,25 @@ class ProductService {
             productData.return_days = productData.returnDays;
             delete productData.returnDays;
         }
+        if (productData.isNew !== undefined) {
+            productData.is_new = productData.isNew;
+            delete productData.isNew;
+        }
+        if (productData.createdAt !== undefined) {
+            productData.created_at = productData.createdAt;
+            delete productData.createdAt;
+        }
+        if (productData.updatedAt !== undefined) {
+            productData.updated_at = productData.updatedAt;
+            delete productData.updatedAt;
+        }
+
+        // DEPRECATED: delivery_charge is no longer used directly on product
         if (productData.deliveryCharge !== undefined) {
-            productData.delivery_charge = productData.deliveryCharge;
             delete productData.deliveryCharge;
+        }
+        if (productData.delivery_charge !== undefined) {
+            delete productData.delivery_charge;
         }
 
         const { data, error } = await supabase

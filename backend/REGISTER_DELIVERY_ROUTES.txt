@@ -1,7 +1,0 @@
-// Add this code snippet to your server.js file to register the delivery-configs routes
-
-// Import the routes (add this near the top with other route imports)
-const deliveryConfigsRoutes = require('./routes/delivery-configs.routes');
-
-// Register the routes (add this with other app.use() statements)
-app.use('/api/admin/delivery-configs', deliveryConfigsRoutes);

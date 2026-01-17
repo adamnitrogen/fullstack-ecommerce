@@ -399,15 +399,36 @@ async function createProductWithVariants(productData, variants) {
         }
     }
 
-    // Normalize delivery_charge
-    if (productData.deliveryCharge !== undefined) {
-        productData.delivery_charge = productData.deliveryCharge;
-        delete productData.deliveryCharge;
+    // Normalize product data fields for RPC
+    // We provide both versions to be compatible with old and new RPC definitions
+    const normalizedProduct = { ...productData };
+
+    if (normalizedProduct.isReturnable !== undefined) {
+        normalizedProduct.is_returnable = normalizedProduct.isReturnable;
+        delete normalizedProduct.isReturnable;
+    }
+    if (normalizedProduct.returnDays !== undefined) {
+        normalizedProduct.return_days = normalizedProduct.returnDays;
+        delete normalizedProduct.returnDays;
+    }
+    if (normalizedProduct.deliveryCharge !== undefined) {
+        delete normalizedProduct.deliveryCharge;
+    }
+    if (normalizedProduct.isNew !== undefined) {
+        normalizedProduct.is_new = normalizedProduct.isNew;
+        delete normalizedProduct.isNew;
+    }
+    if (normalizedProduct.createdAt !== undefined) {
+        normalizedProduct.created_at = normalizedProduct.createdAt;
+        delete normalizedProduct.createdAt;
+    }
+    if (normalizedProduct.updatedAt !== undefined) {
+        normalizedProduct.updated_at = normalizedProduct.updatedAt;
+        delete normalizedProduct.updatedAt;
     }
 
-
     const { data, error } = await supabase.rpc('create_product_with_variants', {
-        p_product_data: productData,
+        p_product_data: normalizedProduct,
         p_variants: variants
     });
 
@@ -529,15 +550,43 @@ async function updateProductWithVariants(productId, productData, variants) {
         log.info('UPDATE_PRODUCT_WITH_VARIANTS', `Calculated total inventory from ${variants.length} variants: ${totalStock}`);
     }
 
-    // Normalize delivery_charge
-    if (productData && productData.deliveryCharge !== undefined) {
-        productData.delivery_charge = productData.deliveryCharge;
-        delete productData.deliveryCharge;
+    // Normalize product data fields for RPC
+    // We provide both versions to be compatible with old and new RPC definitions
+    const normalizedProduct = { ...productData };
+
+    if (normalizedProduct.isReturnable !== undefined) {
+        normalizedProduct.is_returnable = normalizedProduct.isReturnable;
+        delete normalizedProduct.isReturnable;
     }
+    if (normalizedProduct.returnDays !== undefined) {
+        normalizedProduct.return_days = normalizedProduct.returnDays;
+        delete normalizedProduct.returnDays;
+    }
+    if (normalizedProduct.deliveryCharge !== undefined) {
+        delete normalizedProduct.deliveryCharge;
+    }
+    if (normalizedProduct.isNew !== undefined) {
+        normalizedProduct.is_new = normalizedProduct.isNew;
+        delete normalizedProduct.isNew;
+    }
+    if (normalizedProduct.createdAt !== undefined) {
+        normalizedProduct.created_at = normalizedProduct.createdAt;
+        delete normalizedProduct.createdAt;
+    }
+    if (normalizedProduct.updatedAt !== undefined) {
+        normalizedProduct.updated_at = normalizedProduct.updatedAt;
+        delete normalizedProduct.updatedAt;
+    }
+
+    log.debug('UPDATE_PRODUCT_WITH_VARIANTS', 'Payload for RPC:', {
+        productId,
+        is_returnable: normalizedProduct.is_returnable,
+        return_days: normalizedProduct.return_days
+    });
 
     const { data, error } = await supabase.rpc('update_product_with_variants', {
         p_product_id: productId,
-        p_product_data: productData,
+        p_product_data: normalizedProduct,
         p_variants: variants
     });
 

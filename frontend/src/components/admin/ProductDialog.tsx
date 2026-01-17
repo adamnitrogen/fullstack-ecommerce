@@ -1,5 +1,5 @@
 import { logger } from "@/lib/logger";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
@@ -20,15 +20,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ImageUpload } from "./ImageUpload";
 import { VariantFormSection } from "./VariantFormSection";
 import { DeliveryConfigForm } from "./DeliveryConfigForm";
-import type { Product, VariantFormData } from "@/types";
+import type { Product, VariantFormData, DeliveryConfig } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { X, Plus, Package, Loader2 } from "lucide-react";
+import { X, Plus, Package, Loader2, RotateCcw } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -40,7 +41,7 @@ interface ProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   product: Product | null;
-  onSave: (product: Omit<Partial<Product>, 'variants'> & { imageFiles?: (File | string)[], variants?: VariantFormData[] }) => void;
+  onSave: (product: Omit<Partial<Product>, 'variants' | 'delivery_config'> & { imageFiles?: (File | string)[], variants?: VariantFormData[], delivery_config?: Partial<DeliveryConfig> }) => void;
   isSaving?: boolean;
 }
 
@@ -81,8 +82,8 @@ export function ProductDialog({
     tags: [],
     inventory: 0,
     benefits: [],
-    isReturnable: true,
-    returnDays: 3,
+    isReturnable: false,
+    returnDays: 0,
     isNew: false,
     createdAt: new Date().toISOString(),
     variant_mode: 'UNIT',
@@ -97,6 +98,15 @@ export function ProductDialog({
   const [customTag, setCustomTag] = useState("");
   const [originalImages, setOriginalImages] = useState<string[]>([]);
   const [removedImages, setRemovedImages] = useState<string[]>([]);
+  const [deliveryConfig, setDeliveryConfig] = useState<Partial<DeliveryConfig>>({
+    calculation_type: "FLAT_PER_ORDER",
+    base_delivery_charge: 0,
+    gst_percentage: 18,
+    delivery_refund_policy: "NON_REFUNDABLE",
+    is_active: true, // Default to true for new products to encourage config
+  });
+
+  const prevDetailedProductRef = useRef<any>(null);
 
   // Fetch detailed product data when editing
   const { data: detailedProduct, isLoading: isLoadingProduct } = useQuery({
@@ -120,18 +130,39 @@ export function ProductDialog({
         setOriginalImages(originalImageUrls);
         setRemovedImages([]);
 
-        setFormData({
-          ...productData,
-          id: productData.id, // Ensure ID is explicitly kept
-          mrp: productData.mrp || productData.price,
-          isReturnable: (productData as any).is_returnable !== undefined ? (productData as any).is_returnable : (productData.isReturnable !== false),
-          returnDays: (productData as any).return_days || productData.returnDays || 3,
-          imageFiles: originalImageUrls,
-          default_hsn_code: productData.default_hsn_code || (productData as any).default_hsn_code || "",
-          default_gst_rate: productData.default_gst_rate ?? (productData as any).default_gst_rate ?? 0,
-          default_tax_applicable: (productData as any).default_tax_applicable !== undefined ? (productData as any).default_tax_applicable : (productData.default_tax_applicable !== false),
-          default_price_includes_tax: (productData as any).default_price_includes_tax !== undefined ? (productData as any).default_price_includes_tax : (productData.default_price_includes_tax !== false),
-        });
+        // Initialize form data only if we just switched products or opened the dialog
+        // This prevents overwriting user changes while they are typing if detailedProduct finishes loading later
+        const shouldInitialize = !formData.id || formData.id !== productData.id;
+        const shouldUpdateFromDetailed = detailedProduct && !prevDetailedProductRef.current;
+
+        if (shouldInitialize || shouldUpdateFromDetailed) {
+          // If updating from detailed, we prefer currently edited values for title/description if they aren't empty
+          // but we prioritize correctly loaded metadata like return policy
+          setFormData({
+            id: productData.id,
+            title: (shouldUpdateFromDetailed && formData.title) ? formData.title : (productData.title || ""),
+            description: (shouldUpdateFromDetailed && formData.description) ? formData.description : (productData.description || ""),
+            price: productData.price || 0,
+            mrp: productData.mrp || productData.price || 0,
+            category: productData.category || "Dairy",
+            tags: productData.tags || [],
+            inventory: productData.inventory || 0,
+            benefits: productData.benefits || [],
+            isReturnable: (productData as any).is_returnable === true || productData.isReturnable === true,
+            returnDays: (productData as any).return_days ?? productData.returnDays ?? 3,
+            isNew: productData.isNew ?? false,
+            createdAt: productData.createdAt || (productData as any).created_at || new Date().toISOString(),
+            variant_mode: productData.variant_mode || 'UNIT',
+            imageFiles: originalImageUrls,
+            default_hsn_code: productData.default_hsn_code || (productData as any).default_hsn_code || "",
+            default_gst_rate: productData.default_gst_rate ?? (productData as any).default_gst_rate ?? 0,
+            default_tax_applicable: (productData as any).default_tax_applicable ?? productData.default_tax_applicable ?? true,
+            default_price_includes_tax: (productData as any).default_price_includes_tax ?? productData.default_price_includes_tax ?? true,
+          });
+        }
+
+        // Update ref for the next render
+        prevDetailedProductRef.current = detailedProduct;
 
         // Initialize variants from product
         if (productData.variants && productData.variants.length > 0) {
@@ -169,8 +200,8 @@ export function ProductDialog({
           tags: [],
           inventory: 0,
           benefits: [],
-          isReturnable: true,
-          returnDays: 3,
+          isReturnable: false,
+          returnDays: 0,
           isNew: true,
           createdAt: new Date().toISOString(),
           variant_mode: 'UNIT',
@@ -198,15 +229,23 @@ export function ProductDialog({
         tags: [],
         inventory: 0,
         benefits: [],
-        isReturnable: true,
-        returnDays: 3,
+        isReturnable: false,
+        returnDays: 0,
         isNew: false,
         createdAt: new Date().toISOString(),
         variant_mode: 'UNIT',
         default_tax_applicable: true,
         default_price_includes_tax: true,
         default_gst_rate: 0,
+
         default_hsn_code: "",
+      });
+      setDeliveryConfig({
+        calculation_type: "FLAT_PER_ORDER",
+        base_delivery_charge: 0,
+        gst_percentage: 18,
+        delivery_refund_policy: "NON_REFUNDABLE",
+        is_active: true,
       });
       setBenefitInput("");
       setCustomTag("");
@@ -265,10 +304,13 @@ export function ProductDialog({
     }
 
     // Pass imageFiles and variants to parent
+    // Pass clean data to parent
+    const { images, ...cleanedFormData } = formData;
     onSave({
-      ...formData,
+      ...cleanedFormData,
       imageFiles: formData.imageFiles,
       variants,
+      delivery_config: deliveryConfig,
     });
   };
 
@@ -475,29 +517,7 @@ export function ProductDialog({
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="delivery_charge">
-                    Base Delivery Charge (₹)
-                  </Label>
-                  <Input
-                    id="delivery_charge"
-                    name="delivery_charge"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formData.delivery_charge ?? ''}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        delivery_charge: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    placeholder="e.g. 50"
-                  />
-                  <p className="text-[10px] text-muted-foreground">
-                    Per-unit delivery fee for this product (Default for all variants)
-                  </p>
-                </div>
+
               </div>
 
               {discountPercentage > 0 && (
@@ -625,17 +645,20 @@ export function ProductDialog({
               </div>
             </div>
 
-            {/* Delivery Configuration - Only available in Edit Mode */}
-            {product?.id && (
-              <div className="space-y-4 border rounded-lg p-4 bg-muted/10">
+            {/* Delivery Configuration */}
+            <div className="space-y-4 border rounded-lg p-4 bg-muted/10">
+              {product?.id ? (
+                // Edit Mode: Use standalone form that fetches/saves independently
                 <DeliveryConfigForm productId={product.id} />
-              </div>
-            )}
-            {!product?.id && (
-              <div className="p-4 border rounded-lg bg-muted/10 text-center text-sm text-muted-foreground">
-                <p>Save the product first to configure advanced delivery rules.</p>
-              </div>
-            )}
+              ) : (
+                // Create Mode: Use controlled form that updates local state
+                <DeliveryConfigForm
+                  productId=""
+                  value={deliveryConfig}
+                  onChange={setDeliveryConfig}
+                />
+              )}
+            </div>
 
             {/* Size Variants */}
             <Collapsible open={variantsOpen} onOpenChange={setVariantsOpen}>
@@ -882,68 +905,73 @@ export function ProductDialog({
             </div>
 
             {/* Return Policy */}
-            <div className="space-y-4 border rounded-lg p-4">
-              <h3 className="text-base font-semibold">Return Policy</h3>
+            <div className="space-y-4 border rounded-lg p-5 bg-muted/20">
+              <div className="flex items-center gap-2 mb-2">
+                <RotateCcw className="h-5 w-5 text-primary" />
+                <h3 className="text-base font-semibold">Return Policy</h3>
+              </div>
 
-              <div className="space-y-4">
-                <Label>Return Policy</Label>
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id="returnable"
-                      name="returnPolicy"
-                      checked={formData.isReturnable === true}
-                      onChange={() => setFormData({ ...formData, isReturnable: true, returnDays: formData.returnDays || 3 })}
-                      className="h-4 w-4 text-primary focus:ring-primary"
-                    />
-                    <Label htmlFor="returnable" className="font-normal cursor-pointer">
-                      Returnable
-                    </Label>
+              <div className="space-y-6">
+                <RadioGroup
+                  value={formData.isReturnable ? "returnable" : "non-returnable"}
+                  onValueChange={(value) => {
+                    const isReturnable = value === "returnable";
+                    setFormData({
+                      ...formData,
+                      isReturnable,
+                      returnDays: isReturnable ? (formData.returnDays || 3) : 0
+                    });
+                  }}
+                  className="grid gap-4"
+                >
+                  <div className="flex items-start space-x-3 space-y-0">
+                    <RadioGroupItem value="returnable" id="returnable" className="mt-1" />
+                    <div className="grid gap-1.5 leading-none">
+                      <Label htmlFor="returnable" className="font-semibold cursor-pointer text-sm">
+                        Returnable
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Customers can return the product within a specific window.
+                      </p>
+
+                      {formData.isReturnable && (
+                        <div className="mt-3 p-3 bg-background border rounded-md space-y-3 max-w-[200px]">
+                          <Label htmlFor="returnDays" className="text-xs font-medium">
+                            Return Window (Days)
+                          </Label>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              id="returnDays"
+                              name="returnDays"
+                              type="number"
+                              min="0"
+                              max="30"
+                              value={formData.returnDays?.toString()}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value);
+                                setFormData({ ...formData, returnDays: isNaN(val) ? 0 : val });
+                              }}
+                              className="h-8 w-20 text-center font-medium"
+                            />
+                            <span className="text-xs text-muted-foreground">Days</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  {formData.isReturnable && (
-                    <div className="ml-6 space-y-2">
-                      <Label htmlFor="returnDays" className="text-sm">
-                        Return Window (Days)
+                  <div className="flex items-start space-x-3 space-y-0">
+                    <RadioGroupItem value="non-returnable" id="non-returnable" className="mt-1" />
+                    <div className="grid gap-1.5 leading-none">
+                      <Label htmlFor="non-returnable" className="font-semibold cursor-pointer text-sm">
+                        Non-returnable
                       </Label>
-                      <Input
-                        id="returnDays"
-                        name="returnDays"
-                        type="number"
-                        min="1"
-                        max="30"
-                        value={formData.returnDays?.toString()}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setFormData({ ...formData, returnDays: parseInt(value) });
-                        }}
-                        placeholder="e.g., 3"
-                        className="w-32"
-                      />
                       <p className="text-xs text-muted-foreground">
-                        Number of days customers can return the product
+                        This product cannot be returned once delivered.
                       </p>
                     </div>
-                  )}
-
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id="non-returnable"
-                      name="returnPolicy"
-                      checked={formData.isReturnable === false}
-                      onChange={() => setFormData({ ...formData, isReturnable: false, returnDays: 0 })}
-                      className="h-4 w-4 text-primary focus:ring-primary"
-                    />
-                    <Label htmlFor="non-returnable" className="font-normal cursor-pointer">
-                      Non-returnable
-                    </Label>
                   </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Choose whether this product can be returned after purchase
-                </p>
+                </RadioGroup>
               </div>
             </div>
 

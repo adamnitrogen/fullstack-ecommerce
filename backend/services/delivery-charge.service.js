@@ -52,7 +52,7 @@ class DeliveryChargeService {
                     .eq('variant_id', variantId)
                     .single();
 
-                if (!variantError && variantConfig) {
+                if (!variantError && variantConfig && variantConfig.is_active !== false) {
                     log.debug('DELIVERY_CONFIG', 'Using variant-level config', { variantId });
                     return variantConfig;
                 }
@@ -66,7 +66,7 @@ class DeliveryChargeService {
                 .eq('product_id', productId)
                 .single();
 
-            if (!productError && productConfig) {
+            if (!productError && productConfig && productConfig.is_active !== false) {
                 log.debug('DELIVERY_CONFIG', 'Using product-level config', { productId });
                 return productConfig;
             }

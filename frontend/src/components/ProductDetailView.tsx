@@ -61,8 +61,7 @@ export const ProductDetailView = ({
     if (selectedVariant) return selectedVariant.stock_quantity;
     return product.inventory || 0;
   }, [selectedVariant, product.inventory]);
-  // Computed delivery charge
-  const deliveryCharge = product.delivery_charge || 0;
+
 
   // State for the currently displayed image
   const [displayImage, setDisplayImage] = useState<string>(
@@ -319,12 +318,7 @@ export const ProductDetailView = ({
                 {priceIncludesTax ? "Inclusive of all taxes" : "Price excludes taxes"}
               </p>
             )}
-            {deliveryCharge > 0 && (
-              <div className="flex items-center gap-2 text-[10px] text-[#B85C3C] font-semibold mt-1">
-                <Truck className="h-3 w-3" />
-                <span>₹{deliveryCharge} Delivery Charge applicable</span>
-              </div>
-            )}
+
           </div>
 
           {/* Stock status without number */}
@@ -364,6 +358,25 @@ export const ProductDetailView = ({
                   </div>
                   <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wide">
                     Non-refundable Delivery
+                  </span>
+                </div>
+              )}
+
+              {/* Dynamic Delivery Charge Info */}
+              {(selectedVariant?.delivery_config || product.delivery_config) && (
+                <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-500 mt-1">
+                  <div className="w-4 h-4 rounded-full bg-blue-100 flex items-center justify-center">
+                    <Truck className="h-2.5 w-2.5 text-blue-600" />
+                  </div>
+                  <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wide">
+                    {(() => {
+                      const config = selectedVariant?.delivery_config || product.delivery_config;
+                      if (!config) return '';
+                      if (config.calculation_type === 'PER_ITEM') return `Delivery: ₹${config.base_delivery_charge} / item`;
+                      if (config.calculation_type === 'FLAT_PER_ORDER') return `Delivery: ₹${config.base_delivery_charge} / order (Flat)`;
+                      if (config.calculation_type === 'PER_PACKAGE') return `Delivery: ₹${config.base_delivery_charge} / package`;
+                      return `Delivery: ₹${config.base_delivery_charge} (Weight Based)`;
+                    })()}
                   </span>
                 </div>
               )}

@@ -136,7 +136,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
         if (sessionError) {
-          logger.debug('[AuthStore] Supabase getSession error:', sessionError);
+          logger.warn('[AuthStore] Supabase getSession error:', sessionError.message);
+
+          const isRefreshError =
+            sessionError.message.includes('Invalid Refresh Token') ||
+            sessionError.message.includes('Refresh Token Not Found') ||
+            sessionError.message.includes('not found');
+
+          if (isRefreshError) {
+            logger.warn('[AuthStore] Detected invalid refresh token, forcing logout cleanup');
+            await get().logout();
+            set({ isInitializing: false, isInitialized: true });
+            return;
+          }
         }
 
         if (session?.user) {

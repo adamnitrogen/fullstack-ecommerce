@@ -15,6 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { Loader2, Lock, ShieldCheck, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
+import { loadRazorpay } from "@/lib/razorpay";
 import type { CheckoutSummary, CheckoutAddress, Product } from "@/types";
 import { getErrorMessage } from "@/lib/errorUtils";
 import {
@@ -169,6 +170,14 @@ export default function Checkout() {
 
     try {
       setProcessing(true);
+
+      // Load Razorpay SDK first
+      const isLoaded = await loadRazorpay();
+      if (!isLoaded) {
+        toast.error("Failed to load payment gateway. Please check your connection.");
+        setProcessing(false);
+        return;
+      }
 
       // Pre-payment stock validation (different endpoints for buy now vs cart)
       let stockValidation;
@@ -410,7 +419,8 @@ export default function Checkout() {
                   <OrderSummary items={summary.cart.cart_items.map((item) => ({
                     ...item,
                     productId: item.product_id,
-                    product: item.products
+                    product: item.products,
+                    variant: item.product_variants
                   }))} />
 
                   <Separator className="bg-border/60 my-2" />
