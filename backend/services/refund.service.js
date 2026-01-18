@@ -217,13 +217,18 @@ class RefundService {
                     .eq('id', order.id);
 
                 // Log Timeline
-                await require('./order.service').logStatusHistory(
-                    order.id,
-                    'refund_initiated',
-                    initiatedBy === 'USER' ? order.user_id : (initiatedBy === 'ADMIN' ? 'ADMIN' : 'SYSTEM'),
-                    `Refund initiated for ₹${calculation.amount}. Reason: ${reason}`,
-                    initiatedBy
-                );
+                try {
+                    const { logStatusHistory } = require('./history.service');
+                    await logStatusHistory(
+                        order.id,
+                        'refund_initiated',
+                        initiatedBy === 'USER' ? order.user_id : (initiatedBy === 'ADMIN' ? 'ADMIN' : 'SYSTEM'),
+                        `Refund initiated for ₹${calculation.amount}. Reason: ${reason}`,
+                        initiatedBy
+                    );
+                } catch (histError) {
+                    logger.warn(`[RefundService] Failed to log history: ${histError.message}`);
+                }
             }
 
             await supabase

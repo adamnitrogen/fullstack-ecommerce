@@ -586,21 +586,72 @@ const createOrder = async (userId, checkoutData, cart) => {
     // This allows including the invoice link in the confirmation email
     if (order.status === 'confirmed' || checkoutData.payment_status === 'paid') {
         try {
-            const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
-            logger.info({ orderId: order.id }, '[Checkout] Generating immediate Razorpay Payment Receipt');
-            // This is now purely for Payment Receipt, not the legal Tax Invoice
-            const result = await InvoiceOrchestrator.generateRazorpayInvoice(order);
+            // OPTIMIZATION: If we already have an invoice ID from the checkout flow (Invoice A),
+            // reuse it instead of creating a new one (Invoice B) which would be unpaid.
+            if (checkoutData.invoice_id) {
+                logger.info({ orderId: order.id, invoiceId: checkoutData.invoice_id }, '[Checkout] Linking existing Razorpay Invoice (Receipt)');
 
-            if (result.success && result.invoiceUrl) {
-                order.invoiceUrl = result.invoiceUrl;
-                // Also update the local order object to reflect invoice status if we were returning it
-                order.invoice_id = result.invoiceId;
-                order.invoice_status = 'generated';
+                // Fetch the existing invoice to get the URL
+                const { RazorpayInvoiceService } = require('./razorpay-invoice.service'); // Ensure this service exports what we need
+                // Actually, checkout.service.js doesn't import RazorpayInvoiceService directly yet, but InvoiceOrchestrator uses it.
+                // Or we can just use the razorpay instance directly since we are in checkout service.
+                const inv = await razorpay.invoices.fetch(checkoutData.invoice_id);
+
+                if (inv && inv.short_url) {
+                    order.invoiceUrl = inv.short_url;
+                    order.invoice_id = checkoutData.invoice_id; // Set internally for response
+
+                    // Update Order with this invoice
+                    await supabase.from('orders').update({
+                        invoice_url: inv.short_url,
+                        invoice_id: inv.id, // Store the Razorpay Invoice ID as the "invoice_id" (conceptually)
+                        invoice_status: inv.status
+                    }).eq('id', order.id);
+
+                    // Also ensure we insert into 'invoices' table to keep Orchestrator happy/consistent?
+                    // InvoiceOrchestrator.generateRazorpayInvoice inserts into 'invoices'.
+                    // We should probably do the same for consistency.
+                    await supabase.from('invoices').insert({
+                        order_id: order.id,
+                        type: 'RAZORPAY',
+                        invoice_number: inv.invoice_number,
+                        provider_id: inv.id,
+                        public_url: inv.short_url,
+                        status: inv.status
+                    });
+                }
+            } else {
+                // Fallback: Create new invoice if one doesn't exist (e.g. Buy Now might not have created one? Or legacy flow?)
+                // Actually Buy Now uses createRazorpayInvoice too, so it should have one.
+                const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
+                logger.info({ orderId: order.id }, '[Checkout] Generating immediate Razorpay Payment Receipt');
+                // This is now purely for Payment Receipt, not the legal Tax Invoice
+                const result = await InvoiceOrchestrator.generateRazorpayInvoice(order);
+
+                if (result.success && result.invoiceUrl) {
+                    order.invoiceUrl = result.invoiceUrl;
+                    // Also update the local order object to reflect invoice status if we were returning it
+                    order.invoice_id = result.invoiceId;
+                    order.invoice_status = 'generated';
+                }
             }
         } catch (invError) {
-            logger.warn({ err: invError, orderId: order.id }, '[Checkout] Failed to generate immediate invoice');
+            logger.warn({ err: invError, orderId: order.id }, '[Checkout] Failed to link/generate immediate invoice');
             // Continue - do not block the order response
         }
+    }
+
+    // Log initial payment verification (PAYMENT_SUCCESS)
+    // NOTE: 'ORDER_PLACED' is handled by the creation RPC or system trigger, so we avoid duplicating it here.
+    try {
+        const { logStatusHistory } = require('./history.service');
+
+        if (checkoutData.payment_status === 'paid') {
+            await logStatusHistory(order.id, 'PAYMENT_SUCCESS', userId, `Payment verified (ID: ${razorpay_payment_id || payment_id || 'N/A'})`, 'SYSTEM');
+            // User requested that orders NOT be auto-confirmed by system. Leaving status as 'pending'.
+        }
+    } catch (histError) {
+        log.warn({ err: histError, orderId: order.id }, '[Checkout] Failed to log payment status history');
     }
 
     // Send Order Confirmation Email (non-transactional, OK to fail)
@@ -1052,14 +1103,18 @@ async function processPaymentAndOrder(userId, {
                 billing_address_id,
                 payment_id,
                 notes,
-                payment_status: 'paid'
+                payment_status: 'paid',
+                // Pass invoice_id if available on payment record to prevent duplicate invoices
+                invoice_id: (payment_id && !isMockPayment) ?
+                    (await supabase.from('payments').select('invoice_id').eq('id', payment_id).single()).data?.invoice_id
+                    : null
             },
             cart
         );
 
         // Log functionality for Timeline (Fix for missing history)
-        const { logStatusHistory } = require('./order.service');
-        await logStatusHistory(order.id, 'pending', userId, 'Order placed successfully');
+        const { logStatusHistory } = require('./history.service');
+        // User requested that orders NOT be auto-confirmed by system. Leaving status as 'pending'.
 
         // --- DB SUCCESS ---
         // Payment was already captured, so we don't need to do anything else.
@@ -1385,34 +1440,77 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
         const order = rpcResult;
 
         // Log functionality for Timeline (Fix for missing history)
-        const { logStatusHistory } = require('./order.service');
-        await logStatusHistory(order.id, 'pending', userId, 'Order placed successfully');
+        const { logStatusHistory } = require('./history.service');
+        // User requested that orders NOT be auto-confirmed by system. Leaving status as 'pending'.
 
         log.info('BUY_NOW_SUCCESS', 'Buy Now order created successfully', { orderId: order?.id });
 
         // Generate Invoice immediately after successful RPC (since payment is already verified/paid)
         try {
-            const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
-            log.info({ orderId: order.id }, 'Generating immediate Razorpay Payment Receipt for Buy Now');
-            const result = await InvoiceOrchestrator.generateRazorpayInvoice({
-                ...order,
-                customer_name: profile.name,
-                customer_email: profile.email,
-                customer_phone: profile.phone || shippingAddr?.phone,
-                items: orderItems,
-                shippingAddress: shippingAddr,
-                billingAddress: billingAddr,
-                subtotal,
-                delivery_charge: deliveryCharge,
-                delivery_gst: deliveryGST,
-                coupon_discount: 0
-            });
+            // OPTIMIZATION: Check for existing invoice linked to payment to avoid duplicates
+            let existingInvoiceId = null;
+            if (payment_id) {
+                const { data: payRecord } = await supabase.from('payments').select('invoice_id').eq('id', payment_id).single();
+                existingInvoiceId = payRecord?.invoice_id;
+            }
 
-            if (result.success && result.invoiceUrl) {
-                order.invoiceUrl = result.invoiceUrl;
+            if (existingInvoiceId) {
+                log.info({ orderId: order.id, invoiceId: existingInvoiceId }, 'Linking existing Razorpay Invoice (Receipt) for Buy Now');
+                const inv = await razorpay.invoices.fetch(existingInvoiceId);
+
+                if (inv && inv.short_url) {
+                    order.invoiceUrl = inv.short_url;
+
+                    await supabase.from('orders').update({
+                        invoice_url: inv.short_url,
+                        invoice_id: inv.id,
+                        invoice_status: inv.status
+                    }).eq('id', order.id);
+
+                    await supabase.from('invoices').insert({
+                        order_id: order.id,
+                        type: 'RAZORPAY',
+                        invoice_number: inv.invoice_number,
+                        provider_id: inv.id,
+                        public_url: inv.short_url,
+                        status: inv.status
+                    });
+                }
+            } else {
+                const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
+                log.info({ orderId: order.id }, 'Generating immediate Razorpay Payment Receipt for Buy Now');
+                const result = await InvoiceOrchestrator.generateRazorpayInvoice({
+                    ...order,
+                    customer_name: profile.name,
+                    customer_email: profile.email,
+                    customer_phone: profile.phone || shippingAddr?.phone,
+                    items: orderItems,
+                    shippingAddress: shippingAddr,
+                    billingAddress: billingAddr,
+                    subtotal,
+                    delivery_charge: deliveryCharge,
+                    delivery_gst: deliveryGST,
+                    coupon_discount: 0
+                });
+
+                if (result.success && result.invoiceUrl) {
+                    order.invoiceUrl = result.invoiceUrl;
+                }
             }
         } catch (invError) {
-            log.warn('BUY_NOW_INVOICE_ERROR', 'Failed to generate immediate invoice', { error: invError.message });
+            log.warn('BUY_NOW_INVOICE_ERROR', 'Failed to link/generate immediate invoice', { error: invError.message });
+        }
+
+        // Log initial timeline event for Buy Now
+        try {
+            const { logStatusHistory } = require('./history.service');
+            // Duplicate 'ORDER_PLACED' check removed as per user feedback
+
+            // Buy Now is always paid immediately
+            await logStatusHistory(order.id, 'PAYMENT_SUCCESS', userId, `Payment verified (ID: ${razorpay_payment_id || paymentData.payment_id || 'N/A'})`, 'SYSTEM');
+            // Auto-confirm removed as per business rule
+        } catch (histError) {
+            log.warn({ err: histError, orderId: order.id }, '[Checkout] Failed to log Buy Now status history');
         }
 
         // Send confirmation email
