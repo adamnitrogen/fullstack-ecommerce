@@ -123,7 +123,7 @@ export function DeliveryConfigForm({ productId, variantId = null, value, onChang
                             </p>
                         </div>
                         <Switch
-                            checked={formData.is_active}
+                            checked={formData.is_active ?? true}
                             onCheckedChange={(checked) => updateData({ ...formData, is_active: checked })}
                         />
                     </div>
@@ -135,7 +135,7 @@ export function DeliveryConfigForm({ productId, variantId = null, value, onChang
                             <div className="space-y-2">
                                 <Label>Calculation Method</Label>
                                 <Select
-                                    value={formData.calculation_type}
+                                    value={formData.calculation_type || "PER_ITEM"}
                                     onValueChange={(val: any) => updateData({ ...formData, calculation_type: val })}
                                 >
                                     <SelectTrigger>
@@ -161,7 +161,7 @@ export function DeliveryConfigForm({ productId, variantId = null, value, onChang
                                         type="number"
                                         min="1"
                                         step="1"
-                                        value={formData.max_items_per_package}
+                                        value={formData.max_items_per_package ?? 3}
                                         onChange={(e) => updateData({ ...formData, max_items_per_package: parseInt(e.target.value) || 1 })}
                                     />
                                     <p className="text-[10px] text-muted-foreground">
@@ -177,7 +177,7 @@ export function DeliveryConfigForm({ productId, variantId = null, value, onChang
                                     type="number"
                                     min="0"
                                     step="0.01"
-                                    value={formData.base_delivery_charge}
+                                    value={formData.base_delivery_charge ?? 0}
                                     onChange={(e) => updateData({ ...formData, base_delivery_charge: parseFloat(e.target.value) || 0 })}
                                 />
                             </div>
@@ -186,7 +186,7 @@ export function DeliveryConfigForm({ productId, variantId = null, value, onChang
                             <div className="space-y-2">
                                 <Label>GST Rate (%)</Label>
                                 <Select
-                                    value={formData.gst_percentage?.toString()}
+                                    value={formData.gst_percentage?.toString() ?? "0"}
                                     onValueChange={(val) => updateData({ ...formData, gst_percentage: parseFloat(val) })}
                                 >
                                     <SelectTrigger>
@@ -209,7 +209,7 @@ export function DeliveryConfigForm({ productId, variantId = null, value, onChang
                             <div className="space-y-2">
                                 <Label>Refund Policy</Label>
                                 <Select
-                                    value={formData.delivery_refund_policy}
+                                    value={formData.delivery_refund_policy || "NON_REFUNDABLE"}
                                     onValueChange={(val: any) => updateData({ ...formData, delivery_refund_policy: val })}
                                 >
                                     <SelectTrigger>

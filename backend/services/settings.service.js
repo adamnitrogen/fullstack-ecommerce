@@ -31,7 +31,7 @@ async function getDeliverySettings() {
         const result = {
             delivery_threshold: settings.delivery_threshold ?? 1500,
             delivery_charge: settings.delivery_charge ?? 50,
-            delivery_gst: settings.delivery_gst ?? 0 // Default to 0% GST if not set
+            delivery_gst: settings.delivery_gst ?? 18 // Default to 18% GST if not set, matching system defaults
         };
 
 

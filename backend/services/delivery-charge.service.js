@@ -279,8 +279,44 @@ class DeliveryChargeService {
                         });
                     }
                 } else {
-                    // Product Specific Surcharge: Always additive
-                    const result = await this.calculateDeliveryCharge(productId, variantId, quantity, isFreeDelivery);
+                    // Product Specific Config
+                    // CHECK: Is this a Surcharge (Addition) or Override (Replacement)?
+                    // Heuristic: FLAT_PER_ORDER is usually an override. 
+                    // PER_ITEM, PER_PACKAGE, WEIGHT_BASED are usually surcharges on top of standard delivery.
+
+                    // User Feedback: All product charges should be ADDITIVE.
+                    const isSurcharge = true;
+
+                    if (isSurcharge && !globalChargeApplied) {
+                        // If it's a surcharge, we MUST ensure the global base charge is applied AT LEAST ONCE for the cart
+                        // We calculate the global charge "virtually" and add it to the totals, 
+                        // effectively attributing the base charge to this item for accounting.
+
+                        // Fetch global defaults essentially by calling with nulls
+                        const globalResult = await this.calculateDeliveryCharge(null, null, 1, isFreeDelivery);
+                        totalDeliveryCharge += globalResult.deliveryCharge;
+                        totalDeliveryGST += globalResult.deliveryGST;
+                        globalChargeApplied = true;
+
+                        // PUSH VIRTUAL ITEM FOR BREAKDOWN UI
+                        itemDeliveries.push({
+                            product_id: 'GLOBAL_CHARGE',
+                            variant_id: null,
+                            quantity: 1,
+                            deliveryCharge: globalResult.deliveryCharge,
+                            deliveryGST: globalResult.deliveryGST,
+                            totalDelivery: globalResult.totalDelivery,
+                            snapshot: globalResult.snapshot
+                        });
+
+                        log.debug('APPLY_GLOBAL_BASE', 'Applied global base charge due to surcharge item', { productId });
+                    }
+
+                    // Product Specific Charge (The Surcharge itself)
+                    // Note: Surcharges shouldn't be free just because order > threshold? 
+                    // Assuming surcharge is always paid unless specific logic exists.
+                    const result = await this.calculateDeliveryCharge(productId, variantId, quantity, false);
+
                     totalDeliveryCharge += result.deliveryCharge;
                     totalDeliveryGST += result.deliveryGST;
 

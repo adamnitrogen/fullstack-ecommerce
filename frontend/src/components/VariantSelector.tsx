@@ -115,12 +115,7 @@ export function VariantSelector({
                                 {variant.size_label}
                             </span>
 
-                            {/* Description (for Size variants) */}
-                            {variant.description && (
-                                <span className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1 max-w-[100px]">
-                                    {variant.description}
-                                </span>
-                            )}
+
 
                             {/* Price */}
                             <span

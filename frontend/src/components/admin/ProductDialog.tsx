@@ -172,6 +172,7 @@ export function ProductDialog({
             size_label: v.size_label,
             size_value: v.size_value,
             unit: v.unit,
+            description: v.description || "",
             mrp: v.mrp,
             selling_price: v.selling_price,
             stock_quantity: v.stock_quantity,

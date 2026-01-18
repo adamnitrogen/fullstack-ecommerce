@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { VariantFormData, VariantUnit } from "@/types";
 
@@ -391,7 +392,19 @@ export function VariantFormSection({
                                                     </Select>
                                                 </div>
 
-                                                {/* Common fields continue below... but need to wrap? */}
+                                                {/* Description Field for UNIT Mode */}
+                                                <div className="space-y-1 md:col-span-2">
+                                                    <Label htmlFor={`variant-desc-${index}`} className="text-xs">
+                                                        Description
+                                                    </Label>
+                                                    <Textarea
+                                                        id={`variant-desc-${index}`}
+                                                        value={variant.description || ''}
+                                                        onChange={(e) => handleVariantChange(index, "description" as keyof VariantFormData, e.target.value)}
+                                                        placeholder="• Feature 1&#10;• Feature 2"
+                                                        className="min-h-[60px] py-2 resize-y leading-snug"
+                                                    />
+                                                </div>
                                             </div>
                                         </>
                                     ) : (
@@ -424,14 +437,14 @@ export function VariantFormSection({
                                             </div>
                                             <div className="space-y-1">
                                                 <Label htmlFor={`variant-desc-${index}`} className="text-xs">
-                                                    Description (e.g. Dimensions, Items count)
+                                                    Description (Bullet points supported)
                                                 </Label>
-                                                <Input
+                                                <Textarea
                                                     id={`variant-desc-${index}`}
                                                     value={variant.description || ''}
                                                     onChange={(e) => handleVariantChange(index, "description" as keyof VariantFormData, e.target.value)}
-                                                    placeholder="e.g. Pack of 5 items"
-                                                    className="h-9"
+                                                    placeholder="• Feature 1&#10;• Feature 2"
+                                                    className="min-h-[60px]"
                                                 />
                                             </div>
                                         </div>

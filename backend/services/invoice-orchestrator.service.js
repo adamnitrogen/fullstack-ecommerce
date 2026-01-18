@@ -105,7 +105,7 @@ class InvoiceOrchestrator {
                     // We might need an endpoint to serve this file, e.g. /api/invoices/:id/download
                     // So we don't put a direct URL here yet unless we have a public storage bucket.
                     // For local file, we construct a backend route URL.
-                    invoice_url: `/api/invoices/${result.invoiceId}/download`
+                    invoice_url: result.publicUrl || `/api/invoices/${result.invoiceId}/download`
                 }).eq('id', orderId);
 
                 // Send Email

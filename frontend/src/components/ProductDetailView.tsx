@@ -417,7 +417,7 @@ export const ProductDetailView = ({
                 <h3 className="text-xs font-black uppercase tracking-widest text-[#2C1810]">
                   {product.variant_mode === 'SIZE' ? `${selectedVariant.size_label} Size Details` : 'Variant Details'}
                 </h3>
-                <p className="text-sm text-muted-foreground leading-relaxed font-light">
+                <p className="text-sm text-muted-foreground leading-relaxed font-light whitespace-pre-line">
                   {selectedVariant.description}
                 </p>
               </div>

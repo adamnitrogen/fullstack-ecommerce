@@ -46,10 +46,13 @@ class InternalInvoiceService {
             // 4. Generate PDF
             const pdfBuffer = await this._generatePdf(templateData);
 
-            // 5. Save to Disk
+            // 5. Upload to Supabase Storage (and save local backup)
             const filename = `${invoiceNumber}.pdf`;
             const filePath = path.join(STORAGE_DIR, filename);
             fs.writeFileSync(filePath, pdfBuffer);
+
+            // Upload to Storage
+            const publicUrl = await this._uploadToStorage(filename, pdfBuffer);
 
             // 6. Persist Metadata in DB
             const expiryDate = new Date();
@@ -61,8 +64,8 @@ class InternalInvoiceService {
                     order_id: order.id,
                     type: isGstInvoice ? 'TAX_INVOICE' : 'BILL_OF_SUPPLY',
                     invoice_number: invoiceNumber,
-                    file_path: filePath,
-                    public_url: null, // Local file for now, served via API endpoint
+                    file_path: filePath, // Keep local ref for now
+                    public_url: publicUrl, // Store public URL
                     status: 'GENERATED',
                     generated_at: new Date().toISOString(),
                     expires_at: expiryDate.toISOString()
@@ -81,7 +84,8 @@ class InternalInvoiceService {
                 success: true,
                 invoiceId: invoiceRecord.id,
                 filePath,
-                invoiceNumber
+                invoiceNumber,
+                publicUrl: invoiceRecord.public_url
             };
 
         } catch (error) {
@@ -236,7 +240,185 @@ class InternalInvoiceService {
         };
     }
 
-    // ... _generatePdf remains same ...
+    /**
+     * Generate PDF Buffer using Puppeteer
+     */
+    static async _generatePdf(data) {
+        const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox'] });
+        try {
+            const page = await browser.newPage();
+
+            // Compile Template
+            const templateHtml = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+            <style>
+              body { font-family: Helvetica, sans-serif; padding: 40px; color: #333; }
+              .header { display: flex; justify-content: space-between; margin-bottom: 40px; border-bottom: 2px solid #eee; padding-bottom: 20px; }
+              .company-info h3 { margin: 0 0 5px 0; font-size: 20px; color: #000; }
+              .company-info p { margin: 0; font-size: 12px; color: #555; }
+              .invoice-title { font-size: 24px; font-weight: bold; text-align: right; color: #444; }
+              .invoice-details { text-align: right; font-size: 13px; margin-top: 10px; }
+              .invoice-details p { margin: 2px 0; }
+              
+              .bill-to { margin-bottom: 30px; }
+              .bill-to h4 { margin: 0 0 5px 0; font-size: 14px; text-transform: uppercase; color: #666; }
+              .bill-to p { margin: 0; font-size: 14px; }
+
+              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+              th { background-color: #f8f9fa; border-bottom: 2px solid #ddd; padding: 10px; text-align: left; font-size: 12px; font-weight: bold; text-transform: uppercase; color: #555; }
+              td { border-bottom: 1px solid #eee; padding: 10px; text-align: left; font-size: 13px; }
+              td.right { text-align: right; }
+              th.right { text-align: right; }
+              
+              .totals { margin-top: 30px; float: right; width: 40%; }
+              .totals-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; }
+              .grand-total { font-weight: bold; font-size: 16px; border-top: 2px solid #333; border-bottom: 2px solid #333; padding: 10px 0; margin-top: 10px; }
+              
+              .footer { margin-top: 50px; text-align: center; font-size: 10px; color: #777; border-top: 1px solid #eee; padding-top: 20px; }
+            </style>
+            </head>
+            <body>
+              <div class="header">
+                <div class="company-info">
+                    <h3>{{seller.name}}</h3>
+                    <p>{{seller.address.line1}}</p>
+                    <p>{{seller.address.city}}, {{seller.address.state}} - {{seller.address.zip}}</p>
+                    <p><strong>GSTIN:</strong> {{seller.gstin}}</p>
+                </div>
+                <div>
+                    <div class="invoice-title">{{title}}</div>
+                    <div class="invoice-details">
+                        <p><strong>Invoice No:</strong> {{invoiceNumber}}</p>
+                        <p><strong>Date:</strong> {{invoiceDate}}</p>
+                        <p><strong>Place of Supply:</strong> {{placeOfSupply}}</p>
+                    </div>
+                </div>
+              </div>
+
+              <div class="bill-to">
+                  <h4>Bill To</h4>
+                  <p><strong>{{customer.name}}</strong></p>
+                  {{#if customer.shipping_address}}
+                  <p>{{customer.shipping_address.address_line1}}, {{customer.shipping_address.city}}</p>
+                  <p>{{customer.shipping_address.state}} - {{customer.shipping_address.pincode}}</p>
+                  {{/if}}
+                  {{#if customer.gstin}}
+                  <p><strong>GSTIN:</strong> {{customer.gstin}}</p>
+                  {{/if}}
+              </div>
+
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width: 5%">#</th>
+                    <th style="width: 35%">Item</th>
+                    <th style="width: 10%">HSN</th>
+                    <th style="width: 5%">Qty</th>
+                    <th class="right" style="width: 10%">Rate</th>
+                    <th class="right" style="width: 15%">Taxable</th>
+                    {{#if isInterState}}
+                    <th class="right" style="width: 10%">IGST</th>
+                    {{else}}
+                    <th class="right" style="width: 10%">CGST%</th>
+                    <th class="right" style="width: 10%">SGST%</th>
+                    {{/if}}
+                    <th class="right" style="width: 10%">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {{#each items}}
+                  <tr>
+                    <td>{{index}}</td>
+                    <td>{{name}} {{#if variant}}<br><small class="text-muted">({{variant}})</small>{{/if}}</td>
+                    <td>{{hsn_code}}</td>
+                    <td>{{quantity}}</td>
+                    <td class="right">{{rate}}</td>
+                    <td class="right">{{taxableValue}}</td>
+                    {{#if ../isInterState}}
+                    <td class="right">{{igstAmount}}</td>
+                    {{else}}
+                    <td class="right">{{cgstAmount}}</td>
+                    <td class="right">{{sgstAmount}}</td>
+                    {{/if}}
+                    <td class="right">{{totalAmount}}</td>
+                  </tr>
+                  {{/each}}
+                </tbody>
+              </table>
+
+              <div class="totals">
+                  <div class="totals-row"><span>Taxable Amount:</span> <span>{{summary.taxableAmount}}</span></div>
+                  {{#if isInterState}}
+                  <div class="totals-row"><span>Total IGST:</span> <span>{{summary.totalIgst}}</span></div>
+                  {{else}}
+                  <div class="totals-row"><span>Total CGST:</span> <span>{{summary.totalCgst}}</span></div>
+                  <div class="totals-row"><span>Total SGST:</span> <span>{{summary.totalSgst}}</span></div>
+                  {{/if}}
+                  {{#if summary.deliveryCharge}}
+                  <div class="totals-row"><span>Delivery Charges:</span> <span>{{summary.deliveryCharge}}</span></div>
+                  {{/if}}
+                  <div class="totals-row grand-total"><span>Grand Total:</span> <span>₹{{summary.grandTotal}}</span></div>
+                  <div style="font-size: 12px; margin-top: 5px; text-align: right;">Amount in words:<br><strong>{{amountInWords}}</strong></div>
+              </div>
+              
+              <div style="clear: both;"></div>
+              
+              <div class="footer">
+                  <p>This is a computer generated invoice and does not require a signature.</p>
+              </div>
+            </body>
+            </html>
+            `;
+
+            const template = handlebars.compile(templateHtml);
+            const html = template(data);
+
+            await page.setContent(html, { waitUntil: 'networkidle0' });
+            const pdf = await page.pdf({ format: 'A4', printBackground: true });
+
+            return pdf;
+        } finally {
+            await browser.close();
+        }
+    }
+
+    /**
+     * Upload File to Supabase Storage
+     */
+    static async _uploadToStorage(filename, fileBuffer) {
+        try {
+            const bucketName = 'invoices';
+
+            // 1. Upload
+            const { error: uploadError } = await supabase.storage
+                .from(bucketName)
+                .upload(filename, fileBuffer, {
+                    contentType: 'application/pdf',
+                    upsert: true
+                });
+
+            if (uploadError) {
+                // If bucket doesn't exist, try creating it?
+                // Note: Client creation of buckets requires specific permissions. 
+                // Better to log error and fallback.
+                throw uploadError;
+            }
+
+            // 2. Get Public URL
+            const { data } = supabase.storage
+                .from(bucketName)
+                .getPublicUrl(filename);
+
+            return data.publicUrl;
+
+        } catch (error) {
+            log.error('UPLOAD_STORAGE_FAIL', error);
+            return null; // Fallback to local
+        }
+    }
+
 
     static _amountToWords(amount) {
         // Basic Indian Number System to Words
