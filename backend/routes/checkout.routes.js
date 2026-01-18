@@ -186,34 +186,9 @@ router.post('/create-payment-order', validate(createPaymentOrderSchema), request
             return razorpayItem;
         });
 
-        // Add Discount as negative line item? No, Razorpay API handles discounts differently via discount_amount?
-        // Or we just rely on the fact that line items should sum up to total?
-        // Razorpay Invoices calculate total from line items.
-        // Wait. `totals.finalAmount` includes discounts.
-        // If we send line items, Razorpay calcualtes the total.
-        // If we have coupons, the "Price" of the line items might need to be adjusted OR we add a discount line item (negative amount allowed?).
-        // Razorpay Items have fixed amounts (the synced price).
-        // If we use `item_id`, the price is fixed to what's in the catalog.
-        // If our Cart has a Coupon applied, the user pays LESS than the sum of items.
-        // HOW DO WE HANDLE DISCOUNTS with synced Items?
-        // Option A: Add a "Discount" line item with negative value (if Razorpay supports it).
-        // Option B: Don't use `item_id` if price differs? No, that defeats the purpose of GST sync (tax rate).
-        // Option C: Razorpay Invoice API has `discount` param?
-        // Let's assume we pass a negative line item for "Coupon Discount".
-        // Checking Razorpay docs... "You can add a discount line item with a negative amount".
-
-        if (totals.couponDiscount > 0) {
-            lineItems.push({
-                name: 'Coupon Discount',
-                amount: -Math.round(totals.couponDiscount * 100),
-                currency: 'INR',
-                quantity: 1
-            });
-        }
-
         // 5. Create Razorpay Invoice
-        // We pass the Profile details and Line Items
-        const razorpayResponse = await createRazorpayInvoice(amount, receipt, profile, lineItems);
+        // We pass the Profile details, Line Items and Totals for transparency/discount
+        const razorpayResponse = await createRazorpayInvoice(amount, receipt, profile, lineItems, totals);
 
         // 6. Create Payment Record
         const payment = await createPaymentRecord({

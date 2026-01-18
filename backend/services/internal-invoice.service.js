@@ -135,57 +135,21 @@ class InternalInvoiceService {
             }
         } catch (e) { log.warn('Failed to load logo', e); }
 
-        // Process Items
+        // Initialize Totals
         let grandTotal = 0;
         let totalTaxable = 0;
         let totalCgst = 0;
         let totalSgst = 0;
         let totalIgst = 0;
 
-        // Identify and Bundle Non-Refundable Delivery Charges
-        let nonRefundableDeliveryTotal = 0;
-        let nonRefundableDeliveryGst = 0;
-
-        // Rule: order.delivery_charge and order.delivery_gst include BOTH standard and surcharges.
-        // We need to look at item snapshots to find refundable portions.
-        let refundableDeliveryCharge = 0;
-        let refundableDeliveryGst = 0;
-
-        (order.items || []).forEach(item => {
-            const snap = item.delivery_calculation_snapshot || {};
-            if (snap.source !== 'global' && snap.delivery_refund_policy === 'REFUNDABLE') {
-                refundableDeliveryCharge += (item.delivery_charge || 0);
-                refundableDeliveryGst += (item.delivery_gst || 0);
-            }
-        });
-
-        // Non-refundable is everything else
-        nonRefundableDeliveryTotal = (order.delivery_charge || 0) - refundableDeliveryCharge;
-        nonRefundableDeliveryGst = (order.delivery_gst || 0) - refundableDeliveryGst;
-
-        const totalNonRefundableToBundle = nonRefundableDeliveryTotal + nonRefundableDeliveryGst;
-
+        // Collect All Product Items
         const items = order.items.map((item, index) => {
             const quantity = item.quantity || 1;
-            let amount = parseFloat(item.total_amount || 0);
-            let taxable = parseFloat(item.taxable_amount || 0);
+            const amount = parseFloat(item.total_amount || 0);
+            const taxable = parseFloat(item.taxable_amount || 0);
             const cgst = parseFloat(item.cgst || 0);
             const sgst = parseFloat(item.sgst || 0);
             const igst = parseFloat(item.igst || 0);
-
-            // Distribution Logic for non-refundable delivery
-            if (totalNonRefundableToBundle > 0) {
-                // Pro-rate based on order's item total
-                const totalItemsPlain = order.items.reduce((sum, it) => sum + parseFloat(it.total_amount || 0), 0);
-                const portion = (amount / totalItemsPlain) * totalNonRefundableToBundle;
-
-                // We add the portion to both taxable and total
-                // This is a "silent" bundling. Since we've already calculated GST, 
-                // we technically just increase the "gross" value for display.
-                // However, for Tax Invoices, we should probably bundle it into the Rate/Taxable.
-                taxable += (portion * (taxable / amount)); // Pro-rate taxable within item
-                amount += portion;
-            }
 
             totalTaxable += taxable;
             totalCgst += cgst;
@@ -193,7 +157,6 @@ class InternalInvoiceService {
             totalIgst += igst;
             grandTotal += amount;
 
-            // Rate display: Taxable Value / Quantity
             const rate = quantity > 0 ? (taxable / quantity).toFixed(2) : "0.00";
 
             return {
@@ -212,15 +175,17 @@ class InternalInvoiceService {
             };
         });
 
-        // Add Refundable Delivery if exists
-        if (refundableDeliveryCharge > 0) {
-            grandTotal += (refundableDeliveryCharge + refundableDeliveryGst);
+        // Add Delivery Charges to Totals (Transparently)
+        const deliveryBase = order.delivery_charge || 0;
+        const deliveryGst = order.delivery_gst || 0;
 
+        if (deliveryBase > 0 || deliveryGst > 0) {
+            grandTotal += (deliveryBase + deliveryGst);
             if (isInterState) {
-                totalIgst += refundableDeliveryGst;
+                totalIgst += deliveryGst;
             } else {
-                totalCgst += (refundableDeliveryGst / 2);
-                totalSgst += (refundableDeliveryGst / 2);
+                totalCgst += (deliveryGst / 2);
+                totalSgst += (deliveryGst / 2);
             }
         }
 
@@ -237,7 +202,7 @@ class InternalInvoiceService {
             seller,
             customer: {
                 name: order.customer_name || 'Valued Customer',
-                billing_address: order.billing_address || order.shipping_address, // Fallback
+                billing_address: order.billing_address || order.shipping_address,
                 shipping_address: order.shipping_address,
                 gstin: order.customer_gstin || null
             },
@@ -249,7 +214,7 @@ class InternalInvoiceService {
                 totalCgst: totalCgst.toFixed(2),
                 totalSgst: totalSgst.toFixed(2),
                 totalIgst: totalIgst.toFixed(2),
-                deliveryCharge: refundableDeliveryCharge.toFixed(2),
+                deliveryCharge: deliveryBase.toFixed(2),
                 grandTotal: grandTotal.toFixed(2)
             },
             amountInWords

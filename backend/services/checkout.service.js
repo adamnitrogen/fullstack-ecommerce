@@ -126,93 +126,66 @@ const getCheckoutSummary = async (userId, addressId = null) => {
 
 // Create Razorpay INVOICE (replaces simple Order)
 // This generates a detailed PDF Invoice + Email
-const createRazorpayInvoice = async (amount, receipt, customer, lineItems) => {
+const createRazorpayInvoice = async (amount, receipt, customer, lineItems, totals = null) => {
     log.operationStart('CREATE_RAZORPAY_INVOICE', { amount, receipt });
     const startTime = Date.now();
 
     try {
-        // Extract delivery charge and GST from metadata
-        let deliveryCharge = 0;
-        let deliveryGST = 0;
-        let deliveryGSTRate = 18;
-
-        // Check if first item has delivery metadata
-        if (lineItems.length > 0 && lineItems[0].deliveryCharge !== undefined) {
-            deliveryCharge = lineItems[0].deliveryCharge || 0;
-            deliveryGST = lineItems[0].deliveryGST || 0;
-            deliveryGSTRate = lineItems[0].deliveryGSTRate || 18;
-        }
-
-        // Clean line items (remove delivery metadata)
-        const cleanLineItems = lineItems.map(item => {
+        // Prepare Product Line Items (Strictly Products)
+        // We filter out any existing delivery or discount items if passed (safeguard)
+        const productItems = lineItems.filter(item =>
+            !['Standard Delivery (Non-Ref)', 'Refundable Surcharge', 'Addt. Processing (Non-Ref)', 'Coupon Discount'].includes(item.name)
+        ).map(item => {
             const { deliveryCharge, deliveryGST, deliveryGSTRate, ...rest } = item;
             return rest;
         });
 
-        // Bundle Non-Refundable Delivery Logic
-        // In local checkout service, we should determine which charges are refundable
-        let nonRefundableDeliveryTotal = 0;
-        let refundableDeliveryCharge = 0;
+        // Identify and Aggregated Delivery Charges (Transparency)
+        const deliveryAggregator = {};
 
-        // The lineItems passed here might already contain the delivery info if it was extracted before
-        // However, the items typically have the delivery metadata if mapped from checkout.
-        // Let's use the logic: Standard Delivery is always non-refundable.
-        // Refundable is only if specific surcharge has policy.
+        if (totals) {
+            // Priority 1: Use totals for high accuracy
+            if (totals.globalDeliveryCharge > 0) {
+                const label = 'Standard Delivery (Non-Ref)';
+                const totalGlobal = totals.globalDeliveryCharge + (totals.globalDeliveryGST || 0);
+                deliveryAggregator[label] = (deliveryAggregator[label] || 0) + totalGlobal;
+            }
 
-        // If we don't have the full snapshots here, we look at the deliveryCharge passed
-        // Note: createOrder calls this. 
-        // Let's check how lineItems are passed to this function.
-        // Wait, lineItems here are usually prepared in a way that matches Razorpay expected format.
-
-        if (deliveryCharge > 0) {
-            // Assume the global portion is non-refundable 
-            // This is a bit tricky if we don't have item-level metadata here.
-            // But usually this function is called from Checkout where we have the totals.
-
-            // To be safe and consistent with InvoiceOrchestrator:
-            // If the user wants to HIDE non-refundable charges (base or total),
-            // and Standard Delivery is always non-refundable, we bundle the global portion.
-
-            // FOR NOW: Treat ALL deliveryCharge passed here as non-refundable and bundle it
-            // UNLESS it's explicitly marked as refundable (which it isn't in current signature).
-            nonRefundableDeliveryTotal = deliveryCharge + deliveryGST;
-        }
-
-        // Pro-rate non-refundable delivery into product items
-        if (nonRefundableDeliveryTotal > 0 && cleanLineItems.length > 0) {
-            // Ensure first all items have a base amount (fallback to 0) to avoid NaN in reduce
-            cleanLineItems.forEach(item => {
-                if (item.amount === undefined || isNaN(item.amount)) {
-                    item.amount = 0;
-                }
-            });
-
-            const currentTotalAmount = cleanLineItems.reduce((sum, item) => sum + (item.amount * item.quantity), 0);
-
-            if (currentTotalAmount > 0) {
-                cleanLineItems.forEach((item, index) => {
-                    // Remove item_id if bundling to ensure Razorpay uses our modified amount
-                    delete item.item_id;
-
-                    if (index === cleanLineItems.length - 1) {
-                        const distributedSoFar = cleanLineItems.slice(0, -1).reduce((sum, it) => sum + (it._addedAmount || 0) * it.quantity, 0);
-                        const remainder = Math.round(nonRefundableDeliveryTotal * 100) - distributedSoFar;
-                        item.amount += Math.round(remainder / item.quantity);
-                    } else {
-                        const portion = (item.amount * item.quantity / currentTotalAmount) * (nonRefundableDeliveryTotal * 100);
-                        const addedPerUnit = Math.round(portion / item.quantity);
-                        item.amount += addedPerUnit;
-                        item._addedAmount = addedPerUnit;
+            if (totals.productDeliveryCharges > 0) {
+                (totals.itemBreakdown || []).forEach(item => {
+                    const total = (item.delivery_charge || 0) + (item.delivery_gst || 0);
+                    if (total > 0 && item.delivery_meta?.source !== 'global') {
+                        const isRefundable = (item.delivery_meta?.delivery_refund_policy === 'REFUNDABLE');
+                        const label = isRefundable ? 'Refundable Surcharge' : 'Addt. Processing (Non-Ref)';
+                        deliveryAggregator[label] = (deliveryAggregator[label] || 0) + total;
                     }
-                    delete item._addedAmount;
                 });
-                log.info({ receipt, bundled: nonRefundableDeliveryTotal }, "Bundled delivery into Razorpay checkout line items");
-            } else {
-                // If total amount is 0 (e.g. donation?), just add it to the first item
-                delete cleanLineItems[0].item_id;
-                cleanLineItems[0].amount += Math.round(nonRefundableDeliveryTotal * 100);
+            }
+        } else {
+            // Fallback: Legacy extraction from metadata (Buy Now or older callers)
+            const firstItem = lineItems[0] || {};
+            if (firstItem.deliveryCharge !== undefined) {
+                const base = firstItem.deliveryCharge || 0;
+                const gst = firstItem.deliveryGST || 0;
+                const total = base + gst;
+                if (total > 0) {
+                    deliveryAggregator['Standard Delivery (Non-Ref)'] = total;
+                }
             }
         }
+
+        // Final Line Items
+        const cleanLineItems = [...productItems];
+
+        // Add delivery items
+        Object.entries(deliveryAggregator).forEach(([name, amount]) => {
+            cleanLineItems.push({
+                name: name,
+                amount: Math.round(amount * 100),
+                currency: 'INR',
+                quantity: 1
+            });
+        });
 
         // Construct Invoice Payload
         const payload = {
@@ -229,6 +202,12 @@ const createRazorpayInvoice = async (amount, receipt, customer, lineItems) => {
             sms_notify: 0,
             email_notify: 0
         };
+
+        // Add Coupon Discount (Reliable via discount_amount)
+        const discountVal = (totals?.couponDiscount || 0);
+        if (discountVal > 0) {
+            payload.discount_amount = Math.round(discountVal * 100);
+        }
 
         // Ensure proper contact format if possible, otherwise Razorpay might complain.
         // Assuming database phone is clean.
@@ -571,42 +550,7 @@ const createOrder = async (userId, checkoutData, cart) => {
         orderNumber: rpcResult.order_number
     }, '[Checkout] Order created successfully via transaction');
 
-    // Prepare Presentation-Ready Order Object (Bundled for Clean UI)
-    // Rule: Hide non-refundable delivery charges by bundling them into items
-    let nonRefundableDeliveryTotal = 0;
-    let refundableDeliveryTotal = 0;
-    let nonRefundableDeliveryGST = 0;
-    let refundableDeliveryGST = 0;
-
-    const presentationItems = orderItems.map(item => {
-        const snap = item.delivery_calculation_snapshot || {};
-        // Fix: Respect policy regardless of source
-        const isRefundable = (snap.delivery_refund_policy === 'REFUNDABLE');
-
-        if (isRefundable) {
-            refundableDeliveryTotal += (item.delivery_charge || 0);
-            refundableDeliveryGST += (item.delivery_gst || 0);
-        } else {
-            nonRefundableDeliveryTotal += (item.delivery_charge || 0);
-            nonRefundableDeliveryGST += (item.delivery_gst || 0);
-        }
-        return { ...item };
-    });
-
-    const totalToBundle = nonRefundableDeliveryTotal + nonRefundableDeliveryGST;
-    if (totalToBundle > 0 && presentationItems.length > 0) {
-        const currentItemsTotal = presentationItems.reduce((sum, it) => sum + (it.total_amount || 0), 0);
-
-        presentationItems.forEach((item, index) => {
-            const portion = (item.total_amount / currentItemsTotal) * totalToBundle;
-            // Bundling into price_per_unit and total_amount for display
-            // Note: We don't change quantity.
-            item.price_per_unit = (item.price_per_unit || item.product.price) + (portion / item.quantity);
-            item.total_amount += portion;
-        });
-    }
-
-    // Construct order object for response and email
+    // Prepare order object for response and email (no bundling)
     const order = {
         id: rpcResult.id,
         order_number: rpcResult.order_number || rpcResult.orderNumber,
@@ -615,12 +559,12 @@ const createOrder = async (userId, checkoutData, cart) => {
         totalAmount: rpcResult.totalAmount || rpcResult.total_amount,
         customerName: profile.name,
         customerEmail: profile.email,
-        items: presentationItems, // Use bundled items for email/response
+        items: orderItems,
         // Add missing details for email template
         shippingAddress: shippingAddr,
         billingAddress: billingAddr,
-        subtotal: totals.totalPrice + totalToBundle, // Subtotal absorbs non-refundable delivery
-        delivery_charge: refundableDeliveryTotal, // Only show refundable delivery explicitly
+        subtotal: totals.totalPrice,
+        delivery_charge: totals.deliveryCharge, // Show full delivery charge
         coupon_discount: totals.couponDiscount || 0,
         createdAt: new Date(),
         // Tax summary

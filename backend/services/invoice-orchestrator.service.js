@@ -137,62 +137,35 @@ class InvoiceOrchestrator {
             };
         });
 
-        // Identify and Bundle Non-Refundable Delivery Charges
-        // Rule: Standard/Global is always non-refundable. Product surcharge depends on policy.
-        let nonRefundableDeliveryTotal = 0;
-        const refundableDeliveryItems = [];
+        // Identify and Add All Delivery Charges as Line Items (Transparency)
+        const deliveryAggregator = {};
 
         (order.items || []).forEach(item => {
-            const deliveryCharge = item.delivery_charge || 0;
-            const deliveryGst = item.delivery_gst || 0;
-            const totalItemDelivery = deliveryCharge + deliveryGst;
+            const totalItemDelivery = (item.delivery_charge || 0) + (item.delivery_gst || 0);
             const snapshot = item.delivery_calculation_snapshot || {};
 
             if (totalItemDelivery > 0) {
                 const isGlobal = (snapshot.source === 'global');
                 const isRefundable = (snapshot.delivery_refund_policy === 'REFUNDABLE');
 
-                if (!isGlobal && isRefundable) {
-                    // This one stays as an explicit line item
-                    refundableDeliveryItems.push({
-                        name: `Delivery Charge: ${item.product?.title || 'Product'}`,
-                        amount: Math.round(totalItemDelivery * 100),
-                        currency: 'INR',
-                        quantity: 1
-                    });
-                } else {
-                    // Standard/Global or Non-Refundable Product Surcharge
-                    // These get BUNDLED into products
-                    nonRefundableDeliveryTotal += totalItemDelivery;
-                }
+                // Labels matching Frontend (CartSummary.tsx)
+                let label = isGlobal ? 'Standard Delivery (Non-Ref)' :
+                    (isRefundable ? 'Refundable Surcharge' : 'Addt. Processing (Non-Ref)');
+
+                deliveryAggregator[label] = (deliveryAggregator[label] || 0) + totalItemDelivery;
             }
         });
 
-        // Distribute non-refundable total across existing product lineItems
-        if (nonRefundableDeliveryTotal > 0 && lineItems.length > 0) {
-            // Pro-rate distribution based on amount
-            const currentTotalAmount = lineItems.reduce((sum, item) => sum + (item.amount * item.quantity), 0);
-
-            lineItems.forEach((item, index) => {
-                // Calculate portion for this item
-                // If it's the last item, we give it the remainder to avoid rounding issues
-                if (index === lineItems.length - 1) {
-                    const distributedSoFar = lineItems.slice(0, -1).reduce((sum, it) => sum + (it._addedAmount || 0) * it.quantity, 0);
-                    const remainder = Math.round(nonRefundableDeliveryTotal * 100) - distributedSoFar;
-                    item.amount += Math.round(remainder / item.quantity);
-                } else {
-                    const portion = (item.amount * item.quantity / currentTotalAmount) * (nonRefundableDeliveryTotal * 100);
-                    const addedPerUnit = Math.round(portion / item.quantity);
-                    item.amount += addedPerUnit;
-                    item._addedAmount = addedPerUnit; // Temporary tracking
-                }
-                delete item._addedAmount;
+        // Add aggregated delivery charges to line items
+        Object.entries(deliveryAggregator).forEach(([name, amount]) => {
+            lineItems.push({
+                name: name,
+                amount: Math.round(amount * 100),
+                currency: 'INR',
+                quantity: 1
             });
-            log.info({ orderId: order.id, bundledAmount: nonRefundableDeliveryTotal }, "Bundled non-refundable delivery into product items");
-        }
-
-        // Add explicit refundable delivery items to the list
-        lineItems.push(...refundableDeliveryItems);
+            log.debug({ name, amount }, "Added delivery line item to Razorpay invoice");
+        });
 
         const data = {
             type: 'invoice',
