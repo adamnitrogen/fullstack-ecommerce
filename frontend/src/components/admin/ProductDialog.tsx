@@ -98,12 +98,13 @@ export function ProductDialog({
   const [customTag, setCustomTag] = useState("");
   const [originalImages, setOriginalImages] = useState<string[]>([]);
   const [removedImages, setRemovedImages] = useState<string[]>([]);
+  const [removedVariantImages, setRemovedVariantImages] = useState<string[]>([]);
   const [deliveryConfig, setDeliveryConfig] = useState<Partial<DeliveryConfig>>({
     calculation_type: "FLAT_PER_ORDER",
     base_delivery_charge: 0,
     gst_percentage: 18,
     delivery_refund_policy: "NON_REFUNDABLE",
-    is_active: true, // Default to true for new products to encourage config
+    is_active: false, // Default to false so users must explicitly enable custom rules
   });
 
   const prevDetailedProductRef = useRef<any>(null);
@@ -243,9 +244,9 @@ export function ProductDialog({
       setDeliveryConfig({
         calculation_type: "FLAT_PER_ORDER",
         base_delivery_charge: 0,
-        gst_percentage: 18,
+        gst_percentage: 0,
         delivery_refund_policy: "NON_REFUNDABLE",
-        is_active: true,
+        is_active: false, // Reset to false on close
       });
       setBenefitInput("");
       setCustomTag("");
@@ -298,6 +299,22 @@ export function ProductDialog({
           logger.debug("Deleted removed image:", imageUrl);
         } catch (error) {
           logger.error("Failed to delete removed image: " + imageUrl, error);
+          // Continue even if deletion fails
+        }
+      }
+    }
+
+    // Delete removed VARIANT images from Supabase Storage
+    if (removedVariantImages.length > 0) {
+      logger.debug("Deleting removed variant images:", removedVariantImages);
+      const { uploadService } = await import("@/services/upload.service");
+
+      for (const imageUrl of removedVariantImages) {
+        try {
+          await uploadService.deleteImageByUrl(imageUrl);
+          logger.debug("Deleted removed variant image:", imageUrl);
+        } catch (error) {
+          logger.error("Failed to delete removed variant image: " + imageUrl, error);
           // Continue even if deletion fails
         }
       }
@@ -647,17 +664,11 @@ export function ProductDialog({
 
             {/* Delivery Configuration */}
             <div className="space-y-4 border rounded-lg p-4 bg-muted/10">
-              {product?.id ? (
-                // Edit Mode: Use standalone form that fetches/saves independently
-                <DeliveryConfigForm productId={product.id} />
-              ) : (
-                // Create Mode: Use controlled form that updates local state
-                <DeliveryConfigForm
-                  productId=""
-                  value={deliveryConfig}
-                  onChange={setDeliveryConfig}
-                />
-              )}
+              <DeliveryConfigForm
+                productId={product?.id || ""}
+                value={deliveryConfig}
+                onChange={setDeliveryConfig}
+              />
             </div>
 
             {/* Size Variants */}
@@ -691,6 +702,7 @@ export function ProductDialog({
                     variants={variants}
                     onChange={setVariants}
                     mode={formData.variant_mode || 'UNIT'}
+                    onVariantImageRemoved={(url) => setRemovedVariantImages((prev) => [...prev, url])}
                   />
                 </CollapsibleContent>
               </div>

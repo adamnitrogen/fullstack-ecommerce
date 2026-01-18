@@ -31,7 +31,7 @@ export function DeliveryConfigForm({ productId, variantId = null, value, onChang
         calculation_type: "PER_ITEM",
         base_delivery_charge: 0,
         max_items_per_package: 3, // Default value
-        gst_percentage: 18,
+        gst_percentage: 0,
         delivery_refund_policy: "NON_REFUNDABLE",
         is_active: true,
     });

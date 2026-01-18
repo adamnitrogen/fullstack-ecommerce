@@ -19,7 +19,8 @@ interface VariantFormSectionProps {
     variants: VariantFormData[];
     onChange: (variants: VariantFormData[]) => void;
     disabled?: boolean;
-    mode?: "UNIT" | "SIZE"; // Added mode prop
+    mode?: "UNIT" | "SIZE";
+    onVariantImageRemoved?: (url: string) => void;
 }
 
 const UNIT_OPTIONS: { value: VariantUnit; label: string }[] = [
@@ -63,6 +64,7 @@ export function VariantFormSection({
     onChange,
     disabled = false,
     mode = "UNIT",
+    onVariantImageRemoved,
 }: VariantFormSectionProps) {
     const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -111,12 +113,20 @@ export function VariantFormSection({
 
     const handleRemoveImage = (index: number) => {
         const updated = [...variants];
+        const removedUrl = updated[index].variant_image_url;
+
         updated[index] = {
             ...updated[index],
             imageFile: undefined,
             variant_image_url: null
         };
+
         onChange(updated);
+
+        // Notify parent about removal if it was a stored URL
+        if (removedUrl && typeof removedUrl === 'string' && !removedUrl.startsWith('blob:') && onVariantImageRemoved) {
+            onVariantImageRemoved(removedUrl);
+        }
     };
 
     const handleSetDefault = (index: number) => {

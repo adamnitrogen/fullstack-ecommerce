@@ -180,7 +180,6 @@ export function VariantSelector({
                             <>
                                 <span>
                                     {selected.size_label}
-                                    {selected.description && <span className="font-normal text-muted-foreground ml-1">({selected.description})</span>}
                                     {" - "}₹{selected.selling_price}
                                 </span>
                                 {discount > 0 && (

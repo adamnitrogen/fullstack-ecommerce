@@ -14,6 +14,39 @@ const validateBody = (schema) => validate(schema, 'body');
 const validateParams = (schema) => validate(schema, 'params');
 const { z } = require('zod');
 
+/* Helper to format Zod validation errors to be user-friendly */
+const formatZodError = (issue) => {
+    let field = issue.path.join('.');
+    let label = field;
+
+    // Humanize common paths
+    if (issue.path[0] === 'variants' && typeof issue.path[1] === 'number') {
+        const variantIndex = issue.path[1] + 1;
+        const variantField = issue.path[2]
+            ? issue.path.slice(2).join(' ').replace(/_/g, ' ')
+            : null;
+
+        // "Variant 1 Description"
+        label = `Variant ${variantIndex}${variantField ? ' ' + variantField.charAt(0).toUpperCase() + variantField.slice(1) : ''}`;
+    } else if (issue.path[0] === 'product') {
+        const productField = issue.path[1].toString().replace(/_/g, ' ');
+        label = `Product ${productField.charAt(0).toUpperCase() + productField.slice(1)}`;
+    } else {
+        // Capitalize and replace underscores if it looks like a variable name
+        if (field.includes('_')) {
+            label = field.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        } else {
+            label = field.charAt(0).toUpperCase() + field.slice(1);
+        }
+    }
+
+    return {
+        field: label,
+        message: issue.message
+    };
+};
+
+
 const log = createModuleLogger('ProductVariantRoutes');
 
 // UUID validation schema
@@ -72,10 +105,7 @@ router.post(
             // Validate request body
             const validationResult = createVariantSchema.safeParse(req.body);
             if (!validationResult.success) {
-                const errors = (validationResult.error.issues || []).map(e => ({
-                    field: e.path.join('.'),
-                    message: e.message
-                }));
+                const errors = (validationResult.error.issues || []).map(formatZodError);
                 log.warn('CREATE_VARIANT', 'Validation failed', { productId, errors });
                 return res.status(400).json({ error: 'Validation failed', details: errors });
             }
@@ -247,10 +277,7 @@ router.post(
             // Validate request body
             const validationResult = createProductWithVariantsSchema.safeParse(req.body);
             if (!validationResult.success) {
-                const errors = (validationResult.error.issues || []).map(e => ({
-                    field: e.path.join('.'),
-                    message: e.message
-                }));
+                const errors = (validationResult.error.issues || []).map(formatZodError);
                 log.warn('CREATE_PRODUCT_WITH_VARIANTS', 'Validation failed', { errors });
                 return res.status(400).json({ error: 'Validation failed', details: errors });
             }
@@ -288,10 +315,7 @@ router.put(
             // Validate request body
             const validationResult = updateProductWithVariantsSchema.safeParse(req.body);
             if (!validationResult.success) {
-                const errors = (validationResult.error.issues || []).map(e => ({
-                    field: e.path.join('.'),
-                    message: e.message
-                }));
+                const errors = (validationResult.error.issues || []).map(formatZodError);
                 log.warn('UPDATE_PRODUCT_WITH_VARIANTS', 'Validation failed', { productId, errors });
                 return res.status(400).json({ error: 'Validation failed', details: errors });
             }

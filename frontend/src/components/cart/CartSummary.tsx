@@ -127,43 +127,67 @@ export const CartSummary = ({
                         )}
 
                         <div className="flex flex-col gap-2 pt-1">
-                            <div className="flex justify-between items-center group/delivery">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100/50">
-                                        <Truck className="w-3.5 h-3.5" />
+                            <div className="flex flex-col gap-0.5">
+                                <div className="flex justify-between items-center group/delivery">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100/50">
+                                            <Truck className="w-3.5 h-3.5" />
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-muted-foreground font-medium">Standard Delivery</span>
+                                            {(totals?.globalDeliveryGST ?? 0) > 0 && (
+                                                <span className="text-[8px] uppercase tracking-wider text-emerald-600 bg-emerald-50/50 border border-emerald-100/50 px-1 py-0 rounded-sm font-bold">
+                                                    Incl. Tax
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
-                                    <span className="text-muted-foreground font-medium">Standard Delivery</span>
+                                    <div className="text-right">
+                                        {totals?.globalDeliveryCharge === 0 ? (
+                                            <span className="text-emerald-600 font-black text-[10px] uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">Free</span>
+                                        ) : (
+                                            <div className="flex flex-col items-end">
+                                                <span className="font-bold text-foreground">
+                                                    ₹{((totals?.globalDeliveryCharge ?? 0) + (totals?.globalDeliveryGST ?? 0)).toFixed(2)}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="text-right">
-                                    {totals?.globalDeliveryCharge === 0 ? (
-                                        <span className="text-emerald-600 font-black text-[10px] uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">Free</span>
-                                    ) : (
-                                        <span className="font-bold text-foreground">₹{totals?.globalDeliveryCharge?.toFixed(2) || '0.00'}</span>
-                                    )}
-                                </div>
+                                {totals && (totals.globalDeliveryGST ?? 0) > 0 && (
+                                    <div className="flex justify-between items-center pl-8">
+                                        <span className="text-[10px] text-muted-foreground/50 italic leading-tight">
+                                            Includes ₹{(totals.globalDeliveryGST ?? 0).toFixed(2)} GST
+                                        </span>
+                                    </div>
+                                )}
                             </div>
 
                             {totals && (totals.productDeliveryCharges || 0) > 0 && (
-                                <div className="flex justify-between items-center animate-in slide-in-from-left-2 duration-500">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-6 h-6 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center border border-orange-100/50">
-                                            <Truck className="w-3.5 h-3.5" />
+                                <div className="flex flex-col gap-0.5 mt-1 border-t border-dashed border-orange-100/50 pt-2 animate-in slide-in-from-left-2 duration-500">
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-6 h-6 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center border border-orange-100/50">
+                                                <Truck className="w-3.5 h-3.5" />
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="text-muted-foreground font-medium">Item Surcharges</span>
+                                                {(totals.productDeliveryGST ?? 0) > 0 && (
+                                                    <span className="text-[8px] uppercase tracking-wider text-orange-600 bg-orange-50/50 border border-orange-100/50 px-1 py-0 rounded-sm font-bold">
+                                                        Incl. Tax
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
-                                        <span className="text-muted-foreground font-medium">Item Surcharges</span>
+                                        <span className="font-bold text-orange-600">₹{((totals.productDeliveryCharges || 0) + (totals.productDeliveryGST || 0)).toFixed(2)}</span>
                                     </div>
-                                    <span className="font-bold text-orange-600 animate-pulse">₹{(totals.productDeliveryCharges || 0).toFixed(2)}</span>
-                                </div>
-                            )}
-
-                            {totals && (totals.deliveryGST || 0) > 0 && (
-                                <div className="flex justify-between items-center animate-in slide-in-from-left-2 duration-500">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100/50">
-                                            <TagIcon className="w-3.5 h-3.5" />
+                                    {(totals.productDeliveryGST ?? 0) > 0 && (
+                                        <div className="flex justify-between items-center pl-8">
+                                            <span className="text-[10px] text-muted-foreground/50 italic leading-tight">
+                                                Includes ₹{(totals.productDeliveryGST ?? 0).toFixed(2)} Surcharge GST
+                                            </span>
                                         </div>
-                                        <span className="text-muted-foreground font-medium">Delivery GST (18%)</span>
-                                    </div>
-                                    <span className="font-bold text-blue-600">₹{(totals.deliveryGST || 0).toFixed(2)}</span>
+                                    )}
                                 </div>
                             )}
                         </div>

@@ -54,7 +54,7 @@ class DeliveryChargeService {
 
                 if (!variantError && variantConfig && variantConfig.is_active !== false) {
                     log.debug('DELIVERY_CONFIG', 'Using variant-level config', { variantId });
-                    return variantConfig;
+                    return { ...variantConfig, source: 'variant' };
                 }
             }
 
@@ -68,7 +68,7 @@ class DeliveryChargeService {
 
             if (!productError && productConfig && productConfig.is_active !== false) {
                 log.debug('DELIVERY_CONFIG', 'Using product-level config', { productId });
-                return productConfig;
+                return { ...productConfig, source: 'product' };
             }
 
             // No config found, use global defaults from Settings Service
@@ -80,6 +80,9 @@ class DeliveryChargeService {
             return {
                 ...DEFAULT_CONFIG,
                 base_delivery_charge: globalSettings.delivery_charge,
+                gst_percentage: globalSettings.delivery_gst,
+                is_taxable: (globalSettings.delivery_gst > 0),
+                source: 'global'
                 // We don't store threshold here, it's applied at cart level
             };
 
@@ -89,7 +92,7 @@ class DeliveryChargeService {
                 productId,
                 variantId
             });
-            return DEFAULT_CONFIG;
+            return { ...DEFAULT_CONFIG, source: 'default' };
         }
     }
 
@@ -113,7 +116,8 @@ class DeliveryChargeService {
             let deliveryCharge = 0;
             let calculationDetails = {
                 calculation_type: config.calculation_type,
-                quantity
+                quantity,
+                source: config.source // Audit source
             };
 
             // Apply calculation logic based on type
@@ -138,7 +142,7 @@ class DeliveryChargeService {
 
                 case CALCULATION_TYPES.FLAT_PER_ORDER:
                     // If free delivery applies, standard flat rate is 0
-                    if (isFreeDelivery) {
+                    if (isFreeDelivery && config.source === 'global') {
                         deliveryCharge = 0;
                         calculationDetails.is_free_delivery_applied = true;
                     } else {
@@ -159,10 +163,22 @@ class DeliveryChargeService {
 
             // Calculate GST if taxable
             let deliveryGST = 0;
-            if (config.is_taxable) {
-                deliveryGST = deliveryCharge * (config.gst_percentage / 100);
+
+            if (config.is_taxable && config.gst_percentage > 0) {
+                // UNIVERSAL INCLUSIVE LOGIC
+                // All configured delivery amounts (Global, Product, Variant) ARE the final totals.
+                // We reverse-calculate the Base and GST components for compliance and reporting.
+                const totalInclusive = deliveryCharge;
+                const gstRate = config.gst_percentage;
+
+                // Base = Total / (1 + Rate/100)
+                const baseAmount = totalInclusive / (1 + (gstRate / 100));
+
+                deliveryGST = totalInclusive - baseAmount;
+                deliveryCharge = baseAmount; // Treat calculated base as the charge portion
             }
 
+            // The final components sum up exactly to the total amount intended
             const totalDelivery = deliveryCharge + deliveryGST;
 
             // Create snapshot for audit trail
@@ -220,26 +236,64 @@ class DeliveryChargeService {
             let totalDeliveryGST = 0;
             const itemDeliveries = [];
 
+            let globalChargeApplied = false;
+
             // Calculate delivery for each item
             for (const item of cartItems) {
                 const productId = item.product_id || item.product?.id;
                 const variantId = item.variant_id || item.variant?.id;
                 const quantity = item.quantity || 1;
 
-                const result = await this.calculateDeliveryCharge(productId, variantId, quantity, isFreeDelivery);
+                // We need to know the source before deciding to add to totals
+                const config = await this.getDeliveryConfig(productId, variantId);
+                const isGlobal = config.source === 'global';
 
-                totalDeliveryCharge += result.deliveryCharge;
-                totalDeliveryGST += result.deliveryGST;
+                if (isGlobal) {
+                    // Global Standard Delivery: Apply only once per order
+                    if (!globalChargeApplied) {
+                        const result = await this.calculateDeliveryCharge(productId, variantId, quantity, isFreeDelivery);
+                        totalDeliveryCharge += result.deliveryCharge;
+                        totalDeliveryGST += result.deliveryGST;
+                        globalChargeApplied = true;
 
-                itemDeliveries.push({
-                    product_id: productId,
-                    variant_id: variantId,
-                    quantity,
-                    deliveryCharge: result.deliveryCharge,
-                    deliveryGST: result.deliveryGST,
-                    totalDelivery: result.totalDelivery,
-                    snapshot: result.snapshot
-                });
+                        // Mark this item as the one carrying the global charge for this calculation run
+                        itemDeliveries.push({
+                            product_id: productId,
+                            variant_id: variantId,
+                            quantity,
+                            deliveryCharge: result.deliveryCharge,
+                            deliveryGST: result.deliveryGST,
+                            totalDelivery: result.totalDelivery,
+                            snapshot: result.snapshot
+                        });
+                    } else {
+                        // Other global items don't add to the charge
+                        itemDeliveries.push({
+                            product_id: productId,
+                            variant_id: variantId,
+                            quantity,
+                            deliveryCharge: 0,
+                            deliveryGST: 0,
+                            totalDelivery: 0,
+                            snapshot: { ...config, source: 'global', base_delivery_charge: 0, applied_as_global: true }
+                        });
+                    }
+                } else {
+                    // Product Specific Surcharge: Always additive
+                    const result = await this.calculateDeliveryCharge(productId, variantId, quantity, isFreeDelivery);
+                    totalDeliveryCharge += result.deliveryCharge;
+                    totalDeliveryGST += result.deliveryGST;
+
+                    itemDeliveries.push({
+                        product_id: productId,
+                        variant_id: variantId,
+                        quantity,
+                        deliveryCharge: result.deliveryCharge,
+                        deliveryGST: result.deliveryGST,
+                        totalDelivery: result.totalDelivery,
+                        snapshot: result.snapshot
+                    });
+                }
             }
 
             const totalDelivery = totalDeliveryCharge + totalDeliveryGST;

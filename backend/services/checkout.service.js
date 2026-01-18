@@ -77,7 +77,25 @@ const getCheckoutSummary = async (userId, addressId = null) => {
     if (shippingAddress && cart.cart_items?.length > 0) {
         try {
             taxResult = TaxEngine.calculateOrderTax(cart.cart_items, shippingAddress);
-            log.debug('CHECKOUT_TAX', 'Tax calculated for checkout summary', {
+
+            // AGGREGATE DELIVERY GST INTO SUMMARY
+            // totals has deliveryGST which is the SUM of global and product delivery GSTs
+            const deliveryGstTotal = totals.deliveryGST || 0;
+            if (deliveryGstTotal > 0) {
+                taxResult.summary.totalTax += deliveryGstTotal;
+                taxResult.summary.totalAmount += deliveryGstTotal; // Note: totalAmount in TaxEngine is taxable+tax
+
+                if (taxResult.summary.taxType === 'INTER') {
+                    taxResult.summary.totalIgst += deliveryGstTotal;
+                } else {
+                    const cgst = Math.round((deliveryGstTotal / 2) * 100) / 100;
+                    const sgst = deliveryGstTotal - cgst;
+                    taxResult.summary.totalCgst += cgst;
+                    taxResult.summary.totalSgst += sgst;
+                }
+            }
+
+            log.debug('CHECKOUT_TAX', 'Tax calculated inclusive of delivery', {
                 taxType: taxResult.summary.taxType,
                 totalTax: taxResult.summary.totalTax
             });
@@ -495,8 +513,9 @@ const createOrder = async (userId, checkoutData, cart) => {
     if (order.status === 'confirmed' || checkoutData.payment_status === 'paid') {
         try {
             const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
-            logger.info({ orderId: order.id }, '[Checkout] Generating immediate invoice for paid order');
-            const result = await InvoiceOrchestrator.generateInvoiceForOrder(order.id);
+            logger.info({ orderId: order.id }, '[Checkout] Generating immediate Razorpay Payment Receipt');
+            // This is now purely for Payment Receipt, not the legal Tax Invoice
+            const result = await InvoiceOrchestrator.generateRazorpayInvoice(order);
 
             if (result.success && result.invoiceUrl) {
                 order.invoiceUrl = result.invoiceUrl;

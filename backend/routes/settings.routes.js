@@ -26,8 +26,8 @@ router.get('/delivery', async (req, res, next) => {
  */
 router.patch('/delivery', authenticateToken, authorizeRole('admin', 'manager'), async (req, res, next) => {
     try {
-        const { threshold, charge } = req.body;
-        const result = await settingsService.updateDeliverySettings({ threshold, charge });
+        const { threshold, charge, gst } = req.body;
+        const result = await settingsService.updateDeliverySettings({ threshold, charge, gst });
 
         // Invalidate delivery settings cache in cart service
         const { invalidateDeliverySettingsCache } = require('../services/cart.service');

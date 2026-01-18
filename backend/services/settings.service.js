@@ -31,7 +31,7 @@ async function getDeliverySettings() {
         const { data, error } = await supabase
             .from('store_settings')
             .select('key, value')
-            .in('key', ['delivery_threshold', 'delivery_charge']);
+            .in('key', ['delivery_threshold', 'delivery_charge', 'delivery_gst']);
 
         if (error) throw error;
 
@@ -43,7 +43,8 @@ async function getDeliverySettings() {
         // Defaults if missing in DB
         const result = {
             delivery_threshold: settings.delivery_threshold ?? 1500,
-            delivery_charge: settings.delivery_charge ?? 50
+            delivery_charge: settings.delivery_charge ?? 50,
+            delivery_gst: settings.delivery_gst ?? 0 // Default to 0% GST if not set
         };
 
         // Update cache
@@ -55,21 +56,24 @@ async function getDeliverySettings() {
         return result;
     } catch (error) {
         logger.error({ err: error }, 'Error fetching delivery settings:');
-        return { delivery_threshold: 1500, delivery_charge: 50 }; // Fallback to hardcoded defaults
+        return { delivery_threshold: 1500, delivery_charge: 50, delivery_gst: 0 }; // Fallback to hardcoded defaults
     }
 }
 
 async function updateDeliverySettings(settings) {
     try {
-        const { threshold, charge } = settings;
+        const { threshold, charge, gst } = settings;
         const updates = [];
 
         if (threshold !== undefined) {
             updates.push(
                 supabase
                     .from('store_settings')
-                    .update({ value: threshold.toString() })
-                    .eq('key', 'delivery_threshold')
+                    .upsert({
+                        key: 'delivery_threshold',
+                        value: threshold.toString(),
+                        description: 'Minimum order amount for free delivery'
+                    }, { onConflict: 'key' })
             );
         }
 
@@ -77,8 +81,23 @@ async function updateDeliverySettings(settings) {
             updates.push(
                 supabase
                     .from('store_settings')
-                    .update({ value: charge.toString() })
-                    .eq('key', 'delivery_charge')
+                    .upsert({
+                        key: 'delivery_charge',
+                        value: charge.toString(),
+                        description: 'Standard delivery charge for orders below threshold'
+                    }, { onConflict: 'key' })
+            );
+        }
+
+        if (gst !== undefined) {
+            updates.push(
+                supabase
+                    .from('store_settings')
+                    .upsert({
+                        key: 'delivery_gst',
+                        value: gst.toString(),
+                        description: 'Standard GST rate for delivery charges'
+                    }, { onConflict: 'key' })
             );
         }
 

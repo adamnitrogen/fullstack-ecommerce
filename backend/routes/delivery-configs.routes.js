@@ -121,9 +121,10 @@ router.post('/', authenticateToken, requireRole(['admin', 'manager']), async (re
             base_delivery_charge,
             max_items_per_package: max_items_per_package || 3,
             unit_weight: unit_weight || null,
-            gst_percentage: gst_percentage || 18,
+            gst_percentage: gst_percentage !== undefined ? gst_percentage : 0,
             is_taxable: is_taxable !== undefined ? is_taxable : true,
             delivery_refund_policy: delivery_refund_policy || 'REFUNDABLE',
+            is_active: req.body.is_active !== undefined ? req.body.is_active : true,
             updated_at: new Date().toISOString()
         };
 

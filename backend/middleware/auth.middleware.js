@@ -288,6 +288,7 @@ module.exports = {
     authenticateToken,
     authorizeRole,
     requireRole: authorizeRole, // Alias
+    requireAuth: authenticateToken, // Alias
     optionalAuth,
     invalidateAuthCache
 };

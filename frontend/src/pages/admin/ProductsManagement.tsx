@@ -119,6 +119,25 @@ export default function ProductsManagement() {
           } else {
             resultProduct = await productService.update(finalProduct.id, finalProduct);
           }
+
+          // Handle Delivery Config for Updates
+          if (delivery_config && resultProduct && resultProduct.id) {
+            try {
+              logger.debug("ProductMutation - Saving delivery config for updated product:", resultProduct.id);
+              await deliveryConfigService.create({
+                ...delivery_config,
+                product_id: resultProduct.id,
+                scope: 'PRODUCT',
+              });
+            } catch (err) {
+              logger.error("Failed to save delivery config for updated product:", err);
+              toast({
+                title: "Warning",
+                description: "Product updated but failed to save delivery configuration.",
+                variant: "destructive",
+              });
+            }
+          }
         } else {
           logger.debug("ProductMutation - Creating new product");
           if (processedVariants && processedVariants.length > 0) {
@@ -139,6 +158,7 @@ export default function ProductsManagement() {
               await deliveryConfigService.create({
                 ...delivery_config,
                 product_id: resultProduct.id,
+                scope: 'PRODUCT',
               });
             } catch (err) {
               logger.error("Failed to save delivery config for new product:", err);
@@ -232,6 +252,25 @@ export default function ProductsManagement() {
         }
       } else {
         logger.debug("No images to delete for this product");
+      }
+
+      // Delete VARIANT images if they exist
+      if (product && product.variants && product.variants.length > 0) {
+        logger.debug("Checking for variant images to delete...");
+        const { uploadService } = await import("@/services/upload.service");
+
+        for (const variant of product.variants) {
+          if (variant.variant_image_url) {
+            try {
+              logger.debug("Attempting to delete variant image:", variant.variant_image_url);
+              await uploadService.deleteImageByUrl(variant.variant_image_url);
+              logger.debug("Successfully deleted variant image");
+            } catch (error) {
+              logger.error(`Failed to delete variant image ${variant.variant_image_url}:`, error);
+              // Continue with other images
+            }
+          }
+        }
       }
 
       // Delete the product

@@ -505,24 +505,22 @@ async function calculateCartTotals(userId, guestId, existingCart = null, { skipV
         // Separate Global vs Product Delivery Charges
         let globalDeliveryCharge = 0;
         let productDeliveryCharges = 0;
+        let globalDeliveryGST = 0;
+        let productDeliveryGST = 0;
 
         if (itemLevelBreakdown.length > 0) {
-            itemLevelBreakdown.forEach(item => {
-                // If it's a specific calculation type usually associated with items (Weight, Package, Item)
-                // we treat it as product delivery charge.
-                // If it is 'FLAT_PER_ORDER' (default), we treat it as global/standard.
-                // However, since we don't have the config type here easily without looking at deliveryResult again...
-                // let's look at deliveryResult.items matched to this item.
-            });
-
             // Better: Iterate deliveryResult.items directly if available
             if (typeof deliveryResult !== 'undefined' && deliveryResult.items) {
                 deliveryResult.items.forEach(delItem => {
-                    const type = delItem.snapshot?.calculation_type;
-                    if (type === 'FLAT_PER_ORDER') {
+                    const isGlobal = delItem.snapshot?.source === 'global';
+                    if (isGlobal) {
+                        // Standard / Global Delivery
                         globalDeliveryCharge += delItem.deliveryCharge;
+                        globalDeliveryGST += delItem.deliveryGST;
                     } else {
+                        // Product Specific (Surcharges)
                         productDeliveryCharges += delItem.deliveryCharge;
+                        productDeliveryGST += delItem.deliveryGST;
                     }
                 });
             }
@@ -541,6 +539,8 @@ async function calculateCartTotals(userId, guestId, existingCart = null, { skipV
             deliveryGST: Math.round(totalDeliveryGST * 100) / 100,
             globalDeliveryCharge: Math.round(globalDeliveryCharge * 100) / 100,
             productDeliveryCharges: Math.round(productDeliveryCharges * 100) / 100,
+            globalDeliveryGST: Math.round(globalDeliveryGST * 100) / 100,
+            productDeliveryGST: Math.round(productDeliveryGST * 100) / 100,
             finalAmount: Math.round(finalAmount * 100) / 100,
             coupon,
             itemBreakdown: itemLevelBreakdown

@@ -33,6 +33,12 @@ interface OrderResponse {
     createdAt?: string;
     status: string;
     invoice_url?: string;
+    invoices?: Array<{
+        id: string;
+        type: 'RAZORPAY' | 'TAX_INVOICE' | 'BILL_OF_SUPPLY';
+        public_url?: string;
+        invoice_number: string;
+    }>;
     subtotal?: number;
     total_amount: number;
     delivery_charge?: number;
@@ -253,12 +259,41 @@ export default function UserOrderDetail() {
                         </div>
                     </div>
                     <div className="ml-auto flex gap-2">
-                        {/* Invoice Download */}
-                        {order.invoice_url && (
-                            <Button variant="outline" onClick={() => window.open(order.invoice_url, '_blank')}>
-                                <FileText className="mr-2 h-4 w-4" /> Invoice
-                            </Button>
-                        )}
+                        {/* Dual Invoice Download Buttons */}
+                        <div className="flex gap-2">
+                            {/* 1. Payment Receipt (Razorpay) */}
+                            {order.invoices?.find(i => i.type === 'RAZORPAY')?.public_url && (
+                                <Button variant="secondary" size="sm" onClick={() => window.open(order.invoices?.find(i => i.type === 'RAZORPAY')?.public_url, '_blank')}>
+                                    <FileText className="mr-2 h-4 w-4" /> Receipt
+                                </Button>
+                            )}
+
+                            {/* 2. Tax Invoice (Internal) */}
+                            {(order.invoice_url || order.invoices?.find(i => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type))) && (
+                                <Button variant="outline" size="sm" onClick={() => {
+                                    // Prefer strict internal endpoint if available via order.invoice_url (set by orchestration)
+                                    // or fallback to constructing it if we have the ID from invoices array
+                                    const internalInv = order.invoices?.find(i => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type));
+                                    const url = order.invoice_url || (internalInv ? `${import.meta.env.VITE_API_URL || 'http://localhost:5001/api'}/invoices/${internalInv.id}/download` : null);
+                                    if (url) {
+                                        // If it's a relative API path, prepend backend URL manually if needed, 
+                                        // or if order.invoice_url is already full URL (it was setting relative in Orchestrator)
+                                        // Orchestrator sets: /api/invoices/:id/download
+                                        // So we need to ensure we open full URL.
+                                        const fullUrl = url.startsWith('http') ? url : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${url}`;
+
+                                        // For authenticated download, we might need a fetch or window.open might fail if auth cookie is strict?
+                                        // Usually window.open works if cookies are SameSite=Lax/None. 
+                                        // If using Bearer token, we need a helper. 
+                                        // For now assuming Cookie auth or query param token (not impl). 
+                                        // Let's try direct open first as our auth uses cookies.
+                                        window.open(fullUrl, '_blank');
+                                    }
+                                }}>
+                                    <FileText className="mr-2 h-4 w-4" /> Tax Invoice
+                                </Button>
+                            )}
+                        </div>
 
                         {/* Cancel Dialog */}
                         {canCancel && (

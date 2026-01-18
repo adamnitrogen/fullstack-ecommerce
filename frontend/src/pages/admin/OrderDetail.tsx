@@ -95,6 +95,14 @@ interface OrderDetail {
     invoice_id?: string;
     invoice_url?: string;
     invoice_status?: string;
+    invoices?: Array<{
+        id: string;
+        type: 'RAZORPAY' | 'TAX_INVOICE' | 'BILL_OF_SUPPLY';
+        public_url?: string;
+        invoice_number: string;
+        status: string;
+        created_at: string;
+    }>;
     email_logs?: {
         id: string;
         event_type: string;
@@ -476,6 +484,51 @@ export default function OrderDetail() {
                                 <div>
                                     <p className="text-muted-foreground">Payment ID</p>
                                     <p className="font-mono mt-1">{order.payment_id || "N/A"}</p>
+                                </div>
+                            </div>
+
+                            {/* Dual Invoice Downloads */}
+                            <div className="flex flex-col gap-2 mt-4 pt-4 border-t">
+                                <p className="text-xs font-medium text-muted-foreground uppercase">Invoices</p>
+                                <div className="flex gap-2 flex-wrap">
+                                    {/* 1. Razorpay Receipt */}
+                                    {order.invoices?.find(i => i.type === 'RAZORPAY')?.public_url ? (
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            className="h-8 text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200"
+                                            onClick={() => window.open(order.invoices?.find(i => i.type === 'RAZORPAY')?.public_url, '_blank')}
+                                        >
+                                            <FileText className="mr-1.5 h-3 w-3" /> Receipt
+                                        </Button>
+                                    ) : (
+                                        order.payment_status === 'paid' && (
+                                            <span className="text-xs text-muted-foreground italic">Receipt pending...</span>
+                                        )
+                                    )}
+
+                                    {/* 2. Tax Invoice */}
+                                    {(order.invoice_url || order.invoices?.find(i => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type))) ? (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 text-xs"
+                                            onClick={() => {
+                                                const internalInv = order.invoices?.find(i => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type));
+                                                const url = order.invoice_url || (internalInv ? `${import.meta.env.VITE_API_URL || 'http://localhost:5001/api'}/invoices/${internalInv.id}/download` : null);
+                                                if (url) {
+                                                    const fullUrl = url.startsWith('http') ? url : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${url}`;
+                                                    window.open(fullUrl, '_blank');
+                                                }
+                                            }}
+                                        >
+                                            <FileText className="mr-1.5 h-3 w-3" /> Tax Invoice
+                                        </Button>
+                                    ) : (
+                                        order.status === 'delivered' && (
+                                            <span className="text-xs text-orange-600 animate-pulse">Generating Invoice...</span>
+                                        )
+                                    )}
                                 </div>
                             </div>
                         </CardContent>

@@ -6,6 +6,13 @@ import * as z from 'zod';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Form,
   FormControl,
   FormField,
@@ -26,6 +33,7 @@ import CouponsManagement from './CouponsManagement';
 const deliverySchema = z.object({
   delivery_threshold: z.number().min(0, 'Threshold must be positive'),
   delivery_charge: z.number().min(0, 'Charge must be positive'),
+  delivery_gst: z.number().min(0).max(28).default(0),
 });
 
 type DeliveryFormValues = z.infer<typeof deliverySchema>;
@@ -43,12 +51,18 @@ export default function SettingsManagement() {
     },
   });
 
+  // Defensive check for invalid API response (e.g. HTML error page)
+  const safeSettings: Partial<DeliveryFormValues> = (deliverySettings && typeof deliverySettings === 'object')
+    ? (deliverySettings as DeliveryFormValues)
+    : {};
+
   // Delivery Form
   const deliveryForm = useForm<DeliveryFormValues>({
     resolver: zodResolver(deliverySchema),
-    values: deliverySettings || {
-      delivery_threshold: 1500,
-      delivery_charge: 50,
+    values: {
+      delivery_threshold: safeSettings.delivery_threshold ?? 1500,
+      delivery_charge: safeSettings.delivery_charge ?? 50,
+      delivery_gst: safeSettings.delivery_gst ?? 0,
     },
   });
 
@@ -58,6 +72,7 @@ export default function SettingsManagement() {
       await api.patch(endpoints.updateDeliverySettings, {
         threshold: data.delivery_threshold,
         charge: data.delivery_charge,
+        gst: data.delivery_gst,
       });
     },
     onSuccess: () => {
@@ -131,6 +146,9 @@ export default function SettingsManagement() {
                         )}
                       />
 
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <FormField
                         control={deliveryForm.control}
                         name="delivery_charge"
@@ -147,7 +165,38 @@ export default function SettingsManagement() {
                               />
                             </FormControl>
                             <FormDescription>
-                              Standard delivery charge for orders below threshold.
+                              Base delivery amount.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={deliveryForm.control}
+                        name="delivery_gst"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Delivery GST (%)</FormLabel>
+                            <Select
+                              onValueChange={(value) => field.onChange(parseInt(value))}
+                              value={field.value?.toString() ?? "0"}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select GST Rate" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {[0, 5, 12, 18, 28].map((rate) => (
+                                  <SelectItem key={rate} value={rate.toString()}>
+                                    {rate}%
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormDescription>
+                              Standard GST rate for delivery charges.
                             </FormDescription>
                             <FormMessage />
                           </FormItem>

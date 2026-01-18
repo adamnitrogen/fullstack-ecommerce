@@ -311,10 +311,11 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
 
         // 7. Generate GST Invoice on DELIVERED (non-blocking)
         if (newStatus === ORDER_STATUS.DELIVERED) {
-            InvoiceOrchestrator.generateInvoiceForOrder(orderId)
+            // New Logic: Generate Internal GST Tax Invoice
+            InvoiceOrchestrator.generateInternalInvoice(orderId)
                 .then(result => {
                     if (result.success) {
-                        logger.info(`[Order ${orderId}] GST Invoice generated: ${result.invoiceId}`);
+                        logger.info(`[Order ${orderId}] Internal GST Invoice generated: ${result.invoiceId}`);
                     } else {
                         logger.error(`[Order ${orderId}] GST Invoice generation failed: ${result.error}`);
                     }

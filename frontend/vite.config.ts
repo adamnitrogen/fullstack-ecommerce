@@ -14,6 +14,13 @@ export default defineConfig(({ mode }) => ({
       host: "localhost",
       port: 5173,
     },
+    proxy: {
+      "/api": {
+        target: "http://localhost:5001",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

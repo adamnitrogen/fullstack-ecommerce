@@ -247,6 +247,17 @@ export interface ReturnRequest {
   }>;
 }
 
+export interface Invoice {
+  id: string;
+  order_id: string;
+  type: 'RAZORPAY' | 'TAX_INVOICE' | 'BILL_OF_SUPPLY';
+  invoice_number: string;
+  provider_id?: string;
+  public_url?: string;
+  status: 'PENDING' | 'GENERATED' | 'FAILED';
+  created_at: string;
+}
+
 export interface Order {
   id: string;
   userId: string;
@@ -270,6 +281,7 @@ export interface Order {
   updatedAt?: string;
   updated_at?: string;
   invoice_url?: string;
+  invoices?: Invoice[];
   // Cancel/Return request details
   cancelReason?: string;
   cancelComments?: string;
@@ -499,6 +511,8 @@ export interface CartTotals {
   coupon?: Coupon | null;
   productDeliveryCharges?: number;
   globalDeliveryCharge?: number;
+  productDeliveryGST?: number;
+  globalDeliveryGST?: number;
   itemBreakdown?: Array<{
     product_id: string;
     variant_id?: string;

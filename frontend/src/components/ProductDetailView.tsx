@@ -72,15 +72,15 @@ export const ProductDetailView = ({
   );
 
   // Update display image when variant changes (if variant has specific image)
+  // Update display image when variant changes (if variant has specific image)
   useEffect(() => {
     if (selectedVariant?.variant_image_url) {
       setDisplayImage(selectedVariant.variant_image_url);
-    } else {
-      // Revert to main product image if variant has no specific image
-      setDisplayImage(product.images[selectedImageIndex] || product.images[0]);
     }
+    // Only auto-update image when the VARIANT changes. 
+    // Manual image selection (clicking thumbnails) should stick and not be overwritten.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedVariant, product.images, selectedImageIndex]);
+  }, [selectedVariant]);
 
 
   // Combine all images (product images + variant images)
@@ -407,6 +407,18 @@ export const ProductDetailView = ({
                 <h3 className="text-xs font-black uppercase tracking-widest text-[#2C1810]">Description</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed font-light">
                   {product.description}
+                </p>
+              </div>
+            )}
+
+            {/* Selected Variant Description (Critical for Size-based variants) */}
+            {selectedVariant?.description && (
+              <div className="space-y-1.5 animate-in fade-in slide-in-from-left-1 duration-300">
+                <h3 className="text-xs font-black uppercase tracking-widest text-[#2C1810]">
+                  {product.variant_mode === 'SIZE' ? `${selectedVariant.size_label} Size Details` : 'Variant Details'}
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed font-light">
+                  {selectedVariant.description}
                 </p>
               </div>
             )}

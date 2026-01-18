@@ -74,6 +74,28 @@ function initScheduler() {
     });
     scheduledJobs.push(invoiceJob);
 
+    // Invoice Cleanup Job (Daily at 3 AM)
+    const cleanupJob = cron.schedule(SCHEDULES.CLEANUP, async () => {
+        log.debug('JOB_START', 'Invoice cleanup job started');
+        try {
+            const result = await InvoiceOrchestrator.cleanupExpiredInvoices();
+            if (result.processed > 0) {
+                log.info('INVOICE_CLEANUP_COMPLETE', `Cleaned up ${result.successful} expired invoices`, {
+                    processed: result.processed,
+                    failed: result.failed
+                });
+            } else {
+                log.debug('INVOICE_CLEANUP_SKIPPED', 'No expired invoices found');
+            }
+        } catch (error) {
+            log.warn('INVOICE_CLEANUP_ERROR', 'Invoice cleanup job failed', { error: error.message });
+        }
+    }, {
+        scheduled: true,
+        timezone: 'Asia/Kolkata'
+    });
+    scheduledJobs.push(cleanupJob);
+
     log.info('SCHEDULER_STARTED', 'All scheduled jobs initialized', {
         emailRetry: SCHEDULES.EMAIL_RETRY,
         invoiceRetry: SCHEDULES.INVOICE_RETRY

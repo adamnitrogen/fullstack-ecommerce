@@ -117,30 +117,31 @@ export const CartItem = ({ item, updateQuantity, removeItem, isLoading, isCalcul
                                 </div>
                             )}
 
-                            {(item.delivery_charge ?? 0) > 0 ? (
+                            {(item.delivery_charge ?? 0) > 0 && item.delivery_meta?.source !== 'global' ? (
                                 <div className="flex flex-col items-start gap-0.5 w-full">
-                                    <div className="flex items-center gap-1.5 font-bold text-[11px] text-primary/90">
+                                    <div className="flex items-center gap-1.5 font-bold text-[11px] text-orange-600/90 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-100">
                                         <Truck className="w-3 h-3" />
                                         <span>
-                                            ₹{(item.delivery_charge ?? 0).toFixed(2)} Delivery
-                                            {(item.delivery_gst ?? 0) > 0 && ` + ₹${(item.delivery_gst ?? 0).toFixed(2)} GST`}
+                                            +₹{((item.delivery_charge ?? 0) + (item.delivery_gst ?? 0)).toFixed(2)} Surcharge
                                         </span>
                                     </div>
                                     {item.delivery_meta && (
-                                        <span className="text-[10px] text-primary/70 font-medium pl-4.5 tracking-wide">
-                                            {item.delivery_meta.calculation_type === 'PER_ITEM' && `(₹${item.delivery_meta.base_charge} / item)`}
-                                            {item.delivery_meta.calculation_type === 'FLAT_PER_ORDER' && `(Flat ₹${item.delivery_meta.base_charge} / order)`}
-                                            {item.delivery_meta.calculation_type === 'PER_PACKAGE' && `(₹${item.delivery_meta.base_charge} / package of ${item.delivery_meta.max_items_per_package})`}
-                                            {item.delivery_meta.calculation_type === 'WEIGHT_BASED' && `(Weight Based)`}
-                                        </span>
+                                        <div className="flex flex-col pl-1">
+                                            <span className="text-[10px] text-muted-foreground font-medium tracking-wide italic leading-tight">
+                                                {item.delivery_meta.calculation_type === 'PER_ITEM' && `(₹${item.delivery_meta.base_charge} / item)`}
+                                                {item.delivery_meta.calculation_type === 'PER_PACKAGE' && `(₹${item.delivery_meta.base_charge} / package)`}
+                                                {item.delivery_meta.calculation_type === 'WEIGHT_BASED' && `(Heavy Item Surcharge)`}
+                                                {item.delivery_meta.calculation_type === 'FLAT_PER_ORDER' && `(Flat Product Charge)`}
+                                            </span>
+                                            {(item.delivery_gst ?? 0) > 0 && (
+                                                <span className="text-[9px] text-muted-foreground/60 font-medium">
+                                                    (Includes ₹{(item.delivery_gst ?? 0).toFixed(2)} GST)
+                                                </span>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
-                            ) : isFreeDelivery && (
-                                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 rounded-md text-[10px] font-bold text-emerald-700 border border-emerald-100">
-                                    <Truck className="w-3 h-3" />
-                                    <span>Free Delivery</span>
-                                </div>
-                            )}
+                            ) : null}
 
                             {(item.coupon_discount ?? 0) > 0 && (
                                 <div className="flex items-center gap-1.5 px-2 py-0.5 bg-primary/5 rounded-md text-[10px] font-black text-primary border border-primary/20">
