@@ -611,18 +611,39 @@ async function getOrderById(id, user) {
                 .then(({ data }) => ({ type: 'billing', data }))
         );
     }
-    // 4. Payment Details (Separate query to avoid ambiguous join)
+    // 4. Refunds (Fetch separately to avoid PostgREST embedding issues)
+    // Try catching errors here gracefully so it doesn't break the whole page
+    promises.push(
+        supabase.from('refunds')
+            .select('id, razorpay_refund_id, amount, status, created_at, notes')
+            .eq('order_id', id)
+            .then(({ data, error }) => {
+                if (error) {
+                    logger.warn(`Failed to fetch refunds for order ${id}:`, error);
+                    return { type: 'refunds', data: [] };
+                }
+                return { type: 'refunds', data: data || [] };
+            })
+    );
+
+    // 4. Payment Details (Fetch with Refunds to handle legacy data without order_id)
     if (data.payment_id) {
         promises.push(
-            supabase.from('payments').select('razorpay_payment_id, method, status').eq('id', data.payment_id).single()
-                .then(({ data }) => ({ type: 'payment', data }))
+            supabase.from('payments')
+                .select('razorpay_payment_id, method, status, refunds(*)')
+                .eq('id', data.payment_id)
+                .single()
+                .then(({ data }) => ({ type: 'payment_with_refunds', data }))
         );
     } else {
         // Fallback: Try to find payment linked to this order
         promises.push(
-            supabase.from('payments').select('razorpay_payment_id, method, status').eq('order_id', id).single()
-                .then(({ data }) => ({ type: 'payment', data }))
-                .catch(() => ({ type: 'payment', data: null }))
+            supabase.from('payments')
+                .select('razorpay_payment_id, method, status, refunds(*)')
+                .eq('order_id', id)
+                .single()
+                .then(({ data }) => ({ type: 'payment_with_refunds', data }))
+                .catch(() => ({ type: 'payment_with_refunds', data: null }))
         );
     }
 
@@ -644,7 +665,20 @@ async function getOrderById(id, user) {
         if (res.type === 'profile' && res.data) profile = res.data;
         if (res.type === 'shipping') dbShippingAddress = res.data;
         if (res.type === 'billing') dbBillingAddress = res.data;
-        if (res.type === 'payment') paymentDetails = res.data;
+        if (res.type === 'refunds') {
+            // Merge parallel fetched refunds (if any)
+            data.refunds = [...(data.refunds || []), ...res.data];
+        }
+        if (res.type === 'payment_with_refunds' && res.data) {
+            paymentDetails = res.data;
+            // Hoist nested refunds to top level order object
+            if (res.data.refunds && res.data.refunds.length > 0) {
+                // Avoid duplicates if we fetched same refunds via order_id
+                const existingIds = new Set((data.refunds || []).map(r => r.id));
+                const newRefunds = res.data.refunds.filter(r => !existingIds.has(r.id));
+                data.refunds = [...(data.refunds || []), ...newRefunds];
+            }
+        }
         if (res.type === 'email_logs') emailLogs = res.data || [];
     });
 
@@ -695,7 +729,8 @@ async function getOrderById(id, user) {
         email_logs: emailLogs,
         // Explicitly pass delivery fields if they exist on order
         delivery_charge: data.delivery_charge || 0,
-        delivery_gst: data.delivery_gst || 0
+        delivery_gst: data.delivery_gst || 0,
+        refunds: data.refunds || []
     };
 }
 

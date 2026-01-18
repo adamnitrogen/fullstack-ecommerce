@@ -80,6 +80,13 @@ interface OrderResponse {
         notes?: string;
         updater?: { role_data?: { name: string } };
     }>;
+    refunds?: Array<{
+        id: string;
+        razorpay_refund_id: string;
+        amount: number;
+        status: string;
+        created_at: string;
+    }>;
 }
 
 interface ReturnableItem {
@@ -623,8 +630,13 @@ export default function UserOrderDetail() {
                                         .map((history, index) => (
                                             <div key={index} className="ml-6 relative">
                                                 <span className="absolute -left-[1.65rem] top-1 h-3 w-3 rounded-full bg-primary border-2 border-background ring-2 ring-muted" />
-                                                <p className="font-medium text-sm capitalize">
-                                                    {(history.event_type || history.status).replace(/_/g, ' ')}
+                                                <p className="font-medium text-sm capitalize flex items-center gap-2">
+                                                    <span>{(history.event_type || history.status).replace(/_/g, ' ')}</span>
+                                                    {(history.event_type === 'REFUND_COMPLETED' || history.event_type === 'REFUND_PARTIAL' || history.status === 'refunded' || history.status === 'partially_refunded') && order.refunds?.some(r => Math.abs(new Date(r.created_at).getTime() - new Date(history.created_at).getTime()) < 120000) && (
+                                                        <Badge variant="outline" className="text-[10px] h-5 font-normal border-green-200 bg-green-50 text-green-700">
+                                                            ₹{order.refunds.find(r => Math.abs(new Date(r.created_at).getTime() - new Date(history.created_at).getTime()) < 120000)?.amount}
+                                                        </Badge>
+                                                    )}
                                                 </p>
                                                 <p className="text-xs text-muted-foreground mb-1">
                                                     {format(new Date(history.created_at), "PPP p")}
@@ -738,6 +750,21 @@ export default function UserOrderDetail() {
                                             </p>
                                         )}
                                     </div>
+
+                                    {/* Refund IDs */}
+                                    {order.refunds && order.refunds.length > 0 && (
+                                        <div className="pt-2 border-t mt-2">
+                                            <span className="text-muted-foreground text-xs block mb-1">Refund Reference(s):</span>
+                                            <div className="space-y-1">
+                                                {order.refunds.map((r: any, idx) => (
+                                                    <div key={idx} className="flex justify-between items-center text-xs bg-red-50 p-1 rounded border border-red-100">
+                                                        <span className="font-mono text-red-800">{r.razorpay_refund_id || r.id}</span>
+                                                        <span className="font-medium text-red-700">₹{r.amount}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>

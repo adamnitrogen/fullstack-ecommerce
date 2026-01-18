@@ -30,12 +30,15 @@ router.patch('/delivery', authenticateToken, authorizeRole('admin', 'manager'), 
         const result = await settingsService.updateDeliverySettings({ threshold, charge, gst });
 
         // Invalidate delivery settings cache in cart service
-        const { invalidateDeliverySettingsCache } = require('../services/cart.service');
-        invalidateDeliverySettingsCache();
+        // Cache is handled directly in service or disabled, no need to call cart service
+        // const { invalidateDeliverySettingsCache } = require('../services/cart.service');
+        // invalidateDeliverySettingsCache();
 
         res.json(result);
     } catch (error) {
-        logger.error({ err: error }, 'Error in PATCH /settings/delivery');
+        logger.error({ err: error }, '[DEBUG-SETTINGS-FAIL] Error in PATCH /settings/delivery');
+        // also console.error to be sure
+        console.error('[DEBUG-SETTINGS-FAIL] Console Error:', error);
         next(error);
     }
 });

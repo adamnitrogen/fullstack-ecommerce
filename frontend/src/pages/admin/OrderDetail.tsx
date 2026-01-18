@@ -23,7 +23,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, MapPin, Phone, Mail, CreditCard, Package, Clock, Truck, User, FileText, Info, IndianRupee } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, Mail, CreditCard, Package, Clock, Truck, User, FileText, Info, IndianRupee, RotateCcw } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
@@ -115,6 +115,15 @@ interface OrderDetail {
         created_at: string;
         retry_count: number;
         error_message?: string;
+
+    }[];
+    refunds?: {
+        id: string;
+        razorpay_refund_id: string;
+        amount: number;
+        status: string;
+        notes?: string;
+        created_at: string;
     }[];
 }
 
@@ -610,6 +619,40 @@ export default function OrderDetail() {
                                     )}
                                 </div>
                             </div>
+
+                            {/* NEW: Refund Information Section */}
+                            {order.refunds && order.refunds.length > 0 && (
+                                <div className="col-span-2 pt-0 mt-4">
+                                    <div className="bg-red-50 border border-red-100 rounded-md p-3">
+                                        <p className="text-[10px] text-red-800 uppercase tracking-widest font-semibold mb-3 flex items-center gap-2">
+                                            <RotateCcw className="h-3 w-3" />
+                                            Refund Details
+                                        </p>
+                                        <div className="space-y-3">
+                                            {order.refunds.map((refund: any, idx: number) => (
+                                                <div key={idx} className="grid grid-cols-2 gap-4 text-xs border-b border-red-100 last:border-0 pb-2 last:pb-0">
+                                                    <div>
+                                                        <p className="text-red-700/70 mb-0.5">Processing ID (Razorpay)</p>
+                                                        <code className="bg-white px-1.5 py-0.5 border border-red-200 rounded text-[10px] break-all text-red-800 font-mono">
+                                                            {refund.razorpay_refund_id || refund.id}
+                                                        </code>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-red-700/70 mb-0.5">Refunded Amount</p>
+                                                        <p className="font-bold text-red-700 text-sm">₹{refund.amount}</p>
+                                                    </div>
+                                                    {refund.notes && (
+                                                        <div className="col-span-2 text-[10px] text-red-600 italic bg-white/50 p-1.5 rounded">
+                                                            Note: {refund.notes}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                         </CardContent>
                     </Card>
 
@@ -638,9 +681,16 @@ export default function OrderDetail() {
                                             </div>
                                             <div>
                                                 <div className="flex justify-between items-start">
-                                                    <p className="text-sm font-semibold capitalize">
+                                                    <p className="text-sm font-semibold capitalize flex items-center gap-2">
                                                         {/* Prefer Event Type for display if set, else status */}
-                                                        {(history.event_type || history.status).replace(/_/g, ' ')}
+                                                        <span>{(history.event_type || history.status).replace(/_/g, ' ')}</span>
+
+                                                        {/* Show Refund Amount in Tagline */}
+                                                        {(history.event_type === 'REFUND_COMPLETED' || history.event_type === 'REFUND_PARTIAL') && order.refunds?.some(r => new Date(r.created_at).getTime() - new Date(history.created_at).getTime() < 60000) && (
+                                                            <Badge variant="outline" className="text-[10px] h-5 font-normal border-green-200 bg-green-50 text-green-700">
+                                                                ₹{order.refunds.find(r => new Date(r.created_at).getTime() - new Date(history.created_at).getTime() < 60000)?.amount}
+                                                            </Badge>
+                                                        )}
                                                     </p>
                                                     <time className="text-[10px] text-muted-foreground">
                                                         {format(new Date(history.created_at), "MMM d, HH:mm")}

@@ -342,9 +342,14 @@ const formatAddress = (addr) => {
     // Extract phone from phone_numbers join or use existing field
     let phone = addr.phone;
     if (addr.phone_numbers) {
-        phone = Array.isArray(addr.phone_numbers)
+        const joinedPhone = Array.isArray(addr.phone_numbers)
             ? addr.phone_numbers[0]?.phone_number
             : addr.phone_numbers?.phone_number;
+
+        // Only override if joinedPhone is valid
+        if (joinedPhone) {
+            phone = joinedPhone;
+        }
     }
 
     return {
