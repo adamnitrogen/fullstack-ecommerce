@@ -143,7 +143,7 @@ export function AddressSelector({ type, selectedAddressId, onSelect, forceEditId
                     "Loading addresses...";
 
     return (
-        <div className="space-y-4 relative min-h-[200px]">
+        <div className="space-y-4 relative">
             <LoadingOverlay isLoading={isLoading || isMutationLoading} message={mutationMessage} />
             <RadioGroup value={selectedAddressId || ""} onValueChange={(id) => {
                 const addr = addresses.find(a => a.id === id);
