@@ -496,10 +496,11 @@ const createOrder = async (userId, checkoutData, cart) => {
         createdAt: new Date(),
         // Tax summary
         tax: taxResult ? {
-            totalTaxableAmount: taxResult.summary.totalTaxableAmount,
-            totalCgst: taxResult.summary.totalCgst,
-            totalSgst: taxResult.summary.totalSgst,
-            totalIgst: taxResult.summary.totalIgst,
+            totalTaxableAmount: (taxResult.summary.totalTaxableAmount || 0) + (totals.deliveryCharge || 0),
+            totalCgst: (taxResult.summary.totalCgst || 0) + ((!taxResult.summary.isInterState && totals.deliveryGST) ? (totals.deliveryGST / 2) : 0),
+            totalSgst: (taxResult.summary.totalSgst || 0) + ((!taxResult.summary.isInterState && totals.deliveryGST) ? (totals.deliveryGST / 2) : 0),
+            totalIgst: (taxResult.summary.totalIgst || 0) + ((taxResult.summary.isInterState && totals.deliveryGST) ? totals.deliveryGST : 0),
+            totalTax: (taxResult.summary.totalTax || 0) + (totals.deliveryGST || 0),
             taxType: taxResult.summary.taxType
         } : null
     };

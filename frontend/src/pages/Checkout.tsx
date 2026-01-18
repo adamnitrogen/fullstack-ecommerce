@@ -417,16 +417,25 @@ export default function Checkout() {
             <div className="sticky top-24 space-y-6">
               <Card className="border-none shadow-elevated overflow-hidden">
                 <CardContent className="p-6 space-y-2">
-                  <OrderSummary items={summary.cart.cart_items.map((item) => ({
-                    ...item,
-                    productId: item.product_id,
-                    product: item.products,
-                    variant: item.product_variants
-                  }))} />
+                  {/* Define mapped items to reuse */}
+                  {(() => {
+                    const cartItems = summary.cart.cart_items.map((item) => ({
+                      ...item,
+                      productId: item.product_id,
+                      product: item.products,
+                      variant: item.product_variants
+                    }));
 
-                  <Separator className="bg-border/60 my-2" />
+                    return (
+                      <>
+                        <OrderSummary items={cartItems} />
 
-                  <PriceBreakdown totals={summary.totals} />
+                        <Separator className="bg-border/60 my-2" />
+
+                        <PriceBreakdown totals={summary.totals} items={cartItems} />
+                      </>
+                    );
+                  })()}
 
                   <Button
                     className="w-full h-14 text-lg font-bold shadow-lg hover:shadow-xl transition-all"

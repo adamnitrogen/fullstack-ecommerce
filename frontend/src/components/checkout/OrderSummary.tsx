@@ -58,6 +58,18 @@ export function OrderSummary({ items }: OrderSummaryProps) {
                                                 ₹{((item.variant?.mrp ?? item.product.mrp ?? 0) * item.quantity).toFixed(2)}
                                             </p>
                                         )}
+                                        {/* Tax Info */}
+                                        {(() => {
+                                            const rate = item.variant?.gst_rate ?? item.product?.default_gst_rate ?? 0;
+                                            if (rate <= 0) return null;
+                                            const price = (item.variant?.selling_price ?? item.product.price) * item.quantity;
+                                            const tax = price - (price / (1 + rate / 100));
+                                            return (
+                                                <p className="text-[9px] text-muted-foreground/60 italic tabular-nums mt-0.5">
+                                                    Incl. ₹{tax.toFixed(2)} Tax ({rate}%)
+                                                </p>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             </div>

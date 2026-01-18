@@ -6,7 +6,7 @@ interface PriceBreakdownProps {
     totals: CartTotals;
 }
 
-export function PriceBreakdown({ totals }: PriceBreakdownProps) {
+export function PriceBreakdown({ totals, items = [] }: PriceBreakdownProps & { items?: any[] }) {
     const totalSavings = (totals.discount || 0) + (totals.couponDiscount || 0);
 
     return (
@@ -122,6 +122,60 @@ export function PriceBreakdown({ totals }: PriceBreakdownProps) {
                                     <span>↳ SGST</span>
                                     <span>₹{(totals.tax?.sgst || 0).toFixed(2)}</span>
                                 </div>
+                            </div>
+                        )}
+
+                        {/* Product-wise Tax Breakdown (Collapsible/Inline) */}
+                        {items && items.length > 0 && (
+                            <div className="mt-2 pt-1">
+                                <details className="group">
+                                    <summary className="text-[10px] text-primary cursor-pointer hover:underline mb-1 list-none flex items-center gap-1 font-medium">
+                                        <span>Show Product Tax Details</span>
+                                    </summary>
+                                    <div className="bg-muted/30 rounded p-2 space-y-2 mt-1 max-h-[150px] overflow-y-auto">
+                                        {items.map((item, idx) => {
+                                            const qty = item.quantity || 1;
+                                            const taxRate = item.variant?.gst_rate ?? item.product?.default_gst_rate ?? item.gst_rate ?? 0;
+                                            const title = item.product?.title || item.title || "Item";
+
+                                            // Estimation if exact tax values not in item
+                                            const sellingPrice = item.variant?.selling_price ?? item.product?.price ?? item.price ?? 0;
+                                            const itemTotal = sellingPrice * qty;
+                                            // Back-calculate tax if price includes tax (assuming it does for this UI context usually)
+                                            // The backend TaxEngine handles this precisely, but here we estimate for display
+                                            // Tax = Price - (Price / (1 + Rate/100))
+                                            const itemTax = itemTotal - (itemTotal / (1 + (taxRate / 100)));
+
+                                            if (taxRate <= 0) return null;
+
+                                            return (
+                                                <div key={idx} className="flex flex-col text-[9px] text-muted-foreground border-b border-dashed border-border/50 last:border-0 pb-1 last:pb-0">
+                                                    <div className="flex justify-between font-medium text-foreground/80">
+                                                        <span className="truncate max-w-[150px]">{title}</span>
+                                                        <span>{taxRate}% GST</span>
+                                                    </div>
+                                                    <div className="flex justify-between pl-1">
+                                                        <span>Tax Amount</span>
+                                                        <span>₹{itemTax.toFixed(2)}</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                        {/* Delivery Tax Line Item */}
+                                        {(totals.globalDeliveryCharge ?? 0) > 0 && (totals.globalDeliveryGST ?? 0) > 0 && (
+                                            <div className="flex flex-col text-[9px] text-muted-foreground border-b border-dashed border-border/50 last:border-0 pb-1 last:pb-0">
+                                                <div className="flex justify-between font-medium text-foreground/80">
+                                                    <span>Delivery Charges</span>
+                                                    <span>18% GST</span>
+                                                </div>
+                                                <div className="flex justify-between pl-1">
+                                                    <span>Tax Amount</span>
+                                                    <span>₹{(totals.globalDeliveryGST || 0).toFixed(2)}</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </details>
                             </div>
                         )}
                     </div>

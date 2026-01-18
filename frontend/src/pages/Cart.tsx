@@ -193,6 +193,7 @@ const Cart = () => {
               availableCoupons={availableCoupons}
               deliverySettings={deliverySettings}
               isCalculating={isCalculating}
+              items={items}
             />
           </div>
         </div>

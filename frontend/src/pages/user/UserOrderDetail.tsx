@@ -724,19 +724,18 @@ export default function UserOrderDetail() {
                             // If IGST > 0, assume interstate. Else intrastate.
                             const isInterstate = (order.total_igst || 0) > 0;
 
-                            const effectiveCgst = isLegacyMismatch && !isInterstate ? ((order.total_cgst || 0) + (deliveryGST / 2)) : (order.total_cgst || 0);
-                            const effectiveSgst = isLegacyMismatch && !isInterstate ? ((order.total_sgst || 0) + (deliveryGST / 2)) : (order.total_sgst || 0);
-                            const effectiveIgst = isLegacyMismatch && isInterstate ? ((order.total_igst || 0) + deliveryGST) : (order.total_igst || 0);
-
                             return (
                                 <TaxBreakdown
                                     totalTaxableAmount={effectiveTaxable}
-                                    totalCgst={effectiveCgst}
-                                    totalSgst={effectiveSgst}
-                                    totalIgst={effectiveIgst}
+                                    totalCgst={order.total_cgst}
+                                    totalSgst={order.total_sgst}
+                                    totalIgst={order.total_igst}
                                     totalAmount={totalAmount}
                                     showInvoiceLink={order.status === 'delivered' || !!order.invoice_url}
                                     invoiceUrl={order.invoice_url}
+                                    items={order.items}
+                                    deliveryCharge={deliveryCharge}
+                                    deliveryGST={deliveryGST}
                                 />
                             );
                         })()}
