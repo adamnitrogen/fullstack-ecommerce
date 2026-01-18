@@ -57,10 +57,13 @@ const createAddress = async (userId, addressData) => {
         }
     }
 
+    // Normalize phone for consistency
+    const normalizedPhone = addressData.phone?.replace(/\s+/g, '').trim();
+
     // Phone validation using Abstract API
     const phoneValidator = require('../utils/phone-validator');
-    logger.info({ phone: addressData.phone }, 'Calling phone validator from createAddress');
-    const validationResult = await phoneValidator.validate(addressData.phone);
+    logger.info({ phone: normalizedPhone }, 'Calling phone validator from createAddress');
+    const validationResult = await phoneValidator.validate(normalizedPhone);
     if (!validationResult.isValid) {
         throw new Error(validationResult.error);
     }
@@ -73,8 +76,7 @@ const createAddress = async (userId, addressData) => {
         .from('phone_numbers')
         .select('id')
         .eq('user_id', userId)
-        .eq('phone_number', addressData.phone)
-        .eq('phone_number', addressData.phone)
+        .eq('phone_number', normalizedPhone)
         .limit(1);
 
     if (existingPhones && existingPhones.length > 0) {
@@ -85,7 +87,7 @@ const createAddress = async (userId, addressData) => {
             .from('phone_numbers')
             .insert([{
                 user_id: userId,
-                phone_number: addressData.phone,
+                phone_number: normalizedPhone,
                 label: 'Mobile',
                 is_primary: false
             }])
@@ -115,8 +117,8 @@ const createAddress = async (userId, addressData) => {
             street_address: address_line1,        // DB column name
             apartment: address_line2 || null,     // DB column name  
             postal_code: postal_code,             // DB column name
-            is_primary: addressData.is_primary,   // DB column name & fix variable ref
-            label: full_name,                     // DB column name
+            is_primary: !!addressData.is_primary, // DB column name & fix variable ref
+            label: full_name || otherFields.label, // DB column name
             ...otherFields  // city, state, country, type
         }])
         .select(`
@@ -158,9 +160,12 @@ const updateAddress = async (id, userId, updates) => {
 
     // 2. Handle Phone Number if present
     if (phone) {
+        // Normalize phone for consistency
+        const normalizedPhone = phone?.replace(/\s+/g, '').trim();
+
         const phoneValidator = require('../utils/phone-validator');
-        logger.info({ phone }, 'Calling phone validator from updateAddress');
-        const validationResult = await phoneValidator.validate(phone);
+        logger.info({ phone: normalizedPhone }, 'Calling phone validator from updateAddress');
+        const validationResult = await phoneValidator.validate(normalizedPhone);
         if (!validationResult.isValid) {
             throw new Error(validationResult.error);
         }
@@ -169,8 +174,7 @@ const updateAddress = async (id, userId, updates) => {
             .from('phone_numbers')
             .select('id')
             .eq('user_id', userId)
-            .eq('phone_number', phone)
-            .eq('phone_number', phone)
+            .eq('phone_number', normalizedPhone)
             .limit(1);
 
         if (existingPhones && existingPhones.length > 0) {
@@ -181,7 +185,7 @@ const updateAddress = async (id, userId, updates) => {
                 .from('phone_numbers')
                 .insert([{
                     user_id: userId,
-                    phone_number: phone,
+                    phone_number: normalizedPhone,
                     label: 'Mobile',
                     is_primary: false
                 }])

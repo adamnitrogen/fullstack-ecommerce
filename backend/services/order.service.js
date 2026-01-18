@@ -1,4 +1,5 @@
 
+const Razorpay = require('razorpay');
 const logger = require('../utils/logger');
 const supabase = require('../config/supabase');
 const emailService = require('./email');
@@ -464,7 +465,7 @@ async function getOrderById(id, user) {
     // 1. Profile
     if (data.user_id) {
         promises.push(
-            supabase.from('profiles').select('full_name, email, phone').eq('id', data.user_id).single()
+            supabase.from('profiles').select('name, email, phone').eq('id', data.user_id).single()
                 .then(({ data }) => ({ type: 'profile', data }))
         );
     }
@@ -501,7 +502,7 @@ async function getOrderById(id, user) {
     if (data.payment_id) {
         promises.push(
             supabase.from('payments')
-                .select('razorpay_payment_id, method, status, refunds(*)')
+                .select('razorpay_payment_id, method, status, invoice_id, refunds(*)')
                 .eq('id', data.payment_id)
                 .single()
                 .then(({ data }) => ({ type: 'payment_with_refunds', data }))
@@ -510,7 +511,7 @@ async function getOrderById(id, user) {
         // Fallback: Try to find payment linked to this order
         promises.push(
             supabase.from('payments')
-                .select('razorpay_payment_id, method, status, refunds(*)')
+                .select('razorpay_payment_id, method, status, invoice_id, refunds(*)')
                 .eq('order_id', id)
                 .single()
                 .then(({ data }) => ({ type: 'payment_with_refunds', data }))
@@ -555,6 +556,51 @@ async function getOrderById(id, user) {
         if (res.type === 'email_logs') emailLogs = res.data || [];
     });
 
+    // Fallback: If no Razorpay invoice found in DB, but Payment has an invoice_id, fetch it live
+    // This repairs missing invoices due to previous bugs or sync issues
+    const hasRazorpayInvoice = invoices.some(i => i.type === 'RAZORPAY');
+    if (!hasRazorpayInvoice && paymentDetails?.invoice_id) {
+        try {
+            const key_id = process.env.RAZORPAY_KEY_ID;
+            const key_secret = process.env.RAZORPAY_KEY_SECRET;
+            if (key_id && key_secret) {
+                const razorpay = new Razorpay({ key_id, key_secret });
+                let inv = await razorpay.invoices.fetch(paymentDetails.invoice_id);
+
+                // Ensure it has a URL (Issue if draft)
+                if (inv.status === 'draft') {
+                    logger.info(`[Order ${id}] Issuing draft invoice found via fallback logic`);
+                    inv = await razorpay.invoices.issue(inv.id);
+                }
+
+                if (inv.short_url) {
+                    const virtualInvoice = {
+                        id: inv.id,
+                        type: 'RAZORPAY', // Matches frontend expectation
+                        invoice_number: inv.invoice_number,
+                        public_url: inv.short_url,
+                        status: inv.status,
+                        created_at: new Date(inv.date * 1000).toISOString()
+                    };
+                    invoices.push(virtualInvoice);
+
+                    // Self-healing: persist to DB for future speed
+                    supabase.from('invoices').insert({
+                        order_id: id,
+                        type: 'RAZORPAY',
+                        invoice_number: inv.invoice_number,
+                        provider_id: inv.id,
+                        public_url: inv.short_url,
+                        status: inv.status
+                    }).then(() => logger.info(`[Order ${id}] Self-healed missing invoice record in DB`))
+                        .catch(e => logger.warn(`[Order ${id}] Failed to persist self-healed invoice`, e));
+                }
+            }
+        } catch (e) {
+            logger.warn({ err: e, invoiceId: paymentDetails.invoice_id }, 'Failed to fetch fallback invoice from Razorpay');
+        }
+    }
+
     // Process Addresses
     let shippingAddress = data.shippingAddress || data.shipping_address;
     if (dbShippingAddress && (!shippingAddress || !shippingAddress.phone)) {
@@ -587,7 +633,7 @@ async function getOrderById(id, user) {
 
     return {
         ...data,
-        customer_name: profile.full_name || data.customer_name || data.customerName || 'Unknown',
+        customer_name: profile.name || data.customer_name || data.customerName || 'Unknown',
         customer_email: profile.email || data.customer_email || data.customerEmail || data.user_email,
         customer_phone: profile.phone || data.customer_phone || data.customerPhone || data.user_phone || shippingAddress?.phone,
         shipping_address: shippingAddress,

@@ -27,9 +27,11 @@ interface AddressSelectorProps {
     type: 'shipping' | 'billing';
     selectedAddressId?: string;
     onSelect: (address: CheckoutAddress) => void;
+    forceEditId?: string | null;
+    onEditOpened?: () => void;
 }
 
-export function AddressSelector({ type, selectedAddressId, onSelect }: AddressSelectorProps) {
+export function AddressSelector({ type, selectedAddressId, onSelect, forceEditId, onEditOpened }: AddressSelectorProps) {
     const queryClient = useQueryClient();
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingAddress, setEditingAddress] = useState<CheckoutAddress | null>(null);
@@ -39,6 +41,18 @@ export function AddressSelector({ type, selectedAddressId, onSelect }: AddressSe
         queryKey: ["addresses"],
         queryFn: addressService.getAddresses,
     });
+
+    // Handle forced edit request
+    useEffect(() => {
+        if (forceEditId && addresses.length > 0) {
+            const addrToEdit = addresses.find(a => a.id === forceEditId);
+            if (addrToEdit) {
+                setEditingAddress(addrToEdit);
+                setDialogOpen(true);
+                if (onEditOpened) onEditOpened();
+            }
+        }
+    }, [forceEditId, addresses, onEditOpened]);
 
     // Auto-select primary address only if no address is currently selected
     useEffect(() => {

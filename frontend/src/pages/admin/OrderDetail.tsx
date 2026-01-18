@@ -313,6 +313,7 @@ export default function OrderDetail() {
                     {availableActions.map(action => (
                         <Button
                             key={action}
+                            size="sm"
                             onClick={() => openStatusConfirmation(action)}
                             disabled={updating}
                             variant={action === 'cancelled' ? 'destructive' : 'default'}
@@ -666,53 +667,74 @@ export default function OrderDetail() {
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-6">
-                                {(order.order_status_history || [])
-                                    .slice()
-                                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                                    .map((history, idx) => (
-                                        <div key={idx} className="relative pl-6 pb-4 last:pb-0">
-                                            {/* Connector */}
-                                            {idx !== (order.order_status_history?.length || 0) - 1 && (
-                                                <div className="absolute left-2.5 top-2 bottom-0 w-[1px] bg-muted" />
-                                            )}
-                                            {/* Dot */}
-                                            <div className="absolute left-0 top-1.5 w-5 h-5 rounded-full border bg-background z-10 flex items-center justify-center">
-                                                <div className={`w-2 h-2 rounded-full ${idx === 0 ? 'bg-primary' : 'bg-muted-foreground'}`} />
-                                            </div>
-                                            <div>
-                                                <div className="flex justify-between items-start">
-                                                    <p className="text-sm font-semibold capitalize flex items-center gap-2">
-                                                        {/* Prefer Event Type for display if set, else status */}
-                                                        <span>{(history.event_type || history.status).replace(/_/g, ' ')}</span>
+                                {(() => {
+                                    const historyItems = [...(order.order_status_history || [])];
 
-                                                        {/* Show Refund Amount in Tagline */}
-                                                        {(history.event_type === 'REFUND_COMPLETED' || history.event_type === 'REFUND_PARTIAL') && order.refunds?.some(r => new Date(r.created_at).getTime() - new Date(history.created_at).getTime() < 60000) && (
-                                                            <Badge variant="outline" className="text-[10px] h-5 font-normal border-green-200 bg-green-50 text-green-700">
-                                                                ₹{order.refunds.find(r => new Date(r.created_at).getTime() - new Date(history.created_at).getTime() < 60000)?.amount}
-                                                            </Badge>
+                                    // Ensure "Order Placed" exists based on order creation date
+                                    const hasPlaced = historyItems.some(h =>
+                                        ['pending', 'ORDER_PLACED'].includes(h.status) ||
+                                        h.event_type === 'ORDER_PLACED'
+                                    );
+
+                                    if (!hasPlaced && order.created_at) {
+                                        historyItems.push({
+                                            status: 'pending',
+                                            event_type: 'ORDER_PLACED',
+                                            created_at: order.created_at,
+                                            notes: 'Order placed successfully.',
+                                            actor: 'SYSTEM',
+                                            updated_by: 'SYSTEM'
+                                        } as any);
+                                    }
+
+                                    return historyItems
+                                        .slice()
+                                        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                                        .map((history, idx) => (
+                                            <div key={idx} className="relative pl-6 pb-4 last:pb-0">
+                                                {/* Connector */}
+                                                {idx !== (order.order_status_history?.length || 0) - 1 && (
+                                                    <div className="absolute left-2.5 top-2 bottom-0 w-[1px] bg-muted" />
+                                                )}
+                                                {/* Dot */}
+                                                <div className="absolute left-0 top-1.5 w-5 h-5 rounded-full border bg-background z-10 flex items-center justify-center">
+                                                    <div className={`w-2 h-2 rounded-full ${idx === 0 ? 'bg-primary' : 'bg-muted-foreground'}`} />
+                                                </div>
+                                                <div>
+                                                    <div className="flex justify-between items-start">
+                                                        <p className="text-sm font-semibold capitalize flex items-center gap-2">
+                                                            {/* Prefer Event Type for display if set, else status */}
+                                                            <span>{(history.event_type || history.status).replace(/_/g, ' ')}</span>
+
+                                                            {/* Show Refund Amount in Tagline */}
+                                                            {(history.event_type === 'REFUND_COMPLETED' || history.event_type === 'REFUND_PARTIAL') && order.refunds?.some(r => new Date(r.created_at).getTime() - new Date(history.created_at).getTime() < 60000) && (
+                                                                <Badge variant="outline" className="text-[10px] h-5 font-normal border-green-200 bg-green-50 text-green-700">
+                                                                    ₹{order.refunds.find(r => new Date(r.created_at).getTime() - new Date(history.created_at).getTime() < 60000)?.amount}
+                                                                </Badge>
+                                                            )}
+                                                        </p>
+                                                        <time className="text-[10px] text-muted-foreground">
+                                                            {format(new Date(history.created_at), "MMM d, HH:mm")}
+                                                        </time>
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground mt-1 bg-muted/20 p-2 rounded italic">
+                                                        {history.notes || `Transitioned to ${history.status}`}
+                                                    </p>
+                                                    <p className="text-[9px] text-muted-foreground mt-1 flex items-center gap-1">
+                                                        <User size={10} />
+                                                        {/* Show Actor explicitly if available */}
+                                                        {history.actor ? (
+                                                            <span className="font-medium">{history.actor}</span>
+                                                        ) : history.updater ? (
+                                                            <span>{history.updater.first_name || history.updater.email} ({history.updater.role_data?.name || 'Staff'})</span>
+                                                        ) : (
+                                                            <span>{history.updated_by || 'System'}</span>
                                                         )}
                                                     </p>
-                                                    <time className="text-[10px] text-muted-foreground">
-                                                        {format(new Date(history.created_at), "MMM d, HH:mm")}
-                                                    </time>
                                                 </div>
-                                                <p className="text-xs text-muted-foreground mt-1 bg-muted/20 p-2 rounded italic">
-                                                    {history.notes || `Transitioned to ${history.status}`}
-                                                </p>
-                                                <p className="text-[9px] text-muted-foreground mt-1 flex items-center gap-1">
-                                                    <User size={10} />
-                                                    {/* Show Actor explicitly if available */}
-                                                    {history.actor ? (
-                                                        <span className="font-medium">{history.actor}</span>
-                                                    ) : history.updater ? (
-                                                        <span>{history.updater.first_name || history.updater.email} ({history.updater.role_data?.name || 'Staff'})</span>
-                                                    ) : (
-                                                        <span>{history.updated_by || 'System'}</span>
-                                                    )}
-                                                </p>
                                             </div>
-                                        </div>
-                                    ))}
+                                        ))
+                                })()}
                             </div>
                         </CardContent>
                     </Card>

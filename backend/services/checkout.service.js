@@ -227,20 +227,26 @@ const createRazorpayInvoice = async (amount, receipt, customer, lineItems, total
         // We use that `order_id` on the frontend.
         // When the user pays that `order_id`, the Invoice status updates to Paid.
 
+        let finalInvoice = invoice;
+        if (invoice.status === 'draft') {
+            finalInvoice = await razorpay.invoices.issue(invoice.id);
+        }
+
         log.operationSuccess('CREATE_RAZORPAY_INVOICE', {
-            invoiceId: invoice.id,
-            orderId: invoice.order_id,
-            amount: invoice.amount
+            invoiceId: finalInvoice.id,
+            orderId: finalInvoice.order_id,
+            amount: finalInvoice.amount,
+            status: finalInvoice.status
         }, Date.now() - startTime);
 
         // We return an object that looks like an "Order" to keep backend consistent
         // The frontend only cares about `id` (which should be order_id)
         return {
-            id: invoice.order_id, // CRITICAL: Frontend expects Order ID, not Invoice ID
-            invoice_id: invoice.id,
-            amount: invoice.amount || Math.round(amount * 100),
-            currency: invoice.currency,
-            status: invoice.status
+            id: finalInvoice.order_id, // CRITICAL: Frontend expects Order ID, not Invoice ID
+            invoice_id: finalInvoice.id,
+            amount: finalInvoice.amount || Math.round(amount * 100),
+            currency: finalInvoice.currency,
+            status: finalInvoice.status
         };
     } catch (error) {
         log.operationError('CREATE_RAZORPAY_INVOICE', error, { amount, receipt });
@@ -298,6 +304,7 @@ const createOrder = async (userId, checkoutData, cart) => {
         shipping_address_id,
         billing_address_id,
         payment_id,
+        razorpay_payment_id, // Destructure here
         notes
     } = checkoutData;
 
@@ -592,10 +599,17 @@ const createOrder = async (userId, checkoutData, cart) => {
                 logger.info({ orderId: order.id, invoiceId: checkoutData.invoice_id }, '[Checkout] Linking existing Razorpay Invoice (Receipt)');
 
                 // Fetch the existing invoice to get the URL
+                // Fetch the existing invoice to get the URL
                 const { RazorpayInvoiceService } = require('./razorpay-invoice.service'); // Ensure this service exports what we need
                 // Actually, checkout.service.js doesn't import RazorpayInvoiceService directly yet, but InvoiceOrchestrator uses it.
                 // Or we can just use the razorpay instance directly since we are in checkout service.
-                const inv = await razorpay.invoices.fetch(checkoutData.invoice_id);
+                let inv = await razorpay.invoices.fetch(checkoutData.invoice_id);
+
+                // FIX: Ensure invoice is issued to get the short_url if it's still in draft
+                if (inv && inv.status === 'draft') {
+                    logger.info({ invoiceId: inv.id }, '[Checkout] Issuing draft invoice to generate URL');
+                    inv = await razorpay.invoices.issue(inv.id);
+                }
 
                 if (inv && inv.short_url) {
                     order.invoiceUrl = inv.short_url;
@@ -1104,6 +1118,7 @@ async function processPaymentAndOrder(userId, {
                 payment_id,
                 notes,
                 payment_status: 'paid',
+                razorpay_payment_id, // Pass to createOrder for logging
                 // Pass invoice_id if available on payment record to prevent duplicate invoices
                 invoice_id: (payment_id && !isMockPayment) ?
                     (await supabase.from('payments').select('invoice_id').eq('id', payment_id).single()).data?.invoice_id
@@ -1456,7 +1471,13 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
 
             if (existingInvoiceId) {
                 log.info({ orderId: order.id, invoiceId: existingInvoiceId }, 'Linking existing Razorpay Invoice (Receipt) for Buy Now');
-                const inv = await razorpay.invoices.fetch(existingInvoiceId);
+                let inv = await razorpay.invoices.fetch(existingInvoiceId);
+
+                // FIX: Ensure invoice is issued to get the short_url if it's still in draft
+                if (inv && inv.status === 'draft') {
+                    log.info({ invoiceId: inv.id }, '[Checkout] Issuing draft invoice (Buy Now) to generate URL');
+                    inv = await razorpay.invoices.issue(inv.id);
+                }
 
                 if (inv && inv.short_url) {
                     order.invoiceUrl = inv.short_url;

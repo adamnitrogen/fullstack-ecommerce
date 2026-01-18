@@ -60,6 +60,7 @@ export default function Checkout() {
   const [billingAddress, setBillingAddress] = useState<CheckoutAddress | null>(null);
   const [billingSameAsShipping, setBillingSameAsShipping] = useState(true);
   const [showPhoneWarning, setShowPhoneWarning] = useState(false);
+  const [addressIdToEdit, setAddressIdToEdit] = useState<string | null>(null);
   const [stockIssues, setStockIssues] = useState<Array<{
     productId: string;
     variantId: string | null;
@@ -393,6 +394,8 @@ export default function Checkout() {
                     setShippingAddress(address);
                     fetchCheckoutSummary(address.id);
                   }}
+                  forceEditId={addressIdToEdit}
+                  onEditOpened={() => setAddressIdToEdit(null)}
                 />
               </CardContent>
             </Card>
@@ -505,7 +508,10 @@ export default function Checkout() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setShowPhoneWarning(false)} className="rounded-full px-6">
+            <AlertDialogAction onClick={() => {
+              if (shippingAddress) setAddressIdToEdit(shippingAddress.id);
+              setShowPhoneWarning(false);
+            }} className="rounded-full px-6">
               OK, I'll add it
             </AlertDialogAction>
           </AlertDialogFooter>

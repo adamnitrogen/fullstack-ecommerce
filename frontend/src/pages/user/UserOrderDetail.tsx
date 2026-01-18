@@ -265,48 +265,46 @@ export default function UserOrderDetail() {
                             </Badge>
                         </div>
                     </div>
-                    <div className="ml-auto flex gap-2">
+                    <div className="ml-auto flex items-center gap-2">
                         {/* Dual Invoice Download Buttons */}
-                        <div className="flex gap-2">
-                            {/* 1. Payment Receipt (Razorpay) */}
-                            {order.invoices?.find(i => i.type === 'RAZORPAY')?.public_url && (
-                                <Button variant="secondary" size="sm" onClick={() => window.open(order.invoices?.find(i => i.type === 'RAZORPAY')?.public_url, '_blank')}>
-                                    <FileText className="mr-2 h-4 w-4" /> Receipt
-                                </Button>
-                            )}
+                        {/* 1. Payment Receipt (Razorpay) */}
+                        {order.invoices?.find(i => i.type === 'RAZORPAY')?.public_url && (
+                            <Button variant="secondary" size="sm" onClick={() => window.open(order.invoices?.find(i => i.type === 'RAZORPAY')?.public_url, '_blank')}>
+                                <FileText className="mr-2 h-4 w-4" /> Receipt
+                            </Button>
+                        )}
 
-                            {/* 2. Tax Invoice (Internal) */}
-                            {(order.invoice_url || order.invoices?.find(i => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type))) && (
-                                <Button variant="outline" size="sm" onClick={() => {
-                                    // Prefer strict internal endpoint if available via order.invoice_url (set by orchestration)
-                                    // or fallback to constructing it if we have the ID from invoices array
-                                    const internalInv = order.invoices?.find(i => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type));
-                                    const url = order.invoice_url || (internalInv ? `${import.meta.env.VITE_API_URL || 'http://localhost:5001/api'}/invoices/${internalInv.id}/download` : null);
-                                    if (url) {
-                                        // If it's a relative API path, prepend backend URL manually if needed, 
-                                        // or if order.invoice_url is already full URL (it was setting relative in Orchestrator)
-                                        // Orchestrator sets: /api/invoices/:id/download
-                                        // So we need to ensure we open full URL.
-                                        const fullUrl = url.startsWith('http') ? url : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${url}`;
+                        {/* 2. Tax Invoice (Internal) */}
+                        {(order.invoice_url || order.invoices?.find(i => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type))) && (
+                            <Button variant="outline" size="sm" onClick={() => {
+                                // Prefer strict internal endpoint if available via order.invoice_url (set by orchestration)
+                                // or fallback to constructing it if we have the ID from invoices array
+                                const internalInv = order.invoices?.find(i => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type));
+                                const url = order.invoice_url || (internalInv ? `${import.meta.env.VITE_API_URL || 'http://localhost:5001/api'}/invoices/${internalInv.id}/download` : null);
+                                if (url) {
+                                    // If it's a relative API path, prepend backend URL manually if needed, 
+                                    // or if order.invoice_url is already full URL (it was setting relative in Orchestrator)
+                                    // Orchestrator sets: /api/invoices/:id/download
+                                    // So we need to ensure we open full URL.
+                                    const fullUrl = url.startsWith('http') ? url : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${url}`;
 
-                                        // For authenticated download, we might need a fetch or window.open might fail if auth cookie is strict?
-                                        // Usually window.open works if cookies are SameSite=Lax/None. 
-                                        // If using Bearer token, we need a helper. 
-                                        // For now assuming Cookie auth or query param token (not impl). 
-                                        // Let's try direct open first as our auth uses cookies.
-                                        window.open(fullUrl, '_blank');
-                                    }
-                                }}>
-                                    <FileText className="mr-2 h-4 w-4" /> Tax Invoice
-                                </Button>
-                            )}
-                        </div>
+                                    // For authenticated download, we might need a fetch or window.open might fail if auth cookie is strict?
+                                    // Usually window.open works if cookies are SameSite=Lax/None. 
+                                    // If using Bearer token, we need a helper. 
+                                    // For now assuming Cookie auth or query param token (not impl). 
+                                    // Let's try direct open first as our auth uses cookies.
+                                    window.open(fullUrl, '_blank');
+                                }
+                            }}>
+                                <FileText className="mr-2 h-4 w-4" /> Tax Invoice
+                            </Button>
+                        )}
 
                         {/* Cancel Dialog */}
                         {canCancel && (
                             <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
                                 <DialogTrigger asChild>
-                                    <Button variant="destructive">
+                                    <Button variant="destructive" size="sm">
                                         <XCircle className="mr-2 h-4 w-4" /> Cancel Order
                                     </Button>
                                 </DialogTrigger>
@@ -340,6 +338,7 @@ export default function UserOrderDetail() {
                             <Dialog open={returnOpen} onOpenChange={setReturnOpen}>
                                 <DialogTrigger asChild>
                                     <Button
+                                        size="sm"
                                         className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-md hover:shadow-lg transition-all duration-200"
                                         onClick={fetchReturnableItems}
                                     >
@@ -623,36 +622,56 @@ export default function UserOrderDetail() {
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="relative border-l border-muted ml-2 space-y-6 pb-2">
-                                    {(order.order_status_history || [])
-                                        .slice() // Copy to sort
-                                        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) // Newest first
-                                        .map((history, index) => (
-                                            <div key={index} className="ml-6 relative">
-                                                <span className="absolute -left-[1.65rem] top-1 h-3 w-3 rounded-full bg-primary border-2 border-background ring-2 ring-muted" />
-                                                <p className="font-medium text-sm capitalize flex items-center gap-2">
-                                                    <span>{(history.event_type || history.status).replace(/_/g, ' ')}</span>
-                                                    {(history.event_type === 'REFUND_COMPLETED' || history.event_type === 'REFUND_PARTIAL' || history.status === 'refunded' || history.status === 'partially_refunded') && order.refunds?.some(r => Math.abs(new Date(r.created_at).getTime() - new Date(history.created_at).getTime()) < 120000) && (
-                                                        <Badge variant="outline" className="text-[10px] h-5 font-normal border-green-200 bg-green-50 text-green-700">
-                                                            ₹{order.refunds.find(r => Math.abs(new Date(r.created_at).getTime() - new Date(history.created_at).getTime()) < 120000)?.amount}
-                                                        </Badge>
+                                <div className="relative border-l border-muted ml-2 space-y-6 pb-2 mt-2">
+                                    {(() => {
+                                        const historyItems = [...(order.order_status_history || [])];
+
+                                        // Ensure "Order Placed" exists based on order creation date
+                                        const hasPlaced = historyItems.some(h =>
+                                            ['pending', 'ORDER_PLACED'].includes(h.status) ||
+                                            h.event_type === 'ORDER_PLACED'
+                                        );
+
+                                        if (!hasPlaced && (order.created_at || order.createdAt)) {
+                                            historyItems.push({
+                                                status: 'pending',
+                                                event_type: 'ORDER_PLACED',
+                                                created_at: (order.created_at || order.createdAt) as string,
+                                                notes: 'Order placed successfully.',
+                                                actor: 'SYSTEM'
+                                            });
+                                        }
+
+                                        return historyItems
+                                            .slice()
+                                            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                                            .map((history, index) => (
+                                                <div key={index} className="ml-6 relative">
+                                                    <span className="absolute -left-[1.65rem] top-1 h-3 w-3 rounded-full bg-primary border-2 border-background ring-2 ring-muted" />
+                                                    <p className="font-medium text-sm capitalize flex items-center gap-2">
+                                                        <span>{(history.event_type || history.status).replace(/_/g, ' ')}</span>
+                                                        {(history.event_type === 'REFUND_COMPLETED' || history.event_type === 'REFUND_PARTIAL' || history.status === 'refunded' || history.status === 'partially_refunded') && order.refunds?.some(r => Math.abs(new Date(r.created_at).getTime() - new Date(history.created_at).getTime()) < 120000) && (
+                                                            <Badge variant="outline" className="text-[10px] h-5 font-normal border-green-200 bg-green-50 text-green-700">
+                                                                ₹{order.refunds.find(r => Math.abs(new Date(r.created_at).getTime() - new Date(history.created_at).getTime()) < 120000)?.amount}
+                                                            </Badge>
+                                                        )}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground mb-1">
+                                                        {format(new Date(history.created_at), "PPP p")}
+                                                        {history.updater && (
+                                                            <span className="ml-1">
+                                                                • {(history.updater.role_data?.name === 'admin' || history.updater.role_data?.name === 'manager') ? 'Staff' : 'You'}
+                                                            </span>
+                                                        )}
+                                                    </p>
+                                                    {history.notes && (
+                                                        <div className="bg-muted/50 p-2 rounded text-xs mt-1 text-gray-700 border border-muted">
+                                                            {history.notes}
+                                                        </div>
                                                     )}
-                                                </p>
-                                                <p className="text-xs text-muted-foreground mb-1">
-                                                    {format(new Date(history.created_at), "PPP p")}
-                                                    {history.updater && (
-                                                        <span className="ml-1">
-                                                            • {(history.updater.role_data?.name === 'admin' || history.updater.role_data?.name === 'manager') ? 'Staff' : 'You'}
-                                                        </span>
-                                                    )}
-                                                </p>
-                                                {history.notes && (
-                                                    <div className="bg-muted/50 p-2 rounded text-xs mt-1 text-gray-700 border border-muted">
-                                                        {history.notes}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
+                                                </div>
+                                            ))
+                                    })()}
                                     {(!order.order_status_history || order.order_status_history.length === 0) && (
                                         <p className="text-sm text-muted-foreground ml-6">No history available.</p>
                                     )}
@@ -814,7 +833,7 @@ export default function UserOrderDetail() {
                         })()}
                     </div>
                 </div>
-            </div>
+            </div >
         </>
     );
 }
