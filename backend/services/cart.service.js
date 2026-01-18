@@ -3,30 +3,16 @@ const logger = require('../utils/logger');
 const { validateCoupon, calculateCouponDiscount } = require('./coupon.service');
 const settingsService = require('./settings.service');
 
-// Delivery settings cache (5-minute TTL)
-let deliverySettingsCache = null;
-let deliverySettingsCacheTime = 0;
-const DELIVERY_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Get cached delivery settings
+ * Get delivery settings (hits DB via SettingsService)
  */
 async function getCachedDeliverySettings() {
-    const now = Date.now();
-    if (deliverySettingsCache && (now - deliverySettingsCacheTime) < DELIVERY_CACHE_TTL) {
-        return deliverySettingsCache;
-    }
-    deliverySettingsCache = await settingsService.getDeliverySettings();
-    deliverySettingsCacheTime = now;
-    return deliverySettingsCache;
+    return await settingsService.getDeliverySettings();
 }
 
-/**
- * Invalidate delivery settings cache (call when settings are updated)
- */
 function invalidateDeliverySettingsCache() {
-    deliverySettingsCache = null;
-    deliverySettingsCacheTime = 0;
+    // No-op as we removed in-memory cache for production robustness
 }
 
 /**
@@ -529,6 +515,9 @@ async function calculateCartTotals(userId, guestId, existingCart = null, { skipV
         // Calculate final amount (including delivery GST)
         const finalAmount = (totalPrice - couponDiscount) + totalDeliveryCharge + totalDeliveryGST;
 
+        // Get current delivery settings for frontend synchronization
+        const settings = await getCachedDeliverySettings();
+
         return {
             itemsCount: cartItems.reduce((sum, item) => sum + item.quantity, 0),
             totalMrp: Math.round(totalMrp * 100) / 100,
@@ -543,7 +532,12 @@ async function calculateCartTotals(userId, guestId, existingCart = null, { skipV
             productDeliveryGST: Math.round(productDeliveryGST * 100) / 100,
             finalAmount: Math.round(finalAmount * 100) / 100,
             coupon,
-            itemBreakdown: itemLevelBreakdown
+            itemBreakdown: itemLevelBreakdown,
+            deliverySettings: {
+                threshold: settings.delivery_threshold,
+                charge: settings.delivery_charge,
+                gst: settings.delivery_gst
+            }
         };
     } catch (error) {
         logger.error({ err: error }, 'Error calculating cart totals:');

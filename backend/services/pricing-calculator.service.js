@@ -126,6 +126,11 @@ class PricingCalculator {
                 // Delivery
                 deliveryCharge: Math.round(deliveryCharge * 100) / 100,
                 freeDeliveryThreshold: settings.delivery_threshold,
+                deliverySettings: {
+                    threshold: settings.delivery_threshold,
+                    charge: settings.delivery_charge,
+                    gst: settings.delivery_gst
+                },
 
                 // Final
                 finalAmount: Math.round(finalAmount * 100) / 100,

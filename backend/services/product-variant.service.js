@@ -443,6 +443,44 @@ async function createProductWithVariants(productData, variants) {
         variantCount: data?.variant_ids?.length || 0
     }, Date.now() - startTime);
 
+    // --- HANDLE DELIVERY CONFIGS ---
+    if (variants && variants.length > 0) {
+        (async () => {
+            try {
+                // Map created variant IDs using size_label as key
+                const { data: createdVariants } = await supabase
+                    .from('product_variants')
+                    .select('id, size_label')
+                    .in('id', data.variant_ids);
+
+                if (createdVariants) {
+                    const variantMap = new Map(createdVariants.map(v => [v.size_label, v.id]));
+                    const configInserts = [];
+
+                    for (const v of variants) {
+                        if (v.delivery_config && variantMap.has(v.size_label)) {
+                            configInserts.push({
+                                ...v.delivery_config,
+                                product_id: data.id,
+                                variant_id: variantMap.get(v.size_label),
+                                scope: 'VARIANT'
+                            });
+                        }
+                    }
+
+                    if (configInserts.length > 0) {
+                        const { error: configError } = await supabase
+                            .from('delivery_configs')
+                            .insert(configInserts);
+                        if (configError) log.error('CREATE_VARIANT_CONFIG_FAIL', configError);
+                    }
+                }
+            } catch (err) {
+                log.error('CREATE_VARIANT_CONFIG_FAIL', err);
+            }
+        })();
+    }
+
     // --- POST-TRANSACTION RAZORPAY SYNC ---
     // User Requirement: Sync only AFTER successful creation
     if (data.variant_ids && data.variant_ids.length > 0) {
@@ -632,6 +670,55 @@ async function updateProductWithVariants(productId, productData, variants) {
         updatedVariants: data?.updated_variants?.length || 0,
         newVariants: data?.new_variants?.length || 0
     }, Date.now() - startTime);
+
+    // --- HANDLE DELIVERY CONFIGS UPDATE ---
+    if (variants && variants.length > 0) {
+        (async () => {
+            try {
+                // For updates, we usually have IDs for existing. For new, we need to fetch.
+                // We can fetch all current variants for this product to be safe
+                const { data: currentVariants } = await supabase
+                    .from('product_variants')
+                    .select('id, size_label')
+                    .eq('product_id', productId);
+
+                if (currentVariants) {
+                    const variantMap = new Map(currentVariants.map(v => [v.size_label, v.id]));
+                    // Also map by ID if available in input, for simpler lookup
+                    currentVariants.forEach(v => variantMap.set(v.id, v.id));
+
+                    const configUpserts = [];
+
+                    for (const v of variants) {
+                        // v.id might be present (update) or missing (new)
+                        // Try to find resolved ID
+                        const resolvedId = v.id || variantMap.get(v.size_label);
+
+                        if (resolvedId && v.delivery_config) {
+                            configUpserts.push({
+                                ...v.delivery_config,
+                                product_id: productId,
+                                variant_id: resolvedId,
+                                scope: 'VARIANT',
+                                updated_at: new Date().toISOString()
+                            });
+                        }
+                    }
+
+                    if (configUpserts.length > 0) {
+                        // We upsert. Conflict is likely (variant_id, scope)
+                        const { error: configError } = await supabase
+                            .from('delivery_configs')
+                            .upsert(configUpserts, { onConflict: 'variant_id,scope' }); // Assuming unique constraint
+
+                        if (configError) log.error('UPDATE_VARIANT_CONFIG_FAIL', configError);
+                    }
+                }
+            } catch (err) {
+                log.error('UPDATE_VARIANT_CONFIG_FAIL', err);
+            }
+        })();
+    }
 
     // --- POST-TRANSACTION RAZORPAY SYNC ---
     const allAffectedVariantIds = [

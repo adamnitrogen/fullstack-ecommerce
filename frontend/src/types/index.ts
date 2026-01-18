@@ -531,6 +531,11 @@ export interface CartTotals {
     taxType: 'INTRA_STATE' | 'INTER_STATE';
     isInterState: boolean;
   };
+  deliverySettings?: {
+    threshold: number;
+    charge: number;
+    gst: number;
+  };
 }
 
 export interface DeliverySettings {

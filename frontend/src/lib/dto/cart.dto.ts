@@ -30,10 +30,11 @@ export class CartDTO {
      * transforms Backend Cart Response to Frontend Cart structure (items + totals)
      * if needed for state updates
      */
-    static fromResponse(response: CartResponse): { items: CartItem[], totals: CartResponse['totals'] } {
+    static fromResponse(response: CartResponse): { items: CartItem[], totals: CartResponse['totals'], deliverySettings?: CartResponse['totals']['deliverySettings'] } {
         return {
             items: this.toCartItems(response),
-            totals: response.totals
+            totals: response.totals,
+            deliverySettings: response.totals.deliverySettings
         };
     }
 }

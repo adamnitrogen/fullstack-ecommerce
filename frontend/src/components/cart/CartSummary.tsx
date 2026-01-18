@@ -51,12 +51,14 @@ export const CartSummary = ({
         }
     };
 
+    const effectiveThreshold = totals?.deliverySettings?.threshold ?? deliverySettings.threshold;
+
     const deliveryProgress = totals
-        ? Math.min((totals.totalPrice / deliverySettings.threshold) * 100, 100)
+        ? Math.min((totals.totalPrice / effectiveThreshold) * 100, 100)
         : 0;
 
     const remainingForFreeDelivery = totals
-        ? Math.max(deliverySettings.threshold - totals.totalPrice, 0)
+        ? Math.max(effectiveThreshold - totals.totalPrice, 0)
         : 0;
 
     return (

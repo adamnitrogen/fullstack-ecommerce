@@ -161,20 +161,20 @@ export const useCartStore = create<CartState>()((set, get) => {
       set({ isLoading: true });
       try {
         const response = await cartService.getCart();
-        const { items, totals } = CartDTO.fromResponse(response);
+        const { items, totals, deliverySettings } = CartDTO.fromResponse(response);
 
         // Coordination: Only apply if no requests were started while we were fetching
         if (pendingRequests === 0) {
-          set({
+          set((state) => ({
             items,
             totals,
             initialized: true,
-            isLoading: false
-          });
-          // Also fetch delivery settings if not yet fetched or periodically
-          if (get().deliverySettings.threshold === 1500) {
-            get().fetchDeliverySettings();
-          }
+            isLoading: false,
+            deliverySettings: deliverySettings ? {
+              threshold: deliverySettings.threshold,
+              charge: deliverySettings.charge
+            } : state.deliverySettings
+          }));
         }
       } catch (error: unknown) {
         if (axios.isAxiosError(error) && error.response?.status === 401) {
@@ -232,10 +232,17 @@ export const useCartStore = create<CartState>()((set, get) => {
       return queueAction(async () => {
         try {
           const response = await cartService.addItem(product.id, quantity, variantId);
-          const { items, totals } = CartDTO.fromResponse(response);
+          const { items, totals, deliverySettings } = CartDTO.fromResponse(response);
 
           if (pendingRequests === 1) {
-            set({ items, totals });
+            set((state) => ({
+              items,
+              totals,
+              deliverySettings: deliverySettings ? {
+                threshold: deliverySettings.threshold,
+                charge: deliverySettings.charge
+              } : state.deliverySettings
+            }));
           }
         } catch (error: unknown) {
           await get().fetchCart();
@@ -284,10 +291,17 @@ export const useCartStore = create<CartState>()((set, get) => {
       return queueAction(async () => {
         try {
           const response = await cartService.removeItem(productId, variantId);
-          const { items, totals } = CartDTO.fromResponse(response);
+          const { items, totals, deliverySettings } = CartDTO.fromResponse(response);
 
           if (pendingRequests === 1) {
-            set({ items, totals });
+            set((state) => ({
+              items,
+              totals,
+              deliverySettings: deliverySettings ? {
+                threshold: deliverySettings.threshold,
+                charge: deliverySettings.charge
+              } : state.deliverySettings
+            }));
           }
         } catch (error) {
           await get().fetchCart();
@@ -348,10 +362,18 @@ export const useCartStore = create<CartState>()((set, get) => {
         queueAction(async () => {
           try {
             const response = await cartService.updateItem(productId, quantity, variantId);
-            const { items, totals } = CartDTO.fromResponse(response);
+            const { items, totals, deliverySettings } = CartDTO.fromResponse(response);
 
             if (pendingRequests === 1) {
-              set({ items, totals, isCalculating: false });
+              set((state) => ({
+                items,
+                totals,
+                isCalculating: false,
+                deliverySettings: deliverySettings ? {
+                  threshold: deliverySettings.threshold,
+                  charge: deliverySettings.charge
+                } : state.deliverySettings
+              }));
             }
             delete updateTimeouts[itemKey];
           } catch (error: unknown) {
@@ -383,9 +405,18 @@ export const useCartStore = create<CartState>()((set, get) => {
       set({ isLoading: true, isCalculating: true });
       try {
         const response = await cartService.applyCoupon(code);
-        const { items, totals } = CartDTO.fromResponse(response);
+        const { items, totals, deliverySettings } = CartDTO.fromResponse(response);
 
-        set({ items, totals, isLoading: false, isCalculating: false });
+        set((state) => ({
+          items,
+          totals,
+          isLoading: false,
+          isCalculating: false,
+          deliverySettings: deliverySettings ? {
+            threshold: deliverySettings.threshold,
+            charge: deliverySettings.charge
+          } : state.deliverySettings
+        }));
         toast.success("Coupon applied successfully");
         return true;
       } catch (error: unknown) {
@@ -400,9 +431,18 @@ export const useCartStore = create<CartState>()((set, get) => {
       set({ isLoading: true, isCalculating: true });
       try {
         const response = await cartService.removeCoupon();
-        const { items, totals } = CartDTO.fromResponse(response);
+        const { items, totals, deliverySettings } = CartDTO.fromResponse(response);
 
-        set({ items, totals, isLoading: false, isCalculating: false });
+        set((state) => ({
+          items,
+          totals,
+          isLoading: false,
+          isCalculating: false,
+          deliverySettings: deliverySettings ? {
+            threshold: deliverySettings.threshold,
+            charge: deliverySettings.charge
+          } : state.deliverySettings
+        }));
         toast.success("Coupon removed");
       } catch (error) {
         set({ isLoading: false, isCalculating: false });

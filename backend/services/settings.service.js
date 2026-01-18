@@ -7,26 +7,13 @@ const logger = require('../utils/logger');
  */
 
 // Cache for settings to avoid redundant DB calls on every cart calculation
-let settingsCache = {
-    data: null,
-    expiry: 0
-};
-
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 function clearSettingsCache() {
-    settingsCache = {
-        data: null,
-        expiry: 0
-    };
+    // No-op: Cache removed
 }
 
 async function getDeliverySettings() {
     try {
-        const now = Date.now();
-        if (settingsCache.data && now < settingsCache.expiry) {
-            return settingsCache.data;
-        }
 
         const { data, error } = await supabase
             .from('store_settings')
@@ -47,11 +34,6 @@ async function getDeliverySettings() {
             delivery_gst: settings.delivery_gst ?? 0 // Default to 0% GST if not set
         };
 
-        // Update cache
-        settingsCache = {
-            data: result,
-            expiry: now + CACHE_DURATION
-        };
 
         return result;
     } catch (error) {
@@ -106,7 +88,6 @@ async function updateDeliverySettings(settings) {
             if (res.error) throw res.error;
         }
 
-        clearSettingsCache();
         return await getDeliverySettings();
     } catch (error) {
         logger.error({ err: error }, 'Error updating delivery settings:');

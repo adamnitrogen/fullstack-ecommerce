@@ -343,6 +343,13 @@ class ProductService {
             delete productData.delivery_charge;
         }
 
+        // Extract delivery config if present
+        let deliveryConfig = null;
+        if (productData.delivery_config) {
+            deliveryConfig = productData.delivery_config;
+            delete productData.delivery_config;
+        }
+
         const { data, error } = await supabase
             .from('products')
             .update(productData)
@@ -351,6 +358,31 @@ class ProductService {
             .single();
 
         if (error) throw error;
+
+        // Handle Delivery Config Update
+        if (deliveryConfig) {
+            try {
+                // Determine if we should update or delete (if explicitly null/empty?)
+                // Usually payload contains the config to set.
+                // We upsert based on product_id and scope
+                const { error: configError } = await supabase
+                    .from('delivery_configs')
+                    .upsert({
+                        ...deliveryConfig,
+                        product_id: id,
+                        scope: 'PRODUCT',
+                        variant_id: null,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'product_id,scope,variant_id' }); // Assuming unique constraint exists
+
+                if (configError) {
+                    logger.error('Error updating delivery config for product:', configError);
+                }
+            } catch (err) {
+                logger.error('Exception updating delivery config:', err);
+            }
+        }
+
         return data;
     }
 
