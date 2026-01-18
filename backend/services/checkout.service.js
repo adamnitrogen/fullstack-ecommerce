@@ -419,8 +419,8 @@ const createOrder = async (userId, checkoutData, cart) => {
         coupon_discount: totals.couponDiscount || 0,
         delivery_charge: totals.deliveryCharge || 0,
         delivery_gst: totals.deliveryGST || 0,
-        // Refund Metadata
-        is_delivery_refundable: !(totals.deliveryCharge > 0 && (totals.globalDeliveryCharge > 0 || totals.itemBreakdown?.some(i => i.delivery_meta?.delivery_refund_policy === 'NON_REFUNDABLE'))),
+        // Refund Metadata: Will be re-calculated based on item snapshots
+        is_delivery_refundable: true,
         delivery_tax_type: 'GST', // System default for now
         status: 'pending', // Orders start as pending until admin/manager confirms
         payment_status: 'paid',
@@ -431,6 +431,9 @@ const createOrder = async (userId, checkoutData, cart) => {
         total_sgst: (taxResult?.summary.totalSgst || 0) + ((!taxResult?.summary.isInterState && totals.deliveryGST) ? (totals.deliveryGST / 2) : 0),
         total_igst: (taxResult?.summary.totalIgst || 0) + ((taxResult?.summary.isInterState && totals.deliveryGST) ? totals.deliveryGST : 0)
     };
+
+    // Determine free delivery status for item calculations
+    const isFreeDelivery = totals.totalPrice >= (totals.deliverySettings?.threshold || 0);
 
     // Prepare order items with tax and delivery snapshots
     const orderItems = [];
@@ -452,10 +455,6 @@ const createOrder = async (userId, checkoutData, cart) => {
         let deliverySnapshot = null;
 
         try {
-            const settingsService = require('./settings.service');
-            const globalSettings = await settingsService.getDeliverySettings();
-            const isFreeDelivery = totals.totalPrice >= (globalSettings.delivery_threshold || 0);
-
             const deliveryResult = await DeliveryChargeService.calculateDeliveryCharge(
                 item.product_id,
                 item.variant_id,
@@ -463,24 +462,35 @@ const createOrder = async (userId, checkoutData, cart) => {
                 isFreeDelivery
             );
 
-            // If it's a global charge, only apply it to the first item that uses it
-            // This mirrors the logic in DeliveryChargeService.calculateCartDelivery
+            itemDeliveryCharge = deliveryResult.deliveryCharge;
+            itemDeliveryGST = deliveryResult.deliveryGST;
+            deliverySnapshot = deliveryResult.snapshot;
+
+            // If it's a global charge, mark it
             if (deliveryResult.snapshot.source === 'global') {
-                if (!globalDeliveryApplied) {
-                    itemDeliveryCharge = deliveryResult.deliveryCharge;
-                    itemDeliveryGST = deliveryResult.deliveryGST;
-                    deliverySnapshot = deliveryResult.snapshot;
-                    globalDeliveryApplied = true;
-                } else {
-                    itemDeliveryCharge = 0;
-                    itemDeliveryGST = 0;
-                    deliverySnapshot = { ...deliveryResult.snapshot, base_delivery_charge: 0, applied_as_global: true };
-                }
-            } else {
-                // Product/Variant specific charges are always applied
-                itemDeliveryCharge = deliveryResult.deliveryCharge;
-                itemDeliveryGST = deliveryResult.deliveryGST;
-                deliverySnapshot = deliveryResult.snapshot;
+                globalDeliveryApplied = true;
+            }
+
+            // CRITICAL: If this is the first item and we have a global base charge (surcharge mode),
+            // attribute it here so it's captured in snapshots and its policy is respected.
+            if (!globalDeliveryApplied && totals.globalDeliveryCharge > 0 && index === 0) {
+                itemDeliveryCharge += totals.globalDeliveryCharge;
+                itemDeliveryGST += totals.globalDeliveryGST;
+                // Determine final policy: If already NON_REFUNDABLE (surcharge), keep it. 
+                // Otherwise, set to PARTIAL to indicate hybrid (Refundable Surcharge + Non-Refundable Global).
+                const finalPolicy = (deliverySnapshot.delivery_refund_policy === 'NON_REFUNDABLE')
+                    ? 'NON_REFUNDABLE'
+                    : 'PARTIAL';
+
+                deliverySnapshot = {
+                    ...deliverySnapshot,
+                    base_delivery_charge: (deliverySnapshot.base_delivery_charge || 0) + totals.globalDeliveryCharge,
+                    delivery_refund_policy: finalPolicy,
+                    is_global_surcharge: true,
+                    non_refundable_delivery_charge: totals.globalDeliveryCharge,
+                    non_refundable_delivery_gst: totals.globalDeliveryGST
+                };
+                globalDeliveryApplied = true;
             }
         } catch (error) {
             logger.warn({ err: error, product_id: item.product_id }, 'Failed to calculate item delivery');
@@ -527,7 +537,16 @@ const createOrder = async (userId, checkoutData, cart) => {
         });
     }
 
-    logger.info({ userId, itemCount: orderItems.length, hasTax: !!taxResult }, '[Checkout] Creating order via transactional RPC');
+    // RE-CALCULATE REFUNDABILITY based on actual snapshots
+    // Ensure we strictly respect 'NON_REFUNDABLE' if any component has it
+    const hasNonRefundableCharge = orderItems.some(item =>
+        (item.delivery_charge > 0) &&
+        item.delivery_calculation_snapshot?.delivery_refund_policy === 'NON_REFUNDABLE'
+    );
+
+    orderData.is_delivery_refundable = !hasNonRefundableCharge;
+
+    logger.info({ userId, itemCount: orderItems.length, hasTax: !!taxResult, isDeliveryRefundable: orderData.is_delivery_refundable }, '[Checkout] Creating order via transactional RPC');
 
     // ATOMIC TRANSACTION: All operations execute together or none do
     // Creates: order, order_items, payment link, admin notifications, 
@@ -561,7 +580,8 @@ const createOrder = async (userId, checkoutData, cart) => {
 
     const presentationItems = orderItems.map(item => {
         const snap = item.delivery_calculation_snapshot || {};
-        const isRefundable = (snap.source !== 'global' && snap.delivery_refund_policy === 'REFUNDABLE');
+        // Fix: Respect policy regardless of source
+        const isRefundable = (snap.delivery_refund_policy === 'REFUNDABLE');
 
         if (isRefundable) {
             refundableDeliveryTotal += (item.delivery_charge || 0);

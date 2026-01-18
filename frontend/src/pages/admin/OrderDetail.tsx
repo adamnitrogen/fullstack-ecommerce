@@ -23,7 +23,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, MapPin, Phone, Mail, CreditCard, Package, Clock, Truck, User, FileText } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, Mail, CreditCard, Package, Clock, Truck, User, FileText, Info, IndianRupee } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
@@ -33,6 +33,8 @@ import { TaxBreakdown } from "@/components/orders/TaxBreakdown";
 
 interface OrderStatusHistory {
     status: string;
+    event_type?: string;
+    actor?: string;
     created_at: string;
     updated_by: string;
     notes?: string;
@@ -527,22 +529,50 @@ export default function OrderDetail() {
                                                     order.payment_status === 'refund_initiated' ? 'outline' :
                                                         'secondary'
                                         }
-                                        className={`mt-1 uppercase ${order.payment_status === 'refund_initiated' ? 'bg-blue-500 text-white' :
-                                            order.payment_status === 'refunded' ? 'bg-green-500 text-white' : ''
-                                            }`}
+                                        className={`mt-1 uppercase ${order.payment_status === 'paid' ? 'bg-green-600 text-white' :
+                                            order.payment_status === 'refund_initiated' ? 'bg-blue-500 text-white' :
+                                                order.payment_status === 'refunded' ? 'bg-red-500 text-white' : ''}`}
                                     >
-                                        {order.payment_status?.replace(/_/g, ' ')}
+                                        {order.payment_status === 'partially_refunded' ? 'Partially Refunded' : order.payment_status?.replace(/_/g, ' ')}
                                     </Badge>
                                 </div>
                                 <div>
-                                    <p className="text-muted-foreground">Payment ID</p>
-                                    <p className="font-mono mt-1">{order.payment_id || "N/A"}</p>
+                                    <p className="text-muted-foreground">Original Transaction Amount</p>
+                                    <p className="font-medium mt-1">₹{(order.total_amount || 0).toFixed(2)}</p>
                                 </div>
+
+                                {order.payment_id && (
+                                    <div className="col-span-2 pt-2 border-t border-dashed mt-2">
+                                        <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold mb-2">Razorpay Metadata</p>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <p className="text-muted-foreground text-[11px]">Payment ID</p>
+                                                <code className="bg-muted px-1 rounded text-[10px] break-all">{order.payment_id}</code>
+                                            </div>
+                                            {order.invoice_id && (
+                                                <div>
+                                                    <p className="text-muted-foreground text-[11px]">Invoice ID</p>
+                                                    <code className="bg-muted px-1 rounded text-[10px] break-all">{order.invoice_id}</code>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {order.payment_status === 'partially_refunded' && (
+                                    <div className="col-span-2 p-2 bg-amber-50 border border-amber-200 rounded text-[11px] text-amber-800 flex items-start gap-2 mt-2">
+                                        <Info size={14} className="mt-0.5 shrink-0" />
+                                        <p>
+                                            <strong>Admin Note:</strong> This order has been partially refunded.
+                                            The breakdown in the Tax Summary reflects the fully loaded financials.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Dual Invoice Downloads */}
                             <div className="flex flex-col gap-2 mt-4 pt-4 border-t">
-                                <p className="text-xs font-medium text-muted-foreground uppercase">Invoices</p>
+                                <p className="text-xs font-medium text-muted-foreground uppercase">Linked Documents</p>
                                 <div className="flex gap-2 flex-wrap">
                                     {/* 1. Razorpay Receipt */}
                                     {order.invoices?.find(i => i.type === 'RAZORPAY')?.public_url ? (
@@ -552,7 +582,7 @@ export default function OrderDetail() {
                                             className="h-8 text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200"
                                             onClick={() => window.open(order.invoices?.find(i => i.type === 'RAZORPAY')?.public_url, '_blank')}
                                         >
-                                            <FileText className="mr-1.5 h-3 w-3" /> Receipt
+                                            <FileText className="mr-1.5 h-3 w-3" /> Razorpay Receipt
                                         </Button>
                                     ) : (
                                         order.payment_status === 'paid' && (
@@ -561,7 +591,7 @@ export default function OrderDetail() {
                                     )}
 
                                     {/* 2. Tax Invoice */}
-                                    {(order.invoice_url || order.invoices?.find(i => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type))) ? (
+                                    {(order.invoice_url || order.invoices?.find(i => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type))) && (
                                         <Button
                                             variant="outline"
                                             size="sm"
@@ -575,61 +605,67 @@ export default function OrderDetail() {
                                                 }
                                             }}
                                         >
-                                            <FileText className="mr-1.5 h-3 w-3" /> Tax Invoice
+                                            <FileText className="mr-1.5 h-3 w-3" /> Download GST Invoice
                                         </Button>
-                                    ) : (
-                                        order.status === 'delivered' && (
-                                            <span className="text-xs text-orange-600 animate-pulse">Generating Invoice...</span>
-                                        )
                                     )}
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
 
-                    {/* Status History */}
-                    {order.order_status_history && order.order_status_history.length > 0 && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <Clock className="h-5 w-5" />
-                                    Order History
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    {order.order_status_history.map((history, index) => (
-                                        <div key={index} className="flex gap-4 items-start border-l-2 border-muted pl-4 ml-2 pb-4 last:pb-0">
-                                            <div className="flex-1">
-                                                <div className="font-medium text-sm flex items-center gap-2">
-                                                    Status changed to <Badge variant="outline">{history.status.toUpperCase()}</Badge>
+                    {/* Order History Timeline */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Clock className="h-5 w-5" />
+                                Timeline & Audit Log
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-6">
+                                {(order.order_status_history || [])
+                                    .slice()
+                                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                                    .map((history, idx) => (
+                                        <div key={idx} className="relative pl-6 pb-4 last:pb-0">
+                                            {/* Connector */}
+                                            {idx !== (order.order_status_history?.length || 0) - 1 && (
+                                                <div className="absolute left-2.5 top-2 bottom-0 w-[1px] bg-muted" />
+                                            )}
+                                            {/* Dot */}
+                                            <div className="absolute left-0 top-1.5 w-5 h-5 rounded-full border bg-background z-10 flex items-center justify-center">
+                                                <div className={`w-2 h-2 rounded-full ${idx === 0 ? 'bg-primary' : 'bg-muted-foreground'}`} />
+                                            </div>
+                                            <div>
+                                                <div className="flex justify-between items-start">
+                                                    <p className="text-sm font-semibold capitalize">
+                                                        {/* Prefer Event Type for display if set, else status */}
+                                                        {(history.event_type || history.status).replace(/_/g, ' ')}
+                                                    </p>
+                                                    <time className="text-[10px] text-muted-foreground">
+                                                        {format(new Date(history.created_at), "MMM d, HH:mm")}
+                                                    </time>
                                                 </div>
-                                                <p className="text-xs text-muted-foreground mt-1">
-                                                    {(() => {
-                                                        const date = new Date(history.created_at);
-                                                        return !isNaN(date.getTime()) ? format(date, "PPP p") : "Date N/A";
-                                                    })()}
-                                                    {history.updater ? (
-                                                        <span className="ml-2">
-                                                            by {history.updater.first_name || history.updater.email}
-                                                            <span className="text-xs bg-muted px-1 rounded ml-1 uppercase border">
-                                                                {history.updater.role_data?.name || 'N/A'}
-                                                            </span>
-                                                        </span>
+                                                <p className="text-xs text-muted-foreground mt-1 bg-muted/20 p-2 rounded italic">
+                                                    {history.notes || `Transitioned to ${history.status}`}
+                                                </p>
+                                                <p className="text-[9px] text-muted-foreground mt-1 flex items-center gap-1">
+                                                    <User size={10} />
+                                                    {/* Show Actor explicitly if available */}
+                                                    {history.actor ? (
+                                                        <span className="font-medium">{history.actor}</span>
+                                                    ) : history.updater ? (
+                                                        <span>{history.updater.first_name || history.updater.email} ({history.updater.role_data?.name || 'Staff'})</span>
                                                     ) : (
-                                                        <span className="ml-2">by {history.updated_by || 'System'}</span>
+                                                        <span>{history.updated_by || 'System'}</span>
                                                     )}
                                                 </p>
-                                                {history.notes && (
-                                                    <p className="text-sm mt-1 text-gray-600">{history.notes}</p>
-                                                )}
                                             </div>
                                         </div>
                                     ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
+                            </div>
+                        </CardContent>
+                    </Card>
 
                     {/* Email History */}
                     {order.email_logs && order.email_logs.length > 0 && (
@@ -753,45 +789,26 @@ export default function OrderDetail() {
                         </CardContent>
                     </Card>
 
-                    {/* Tax Summary */}
-                    {/* Tax Summary - Smart Handling for Legacy vs New Data */}
-                    {(() => {
-                        // Calculate stored tax sum logic
-                        const storedTaxable = order.total_taxable_amount || 0;
-                        const storedTax = (order.total_cgst || 0) + (order.total_sgst || 0) + (order.total_igst || 0);
-                        const storedSum = storedTaxable + storedTax;
-
-                        // Calculate expected total including delivery
-                        const deliveryCharge = order.delivery_charge || 0;
-                        const deliveryGST = order.delivery_gst || 0;
-                        const totalAmount = order.total_amount || 0;
-
-                        // Check mismatch (Legacy: storedSum ~= ProductTotal vs TotalAmount ~= ProductTotal + Delivery)
-                        const isLegacyMismatch = Math.abs(totalAmount - storedSum) > 1.0;
-
-                        // If mismatch, we inject delivery components to make visual math work
-                        // This ensures: Taxable (Product + Delivery) + Tax (Product + Delivery) = Grand Total
-                        const effectiveTaxable = isLegacyMismatch ? (storedTaxable + deliveryCharge) : storedTaxable;
-
-                        // For tax breakdown, we need to distribute delivery GST appropriately
-                        // If IGST > 0, assume interstate. Else intrastate.
-                        const isInterstate = (order.total_igst || 0) > 0;
-
-                        return (
-                            <TaxBreakdown
-                                totalTaxableAmount={effectiveTaxable}
-                                totalCgst={order.total_cgst}
-                                totalSgst={order.total_sgst}
-                                totalIgst={order.total_igst}
-                                totalAmount={totalAmount}
-                                showInvoiceLink={order.status === 'delivered' || !!order.invoice_url}
-                                invoiceUrl={order.invoice_url}
-                                items={order.items}
-                                deliveryCharge={deliveryCharge}
-                                deliveryGST={deliveryGST}
-                            />
-                        );
-                    })()}
+                    <TaxBreakdown
+                        totalTaxableAmount={(() => {
+                            // If we have a legacy mismatch (Total != ComponentSum), 
+                            // we pass the reconciled total taxable to the component.
+                            const storedSum = (order.total_taxable_amount || 0) + (order.total_cgst || 0) + (order.total_sgst || 0) + (order.total_igst || 0);
+                            const totalAmount = order.total_amount || 0;
+                            const isLegacyMismatch = Math.abs(totalAmount - storedSum) > 1.0;
+                            return isLegacyMismatch ? (order.total_taxable_amount || 0) + (order.delivery_charge || 0) : (order.total_taxable_amount || 0);
+                        })()}
+                        totalCgst={order.total_cgst}
+                        totalSgst={order.total_sgst}
+                        totalIgst={order.total_igst}
+                        totalAmount={order.total_amount}
+                        showInvoiceLink={order.status === 'delivered' || !!order.invoice_url}
+                        invoiceUrl={order.invoice_url}
+                        items={order.items}
+                        deliveryCharge={order.delivery_charge || 0}
+                        deliveryGST={order.delivery_gst || 0}
+                        role="admin"
+                    />
 
                     {!order.invoice_url && order.payment_status === 'paid' && (
                         <Card>

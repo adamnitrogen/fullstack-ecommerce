@@ -74,6 +74,8 @@ interface OrderResponse {
     }>;
     order_status_history?: Array<{
         status: string;
+        event_type?: string;
+        actor?: string;
         created_at: string;
         notes?: string;
         updater?: { role_data?: { name: string } };
@@ -622,7 +624,7 @@ export default function UserOrderDetail() {
                                             <div key={index} className="ml-6 relative">
                                                 <span className="absolute -left-[1.65rem] top-1 h-3 w-3 rounded-full bg-primary border-2 border-background ring-2 ring-muted" />
                                                 <p className="font-medium text-sm capitalize">
-                                                    {history.status.replace(/_/g, ' ')}
+                                                    {(history.event_type || history.status).replace(/_/g, ' ')}
                                                 </p>
                                                 <p className="text-xs text-muted-foreground mb-1">
                                                     {format(new Date(history.created_at), "PPP p")}
@@ -709,10 +711,10 @@ export default function UserOrderDetail() {
                                     <div>
                                         <span className="text-muted-foreground">Payment Status:</span>
                                         <Badge variant={(order.paymentStatus || order.payment_status) === 'paid' ? 'default' :
-                                            (order.paymentStatus || order.payment_status) === 'refunded' ? 'destructive' :
+                                            ((order.paymentStatus || order.payment_status) === 'refunded' || (order.paymentStatus || order.payment_status) === 'partially_refunded') ? 'destructive' :
                                                 (order.paymentStatus || order.payment_status) === 'refund_initiated' ? 'outline' : 'secondary'}
                                             className="ml-2 uppercase">
-                                            {(order.paymentStatus || order.payment_status)?.replace(/_/g, ' ')}
+                                            {(order.paymentStatus || order.payment_status) === 'partially_refunded' ? 'Refunded' : (order.paymentStatus || order.payment_status)?.replace(/_/g, ' ')}
                                         </Badge>
                                         {(order.paymentStatus === 'refund_initiated' || order.payment_status === 'refund_initiated') && (
                                             <p className="text-xs text-orange-600 mt-1 font-medium">
@@ -779,6 +781,7 @@ export default function UserOrderDetail() {
                                     items={order.items}
                                     deliveryCharge={deliveryCharge}
                                     deliveryGST={deliveryGST}
+                                    role="customer"
                                 />
                             );
                         })()}

@@ -251,7 +251,9 @@ async function handleEventWebhook(event, payment, notes) {
 /**
  * Handle E-commerce Order Webhook
  */
-async function handleOrderWebhook(event, data, payment) {
+// ... (imports remain same)
+
+async function handleOrderWebhook(event, payload, payment) {
     if (event === 'payment.captured' && payment) {
         const { data: dbPayment } = await supabase
             .from('payments')
@@ -260,8 +262,13 @@ async function handleOrderWebhook(event, data, payment) {
             .single();
 
         if (dbPayment) {
+            if (dbPayment.status === 'PAYMENT_SUCCESS') {
+                logger.info(`Idempotency: Payment ${dbPayment.id} already captured`);
+                return;
+            }
+
             await updatePaymentRecord(dbPayment.id, {
-                status: 'captured',
+                status: 'PAYMENT_SUCCESS', // Standardized robust status
                 razorpay_payment_id: payment.id,
                 method: payment.method,
                 updated_at: new Date().toISOString()
@@ -270,17 +277,27 @@ async function handleOrderWebhook(event, data, payment) {
             if (dbPayment.order_id) {
                 const { data: updatedOrder } = await supabase
                     .from('orders')
-                    .update({ paymentStatus: 'paid', status: 'confirmed' })
+                    .update({
+                        payment_status: 'paid', // Keep 'paid' for backward compatibility or UI mapping -> maps to PAYMENT_SUCCESS
+                        status: 'confirmed',
+                        updated_at: new Date().toISOString() // Fixed case from updatedAt
+                    })
                     .eq('id', dbPayment.order_id)
                     .select('*, order_items(*)')
                     .single();
+
+                // Log Timeline: PAYMENT_SUCCESS
+                await require('./order.service').logStatusHistory(
+                    dbPayment.order_id,
+                    'PAYMENT_SUCCESS',
+                    'SYSTEM',
+                    `Payment captured: ${payment.id} via ${payment.method}`
+                );
 
                 // Send Order Confirmation Email
                 if (updatedOrder) {
                     try {
                         const items = updatedOrder.order_items || [];
-
-                        // Ensure invoice link is present for the email
                         if (!updatedOrder.invoice_url) {
                             try {
                                 const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
@@ -291,6 +308,8 @@ async function handleOrderWebhook(event, data, payment) {
                                 });
                                 if (result.success && result.invoiceUrl) {
                                     updatedOrder.invoice_url = result.invoiceUrl;
+                                    // Persist valid invoice URL
+                                    await supabase.from('orders').update({ invoice_url: result.invoiceUrl }).eq('id', updatedOrder.id);
                                 }
                             } catch (invErr) {
                                 logger.warn({ err: invErr }, 'Failed to generate invoice link in webhook');
@@ -298,10 +317,10 @@ async function handleOrderWebhook(event, data, payment) {
                         }
 
                         await emailService.sendOrderConfirmationEmail(
-                            updatedOrder.customer_email,
+                            updatedOrder.customer_email || updatedOrder.customerEmail,
                             {
                                 order: updatedOrder,
-                                customerName: updatedOrder.customer_name
+                                customerName: updatedOrder.customer_name || updatedOrder.customerName
                             },
                             updatedOrder.user_id
                         );
@@ -310,12 +329,11 @@ async function handleOrderWebhook(event, data, payment) {
                     }
                 }
             }
-            logger.info(`Order Payment ${dbPayment.id} captured`);
+            logger.info(`Order Payment ${dbPayment.id} captured (updated to PAYMENT_SUCCESS)`);
         } else {
             logger.warn(`Order Webhook: Payment record not found for ${payment.order_id}`);
         }
     } else if (event === 'payment.failed' && payment) {
-        // ... (Keep existing failure handling)
         const { data: dbPayment } = await supabase
             .from('payments')
             .select('*')
@@ -324,57 +342,129 @@ async function handleOrderWebhook(event, data, payment) {
 
         if (dbPayment) {
             await updatePaymentRecord(dbPayment.id, {
-                status: 'failed',
+                status: 'PAYMENT_FAILED',
                 error_description: payment.error_description || 'Payment Failed via Webhook',
                 updated_at: new Date().toISOString()
             });
-            logger.info(`Order Payment ${dbPayment.id} marked as failed`);
+
+            if (dbPayment.order_id) {
+                await require('./order.service').logStatusHistory(
+                    dbPayment.order_id,
+                    'PAYMENT_FAILED',
+                    'SYSTEM',
+                    `Payment failed: ${payment.error_description || 'Unknown reason'}`
+                );
+            }
+            logger.info(`Order Payment ${dbPayment.id} marked as PAYMENT_FAILED`);
         }
     } else if (event === 'refund.processed' && data.refund) {
-        // Refund has been processed by Razorpay - update status to 'refunded'
-        const refund = data.refund.entity;
-        logger.info(`[Webhook] Refund processed: ${refund.id} for payment ${refund.payment_id}, amount: ₹${refund.amount / 100}`);
+        const refundEntity = data.refund.entity;
+        logger.info(`[Webhook] Refund processed: ${refundEntity.id} for payment ${refundEntity.payment_id}`);
 
+        // 1. Fetch Payment & Existing Refunds
         const { data: dbPayment, error: paymentError } = await supabase
             .from('payments')
-            .select('*')
-            .eq('razorpay_payment_id', refund.payment_id)
+            .select('*, refunds(*)') // Fetch related refunds
+            .eq('razorpay_payment_id', refundEntity.payment_id)
             .single();
 
-        if (paymentError) {
+        if (paymentError || !dbPayment) {
             logger.error(`[Webhook] Error finding payment for refund:`, paymentError);
             return;
         }
 
-        if (dbPayment) {
-            // Update payment status to refunded (only update existing columns)
-            await updatePaymentRecord(dbPayment.id, {
-                status: 'refunded',
+        const refundAmount = Number(refundEntity.amount) / 100;
+        const totalPaid = Number(dbPayment.amount);
+
+        // Calculate total refunded including this new one (if not already recorded in DB sum)
+        // We rely on 'total_refunded_amount' column + this current refund if it's the one being processed.
+        // However, webhooks are async. Safe way: sum all 'PROCESSED' refunds + this one.
+        // Simplest Robust Way: Update this refund status -> Sum all refunds -> Update Payment Status
+
+        // 2. Update Specific Refund Status
+        const { data: updatedRefund, error: refundUpdateError } = await supabase
+            .from('refunds')
+            .update({
+                razorpay_refund_status: 'PROCESSED',
+                status: 'processed',
+                amount: refundAmount, // Ensure strict sync
                 updated_at: new Date().toISOString()
+            })
+            .eq('razorpay_refund_id', refundEntity.id)
+            .select() // Return the record to check type
+            .single();
+
+        // If refund record doesn't exist (e.g. manual RP dashboard refund), create it?
+        // Deployment rule: "Refund type... driven by backend". If missing, it's external.
+        if (!updatedRefund && refundUpdateError) {
+            logger.warn(`[Webhook] Refund record not found for ${refundEntity.id}. Creating default BUSINESS_REFUND.`);
+            // Auto-create for manual dashboard refunds
+            await supabase.from('refunds').insert({
+                payment_id: dbPayment.id,
+                order_id: dbPayment.order_id,
+                razorpay_refund_id: refundEntity.id,
+                amount: refundAmount,
+                refund_type: 'BUSINESS_REFUND', // Default assumption
+                razorpay_refund_status: 'PROCESSED',
+                status: 'processed',
+                reason: 'Manually initiated via Dashboard'
             });
-            logger.info(`[Webhook] Payment ${dbPayment.id} status updated to 'refunded'`);
+        }
 
-            // Update order status to refunded
-            if (dbPayment.order_id) {
-                const { error: orderError } = await supabase
-                    .from('orders')
-                    .update({
-                        paymentStatus: 'refunded',
-                        status: 'refunded',
-                        updatedAt: new Date().toISOString()
-                    })
-                    .eq('id', dbPayment.order_id);
+        // 3. Recalculate Totals
+        // Fetch valid processed refunds to sum up
+        const { data: allRefunds } = await supabase
+            .from('refunds')
+            .select('amount')
+            .eq('payment_id', dbPayment.id)
+            .in('razorpay_refund_status', ['PROCESSED']);
 
-                if (orderError) {
-                    logger.error(`[Webhook] Error updating order status:`, orderError);
-                } else {
-                    logger.info(`[Webhook] Order ${dbPayment.order_id} status updated to 'refunded'`);
-                }
-            }
-        } else {
-            logger.warn(`[Webhook] Payment not found for Razorpay Payment ID: ${refund.payment_id}`);
+        const totalRefunded = allRefunds?.reduce((sum, r) => sum + Number(r.amount), 0) || refundAmount;
+
+        // 4. Determine New Payment Status
+        const isFullRefund = totalRefunded >= totalPaid;
+        const newPaymentStatus = isFullRefund ? 'REFUND_COMPLETED' : 'REFUND_PARTIAL';
+
+        // 5. Update Payment
+        await supabase
+            .from('payments')
+            .update({
+                status: newPaymentStatus,
+                total_refunded_amount: totalRefunded,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', dbPayment.id);
+
+        logger.info(`[Webhook] Payment ${dbPayment.id} updated to ${newPaymentStatus} (Total Refunded: ${totalRefunded})`);
+
+        // 6. Update Order Status & Timeline
+        if (dbPayment.order_id) {
+            const orderStatus = isFullRefund ? 'refunded' : 'partially_refunded'; // UI mapping
+
+            await supabase
+                .from('orders')
+                .update({
+                    payment_status: orderStatus,
+                    status: isFullRefund ? 'refunded' : 'confirmed', // Only full refund cancels order? Or keep confirmed? 
+                    // Usually full refund = order refunded. Partial = order still confirmed/delivered but money back.
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', dbPayment.order_id);
+
+            // Log Timeline match
+            const eventType = isFullRefund ? 'REFUND_COMPLETED' : 'REFUND_PARTIAL';
+            await require('./order.service').logStatusHistory(
+                dbPayment.order_id,
+                orderStatus,
+                'SYSTEM',
+                `Refund processed: ₹${refundAmount}. Total Refunded: ₹${totalRefunded}`,
+                'SYSTEM',
+                eventType
+            );
         }
     }
+
+
 }
 
 module.exports = webhookService;

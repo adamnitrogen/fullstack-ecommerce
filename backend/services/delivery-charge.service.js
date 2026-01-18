@@ -29,7 +29,7 @@ const DEFAULT_CONFIG = {
     unit_weight: 0,
     gst_percentage: 18,
     is_taxable: true,
-    delivery_refund_policy: 'REFUNDABLE'
+    delivery_refund_policy: 'REFUNDABLE' // Reverted to Refundable for generic defaults
 };
 
 class DeliveryChargeService {
@@ -54,7 +54,11 @@ class DeliveryChargeService {
 
                 if (!variantError && variantConfig && variantConfig.is_active !== false) {
                     log.debug('DELIVERY_CONFIG', 'Using variant-level config', { variantId });
-                    return { ...variantConfig, source: 'variant' };
+                    return {
+                        ...variantConfig,
+                        source: 'variant',
+                        delivery_refund_policy: variantConfig.delivery_refund_policy || 'REFUNDABLE'
+                    };
                 }
             }
 
@@ -68,7 +72,11 @@ class DeliveryChargeService {
 
             if (!productError && productConfig && productConfig.is_active !== false) {
                 log.debug('DELIVERY_CONFIG', 'Using product-level config', { productId });
-                return { ...productConfig, source: 'product' };
+                return {
+                    ...productConfig,
+                    source: 'product',
+                    delivery_refund_policy: productConfig.delivery_refund_policy || 'REFUNDABLE'
+                };
             }
 
             // No config found, use global defaults from Settings Service

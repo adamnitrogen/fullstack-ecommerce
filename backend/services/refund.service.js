@@ -21,12 +21,10 @@ class RefundService {
      * Calculate's the eligible refund amount based on business rules.
      * @param {object} order - The order object from DB
      * @param {string} refundType - BUSINESS_REFUND or TECHNICAL_REFUND
+     * @param {Array} items - Optional: Order items with snapshots for granular calculation
      */
-    static calculateRefundAmount(order, refundType) {
+    static calculateRefundAmount(order, refundType, items = []) {
         const totalAmount = Number(order.total_amount || order.totalAmount || 0);
-        const deliveryCharge = Number(order.delivery_charge || 0);
-        const deliveryGst = Number(order.delivery_gst || 0);
-        const isDeliveryRefundable = order.is_delivery_refundable !== false; // Default true
 
         if (refundType === REFUND_TYPES.TECHNICAL_REFUND) {
             return {
@@ -37,7 +35,42 @@ class RefundService {
             };
         }
 
-        // BUSINESS_REFUND: Exclude delivery fees if policy says non-refundable
+        // BUSINESS_REFUND: Check policy
+        // If items are provided, use granular item-level policy
+        if (items && items.length > 0) {
+            let excludedCharge = 0;
+            let excludedGst = 0;
+
+            items.forEach(item => {
+                const snapshot = item.delivery_calculation_snapshot || {};
+
+                // Priority 1: Full policy exclusion (Surcharge Non-Refundable OR Global Non-Refundable)
+                if (snapshot.delivery_refund_policy === 'NON_REFUNDABLE') {
+                    excludedCharge += Number(item.delivery_charge || 0);
+                    excludedGst += Number(item.delivery_gst || 0);
+                }
+                // Priority 2: Explicit partial component (Hybrid: Refundable Surcharge + Non-Refundable Global)
+                else if (snapshot.non_refundable_delivery_charge) {
+                    excludedCharge += Number(snapshot.non_refundable_delivery_charge || 0);
+                    excludedGst += Number(snapshot.non_refundable_delivery_gst || 0);
+                }
+            });
+
+            const refundAmount = totalAmount - excludedCharge - excludedGst;
+
+            return {
+                amount: Math.max(0, Math.round(refundAmount * 100) / 100),
+                excludedCharge,
+                excludedGst,
+                isFullRefund: (excludedCharge + excludedGst) === 0
+            };
+        }
+
+        // Fallback: Use order-level flag (Legacy/Simpler behavior)
+        const deliveryCharge = Number(order.delivery_charge || 0);
+        const deliveryGst = Number(order.delivery_gst || 0);
+        const isDeliveryRefundable = order.is_delivery_refundable !== false; // Default true
+
         if (!isDeliveryRefundable) {
             const excludedCharge = deliveryCharge;
             const excludedGst = deliveryGst;
@@ -77,10 +110,9 @@ class RefundService {
 
             // 1. Fetch Order and Payment Details
             if (isInternalPaymentId) {
-                // Fetch payment first
                 const { data: paymentRecord, error: pError } = await supabase
                     .from('payments')
-                    .select('*, orders(*)')
+                    .select('*, orders(*, order_items(*))')
                     .eq('id', identifier)
                     .single();
 
@@ -92,7 +124,7 @@ class RefundService {
             } else {
                 const { data: orderRecord, error: oError } = await supabase
                     .from('orders')
-                    .select('*, payments!order_id(*)')
+                    .select('*, payments!order_id(*), order_items(*)')
                     .eq('id', identifier)
                     .single();
 
@@ -117,7 +149,6 @@ class RefundService {
                     isFullRefund: false
                 };
             } else if (refundType === REFUND_TYPES.TECHNICAL_REFUND && !order) {
-                // Special case for technical failure before order creation
                 calculation = {
                     amount: Number(payment.amount),
                     excludedCharge: 0,
@@ -125,7 +156,7 @@ class RefundService {
                     isFullRefund: true
                 };
             } else if (order) {
-                calculation = this.calculateRefundAmount(order, refundType);
+                calculation = this.calculateRefundAmount(order, refundType, order.order_items);
             } else {
                 throw new Error('Order data required for non-technical or existing-order refunds');
             }
@@ -145,55 +176,68 @@ class RefundService {
                     order_id: order?.id || 'N/A',
                     refund_type: refundType,
                     initiated_by: initiatedBy,
-                    reason: reason
+                    reason: reason,
+                    db_payment_id: payment.id // Link back to internal payment
                 }
             };
 
             const rpRefund = await razorpay.payments.refund(payment.razorpay_payment_id, refundOptions);
             logger.info(`[RefundService] Razorpay refund successful ID: ${rpRefund.id}`);
 
-            // 4. Log to Audit Table (Immutable record)
-            const { error: auditError } = await supabase
-                .from('refund_audit_logs')
+            // 4. Create Refund Record in DB (Source of Truth for refund type)
+            // Using the updated 'refunds' table from schema migration
+            const { error: refundDbError } = await supabase
+                .from('refunds')
                 .insert({
-                    order_id: order?.id || null, // Might be null for technical failures
-                    payment_id: payment.razorpay_payment_id,
-                    refund_type: refundType,
-                    original_paid_amount: order?.total_amount || payment.amount,
-                    delivery_charge_excluded: calculation.excludedCharge,
-                    delivery_gst_excluded: calculation.excludedGst,
-                    refunded_amount: calculation.amount,
+                    order_id: order?.id || null,
+                    payment_id: payment.id,
                     razorpay_refund_id: rpRefund.id,
-                    initiated_by: initiatedBy,
-                    reason: reason
+                    amount: calculation.amount,
+                    status: 'processing', // Initial status, will be updated by webhook
+                    razorpay_refund_status: 'PENDING',
+                    refund_type: refundType,
+                    reason: reason,
+                    created_at: new Date().toISOString()
                 });
 
-            if (auditError) {
-                logger.error(`[RefundService] Failed to create audit log: ${auditError.message}`);
+            if (refundDbError) {
+                logger.error(`[RefundService] Failed to insert into refunds table: ${refundDbError.message}`);
+                // Critical: We continue because RP refund happened, but we log strictly.
             }
 
-            // 5. Update Statuses
+            // 5. Update Statuses (Initial optimistic update)
+            // The Webhook will facilitate the final transition to REFUND_PARTIAL / REFUND_COMPLETED
             if (order) {
                 await supabase
                     .from('orders')
                     .update({
-                        payment_status: calculation.isFullRefund ? 'refunded' : 'partially_refunded',
+                        payment_status: 'refund_initiated',
                         updated_at: new Date().toISOString()
                     })
                     .eq('id', order.id);
+
+                // Log Timeline
+                await require('./order.service').logStatusHistory(
+                    order.id,
+                    'refund_initiated',
+                    initiatedBy === 'USER' ? order.user_id : (initiatedBy === 'ADMIN' ? 'ADMIN' : 'SYSTEM'),
+                    `Refund initiated for ₹${calculation.amount}. Reason: ${reason}`,
+                    initiatedBy
+                );
             }
 
             await supabase
                 .from('payments')
                 .update({
-                    status: calculation.isFullRefund ? 'refunded' : 'partially_refunded',
+                    status: 'refund_initiated', // Interim status
+                    refund_type: refundType,    // Lock the type on payment record
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', payment.id);
 
             return {
                 success: true,
-                id: rpRefund.id, // Return ID for consistency with legacy RP calls
+                id: rpRefund.id,
                 refundId: rpRefund.id,
                 amount: calculation.amount
             };

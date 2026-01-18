@@ -1,6 +1,6 @@
 /**
  * Tax Breakdown Component
- * Displays GST tax details in orders
+ * Displays GST tax details in orders with detailed item-wise and delivery breakdowns.
  */
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,34 +21,73 @@ interface TaxBreakdownProps {
     compact?: boolean;
     showInvoiceLink?: boolean;
     invoiceUrl?: string;
+    role?: 'admin' | 'customer';
+    items?: any[];
+    deliveryCharge?: number;
+    deliveryGST?: number;
 }
 
 export function TaxBreakdown({
-    totalTaxableAmount,
-    totalCgst,
-    totalSgst,
-    totalIgst,
+    totalTaxableAmount = 0,
+    totalCgst = 0,
+    totalSgst = 0,
+    totalIgst = 0,
     totalAmount,
     compact = false,
     showInvoiceLink = false,
     invoiceUrl,
     items = [],
     deliveryCharge = 0,
-    deliveryGST = 0
-}: TaxBreakdownProps & { items?: any[], deliveryCharge?: number, deliveryGST?: number }) {
-    const isInterState = (totalIgst || 0) > 0;
-    const totalTax = isInterState
-        ? (totalIgst || 0) + (deliveryGST || 0)
-        : (totalCgst || 0) + (totalSgst || 0) + (deliveryGST || 0);
-    const hasTax = totalTax > 0;
+    deliveryGST = 0,
+    role = 'customer'
+}: TaxBreakdownProps) {
+    // 1. Calculate Product-only tax from items
+    const productTaxableFromItems = items.reduce((sum, item) => {
+        const qty = item.quantity || 1;
+        const taxRate = item.variant?.gst_rate ?? item.product?.gstRate ?? item.gst_rate ?? 0;
+        const itemTaxable = item.taxable_amount ?? ((item.total_amount || ((item.price_per_unit || item.product?.price || 0) * qty)) / (1 + (taxRate / 100)));
+        return sum + itemTaxable;
+    }, 0);
 
-    if (!hasTax && compact) {
-        return null;
-    }
+    const productTaxFromItems = items.reduce((sum, item) => {
+        const qty = item.quantity || 1;
+        const taxRate = item.variant?.gst_rate ?? item.product?.gstRate ?? item.gst_rate ?? 0;
+        const itemTaxable = item.taxable_amount ?? ((item.total_amount || ((item.price_per_unit || item.product?.price || 0) * qty)) / (1 + (taxRate / 100)));
+        const totalItemTaxSnapshot = (item.cgst || 0) + (item.sgst || 0) + (item.igst || 0);
+        const itemTax = totalItemTaxSnapshot > 0 ? totalItemTaxSnapshot : ((item.total_amount || (item.price_per_unit * qty)) - itemTaxable);
+        return sum + Math.max(0, itemTax);
+    }, 0);
+
+    // 2. Identification Logic
+    const isInterState = (totalIgst || 0) > 0;
+
+    // Reconciliation logic: ensure summary components sum up correctly
+    const derivedTotalTaxable = productTaxableFromItems + deliveryCharge;
+
+    // Use derived values if passed-in ones are zero or significantly mismatched
+    const effectiveTaxable = totalTaxableAmount > 0 ? totalTaxableAmount : derivedTotalTaxable;
+
+    // Fix Double Counting: 
+    // If totalCgst/Igst already include delivery (which they often do in new orders), 
+    // we don't add deliveryGST again.
+    // Check if totalTax + TotalTaxable matches TotalAmount
+    const rawTotalTax = (totalCgst || 0) + (totalSgst || 0) + (totalIgst || 0);
+    const taxMismatched = Math.abs(totalAmount - (effectiveTaxable + rawTotalTax)) > 1.0;
+
+    // If mismatched, it means the passed-in buckets don't include delivery GST. 
+    // In that case, we add it explicitly.
+    const effectiveDeliveryGstInBuckets = taxMismatched ? deliveryGST : 0;
+
+    const displayCgst = isInterState ? 0 : (totalCgst + (effectiveDeliveryGstInBuckets / 2));
+    const displaySgst = isInterState ? 0 : (totalSgst + (effectiveDeliveryGstInBuckets / 2));
+    const displayIgst = isInterState ? (totalIgst + effectiveDeliveryGstInBuckets) : 0;
+
+    const displayTotalTax = isInterState ? displayIgst : (displayCgst + displaySgst);
 
     const formatAmount = (amount: number | undefined) => {
         if (amount === undefined || amount === null) return "₹0.00";
-        return `₹${amount.toFixed(2)}`;
+        const safeAmount = Math.max(0, amount);
+        return `₹${safeAmount.toFixed(2)}`;
     };
 
     if (compact) {
@@ -59,18 +98,18 @@ export function TaxBreakdown({
                         <TooltipTrigger asChild>
                             <div className="flex items-center gap-1 cursor-help">
                                 <Info size={14} />
-                                <span>GST: {formatAmount(totalTax)}</span>
+                                <span>GST: {formatAmount(displayTotalTax)}</span>
                             </div>
                         </TooltipTrigger>
                         <TooltipContent>
                             <div className="text-xs space-y-1">
-                                <p>Taxable: {formatAmount(totalTaxableAmount)}</p>
+                                <p>Taxable: {formatAmount(effectiveTaxable)}</p>
                                 {isInterState ? (
-                                    <p>IGST: {formatAmount(totalIgst)}</p>
+                                    <p>IGST: {formatAmount(displayIgst)}</p>
                                 ) : (
                                     <>
-                                        <p>CGST: {formatAmount(totalCgst)}</p>
-                                        <p>SGST: {formatAmount(totalSgst)}</p>
+                                        <p>CGST: {formatAmount(displayCgst)}</p>
+                                        <p>SGST: {formatAmount(displaySgst)}</p>
                                     </>
                                 )}
                             </div>
@@ -82,118 +121,141 @@ export function TaxBreakdown({
     }
 
     return (
-        <Card>
-            <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                    <FileText size={18} />
-                    Tax Summary
+        <Card className={role === 'admin' ? "border-primary/20 shadow-md ring-1 ring-primary/10" : ""}>
+            <CardHeader className="pb-3 bg-muted/20">
+                <CardTitle className="flex items-center justify-between text-base">
+                    <div className="flex items-center gap-2">
+                        <FileText size={18} className={role === 'admin' ? "text-primary" : ""} />
+                        <span>{role === 'admin' ? 'Detailed Tax Summary & Audit' : 'Tax Summary'}</span>
+                    </div>
                 </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-                {hasTax ? (
-                    <>
-                        <div className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                                <span className="text-muted-foreground">Taxable Amount</span>
-                                <span>{formatAmount(totalTaxableAmount)}</span>
-                            </div>
-
-                            {isInterState ? (
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">IGST</span>
-                                    <span>{formatAmount((totalIgst || 0) + (deliveryGST || 0))}</span>
-                                </div>
-                            ) : (
-                                <>
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">CGST</span>
-                                        <span>{formatAmount((totalCgst || 0) + ((deliveryGST || 0) / 2))}</span>
-                                    </div>
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">SGST</span>
-                                        <span>{formatAmount((totalSgst || 0) + ((deliveryGST || 0) / 2))}</span>
-                                    </div>
-                                </>
-                            )}
+            <CardContent className="space-y-4 pt-4 text-xs md:text-sm">
+                <div className="space-y-4">
+                    {/* Primary Taxable & Tax Split */}
+                    <div className="grid grid-cols-2 gap-4 bg-muted/30 p-3 rounded-lg border border-muted">
+                        <div className="space-y-1">
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground block">Total Taxable</span>
+                            <span className="text-sm font-semibold">{formatAmount(effectiveTaxable)}</span>
                         </div>
+                        <div className="space-y-1 text-right">
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground block">Total GST</span>
+                            <span className="text-sm font-semibold text-primary">{formatAmount(displayTotalTax)}</span>
+                        </div>
+                    </div>
 
-                        {/* Item-wise Breakdown */}
-                        {items && items.length > 0 && (
-                            <div className="border rounded-md overflow-hidden text-xs">
-                                <div className="bg-muted px-3 py-2 font-medium flex justify-between items-center cursor-pointer hover:bg-muted/80 transition-colors group">
-                                    <span>Product-wise Breakdown</span>
-                                </div>
-                                <div className="divide-y max-h-[200px] overflow-y-auto">
-                                    {items.map((item, idx) => {
-                                        // Calculate item tax details
-                                        const qty = item.quantity || 1;
-                                        // Try to get tax values from item logic or estimate
-                                        const taxRate = item.variant?.gst_rate ?? item.product?.gst_rate ?? item.gst_rate ?? 0;
-                                        const hsn = item.variant?.hsn_code ?? item.product?.hsn_code ?? item.hsn_code ?? 'N/A';
-
-                                        // If backend provides these directly:
-                                        const itemTaxable = item.taxable_amount ?? (item.price_per_unit || item.price || 0) * qty / (1 + (taxRate / 100));
-                                        const itemTax = (item.total_cgst || 0) + (item.total_sgst || 0) + (item.total_igst || 0) > 0
-                                            ? (item.total_cgst || 0) + (item.total_sgst || 0) + (item.total_igst || 0)
-                                            : ((item.price_per_unit || item.price || 0) * qty) - itemTaxable;
-
-                                        if (taxRate === 0 && itemTax <= 0) return null;
-
-                                        return (
-                                            <div key={idx} className="px-3 py-2 hover:bg-muted/30">
-                                                <div className="flex justify-between font-medium mb-1">
-                                                    <span className="truncate max-w-[180px]" title={item.title || item.product?.title}>{item.title || item.product?.title}</span>
-                                                    <span>{taxRate}% GST</span>
-                                                </div>
-                                                <div className="flex justify-between text-muted-foreground text-[10px]">
-                                                    <span>Taxable: {formatAmount(itemTaxable)}</span>
-                                                    <span>Tax: {formatAmount(itemTax)}</span>
-                                                </div>
-                                                {hsn !== 'N/A' && (
-                                                    <div className="text-[9px] text-muted-foreground mt-0.5">HSN: {hsn}</div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-
-                                    {/* Explicit Delivery Line Item */}
-                                    {((deliveryCharge ?? 0) > 0 || (deliveryGST ?? 0) > 0) && (
-                                        <div className="px-3 py-2 hover:bg-muted/30 border-t border-dashed bg-muted/10">
-                                            <div className="flex justify-between font-medium mb-1">
-                                                <span>Delivery Charges</span>
-                                                <span>18% GST</span>
-                                            </div>
-                                            <div className="flex justify-between text-muted-foreground text-[10px]">
-                                                <span>Taxable: {formatAmount(deliveryCharge)}</span>
-                                                <span>Tax: {formatAmount(deliveryGST)}</span>
-                                            </div>
-                                            <div className="text-[9px] text-muted-foreground mt-0.5">HSN: 996812</div>
-                                        </div>
-                                    )}
-                                </div>
+                    {/* Detailed Breakdown */}
+                    <div className="space-y-2 px-1">
+                        <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">Product(s) Net Taxable</span>
+                            <span>{formatAmount(productTaxableFromItems)}</span>
+                        </div>
+                        {deliveryCharge > 0 && (
+                            <div className="flex justify-between text-xs">
+                                <span className="text-muted-foreground italic">Delivery Service Taxable</span>
+                                <span>{formatAmount(deliveryCharge)}</span>
                             </div>
                         )}
+                        <div className="h-[1px] bg-muted my-1" />
 
-                        <div className="border-t pt-2 mt-2">
+                        {isInterState ? (
                             <div className="flex justify-between text-sm font-medium">
-                                <span>Total Tax</span>
-                                <span>{formatAmount(totalTax)}</span>
+                                <span className="text-muted-foreground">IGST (Integrated GST)</span>
+                                <span className="text-primary">{formatAmount(displayIgst)}</span>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">CGST (Central GST)</span>
+                                    <span>{formatAmount(displayCgst)}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">SGST (State GST)</span>
+                                    <span>{formatAmount(displaySgst)}</span>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    {/* Product-wise Accordion */}
+                    {items && items.length > 0 && (
+                        <div className="border rounded-md overflow-hidden text-xs shadow-sm">
+                            <div className="bg-muted/50 px-3 py-2 font-medium flex justify-between items-center border-b">
+                                <span>Itemized Breakdown</span>
+                                {role === 'admin' && <span className="text-[9px] text-muted-foreground uppercase bg-white px-1 rounded border">Audit Log</span>}
+                            </div>
+                            <div className="divide-y max-h-[250px] overflow-y-auto bg-white">
+                                {items.map((item, idx) => {
+                                    const qty = item.quantity || 1;
+                                    const taxRate = item.variant?.gst_rate ?? item.product?.gstRate ?? item.gst_rate ?? 0;
+                                    const hsn = item.variant?.hsn_code ?? item.variant_snapshot?.hsn_code ?? item.product?.hsnCode ?? item.hsn_code ?? 'N/A';
+
+                                    const itemTaxable = item.taxable_amount ?? ((item.total_amount || ((item.price_per_unit || item.product?.price || 0) * qty)) / (1 + (taxRate / 100)));
+                                    const totalItemTaxSnapshot = (item.cgst || 0) + (item.sgst || 0) + (item.igst || 0);
+                                    const itemTax = totalItemTaxSnapshot > 0 ? totalItemTaxSnapshot : ((item.total_amount || (item.price_per_unit * qty)) - itemTaxable);
+
+                                    return (
+                                        <div key={idx} className="px-3 py-2.5 hover:bg-muted/5 transition-colors">
+                                            <div className="flex justify-between items-start mb-1">
+                                                <div className="space-y-0.5">
+                                                    <div className="font-medium truncate max-w-[200px]" title={item.title || item.product?.title}>{item.title || item.product?.title || 'Product'}</div>
+                                                    <div className="flex items-center gap-2 text-[9px] text-muted-foreground">
+                                                        <span>HSN: {hsn}</span>
+                                                        <span>•</span>
+                                                        <span>Qty: {qty}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="font-semibold text-primary">{taxRate}% GST</div>
+                                                    <div className="text-[9px] text-muted-foreground">{formatAmount(itemTax)} tax</div>
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-between items-center text-[10px] bg-muted/20 px-2 py-1 rounded mt-1">
+                                                <span className="text-muted-foreground">Net Value</span>
+                                                <span className="font-mono">{formatAmount(itemTaxable)}</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+
+                                {((deliveryCharge ?? 0) > 0 || (deliveryGST ?? 0) > 0) && (
+                                    <div className="px-3 py-2.5 bg-amber-50/30 border-t border-dashed transition-all">
+                                        <div className="flex justify-between items-start mb-1">
+                                            <div className="space-y-0.5">
+                                                <div className="font-medium text-amber-900">Delivery Charges</div>
+                                                <div className="text-[9px] text-amber-700 font-mono">HSN: 996812</div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="font-semibold text-amber-600">18% GST</div>
+                                                <div className="text-[9px] text-amber-700">{formatAmount(deliveryGST)} tax</div>
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-between items-center text-[10px] bg-white/50 px-2 py-1 rounded mt-1 border border-amber-200">
+                                            <span className="text-muted-foreground">Service Value</span>
+                                            <span className="font-mono">{formatAmount(deliveryCharge)}</span>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
-                    </>
-                ) : (
-                    <p className="text-sm text-muted-foreground text-center py-2">
-                        No GST applicable
-                    </p>
-                )}
+                    )}
+                </div>
 
-                <div className="border-t pt-2 mt-2">
-                    <div className="flex justify-between font-semibold">
-                        <span>Order Total</span>
-                        <span className="flex items-center">
-                            <IndianRupee size={14} />
-                            {totalAmount.toFixed(2)}
-                        </span>
+                <div className="border-t-2 border-primary/20 pt-4 mt-2">
+                    <div className="flex justify-between items-end">
+                        <div className="space-y-0.5">
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground block">Final Amount Payable</span>
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                <Info size={10} />
+                                Taxable Value + Total GST
+                            </span>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-2xl font-black text-primary flex items-center justify-end leading-none">
+                                <IndianRupee size={22} className="mr-0.5" />
+                                {totalAmount.toFixed(2)}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -203,10 +265,10 @@ export function TaxBreakdown({
                             href={invoiceUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-sm text-primary hover:underline flex items-center gap-1"
+                            className="text-sm font-bold text-white bg-primary hover:bg-primary/90 transition-all flex items-center gap-2 justify-center w-full py-3 rounded-lg shadow-sm"
                         >
-                            <FileText size={14} />
-                            Download GST Invoice
+                            <FileText size={16} />
+                            Download GST Invoice (PDF)
                         </a>
                     </div>
                 )}

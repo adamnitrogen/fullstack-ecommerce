@@ -123,16 +123,7 @@ const getReturnableItems = async (orderId, userId) => {
     return returnableItems;
 };
 
-// Helper to log history
-const logStatusHistory = async (orderId, status, userId, notes = null) => {
-    await supabase.from('order_status_history').insert({
-        order_id: orderId,
-        status: status,
-        updated_by: userId, // Assuming UUID
-        notes: notes,
-        created_at: new Date().toISOString()
-    });
-};
+// Note: Centralized logStatusHistory from order.service is used instead of local helper
 
 const createReturnRequest = async (userId, orderId, returnItems, reason) => {
     // 1. Validate Returnable Items
@@ -194,7 +185,8 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
         .eq('id', orderId);
 
     // 6. Log History
-    await logStatusHistory(orderId, 'return_requested', userId, `Return requested for items: ${returnItems.map(i => i.quantity + 'x Item').join(', ')}. Reason: ${reason}`);
+    const orderService = require('./order.service');
+    await orderService.logStatusHistory(orderId, 'return_requested', userId, `Return requested for items: ${returnItems.map(i => i.quantity + 'x Item').join(', ')}. Reason: ${reason}`, 'USER');
 
     // 7. Log Financial Event
     FinancialEventLogger.logReturnRequested(orderId, returnRequest.id, returnItems, userId)
@@ -376,7 +368,8 @@ const processReturnApproval = async (returnId, adminId) => {
         .eq('id', returnRequest.order_id);
 
     // Log History
-    await logStatusHistory(returnRequest.order_id, 'return_approved', adminId, `Return approved and refund of ₹${totalRefundAmount} processed via Razorpay.`);
+    const orderService = require('./order.service');
+    await orderService.logStatusHistory(returnRequest.order_id, 'return_approved', adminId, `Return approved and refund of ₹${totalRefundAmount} processed via Razorpay.`, 'ADMIN');
 
     // Log Financial Event
     FinancialEventLogger.logReturnApproved(returnId, returnRequest.order_id, adminId, totalRefundAmount)
@@ -431,7 +424,8 @@ const processReturnRejection = async (returnId, adminId, reason) => {
             .update({ status: 'return_rejected' })
             .eq('id', returnRequest.order_id);
 
-        await logStatusHistory(returnRequest.order_id, 'return_rejected', adminId, `Return rejected. Reason: ${reason}`);
+        const orderService = require('./order.service');
+        await orderService.logStatusHistory(returnRequest.order_id, 'return_rejected', adminId, `Return rejected. Reason: ${reason}`, 'ADMIN');
 
         // Log Financial Event
         FinancialEventLogger.logReturnRejected(returnId, returnRequest.order_id, adminId, reason)
