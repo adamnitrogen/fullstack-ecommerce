@@ -114,6 +114,74 @@ class RazorpaySyncService {
             return false;
         }
     }
+
+    // Simple in-memory cache for delivery items to avoid repeated API calls
+    static itemsCache = null;
+    static cacheTimestamp = 0;
+    static CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+    /**
+     * Get or Create a Delivery Charge Item for a specific amount
+     * Reuses existing item if found, otherwise creates new one.
+     * @param {number} amount - Delivery charge amount in RUPEES (will be converted to paisa)
+     * @returns {Promise<Object>} Razorpay Item object
+     */
+    static async getOrCreateDeliveryItem(amount) {
+        try {
+            const amountInPaisa = Math.round(amount * 100);
+            const itemName = `Delivery Charge (₹${amount})`;
+
+            log.operationStart('GET_OR_CREATE_DELIVERY_ITEM', { amount });
+
+            // 1. Refresh cache if needed
+            const now = Date.now();
+            if (!this.itemsCache || (now - this.cacheTimestamp > this.CACHE_TTL)) {
+                log.debug('Refreshing Razorpay items cache');
+                // Fetch valid items (active)
+                // Razorpay list returns { entity: 'collection', count: N, items: [...] }
+                const response = await razorpay.items.all({ count: 100 });
+                this.itemsCache = response.items || [];
+                this.cacheTimestamp = now;
+            }
+
+            // 2. Search in cache
+            // Look for item with same amount and "Delivery Charge" in name to be safe
+            // Razorpay amount is in paisa
+            const existingItem = this.itemsCache.find(item =>
+                Math.abs(item.amount - amountInPaisa) < 1 && // Match amount
+                item.name.toLowerCase().includes('delivery') && // Match name pattern
+                item.active !== false // Ensure active
+            );
+
+            if (existingItem) {
+                log.info('Found existing delivery item', { id: existingItem.id });
+                return existingItem;
+            }
+
+            // 3. Create new if not found
+            log.info('Creating new delivery item', { amount });
+            const newItem = await this.createItem({
+                name: itemName,
+                description: 'Shipping & Handling Charges',
+                amount: amountInPaisa,
+                currency: 'INR',
+                hsn_code: '9968', // SAC for delivery services
+                tax_rate: 18,     // 18% GST default for delivery
+                tax_inclusive: false
+            });
+
+            if (newItem) {
+                // Add to cache
+                this.itemsCache.push(newItem);
+            }
+
+            return newItem;
+
+        } catch (error) {
+            log.operationError('GET_OR_CREATE_DELIVERY_ITEM', error);
+            return null;
+        }
+    }
 }
 
 module.exports = RazorpaySyncService;

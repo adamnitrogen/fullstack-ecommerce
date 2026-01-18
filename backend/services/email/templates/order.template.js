@@ -57,6 +57,21 @@ function getOrderConfirmationEmail({ order, customerName }) {
     const shippingAddrHtml = formatAddr(order.shippingAddress || order.shipping_address);
     const billingAddrHtml = formatAddr(order.billingAddress || order.billing_address);
 
+    // Invoice Link Section
+    let invoiceSection = '';
+    if (order.invoiceUrl) {
+        invoiceSection = `
+        <div style="margin-top: 20px; margin-bottom: 20px; text-align: center;">
+            <a href="${order.invoiceUrl}" style="background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+                📄 Download Tax Invoice
+            </a>
+            <p style="margin-top: 10px; font-size: 13px; color: #666;">
+                Your GST Invoice is ready. Click above to download.
+            </p>
+        </div>
+        `;
+    }
+
     const content = `
         <h2>Order Confirmed! 🎉</h2>
         <p>Hi ${firstName},</p>
@@ -67,6 +82,8 @@ function getOrderConfirmationEmail({ order, customerName }) {
             <strong>Order Date:</strong> ${new Date(order.createdAt || order.created_at || Date.now()).toLocaleDateString()}<br>
             <strong>Payment Status:</strong> ${(order.paymentStatus || 'Paid').toUpperCase()}
         </div>
+
+        ${invoiceSection}
 
         <div style="margin-top: 20px; margin-bottom: 20px;">
             <h3>Shipping Address</h3>

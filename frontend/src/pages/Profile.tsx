@@ -258,24 +258,30 @@ export default function Profile() {
   };
   const setShowPasswordDialog = (open: boolean) => setPasswordDialogOpen(open);
 
-  const isAddressActionLoading =
+  const isActionLoading =
     addAddressMutation.isPending ||
     updateAddressMutation.isPending ||
     deleteAddressMutation.isPending ||
-    setPrimaryMutation.isPending;
+    setPrimaryMutation.isPending ||
+    updateProfileMutation.isPending ||
+    uploadAvatarMutation.isPending ||
+    deleteAvatarMutation.isPending;
 
-  const addressActionMessage =
+  const actionMessage =
     addAddressMutation.isPending ? "Creating new sanctuary..." :
       updateAddressMutation.isPending ? "Updating your sanctuary..." :
         deleteAddressMutation.isPending ? "Removing sanctuary..." :
           setPrimaryMutation.isPending ? "Setting primary sanctuary..." :
-            "Loading your profile...";
+            updateProfileMutation.isPending ? "Saving profile changes..." :
+              uploadAvatarMutation.isPending ? "Updating profile picture..." :
+                deleteAvatarMutation.isPending ? "Removing profile picture..." :
+                  "Loading...";
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <LoadingOverlay
-        isLoading={isLoading || isAddressActionLoading}
-        message={addressActionMessage}
+        isLoading={isLoading || isActionLoading}
+        message={isLoading ? "Loading your profile..." : actionMessage}
       />
 
       {/* Premium Compact Hero Section */}

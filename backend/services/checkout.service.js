@@ -490,6 +490,26 @@ const createOrder = async (userId, checkoutData, cart) => {
     FinancialEventLogger.logOrderCreated(order, taxResult?.summary, userId)
         .catch(err => log.warn('AUDIT_LOG_ERROR', 'Failed to log order creation', { error: err.message }));
 
+    // Generate Invoice immediately for paid orders (if verified)
+    // This allows including the invoice link in the confirmation email
+    if (order.status === 'confirmed' || checkoutData.payment_status === 'paid') {
+        try {
+            const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
+            logger.info({ orderId: order.id }, '[Checkout] Generating immediate invoice for paid order');
+            const result = await InvoiceOrchestrator.generateInvoiceForOrder(order.id);
+
+            if (result.success && result.invoiceUrl) {
+                order.invoiceUrl = result.invoiceUrl;
+                // Also update the local order object to reflect invoice status if we were returning it
+                order.invoice_id = result.invoiceId;
+                order.invoice_status = 'generated';
+            }
+        } catch (invError) {
+            logger.warn({ err: invError, orderId: order.id }, '[Checkout] Failed to generate immediate invoice');
+            // Continue - do not block the order response
+        }
+    }
+
     // Send Order Confirmation Email (non-transactional, OK to fail)
     logger.info({ data: profile.email }, '[CheckoutService] Sending order confirmation email to:');
     emailService.sendOrderConfirmationEmail(

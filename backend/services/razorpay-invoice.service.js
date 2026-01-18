@@ -20,54 +20,67 @@ const razorpay = new Razorpay({
  * Create an invoice for a payment
  * Using minimal required fields for maximum compatibility
  */
-async function createInvoice({
-    paymentId,
-    amount, // Total amount in rupees
-    customerName,
-    customerEmail,
-    customerPhone,
-    description,
-    receiptNumber,
-    lineItems = null // Optional array of items { name, amount, currency, quantity }
-}) {
+/**
+ * Create an invoice for a payment
+ * Supports both:
+ * 1. Raw Payload (from InvoiceOrchestrator) - { type: 'invoice', customer: {...}, line_items: [...] }
+ * 2. Legacy Params - { paymentId, amount, customerName... }
+ */
+async function createInvoice(data) {
     try {
-        logger.info({ paymentId }, 'Creating Razorpay invoice');
+        let invoiceData;
 
-        // Prepare line items
-        let finalLineItems = [];
-        if (lineItems && Array.isArray(lineItems) && lineItems.length > 0) {
-            // Use provided line items (e.g. from product order)
-            finalLineItems = lineItems;
+        // Check if input is a pre-built Razorpay payload (from InvoiceOrchestrator)
+        if (data.type === 'invoice' && (data.line_items || data.customer)) {
+            logger.debug('Using raw invoice payload');
+            invoiceData = { ...data };
         } else {
-            // Fallback: Create single item from total amount (e.g. for event registration)
-            finalLineItems = [{
-                name: description || 'Payment',
-                amount: Math.round(amount * 100), // Convert to paisa
+            // Legacy/Simple Mode: Construct payload from params
+            const {
+                paymentId, amount, customerName, customerEmail,
+                customerPhone, description, receiptNumber, lineItems
+            } = data;
+
+            logger.info({ paymentId }, 'Creating Razorpay invoice (Legacy Mode)');
+
+            let finalLineItems = [];
+            if (lineItems && Array.isArray(lineItems) && lineItems.length > 0) {
+                finalLineItems = lineItems;
+            } else {
+                finalLineItems = [{
+                    name: description || 'Payment',
+                    amount: Math.round(amount * 100),
+                    currency: 'INR',
+                    quantity: 1
+                }];
+            }
+
+            invoiceData = {
+                type: 'invoice',
+                description: description || `Payment for ${receiptNumber}`,
+                customer: {
+                    name: customerName,
+                    email: customerEmail,
+                    contact: customerPhone ? String(customerPhone).replace(/\D/g, '') : undefined
+                },
+                line_items: finalLineItems,
                 currency: 'INR',
-                quantity: 1
-            }];
+                receipt: receiptNumber || `RCP-${Date.now()}`,
+                notes: {
+                    payment_id: paymentId
+                }
+            };
         }
 
-        // Create invoice with minimal required fields
-        const invoiceData = {
-            type: 'invoice',
-            description: description || `Payment for ${receiptNumber}`,
-            customer: {
-                name: customerName,
-                email: customerEmail,
-                contact: customerPhone ? String(customerPhone).replace(/\D/g, '') : undefined
-            },
-            line_items: finalLineItems,
-            currency: 'INR',
-            sms_notify: 0,
-            email_notify: 0, // We send our own email
-            receipt: receiptNumber || `RCP-${Date.now()}`,
-            notes: {
-                payment_id: paymentId
-            }
-        };
+        // FORCE disable notifications to prevent confusing "Pay Now" emails
+        // We handle notifications via our own EmailService
+        invoiceData.sms_notify = 0;
+        invoiceData.email_notify = 0;
 
-        logger.debug({ lineItemsCount: finalLineItems.length }, 'Invoice data prepared');
+        logger.debug({
+            lines: invoiceData.line_items?.length,
+            customer: invoiceData.customer?.name
+        }, 'Invoice data prepared');
 
         // Create the invoice
         const invoice = await razorpay.invoices.create(invoiceData);

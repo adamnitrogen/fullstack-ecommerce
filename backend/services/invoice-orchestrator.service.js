@@ -74,6 +74,15 @@ class InvoiceOrchestrator {
                 .eq('id', orderId);
 
             // 2. Prepare invoice data for Razorpay
+            // Refactor: fetching delivery item ID first
+            const RazorpaySyncService = require('./razorpay-sync.service');
+            if (order.delivery_charge && order.delivery_charge > 0) {
+                const deliveryItem = await RazorpaySyncService.getOrCreateDeliveryItem(order.delivery_charge);
+                if (deliveryItem) {
+                    order.delivery_item_id = deliveryItem.id;
+                }
+            }
+
             const invoiceData = this._prepareInvoiceData(order);
 
             // 3. Create invoice via Razorpay
@@ -108,13 +117,30 @@ class InvoiceOrchestrator {
 
             // 6. Send GST Invoice email to customer
             if (order.profiles?.email) {
+                // Calculate tax breakdown dynamically from items + delivery to ensure accuracy
+                // This handles cases where header-level total_cgst/etc might be 0 or outdated
+                const itemsTax = (order.order_items || []).reduce((sum, item) => {
+                    return sum + (item.cgst || 0) + (item.sgst || 0) + (item.igst || 0);
+                }, 0);
+
+                const itemsTaxable = (order.order_items || []).reduce((sum, item) => {
+                    return sum + (item.taxable_amount || (item.price_per_unit * item.quantity));
+                }, 0);
+
+                const deliveryTax = order.delivery_gst || 0;
+                const deliveryTaxable = order.delivery_charge || 0;
+
+                const totalTax = itemsTax + deliveryTax;
+                const totalTaxable = itemsTaxable + deliveryTaxable;
+                const isInterstate = (order.total_igst > 0) || ((order.order_items || []).some(i => i.igst > 0));
+
                 const taxBreakdown = {
-                    totalTaxableAmount: order.total_taxable_amount,
-                    totalCgst: order.total_cgst,
-                    totalSgst: order.total_sgst,
-                    totalIgst: order.total_igst,
-                    totalTax: (order.total_cgst || 0) + (order.total_sgst || 0) + (order.total_igst || 0),
-                    taxType: order.total_igst > 0 ? 'INTER' : 'INTRA'
+                    totalTaxableAmount: totalTaxable,
+                    totalCgst: isInterstate ? 0 : (totalTax / 2),
+                    totalSgst: isInterstate ? 0 : (totalTax / 2),
+                    totalIgst: isInterstate ? totalTax : 0,
+                    totalTax: totalTax,
+                    taxType: isInterstate ? 'INTER' : 'INTRA'
                 };
 
                 emailService.send('GST_INVOICE_GENERATED', order.profiles.email, {
@@ -122,7 +148,7 @@ class InvoiceOrchestrator {
                     order: {
                         id: orderId,
                         order_number: order.order_number,
-                        total_amount: order.totalAmount,
+                        total_amount: order.totalAmount || (totalTaxable + totalTax), // Ensure total is accurate
                         order_items: order.order_items
                     },
                     invoiceUrl: invoice.short_url,
@@ -195,6 +221,53 @@ class InvoiceOrchestrator {
 
             return lineItem;
         });
+
+        // Add Delivery Charge line item
+        if (order.delivery_charge && order.delivery_charge > 0) {
+            const isInterstate = (order.total_igst || 0) > 0;
+            const deliveryGstAmount = order.delivery_gst || 0;
+
+            // Fetch or create standardized Delivery Charge Item (Reusable)
+            const RazorpaySyncService = require('./razorpay-sync.service');
+            // Note: Since this method is currently synchronous (static _prepareInvoiceData), we cannot await here easily without refactoring the caller.
+            // Check caller: generateInvoiceForOrder calls: const invoiceData = this._prepareInvoiceData(order); 
+            // We need to refactor _prepareInvoiceData to be async.
+
+            // Wait, I cannot refactor _prepareInvoiceData to be async in this single replace block if I don't change the caller too.
+            // Let's use the tool correctly. I need to update the caller first or simultaneously?
+            // Actually, I should update the caller first to await this method, then update this method.
+            // OR I can fetch the delivery item valid ID *inside* generateInvoiceForOrder and pass it to _prepareInvoiceData.
+            // Let's choose the latter: Fetch item in generateInvoiceForOrder, pass to _prepareInvoiceData.
+
+            const deliveryItem = {
+                name: 'Delivery Charge',
+                description: 'Shipping & Handling',
+                amount: Math.round(order.delivery_charge * 100),
+                currency: 'INR',
+                quantity: 1,
+                hsn_code: '9968',
+                tax_rate: 18
+            };
+
+            // If the caller passed a standardized item ID, use it
+            if (order.delivery_item_id) {
+                deliveryItem.item_id = order.delivery_item_id;
+            }
+
+            // Add GST breakdown
+            if (deliveryGstAmount > 0) {
+                if (isInterstate) {
+                    deliveryItem.igst = Math.round(deliveryGstAmount * 100);
+                } else {
+                    // Split evenly for CGST/SGST
+                    const halfTax = deliveryGstAmount / 2;
+                    deliveryItem.cgst = Math.round(halfTax * 100);
+                    deliveryItem.sgst = Math.round(halfTax * 100);
+                }
+            }
+
+            lineItems.push(deliveryItem);
+        }
 
         return {
             type: 'invoice',
