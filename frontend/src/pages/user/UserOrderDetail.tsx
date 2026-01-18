@@ -25,6 +25,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Order, CartItem, Product, Address } from "@/types";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { TaxBreakdown } from "@/components/orders/TaxBreakdown";
+import { InvoiceActions } from "@/components/orders/InvoiceActions";
 
 interface OrderResponse {
     id: string;
@@ -32,6 +33,7 @@ interface OrderResponse {
     created_at: string;
     createdAt?: string;
     status: string;
+    invoice_id?: string; // Added missing field
     invoice_url?: string;
     invoices?: Array<{
         id: string;
@@ -266,6 +268,7 @@ export default function UserOrderDetail() {
                         </div>
                     </div>
                     <div className="ml-auto flex items-center gap-2">
+
                         {/* Dual Invoice Download Buttons */}
                         {/* 1. Payment Receipt (Razorpay) */}
                         {order.invoices?.find(i => i.type === 'RAZORPAY')?.public_url && (
@@ -644,33 +647,52 @@ export default function UserOrderDetail() {
 
                                         return historyItems
                                             .slice()
-                                            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                                            .map((history, index) => (
-                                                <div key={index} className="ml-6 relative">
-                                                    <span className="absolute -left-[1.65rem] top-1 h-3 w-3 rounded-full bg-primary border-2 border-background ring-2 ring-muted" />
-                                                    <p className="font-medium text-sm capitalize flex items-center gap-2">
-                                                        <span>{(history.event_type || history.status).replace(/_/g, ' ')}</span>
-                                                        {(history.event_type === 'REFUND_COMPLETED' || history.event_type === 'REFUND_PARTIAL' || history.status === 'refunded' || history.status === 'partially_refunded') && order.refunds?.some(r => Math.abs(new Date(r.created_at).getTime() - new Date(history.created_at).getTime()) < 120000) && (
-                                                            <Badge variant="outline" className="text-[10px] h-5 font-normal border-green-200 bg-green-50 text-green-700">
-                                                                ₹{order.refunds.find(r => Math.abs(new Date(r.created_at).getTime() - new Date(history.created_at).getTime()) < 120000)?.amount}
-                                                            </Badge>
+                                            .sort((a, b) => {
+                                                const dateA = new Date(a.created_at).getTime();
+                                                const dateB = new Date(b.created_at).getTime();
+                                                return (isNaN(dateB) ? 0 : dateB) - (isNaN(dateA) ? 0 : dateA);
+                                            })
+                                            .map((history, index) => {
+                                                let formattedDate = "Date N/A";
+                                                try {
+                                                    formattedDate = format(new Date(history.created_at), "PPP p");
+                                                } catch (e) { formattedDate = "Invalid Date"; }
+
+                                                return (
+                                                    <div key={index} className="ml-6 relative">
+                                                        <span className="absolute -left-[1.65rem] top-1 h-3 w-3 rounded-full bg-primary border-2 border-background ring-2 ring-muted" />
+                                                        <p className="font-medium text-sm capitalize flex items-center gap-2">
+                                                            <span>{(history.event_type || history.status || 'Updated').replace(/_/g, ' ')}</span>
+                                                            {(history.event_type === 'REFUND_COMPLETED' || history.event_type === 'REFUND_PARTIAL' || history.status === 'refunded' || history.status === 'partially_refunded') && order.refunds?.some(r => {
+                                                                try {
+                                                                    return Math.abs(new Date(r.created_at).getTime() - new Date(history.created_at).getTime()) < 120000;
+                                                                } catch { return false; }
+                                                            }) && (
+                                                                    <Badge variant="outline" className="text-[10px] h-5 font-normal border-green-200 bg-green-50 text-green-700">
+                                                                        ₹{order.refunds.find(r => {
+                                                                            try {
+                                                                                return Math.abs(new Date(r.created_at).getTime() - new Date(history.created_at).getTime()) < 120000;
+                                                                            } catch { return false; }
+                                                                        })?.amount}
+                                                                    </Badge>
+                                                                )}
+                                                        </p>
+                                                        <p className="text-xs text-muted-foreground mb-1">
+                                                            {formattedDate}
+                                                            {history.updater && (
+                                                                <span className="ml-1">
+                                                                    • {(history.updater.role_data?.name === 'admin' || history.updater.role_data?.name === 'manager') ? 'Staff' : 'You'}
+                                                                </span>
+                                                            )}
+                                                        </p>
+                                                        {history.notes && (
+                                                            <div className="bg-muted/50 p-2 rounded text-xs mt-1 text-gray-700 border border-muted">
+                                                                {history.notes}
+                                                            </div>
                                                         )}
-                                                    </p>
-                                                    <p className="text-xs text-muted-foreground mb-1">
-                                                        {format(new Date(history.created_at), "PPP p")}
-                                                        {history.updater && (
-                                                            <span className="ml-1">
-                                                                • {(history.updater.role_data?.name === 'admin' || history.updater.role_data?.name === 'manager') ? 'Staff' : 'You'}
-                                                            </span>
-                                                        )}
-                                                    </p>
-                                                    {history.notes && (
-                                                        <div className="bg-muted/50 p-2 rounded text-xs mt-1 text-gray-700 border border-muted">
-                                                            {history.notes}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))
+                                                    </div>
+                                                )
+                                            });
                                     })()}
                                     {(!order.order_status_history || order.order_status_history.length === 0) && (
                                         <p className="text-sm text-muted-foreground ml-6">No history available.</p>

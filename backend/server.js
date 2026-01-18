@@ -199,6 +199,7 @@ app.use('/api/webhooks', require('./routes/webhook.routes')); // Payment webhook
 app.use('/api/invoices', require('./routes/invoice.routes')); // Invoice management
 app.use('/api/cron', require('./routes/cron.routes')); // Background job triggers
 app.use('/api/admin/delivery-configs', require('./routes/delivery-configs.routes')); // Delivery config management
+app.use('/api/custom-invoices', require('./routes/custom-invoice.routes')); // Manual invoice generation
 
 // Global Error Handler (Must be last)
 app.use(require('./middleware/error.middleware'));

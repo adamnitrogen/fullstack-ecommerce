@@ -92,7 +92,7 @@ class RazorpaySyncService {
         try {
             return await razorpay.items.fetch(itemId);
         } catch (error) {
-            log.error({ err: error }, 'Error fetching Razorpay item');
+            log.operationError('FETCH_ITEM_FAIL', error, { itemId });
             return null;
         }
     }

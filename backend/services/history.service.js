@@ -120,6 +120,7 @@ async function logStatusHistory(orderId, statusOrEventType, updatedBy, notes = '
             logger.warn(`Failed to log history for order ${orderId}. Error: ${error.message}`);
 
             if (error.code === '23503') {
+                logger.info(`Retrying log history with updated_by=null for order ${orderId}`);
                 await supabase.from('order_status_history').insert({
                     order_id: orderId,
                     status: status,
@@ -130,6 +131,8 @@ async function logStatusHistory(orderId, statusOrEventType, updatedBy, notes = '
                     created_at: new Date().toISOString()
                 });
             }
+        } else {
+            logger.info({ orderId, status, actor: finalActor }, 'Successfully logged status history');
         }
     } catch (err) {
         logger.error({ err }, 'Exception in logStatusHistory');

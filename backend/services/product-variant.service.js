@@ -29,10 +29,10 @@ async function deleteImageFromStorage(url) {
             .remove([imagePath]);
 
         if (error) {
-            log.error('DELETE_IMAGE_STORAGE_FAIL', error, { url });
+            log.operationError('DELETE_IMAGE_STORAGE_FAIL', error, { url });
         }
     } catch (err) {
-        log.error('DELETE_IMAGE_STORAGE_FAIL', err, { url });
+        log.operationError('DELETE_IMAGE_STORAGE_FAIL', err, { url });
     }
 }
 
@@ -225,7 +225,7 @@ async function createVariant(productId, variantData) {
             }
         });
     } catch (err) {
-        log.error('RAZORPAY_SYNC_FAIL', 'Failed to sync variant to Razorpay', { error: err.message });
+        log.operationError('RAZORPAY_SYNC_FAIL', err, { productId });
     }
     // --- RAZORPAY SYNC END ---
 
@@ -250,7 +250,7 @@ async function updateVariant(variantId, updates) {
         existingVariant.variant_image_url !== updates.variant_image_url) {
         // Run asynchronously
         deleteImageFromStorage(existingVariant.variant_image_url).catch(err =>
-            log.error('IMG_CLEANUP_FAIL', err, { variantId })
+            log.operationError('IMG_CLEANUP_FAIL', err, { variantId })
         );
     }
 
@@ -276,7 +276,7 @@ async function updateVariant(variantId, updates) {
         RazorpaySyncService.updateItem(data.razorpay_item_id, {
             amount: data.selling_price * 100,
             description: data.description
-        }).catch(err => log.error('RAZORPAY_UPDATE_FAIL', err));
+        }).catch(err => log.operationError('RAZORPAY_UPDATE_FAIL', err));
     }
     // ---------------------------
 
@@ -298,7 +298,7 @@ async function deleteVariant(variantId) {
     // Delete image from storage if exists
     if (variant?.variant_image_url) {
         deleteImageFromStorage(variant.variant_image_url).catch(err =>
-            log.error('IMG_CLEANUP_FAIL', err, { variantId })
+            log.operationError('IMG_CLEANUP_FAIL', err, { variantId })
         );
     }
 
@@ -321,7 +321,7 @@ async function deleteVariant(variantId) {
     // --- RAZORPAY SYNC DELETE ---
     if (variant?.razorpay_item_id) {
         RazorpaySyncService.deleteItem(variant.razorpay_item_id).catch(err =>
-            log.error('RAZORPAY_DELETE_FAIL', err, { itemId: variant.razorpay_item_id })
+            log.operationError('RAZORPAY_DELETE_FAIL', err, { itemId: variant.razorpay_item_id })
         );
     }
     // ---------------------------
@@ -472,11 +472,11 @@ async function createProductWithVariants(productData, variants) {
                         const { error: configError } = await supabase
                             .from('delivery_configs')
                             .insert(configInserts);
-                        if (configError) log.error('CREATE_VARIANT_CONFIG_FAIL', configError);
+                        if (configError) log.operationError('CREATE_VARIANT_CONFIG_FAIL', configError);
                     }
                 }
             } catch (err) {
-                log.error('CREATE_VARIANT_CONFIG_FAIL', err);
+                log.operationError('CREATE_VARIANT_CONFIG_FAIL', err);
             }
         })();
     }
@@ -518,12 +518,12 @@ async function createProductWithVariants(productData, variants) {
                                     .eq('id', variant.id);
                             }
                         } catch (itemSyncErr) {
-                            log.error('SYNC_VARIANT_FAIL', itemSyncErr, { variantId: variant.id });
+                            log.operationError('SYNC_VARIANT_FAIL', itemSyncErr, { variantId: variant.id });
                         }
                     }
                 }
             } catch (err) {
-                log.error('POST_CREATE_SYNC_FAIL', err);
+                log.operationError('POST_CREATE_SYNC_FAIL', err);
             }
         })();
     }
@@ -661,7 +661,7 @@ async function updateProductWithVariants(productId, productData, variants) {
                 }
             }
         } catch (cleanupErr) {
-            log.error('VARIANT_IMAGE_CLEANUP_FAIL', cleanupErr);
+            log.operationError('VARIANT_IMAGE_CLEANUP_FAIL', cleanupErr);
         }
     })();
 
@@ -711,11 +711,11 @@ async function updateProductWithVariants(productId, productData, variants) {
                             .from('delivery_configs')
                             .upsert(configUpserts, { onConflict: 'variant_id,scope' }); // Assuming unique constraint
 
-                        if (configError) log.error('UPDATE_VARIANT_CONFIG_FAIL', configError);
+                        if (configError) log.operationError('UPDATE_VARIANT_CONFIG_FAIL', configError);
                     }
                 }
             } catch (err) {
-                log.error('UPDATE_VARIANT_CONFIG_FAIL', err);
+                log.operationError('UPDATE_VARIANT_CONFIG_FAIL', err);
             }
         })();
     }
@@ -769,12 +769,12 @@ async function updateProductWithVariants(productId, productData, variants) {
                                 }
                             }
                         } catch (err) {
-                            log.error('SYNC_UPDATE_VARIANT_FAIL', err, { variantId: variant.id });
+                            log.operationError('SYNC_UPDATE_VARIANT_FAIL', err, { variantId: variant.id });
                         }
                     }
                 }
             } catch (err) {
-                log.error('POST_UPDATE_SYNC_FAIL', err);
+                log.operationError('POST_UPDATE_SYNC_FAIL', err);
             }
         })();
     }

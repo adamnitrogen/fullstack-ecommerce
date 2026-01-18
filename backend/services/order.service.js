@@ -217,12 +217,13 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
         // 7. Generate GST Invoice on DELIVERED (non-blocking)
         if (newStatus === ORDER_STATUS.DELIVERED) {
             // New Logic: Generate Internal GST Tax Invoice
+            // The InvoiceOrchestrator already determines if it should be GST or Non-GST
             InvoiceOrchestrator.generateInternalInvoice(orderId)
                 .then(result => {
                     if (result.success) {
-                        logger.info(`[Order ${orderId}] Internal GST Invoice generated: ${result.invoiceId}`);
+                        logger.info(`[Order ${orderId}] Internal Invoice generated: ${result.invoiceId}`);
                     } else {
-                        logger.error(`[Order ${orderId}] GST Invoice generation failed: ${result.error}`);
+                        logger.error(`[Order ${orderId}] Invoice generation failed: ${result.error}`);
                     }
                 })
                 .catch(err => logger.error(`[Order ${orderId}] Invoice generation error:`, err.message));
@@ -443,6 +444,17 @@ async function getOrderById(id, user) {
         .single();
 
     if (error) throw error;
+
+    // Debug Log for History
+    if (data && data.order_status_history) {
+        logger.info({
+            orderId: id,
+            historyCount: data.order_status_history.length
+        }, 'fetched order_status_history');
+    } else {
+        logger.warn({ orderId: id }, 'Fetched order but order_status_history is missing or empty');
+    }
+
     if (!data) {
         const err = new Error('Order not found');
         err.status = 404;

@@ -46,13 +46,16 @@ router.get('/:id/download', requireAuth, async (req, res) => {
             return res.status(404).json({ error: 'Razorpay invoice URL not found' });
         } else {
             // Serve local PDF
-            if (fs.existsSync(invoice.file_path)) {
+            if (invoice.file_path && fs.existsSync(invoice.file_path)) {
                 res.setHeader('Content-Type', 'application/pdf');
                 res.setHeader('Content-Disposition', `inline; filename="${invoice.invoice_number}.pdf"`);
                 const fileStream = fs.createReadStream(invoice.file_path);
                 fileStream.pipe(res);
+            } else if (invoice.public_url) {
+                // Fallback to public URL if local file is missing but we have a link (e.g. strategy was SUPABASE)
+                return res.redirect(invoice.public_url);
             } else {
-                logger.error(`Invoice file missing at path: ${invoice.file_path}`);
+                logger.error(`Invoice file missing at path: ${invoice.file_path} and no public URL available`);
                 return res.status(404).json({ error: 'Invoice file not found' });
             }
         }

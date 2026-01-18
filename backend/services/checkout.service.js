@@ -15,6 +15,7 @@ const { TaxEngine } = require('./tax-engine.service');
 const { PricingCalculator } = require('./pricing-calculator.service');
 const { FinancialEventLogger } = require('./financial-event-logger.service');
 const { DeliveryChargeService } = require('./delivery-charge.service');
+const { logStatusHistory, ORDER_STATUS } = require('./history.service');
 
 // Create module-specific logger
 const log = createModuleLogger('CheckoutService');
@@ -584,6 +585,17 @@ const createOrder = async (userId, checkoutData, cart) => {
             taxType: taxResult.summary.taxType
         } : null
     };
+
+    // --- FIX: Log Initial Order History ---
+    // Manually log initial history since we used RPC
+    logStatusHistory(
+        order.id,
+        ORDER_STATUS.PENDING,
+        userId,
+        'Order placed successfully',
+        'USER',
+        'ORDER_PLACED'
+    ).catch(err => log.warn('HISTORY_LOG_ERROR', 'Failed to log initial history', { err }));
 
     // Log financial event for audit (non-blocking)
     FinancialEventLogger.logOrderCreated(order, taxResult?.summary, userId)
@@ -1233,7 +1245,7 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
     // Verify payment signature
     const isValidSignature = verifyRazorpayPayment(razorpay_order_id, razorpay_payment_id, razorpay_signature);
     if (!isValidSignature) {
-        log.error('BUY_NOW_INVALID_SIGNATURE', 'Invalid payment signature');
+        log.warn('BUY_NOW_INVALID_SIGNATURE', 'Invalid payment signature');
         const error = new Error('Payment verification failed. Please contact support if money was deducted.');
         error.status = 400;
         throw error;
@@ -1448,7 +1460,7 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
             });
 
         if (rpcError) {
-            log.error('BUY_NOW_RPC_ERROR', 'Buy Now order creation failed', { error: rpcError.message });
+            log.operationError('BUY_NOW_RPC_ERROR', rpcError, { orderNumber: checkoutData.receipt });
             throw rpcError;
         }
 
@@ -1559,7 +1571,7 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
         };
 
     } catch (error) {
-        log.error('BUY_NOW_ERROR', 'Buy Now order failed', { error: error.message });
+        log.operationError('BUY_NOW_ERROR', error);
 
         // Refund payment if order creation failed
         if (razorpay_payment_id) {
@@ -1588,7 +1600,7 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
                 if (refundError.message.includes('Order creation failed')) {
                     throw refundError;
                 }
-                log.error('BUY_NOW_REFUND_ERROR', 'Failed to refund payment', { error: refundError.message });
+                log.operationError('BUY_NOW_REFUND_ERROR', refundError);
                 const criticalError = new Error('Order failed and we encountered an issue processing your refund. Please contact support immediately with your payment ID.');
                 criticalError.status = 500;
                 throw criticalError;

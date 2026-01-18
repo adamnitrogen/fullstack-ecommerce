@@ -2,12 +2,11 @@ const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer');
 const handlebars = require('handlebars');
-const { v4: uuidv4 } = require('uuid');
 const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
 const { createModuleLogger } = require('../utils/logging-standards');
 
-const log = createModuleLogger('InternalInvoiceService');
+const log = createModuleLogger('CustomInvoiceService');
 
 // Ensure storage directory exists
 const STORAGE_DIR = path.join(__dirname, '../../storage/invoices');
@@ -16,37 +15,50 @@ if (!fs.existsSync(STORAGE_DIR)) {
 }
 
 // Logo path
-const LOGO_PATH = path.join(__dirname, '../../frontend/public/favicon.ico'); // Fallback/Test path, ideally use actual logo or convert ICO to PNG
-// Note: Puppeteer + ICO might be flaky, better to have PNG. 
-// But we'll try to read it as base64.
+const LOGO_PATH = path.join(__dirname, '../../frontend/public/favicon.ico');
 
-class InternalInvoiceService {
+class CustomInvoiceService {
 
     /**
-     * Generate Internal GST Invoice for a Delivered Order
-     * @param {Object} order - Order object with items and profiles
+     * Generate Custom Invoice for a Delivered Order
+     * @param {string} orderId - ID of the order
+     * @param {string} forcedType - 'TAX_INVOICE' or 'BILL_OF_SUPPLY'
      */
-    static async generateInvoice(order) {
-        log.operationStart('GENERATE_INTERNAL_INVOICE', { orderId: order.id });
+    static async generateCustomInvoice(orderId, forcedType) {
+        log.operationStart('GENERATE_CUSTOM_INVOICE', { orderId, forcedType });
         const startTime = Date.now();
 
         try {
-            // 1. Determine Invoice Type (Tax Invoice vs Bill of Supply)
-            const isGstInvoice = this._isGstApplicable(order);
-            const invoiceType = isGstInvoice ? 'TAX INVOICE' : 'BILL OF SUPPLY';
+            // 1. Fetch full order details
+            const { data: order, error: fetchError } = await supabase
+                .from('orders')
+                .select(`*, items:order_items(*)`)
+                .eq('id', orderId)
+                .single();
 
-            // 2. Generate Invoice Number (Simple sequential or logic)
-            // For MVP: INV-{Year}-{Random} or fetch from a sequence table. 
-            // Using Timestamp for uniqueness now.
-            const invoiceNumber = `INV-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
+            if (fetchError || !order) throw new Error('Order not found');
 
-            // 3. Prepare Template Data
-            const templateData = await this._prepareTemplateData(order, invoiceNumber, invoiceType, isGstInvoice);
+            // 2. Validate Status
+            if (order.status !== 'delivered') {
+                throw new Error('Invoices can only be generated for delivered orders');
+            }
 
-            // 4. Generate PDF
+            // 3. Determine Invoice Title
+            const isGstInvoice = forcedType === 'TAX_INVOICE';
+            const invoiceTypeDisplay = isGstInvoice ? 'TAX INVOICE' : 'BILL OF SUPPLY';
+
+            // 4. Generate Invoice Number
+            const year = new Date().getFullYear();
+            const prefix = isGstInvoice ? 'GST' : 'BOS';
+            const invoiceNumber = `${prefix}-${year}-${Date.now().toString().slice(-6)}`;
+
+            // 5. Prepare Template Data (Reusing logic if possible, but copying for safety)
+            const templateData = await this._prepareTemplateData(order, invoiceNumber, invoiceTypeDisplay, isGstInvoice);
+
+            // 6. Generate PDF
             const pdfBuffer = await this._generatePdf(templateData);
 
-            // 5. Storage Strategy Handler
+            // 7. Storage Strategy Handler
             const strategy = (process.env.INVOICE_STORAGE_STRATEGY || 'BOTH').toUpperCase();
             const saveLocal = ['LOCAL', 'BOTH'].includes(strategy);
             const saveSupabase = ['SUPABASE', 'BOTH'].includes(strategy);
@@ -64,18 +76,18 @@ class InternalInvoiceService {
                 publicUrl = await this._uploadToStorage(filename, pdfBuffer);
             }
 
-            // 6. Persist Metadata in DB
+            // 8. Persist Metadata in DB
             const expiryDate = new Date();
             expiryDate.setDate(expiryDate.getDate() + 30); // 30 Days Retention
 
-            const { data: invoiceRecord, error } = await supabase
+            const { data: invoiceRecord, error: dbError } = await supabase
                 .from('invoices')
                 .insert({
                     order_id: order.id,
-                    type: isGstInvoice ? 'TAX_INVOICE' : 'BILL_OF_SUPPLY',
+                    type: forcedType,
                     invoice_number: invoiceNumber,
-                    file_path: filePath, // Keep local ref for now
-                    public_url: publicUrl, // Store public URL
+                    file_path: filePath,
+                    public_url: publicUrl,
                     status: 'GENERATED',
                     generated_at: new Date().toISOString(),
                     expires_at: expiryDate.toISOString()
@@ -83,39 +95,41 @@ class InternalInvoiceService {
                 .select()
                 .single();
 
-            if (error) throw error;
+            if (dbError) throw dbError;
 
-            log.operationSuccess('GENERATE_INTERNAL_INVOICE', {
+            // 9. Update Order to point to this as the latest official invoice
+            await supabase.from('orders').update({
+                invoice_id: invoiceRecord.id,
+                invoice_number: invoiceNumber,
+                invoice_status: 'generated',
+                invoice_generated_at: new Date().toISOString(),
+                invoice_url: publicUrl || `/api/invoices/${invoiceRecord.id}/download`
+            }).eq('id', orderId);
+
+            log.operationSuccess('GENERATE_CUSTOM_INVOICE', {
                 invoiceId: invoiceRecord.id,
-                path: filePath
+                invoiceNumber
             }, Date.now() - startTime);
 
             return {
                 success: true,
                 invoiceId: invoiceRecord.id,
-                filePath: invoiceRecord.file_path,
                 invoiceNumber,
-                publicUrl: invoiceRecord.public_url
+                publicUrl: invoiceRecord.public_url,
+                filePath: invoiceRecord.file_path
             };
 
         } catch (error) {
-            log.operationError('GENERATE_INTERNAL_INVOICE', error);
+            log.operationError('GENERATE_CUSTOM_INVOICE', error);
             return { success: false, error: error.message };
         }
     }
 
-    // --- Helpers ---
-
-    static _isGstApplicable(order) {
-        // If any item has a GST rate > 0, it's a Tax Invoice. 
-        // Also check delivery charge GST.
-        const hasItemGst = order.items?.some(item => (item.gst_rate && item.gst_rate > 0));
-        const hasDeliveryGst = order.delivery_gst > 0;
-        return hasItemGst || hasDeliveryGst;
-    }
+    // --- Template & PDF Logic (Borrowed from InternalInvoiceService) ---
 
     static async _prepareTemplateData(order, invoiceNumber, invoiceType, isGstInvoice) {
-        // Load seller info from Environment Variables
+        // ... (Same logic as InternalInvoiceService._prepareTemplateData)
+        // I will copy it here to ensure it works independently and allow customization for Bill of Supply if needed
         const seller = {
             name: process.env.SELLER_NAME || process.env.SMTP_FROM_NAME || 'Meri Gau Mata',
             address: {
@@ -124,35 +138,29 @@ class InternalInvoiceService {
                 state: process.env.SELLER_STATE || 'Maharashtra',
                 zip: process.env.SELLER_ZIP || '400000'
             },
-            gstin: process.env.SELLER_GSTIN || 'URP', // Unregistered Person by default? No, usually generic placeholder
+            gstin: process.env.SELLER_GSTIN || 'URP',
             pan: process.env.SELLER_PAN || 'N/A',
             city: process.env.SELLER_CITY || 'Mumbai'
         };
 
-        // Determine Place of Supply
         const customerState = order.shipping_address?.state || 'Maharashtra';
         const sellerState = seller.address.state;
-
-        // Simple case-insensitive check
         const isInterState = !customerState.toLowerCase().includes(sellerState.toLowerCase());
 
-        // Read Logo
         let logoDataUrl = '';
         try {
             if (fs.existsSync(LOGO_PATH)) {
                 const logoBuffer = fs.readFileSync(LOGO_PATH);
                 logoDataUrl = `data:image/x-icon;base64,${logoBuffer.toString('base64')}`;
             }
-        } catch (e) { log.warn('Failed to load logo', e); }
+        } catch (e) { }
 
-        // Initialize Totals
         let grandTotal = 0;
         let totalTaxable = 0;
         let totalCgst = 0;
         let totalSgst = 0;
         let totalIgst = 0;
 
-        // Collect All Product Items
         const items = order.items.map((item, index) => {
             const quantity = item.quantity || 1;
             const amount = parseFloat(item.total_amount || 0);
@@ -171,7 +179,7 @@ class InternalInvoiceService {
 
             return {
                 index: index + 1,
-                name: item.product?.title || 'Product',
+                name: item.title || item.product?.title || 'Product',
                 variant: item.variant_snapshot?.size_label || item.size_label || null,
                 hsn_code: item.hsn_code || 'N/A',
                 quantity,
@@ -185,7 +193,6 @@ class InternalInvoiceService {
             };
         });
 
-        // Add Delivery Charges to Totals (Transparently)
         const deliveryBase = order.delivery_charge || 0;
         const deliveryGst = order.delivery_gst || 0;
 
@@ -231,15 +238,11 @@ class InternalInvoiceService {
         };
     }
 
-    /**
-     * Generate PDF Buffer using Puppeteer
-     */
     static async _generatePdf(data) {
         const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox'] });
         try {
             const page = await browser.newPage();
-
-            // Compile Template
+            // Using a slightly more polished template style similar to the user's existing one
             const templateHtml = `
             <!DOCTYPE html>
             <html>
@@ -249,7 +252,7 @@ class InternalInvoiceService {
               .header { display: flex; justify-content: space-between; margin-bottom: 40px; border-bottom: 2px solid #eee; padding-bottom: 20px; }
               .company-info h3 { margin: 0 0 5px 0; font-size: 20px; color: #000; }
               .company-info p { margin: 0; font-size: 12px; color: #555; }
-              .invoice-title { font-size: 24px; font-weight: bold; text-align: right; color: #444; }
+              .invoice-title { font-size: 24px; font-weight: bold; text-align: right; color: #fb923c; }
               .invoice-details { text-align: right; font-size: 13px; margin-top: 10px; }
               .invoice-details p { margin: 2px 0; }
               
@@ -258,14 +261,14 @@ class InternalInvoiceService {
               .bill-to p { margin: 0; font-size: 14px; }
 
               table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-              th { background-color: #f8f9fa; border-bottom: 2px solid #ddd; padding: 10px; text-align: left; font-size: 12px; font-weight: bold; text-transform: uppercase; color: #555; }
-              td { border-bottom: 1px solid #eee; padding: 10px; text-align: left; font-size: 13px; }
+              th { background-color: #fffaf0; border-bottom: 2px solid #fb923c; padding: 10px; text-align: left; font-size: 11px; font-weight: bold; text-transform: uppercase; color: #555; }
+              td { border-bottom: 1px solid #eee; padding: 10px; text-align: left; font-size: 12px; }
               td.right { text-align: right; }
               th.right { text-align: right; }
               
-              .totals { margin-top: 30px; float: right; width: 40%; }
-              .totals-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; }
-              .grand-total { font-weight: bold; font-size: 16px; border-top: 2px solid #333; border-bottom: 2px solid #333; padding: 10px 0; margin-top: 10px; }
+              .totals { margin-top: 30px; float: right; width: 45%; }
+              .totals-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 13px; }
+              .grand-total { font-weight: bold; font-size: 16px; border-top: 2px solid #fb923c; border-bottom: 2px solid #fb923c; padding: 10px 0; margin-top: 10px; color: #c2410c; }
               
               .footer { margin-top: 50px; text-align: center; font-size: 10px; color: #777; border-top: 1px solid #eee; padding-top: 20px; }
             </style>
@@ -273,6 +276,7 @@ class InternalInvoiceService {
             <body>
               <div class="header">
                 <div class="company-info">
+                    {{#if logoDataUrl}}<img src="{{logoDataUrl}}" style="height: 40px; margin-bottom: 10px;" />{{/if}}
                     <h3>{{seller.name}}</h3>
                     <p>{{seller.address.line1}}</p>
                     <p>{{seller.address.city}}, {{seller.address.state}} - {{seller.address.zip}}</p>
@@ -281,9 +285,9 @@ class InternalInvoiceService {
                 <div>
                     <div class="invoice-title">{{title}}</div>
                     <div class="invoice-details">
-                        <p><strong>Invoice No:</strong> {{invoiceNumber}}</p>
+                        <p><strong>No:</strong> {{invoiceNumber}}</p>
                         <p><strong>Date:</strong> {{invoiceDate}}</p>
-                        <p><strong>Place of Supply:</strong> {{placeOfSupply}}</p>
+                        <p><strong>Place:</strong> {{placeOfSupply}}</p>
                     </div>
                 </div>
               </div>
@@ -306,32 +310,29 @@ class InternalInvoiceService {
                     <th style="width: 5%">#</th>
                     <th style="width: 35%">Item</th>
                     <th style="width: 10%">HSN</th>
-                    <th style="width: 5%">Qty</th>
-                    <th class="right" style="width: 10%">Rate</th>
-                    <th class="right" style="width: 15%">Taxable</th>
-                    {{#if isInterState}}
-                    <th class="right" style="width: 10%">IGST</th>
-                    {{else}}
-                    <th class="right" style="width: 10%">CGST%</th>
-                    <th class="right" style="width: 10%">SGST%</th>
+                    <th style="width: 8%">Qty</th>
+                    <th class="right" style="width: 12%">Rate</th>
+                    {{#if isGstInvoice}}
+                      <th class="right" style="width: 15%">Taxable</th>
+                      <th class="right" style="width: 15%">{{#if isInterState}}IGST{{else}}CGST+SGST{{/if}}</th>
                     {{/if}}
-                    <th class="right" style="width: 10%">Total</th>
+                    <th class="right" style="width: 15%">Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {{#each items}}
                   <tr>
                     <td>{{index}}</td>
-                    <td>{{name}} {{#if variant}}<br><small class="text-muted">({{variant}})</small>{{/if}}</td>
+                    <td>{{name}} {{#if variant}}<br><small style="color: #666">({{variant}})</small>{{/if}}</td>
                     <td>{{hsn_code}}</td>
                     <td>{{quantity}}</td>
                     <td class="right">{{rate}}</td>
-                    <td class="right">{{taxableValue}}</td>
-                    {{#if ../isInterState}}
-                    <td class="right">{{igstAmount}}</td>
-                    {{else}}
-                    <td class="right">{{cgstAmount}}</td>
-                    <td class="right">{{sgstAmount}}</td>
+                    {{#if ../isGstInvoice}}
+                      <td class="right">{{taxableValue}}</td>
+                      <td class="right">
+                        {{#if ../isInterState}}{{igstAmount}}
+                        {{else}}{{cgstAmount}} + {{sgstAmount}}{{/if}}
+                      </td>
                     {{/if}}
                     <td class="right">{{totalAmount}}</td>
                   </tr>
@@ -340,24 +341,27 @@ class InternalInvoiceService {
               </table>
 
               <div class="totals">
-                  <div class="totals-row"><span>Taxable Amount:</span> <span>{{summary.taxableAmount}}</span></div>
-                  {{#if isInterState}}
-                  <div class="totals-row"><span>Total IGST:</span> <span>{{summary.totalIgst}}</span></div>
-                  {{else}}
-                  <div class="totals-row"><span>Total CGST:</span> <span>{{summary.totalCgst}}</span></div>
-                  <div class="totals-row"><span>Total SGST:</span> <span>{{summary.totalSgst}}</span></div>
+                  {{#if isGstInvoice}}
+                    <div class="totals-row"><span>Taxable Amount:</span> <span>{{summary.taxableAmount}}</span></div>
+                    {{#if isInterState}}
+                      <div class="totals-row"><span>Total IGST ({{items.0.gstRate}}%):</span> <span>{{summary.totalIgst}}</span></div>
+                    {{else}}
+                      <div class="totals-row"><span>Total CGST:</span> <span>{{summary.totalCgst}}</span></div>
+                      <div class="totals-row"><span>Total SGST:</span> <span>{{summary.totalSgst}}</span></div>
+                    {{/if}}
                   {{/if}}
                   {{#if summary.deliveryCharge}}
                   <div class="totals-row"><span>Delivery Charges:</span> <span>{{summary.deliveryCharge}}</span></div>
                   {{/if}}
                   <div class="totals-row grand-total"><span>Grand Total:</span> <span>₹{{summary.grandTotal}}</span></div>
-                  <div style="font-size: 12px; margin-top: 5px; text-align: right;">Amount in words:<br><strong>{{amountInWords}}</strong></div>
+                  <div style="font-size: 11px; margin-top: 10px; text-align: right; font-style: italic;">{{amountInWords}}</div>
               </div>
               
               <div style="clear: both;"></div>
               
               <div class="footer">
-                  <p>This is a computer generated invoice and does not require a signature.</p>
+                  <p>This is a computer generated document and does not require a signature.</p>
+                  <p>Subject to {{seller.city}} Jurisdiction</p>
               </div>
             </body>
             </html>
@@ -375,14 +379,9 @@ class InternalInvoiceService {
         }
     }
 
-    /**
-     * Upload File to Supabase Storage
-     */
     static async _uploadToStorage(filename, fileBuffer) {
         try {
             const bucketName = 'invoices';
-
-            // 1. Upload
             const { error: uploadError } = await supabase.storage
                 .from(bucketName)
                 .upload(filename, fileBuffer, {
@@ -390,14 +389,8 @@ class InternalInvoiceService {
                     upsert: true
                 });
 
-            if (uploadError) {
-                // If bucket doesn't exist, try creating it?
-                // Note: Client creation of buckets requires specific permissions. 
-                // Better to log error and fallback.
-                throw uploadError;
-            }
+            if (uploadError) throw uploadError;
 
-            // 2. Get Public URL
             const { data } = supabase.storage
                 .from(bucketName)
                 .getPublicUrl(filename);
@@ -406,14 +399,11 @@ class InternalInvoiceService {
 
         } catch (error) {
             log.operationError('UPLOAD_STORAGE_FAIL', error);
-            return null; // Fallback to local
+            return null;
         }
     }
 
-
     static _amountToWords(amount) {
-        // Basic Indian Number System to Words
-        // Supports up to Crores
         const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
         const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
 
@@ -439,4 +429,4 @@ class InternalInvoiceService {
     }
 }
 
-module.exports = InternalInvoiceService;
+module.exports = CustomInvoiceService;
