@@ -23,25 +23,27 @@ const getUserAddresses = async (userId) => {
     if (error) throw error;
 
     // Map to include phone property directly, handling both object and array responses from Supabase joins
-    return data.map(addr => ({
-        ...addr,
-        phone: Array.isArray(addr.phone_numbers)
-            ? addr.phone_numbers[0]?.phone_number
-            : addr.phone_numbers?.phone_number
-    }));
+    return data.map(formatAddress);
 };
 
 // Get specific address
 const getAddressById = async (id, userId) => {
     const { data, error } = await supabase
         .from('addresses')
-        .select('*')
+        .select(`
+            *,
+            phone_numbers (
+                phone_number
+            )
+        `)
         .eq('id', id)
         .eq('user_id', userId)
         .single();
 
     if (error) throw error;
-    return data;
+
+    // Map to include phone property directly
+    return formatAddress(data);
 };
 
 // Create new address
@@ -128,12 +130,7 @@ const createAddress = async (userId, addressData) => {
     if (error) throw error;
 
     // Flatten the response to include phone directly
-    return {
-        ...data,
-        phone: Array.isArray(data.phone_numbers)
-            ? data.phone_numbers[0]?.phone_number
-            : data.phone_numbers?.phone_number
-    };
+    return formatAddress(data);
 };
 
 // Update address
@@ -216,12 +213,7 @@ const updateAddress = async (id, userId, updates) => {
     if (error) throw error;
 
     // Flatten response
-    return {
-        ...data,
-        phone: Array.isArray(data.phone_numbers)
-            ? data.phone_numbers[0]?.phone_number
-            : data.phone_numbers?.phone_number
-    };
+    return formatAddress(data);
 };
 
 // Delete address
@@ -291,7 +283,7 @@ const setPrimaryAddress = async (id, userId, type, correlationId = null) => {
         .single();
 
     if (fetchError) throw fetchError;
-    return data;
+    return formatAddress(data);
 };
 
 // Get primary address of a specific type
@@ -309,21 +301,10 @@ const getPrimaryAddress = async (userId, type) => {
         .eq('is_primary', true)
         .single();
 
-    // If no primary found, return null (not an error)
     if (error && error.code === 'PGRST116') return null;
     if (error) throw error;
 
-    // Map to include phone property and map field names for frontend
-    if (data) {
-        return {
-            ...data,
-            phone: data.phone_numbers?.phone_number,
-            full_name: data.label,
-            address_line1: data.street_address,
-            address_line2: data.apartment
-        };
-    }
-    return data;
+    return formatAddress(data);
 };
 
 // Get latest address (optional type filter)
@@ -351,32 +332,33 @@ const getLatestAddress = async (userId, type = null) => {
         result = data[0];
     }
 
-    // Map to include phone property and map field names for frontend
-    if (result) {
-        return {
-            ...result,
-            phone: result.phone_numbers?.phone_number,
-            full_name: result.label,
-            address_line1: result.street_address,
-            address_line2: result.apartment
-        };
-    }
-    return null;
+    return formatAddress(result);
 };
 
 // Helper to format DB address to frontend structure
 const formatAddress = (addr) => {
     if (!addr) return null;
-    const phone = Array.isArray(addr.phone_numbers)
-        ? addr.phone_numbers[0]?.phone_number
-        : addr.phone_numbers?.phone_number;
+
+    // Extract phone from phone_numbers join or use existing field
+    let phone = addr.phone;
+    if (addr.phone_numbers) {
+        phone = Array.isArray(addr.phone_numbers)
+            ? addr.phone_numbers[0]?.phone_number
+            : addr.phone_numbers?.phone_number;
+    }
 
     return {
         ...addr,
-        phone: phone || addr.phone,
-        full_name: addr.label || addr.full_name,
-        address_line1: addr.street_address || addr.address_line1,
-        address_line2: addr.apartment || addr.address_line2
+        phone: phone || '',
+        full_name: addr.label || addr.full_name || 'User',
+        address_line1: addr.street_address || addr.address_line1 || '',
+        address_line2: addr.apartment || addr.address_line2 || null,
+        postal_code: addr.postal_code || '',
+        city: addr.city || '',
+        state: addr.state || '',
+        country: addr.country || 'India',
+        type: addr.type || 'other',
+        is_primary: !!addr.is_primary
     };
 };
 

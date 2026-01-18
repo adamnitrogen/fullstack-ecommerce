@@ -1,5 +1,6 @@
 import { apiClient } from '@/lib/api-client';
 import type { CheckoutSummary, RazorpayOrderResponse, Order } from '@/types';
+import { transformToCheckoutAddress } from './address.service';
 
 interface BuyNowData {
     productId: string;
@@ -12,7 +13,17 @@ export const checkoutService = {
     getSummary: async (addressId?: string): Promise<CheckoutSummary> => {
         const url = addressId ? `/checkout/summary?addressId=${addressId}` : '/checkout/summary';
         const response = await apiClient.get(url);
-        return response.data;
+        const data = response.data;
+
+        // Transform addresses if they exist
+        if (data.shipping_address) {
+            data.shipping_address = transformToCheckoutAddress(data.shipping_address);
+        }
+        if (data.billing_address) {
+            data.billing_address = transformToCheckoutAddress(data.billing_address);
+        }
+
+        return data;
     },
 
     // Validate stock availability before payment
@@ -59,7 +70,17 @@ export const checkoutService = {
     // Get Buy Now summary (single item + addresses + totals)
     getSummaryForBuyNow: async (buyNowData: BuyNowData): Promise<CheckoutSummary & { isBuyNow: true }> => {
         const response = await apiClient.post('/checkout/buy-now/summary', buyNowData);
-        return response.data;
+        const data = response.data;
+
+        // Transform addresses if they exist
+        if (data.shipping_address) {
+            data.shipping_address = transformToCheckoutAddress(data.shipping_address);
+        }
+        if (data.billing_address) {
+            data.billing_address = transformToCheckoutAddress(data.billing_address);
+        }
+
+        return data;
     },
 
     // Validate stock for Buy Now item

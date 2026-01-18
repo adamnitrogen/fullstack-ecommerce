@@ -60,6 +60,8 @@ interface OrderDetail {
     coupon_discount: number;
     delivery_charge: number;
     created_at: string;
+    // Delivery fields (explicit)
+    delivery_gst?: number;
     shipping_address: CheckoutAddress;
     billing_address: CheckoutAddress;
     items: (CartItem & {
@@ -359,93 +361,144 @@ export default function OrderDetail() {
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-4">
-                                {order.items.map((item, index) => {
-                                    // Get variant size label
-                                    const sizeLabel = item.variant?.size_label || item.size_label;
-                                    // Use variant image if available, otherwise use product image
-                                    const displayImage = item.variant?.variant_image_url || item.product?.images?.[0];
-                                    // Use price_per_unit if available (from order item), fallback to item.price or product price
-                                    const unitPrice = item.price_per_unit || item.price || item.product?.price || 0;
+                                {(() => {
+                                    // Calculate Non-Refundable Total to Bundle
+                                    const refundableTotal = (order.items || []).reduce((sum: number, item: any) => {
+                                        const snapshot = item.delivery_calculation_snapshot || {};
+                                        if (snapshot.source !== 'global' && snapshot.delivery_refund_policy === 'REFUNDABLE') {
+                                            return sum + (item.delivery_charge || 0) + (item.delivery_gst || 0);
+                                        }
+                                        return sum;
+                                    }, 0);
 
-                                    return (
-                                        <div key={index} className="border-b pb-4 last:border-0 last:pb-0">
-                                            <div className="flex gap-4 items-start">
-                                                <div className="w-16 h-16 bg-muted rounded-md overflow-hidden">
-                                                    {displayImage && (
-                                                        <img
-                                                            src={displayImage}
-                                                            alt={item.product?.title}
-                                                            className="w-full h-full object-cover"
-                                                        />
-                                                    )}
-                                                </div>
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <h4 className="font-medium">{item.product?.title || "Product"}</h4>
-                                                        {sizeLabel && (
-                                                            <Badge variant="secondary" className="text-xs font-normal">
-                                                                {sizeLabel}
-                                                            </Badge>
+                                    const deliveryTotal = (order.delivery_charge || 0) + (order.delivery_gst || 0);
+                                    const nonRefundableTotalToBundle = Math.max(0, deliveryTotal - refundableTotal);
+
+                                    // Total for pro-rating
+                                    const itemsTotalAmount = order.items.reduce((sum, item) => sum + (item.quantity * (item.price_per_unit || item.price || item.product?.price || 0)), 0);
+
+                                    return order.items.map((item, index) => {
+                                        // Get variant size label
+                                        const sizeLabel = item.variant?.size_label || item.size_label;
+                                        // Use variant image if available, otherwise use product image
+                                        const displayImage = item.variant?.variant_image_url || item.product?.images?.[0];
+
+                                        // Calculate Bundled Price
+                                        const rawUnitPrice = item.price_per_unit || item.price || item.product?.price || 0;
+                                        const itemTotalRaw = item.quantity * rawUnitPrice;
+
+                                        let bundledUnitPrice = rawUnitPrice;
+                                        if (nonRefundableTotalToBundle > 0 && itemsTotalAmount > 0) {
+                                            const portion = (itemTotalRaw / itemsTotalAmount) * nonRefundableTotalToBundle;
+                                            bundledUnitPrice = rawUnitPrice + (portion / item.quantity);
+                                        }
+
+                                        return (
+                                            <div key={index} className="border-b pb-4 last:border-0 last:pb-0">
+                                                <div className="flex gap-4 items-start">
+                                                    <div className="w-16 h-16 bg-muted rounded-md overflow-hidden">
+                                                        {displayImage && (
+                                                            <img
+                                                                src={displayImage}
+                                                                alt={item.product?.title}
+                                                                className="w-full h-full object-cover"
+                                                            />
                                                         )}
                                                     </div>
-                                                    <p className="text-sm text-muted-foreground">
-                                                        Qty: {item.quantity} × ₹{unitPrice}
-                                                    </p>
-                                                    {(item.gst_rate || 0) > 0 && (
-                                                        <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                                                            <p>Generic Tax: {item.gst_rate}% (HSN: {item.hsn_code || 'N/A'})</p>
-                                                            <div className="flex gap-2">
-                                                                {item.cgst ? <span>CGST: ₹{item.cgst}</span> : null}
-                                                                {item.sgst ? <span>SGST: ₹{item.sgst}</span> : null}
-                                                                {item.igst ? <span>IGST: ₹{item.igst}</span> : null}
-                                                            </div>
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <h4 className="font-medium">{item.product?.title || "Product"}</h4>
+                                                            {sizeLabel && (
+                                                                <Badge variant="secondary" className="text-xs font-normal">
+                                                                    {sizeLabel}
+                                                                </Badge>
+                                                            )}
                                                         </div>
-                                                    )}
-                                                </div>
-                                                <div className="text-right font-medium">
-                                                    ₹{(item.quantity * unitPrice).toFixed(2)}
-                                                </div>
-                                            </div>
-                                            {item.delivery_calculation_snapshot && (
-                                                <div className="ml-20 mt-2 text-xs text-muted-foreground bg-muted/30 p-2 rounded border border-dashed border-muted-foreground/20 max-w-md">
-                                                    <div className="flex items-center gap-1.5 font-medium text-[10px] uppercase tracking-wider mb-1 text-primary">
-                                                        <Truck className="h-3 w-3" />
-                                                        Delivery Details
-                                                    </div>
-                                                    <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                                                        <p>Method: <span className="font-medium">{item.delivery_calculation_snapshot.calculation_type?.replace(/_/g, ' ')}</span></p>
-                                                        <p>Charge: <span className="font-medium">₹{item.delivery_calculation_snapshot.delivery_charge}</span></p>
-                                                        {item.delivery_gst ? <p>GST (18%): <span className="font-medium">₹{item.delivery_gst}</span></p> : null}
-                                                        {item.delivery_calculation_snapshot.policy && (
-                                                            <p className={item.delivery_calculation_snapshot.policy === 'NON_REFUNDABLE' ? 'text-orange-600 font-medium' : 'text-green-600 font-medium'}>
-                                                                {item.delivery_calculation_snapshot.policy === 'NON_REFUNDABLE' ? 'Non-Refundable' : 'Refundable'}
-                                                            </p>
+                                                        <p className="text-sm text-muted-foreground">
+                                                            Qty: {item.quantity} × ₹{bundledUnitPrice.toFixed(2)}
+                                                            <span className="text-xs ml-2 text-muted-foreground/80">
+                                                                ({(item.product?.price_includes_tax ?? item.product?.default_price_includes_tax ?? true) ? 'Inc. Tax' : 'Excl. Tax'})
+                                                            </span>
+                                                        </p>
+                                                        {(item.gst_rate || 0) > 0 && (
+                                                            <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                                                                <p>Generic Tax: {item.gst_rate}% (HSN: {item.hsn_code || 'N/A'})</p>
+                                                                <div className="flex gap-2">
+                                                                    {item.cgst ? <span>CGST: ₹{item.cgst}</span> : null}
+                                                                    {item.sgst ? <span>SGST: ₹{item.sgst}</span> : null}
+                                                                    {item.igst ? <span>IGST: ₹{item.igst}</span> : null}
+                                                                </div>
+                                                            </div>
                                                         )}
                                                     </div>
+                                                    <div className="text-right font-medium">
+                                                        ₹{(item.quantity * bundledUnitPrice).toFixed(2)}
+                                                    </div>
                                                 </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                                                {item.delivery_calculation_snapshot && (
+                                                    <div className="ml-20 mt-2 text-xs text-muted-foreground bg-muted/30 p-2 rounded border border-dashed border-muted-foreground/20 max-w-md">
+                                                        <div className="flex items-center gap-1.5 font-medium text-[10px] uppercase tracking-wider mb-1 text-primary">
+                                                            <Truck className="h-3 w-3" />
+                                                            Delivery Details
+                                                        </div>
+                                                        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                                                            <p>Method: <span className="font-medium">{item.delivery_calculation_snapshot.calculation_type?.replace(/_/g, ' ')}</span></p>
+                                                            <p>Charge: <span className="font-medium">₹{item.delivery_calculation_snapshot.delivery_charge}</span></p>
+                                                            {item.delivery_gst ? <p>GST (18%): <span className="font-medium">₹{item.delivery_gst}</span></p> : null}
+                                                            {item.delivery_calculation_snapshot.policy && (
+                                                                <p className={item.delivery_calculation_snapshot.policy === 'NON_REFUNDABLE' ? 'text-orange-600 font-medium' : 'text-green-600 font-medium'}>
+                                                                    {item.delivery_calculation_snapshot.policy === 'NON_REFUNDABLE' ? 'Non-Refundable' : 'Refundable'}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    });
+                                })()}
                             </div>
 
                             <Separator className="my-4" />
 
                             <div className="space-y-2 text-sm">
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Subtotal</span>
-                                    <span>₹{order.subtotal.toFixed(2)}</span>
-                                </div>
-                                {order.coupon_discount > 0 && (
-                                    <div className="flex justify-between text-green-600">
-                                        <span>Coupon Discount</span>
-                                        <span>-₹{order.coupon_discount.toFixed(2)}</span>
-                                    </div>
-                                )}
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Delivery Charge</span>
-                                    <span>₹{order.delivery_charge.toFixed(2)}</span>
-                                </div>
+                                {(() => {
+                                    const refundableTotal = (order.items || []).reduce((sum: number, item: any) => {
+                                        const snapshot = item.delivery_calculation_snapshot || {};
+                                        if (snapshot.source !== 'global' && snapshot.delivery_refund_policy === 'REFUNDABLE') {
+                                            return sum + (item.delivery_charge || 0) + (item.delivery_gst || 0);
+                                        }
+                                        return sum;
+                                    }, 0);
+
+                                    const deliveryTotal = (order.delivery_charge || 0) + (order.delivery_gst || 0);
+                                    const nonRefundableTotalToBundle = Math.max(0, deliveryTotal - refundableTotal);
+                                    const subtotalToDisplay = order.subtotal + nonRefundableTotalToBundle;
+
+                                    return (
+                                        <>
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Subtotal</span>
+                                                <span>₹{subtotalToDisplay.toFixed(2)}</span>
+                                            </div>
+                                            {order.coupon_discount > 0 && (
+                                                <div className="flex justify-between text-green-600">
+                                                    <span>Coupon Discount</span>
+                                                    <span>-₹{order.coupon_discount.toFixed(2)}</span>
+                                                </div>
+                                            )}
+                                            {refundableTotal > 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-muted-foreground flex items-center gap-1.5">
+                                                        Delivery & Handling
+                                                        <Badge variant="outline" className="text-[10px] h-4 font-normal text-blue-600 border-blue-200 bg-blue-50">Refundable</Badge>
+                                                    </span>
+                                                    <span>₹{refundableTotal.toFixed(2)}</span>
+                                                </div>
+                                            )}
+                                        </>
+                                    );
+                                })()}
                                 <Separator className="my-2" />
                                 <div className="flex justify-between font-bold text-lg">
                                     <span>Total Payable</span>
@@ -710,7 +763,7 @@ export default function OrderDetail() {
 
                         // Calculate expected total including delivery
                         const deliveryCharge = order.delivery_charge || 0;
-                        const deliveryGST = ((order as any).delivery_gst || 0); // Type assertion needed if not in interface yet
+                        const deliveryGST = order.delivery_gst || 0;
                         const totalAmount = order.total_amount || 0;
 
                         // Check mismatch (Legacy: storedSum ~= ProductTotal vs TotalAmount ~= ProductTotal + Delivery)

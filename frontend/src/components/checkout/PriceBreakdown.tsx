@@ -42,61 +42,96 @@ export function PriceBreakdown({ totals, items = [] }: PriceBreakdownProps & { i
                     </div>
                 )}
 
-                {/* Standard Delivery Charge (Inclusive) */}
-                {(totals.globalDeliveryCharge ?? 0) > 0 && (
-                    <div className="flex flex-col mb-1.5 group/del">
-                        <div className="flex justify-between items-center transition-colors">
-                            <span className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium">
-                                <Truck className="w-3.5 h-3.5 text-emerald-600" />
-                                Standard Delivery
-                                {(totals.globalDeliveryGST ?? 0) > 0 && (
-                                    <span className="text-[8px] uppercase tracking-wider text-emerald-600 bg-emerald-50/50 border border-emerald-100/50 px-1 py-0 rounded-sm font-bold">
-                                        Incl. Tax
-                                    </span>
-                                )}
-                            </span>
-                            <span className="font-bold text-xs">
-                                ₹{((totals.globalDeliveryCharge ?? 0) + (totals.globalDeliveryGST ?? 0)).toFixed(2)}
-                            </span>
+                {/* Delivery & Handling Section */}
+                {((totals.deliveryCharge || 0) + (totals.deliveryGST || 0)) > 0 && (
+                    <div className="pt-2 border-t border-dashed border-border/40 space-y-2">
+                        <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] font-bold uppercase tracking-wider mb-1">
+                            <Truck className="w-3 h-3 text-primary/70" />
+                            Delivery & Handling
                         </div>
-                        {/* Breakdown of Standard GST */}
-                        {(totals.globalDeliveryGST ?? 0) > 0 && (
-                            <div className="flex justify-between items-center pl-6 mt-0.5">
-                                <span className="text-[10px] text-muted-foreground/50 italic leading-tight">
-                                    Includes ₹{(totals.globalDeliveryGST ?? 0).toFixed(2)} Standard GST
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                )}
 
-                {/* Item Surcharges (Inclusive) */}
-                {(totals.productDeliveryCharges ?? 0) > 0 && (
-                    <div className="flex flex-col mb-1.5 pt-1.5 border-t border-dashed border-border/40 group/sur">
-                        <div className="flex justify-between items-center">
-                            <span className="flex items-center gap-1.5 text-muted-foreground text-[11px] font-medium">
-                                <div className="w-3.5 h-3.5 flex items-center justify-center">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-orange-400" />
-                                </div>
-                                Item Surcharges
-                                {(totals.productDeliveryGST ?? 0) > 0 && (
-                                    <span className="text-[8px] uppercase tracking-wider text-orange-600 bg-orange-50/50 border border-orange-100/50 px-1 py-0 rounded-sm font-bold">
-                                        Incl. Tax
-                                    </span>
-                                )}
-                            </span>
-                            <span className="font-bold text-xs text-orange-600/90">
-                                ₹{((totals.productDeliveryCharges ?? 0) + (totals.productDeliveryGST ?? 0)).toFixed(2)}
-                            </span>
-                        </div>
-                        {/* Breakdown of Surcharge GST */}
-                        {(totals.productDeliveryGST ?? 0) > 0 && (
-                            <div className="flex justify-between items-center pl-6 mt-0.5">
-                                <span className="text-[10px] text-muted-foreground/50 italic leading-tight">
-                                    Includes ₹{(totals.productDeliveryGST ?? 0).toFixed(2)} Surcharge GST
+                        {/* Standard Delivery row */}
+                        {(totals.globalDeliveryCharge ?? 0) > 0 && (
+                            <div className="flex justify-between items-center pl-1 group/del">
+                                <span className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium">
+                                    Standard Delivery
+                                    <span className="text-[9px] opacity-50 font-normal">(Non-Refundable)</span>
+                                    {(totals.globalDeliveryGST ?? 0) > 0 && (
+                                        <span className="text-[8px] uppercase tracking-wider text-emerald-600 bg-emerald-50/50 border border-emerald-100/50 px-1 py-0 rounded-sm font-bold">
+                                            Incl. Tax
+                                        </span>
+                                    )}
+                                </span>
+                                <span className="font-bold text-xs">
+                                    ₹{((totals.globalDeliveryCharge ?? 0) + (totals.globalDeliveryGST ?? 0)).toFixed(2)}
                                 </span>
                             </div>
                         )}
+
+                        {/* Item Surcharges (Split by Refundability) */}
+                        {(() => {
+                            let refundableBase = 0;
+                            let refundableGst = 0;
+                            let nonRefundableBase = 0;
+                            let nonRefundableGst = 0;
+
+                            items.forEach(item => {
+                                const meta = item.delivery_meta || {};
+                                const base = item.delivery_charge || 0;
+                                const gst = item.delivery_gst || 0;
+
+                                if (meta.source !== 'global') {
+                                    if (meta.delivery_refund_policy === 'REFUNDABLE') {
+                                        refundableBase += base;
+                                        refundableGst += gst;
+                                    } else {
+                                        nonRefundableBase += base;
+                                        nonRefundableGst += gst;
+                                    }
+                                }
+                            });
+
+                            const refundableTotal = refundableBase + refundableGst;
+                            const nonRefundableTotal = nonRefundableBase + nonRefundableGst;
+
+                            return (
+                                <>
+                                    {refundableTotal > 0 && (
+                                        <div className="flex justify-between items-center pl-1 group/sur">
+                                            <span className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-400/60" />
+                                                Refundable Surcharge
+                                                {refundableGst > 0 && (
+                                                    <span className="text-[8px] uppercase tracking-wider text-blue-600 bg-blue-50/50 border border-blue-100/50 px-1 py-0 rounded-sm font-bold">
+                                                        Incl. Tax
+                                                    </span>
+                                                )}
+                                            </span>
+                                            <span className="font-bold text-xs text-blue-600/90">
+                                                ₹{refundableTotal.toFixed(2)}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {nonRefundableTotal > 0 && (
+                                        <div className="flex justify-between items-center pl-1 group/sur">
+                                            <span className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-orange-400/60" />
+                                                Addt. Processing
+                                                <span className="text-[9px] opacity-40 font-normal">(Non-Ref)</span>
+                                                {nonRefundableGst > 0 && (
+                                                    <span className="text-[8px] uppercase tracking-wider text-orange-600 bg-orange-50/50 border border-orange-100/50 px-1 py-0 rounded-sm font-bold">
+                                                        Incl. Tax
+                                                    </span>
+                                                )}
+                                            </span>
+                                            <span className="font-bold text-xs text-orange-600/90">
+                                                ₹{nonRefundableTotal.toFixed(2)}
+                                            </span>
+                                        </div>
+                                    )}
+                                </>
+                            );
+                        })()}
                     </div>
                 )}
 
@@ -161,19 +196,46 @@ export function PriceBreakdown({ totals, items = [] }: PriceBreakdownProps & { i
                                                 </div>
                                             );
                                         })}
-                                        {/* Delivery Tax Line Item */}
-                                        {(totals.globalDeliveryCharge ?? 0) > 0 && (totals.globalDeliveryGST ?? 0) > 0 && (
-                                            <div className="flex flex-col text-[9px] text-muted-foreground border-b border-dashed border-border/50 last:border-0 pb-1 last:pb-0">
-                                                <div className="flex justify-between font-medium text-foreground/80">
-                                                    <span>Delivery Charges</span>
-                                                    <span>18% GST</span>
+                                        {/* Delivery Tax Line Items */}
+                                        {(() => {
+                                            const deliveryTaxItems = [];
+
+                                            // Global GST
+                                            if ((totals.globalDeliveryGST ?? 0) > 0) {
+                                                deliveryTaxItems.push({
+                                                    label: "Standard Delivery GST",
+                                                    amount: totals.globalDeliveryGST || 0
+                                                });
+                                            }
+
+                                            // Product SPECIFIC GST
+                                            let productDeliveryGSTTotal = 0;
+                                            items.forEach(item => {
+                                                if (item.delivery_meta?.source !== 'global') {
+                                                    productDeliveryGSTTotal += (item.delivery_gst || 0);
+                                                }
+                                            });
+
+                                            if (productDeliveryGSTTotal > 0) {
+                                                deliveryTaxItems.push({
+                                                    label: "Sur-Charge GST",
+                                                    amount: productDeliveryGSTTotal
+                                                });
+                                            }
+
+                                            return deliveryTaxItems.map((tax, idx) => (
+                                                <div key={`del-tax-${idx}`} className="flex flex-col text-[9px] text-muted-foreground border-b border-dashed border-border/50 last:border-0 pb-1 last:pb-0">
+                                                    <div className="flex justify-between font-medium text-foreground/80">
+                                                        <span>{tax.label}</span>
+                                                        <span>18% GST</span>
+                                                    </div>
+                                                    <div className="flex justify-between pl-1">
+                                                        <span>Tax Amount</span>
+                                                        <span>₹{(tax.amount || 0).toFixed(2)}</span>
+                                                    </div>
                                                 </div>
-                                                <div className="flex justify-between pl-1">
-                                                    <span>Tax Amount</span>
-                                                    <span>₹{(totals.globalDeliveryGST || 0).toFixed(2)}</span>
-                                                </div>
-                                            </div>
-                                        )}
+                                            ));
+                                        })()}
                                     </div>
                                 </details>
                             </div>

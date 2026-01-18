@@ -160,6 +160,9 @@ router.post('/create-payment-order', validate(createPaymentOrderSchema), request
                 // Synced Item: Use ID
                 razorpayItem = {
                     item_id: variant.razorpay_item_id,
+                    name: `${product.title} - ${variant?.size_label || 'Default'}`,
+                    amount: Math.round((variant?.selling_price || product.price) * 100),
+                    currency: 'INR',
                     quantity: item.quantity
                 };
             } else {
@@ -553,6 +556,9 @@ router.post('/buy-now/create-payment-order', requestLock('create-payment-order')
         if (variant?.razorpay_item_id) {
             razorpayItem = {
                 item_id: variant.razorpay_item_id,
+                name: `${product.title}${variant ? ` - ${variant.size_label}` : ''}`,
+                amount: Math.round(unitPrice * 100),
+                currency: 'INR',
                 quantity
             };
         } else {

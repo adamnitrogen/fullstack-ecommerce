@@ -9,11 +9,13 @@ export class CartDTO {
             return [];
         }
 
-        const seenProducts = new Set<string>();
+        const itemBreakdown = response.totals?.itemBreakdown || [];
 
         return response.cart.cart_items.map((item) => {
-            const showCharge = !seenProducts.has(item.product_id);
-            seenProducts.add(item.product_id);
+            const itemDetail = itemBreakdown.find((id: any) =>
+                (id.variant_id && id.variant_id === item.variant_id) ||
+                (!id.variant_id && id.product_id === item.product_id)
+            );
 
             return {
                 productId: item.product_id,
@@ -21,7 +23,9 @@ export class CartDTO {
                 product: item.products,
                 variantId: item.variant_id || undefined,
                 variant: item.product_variants,
-                delivery_charge: showCharge ? (item.products?.delivery_charge ?? 0) : 0,
+                delivery_charge: itemDetail?.delivery_charge ?? 0,
+                delivery_gst: itemDetail?.delivery_gst ?? 0,
+                delivery_meta: itemDetail?.delivery_meta
             };
         });
     }

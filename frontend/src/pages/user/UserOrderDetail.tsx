@@ -146,7 +146,6 @@ export default function UserOrderDetail() {
             await apiClient.post(`/orders/${id}/cancel`, { reason: cancelReason });
             toast.success("Order cancelled successfully");
             fetchOrderDetail(); // Refresh
-            fetchOrderDetail(); // Refresh
         } catch (error: unknown) {
             toast.error(getErrorMessage(error, "Failed to cancel order"));
         } finally {
@@ -178,7 +177,6 @@ export default function UserOrderDetail() {
 
             toast.success("Return request submitted");
             setReturnOpen(false);
-            fetchOrderDetail();
             fetchOrderDetail();
         } catch (error: unknown) {
             toast.error(getErrorMessage(error, "Failed to submit return request"));
@@ -499,61 +497,106 @@ export default function UserOrderDetail() {
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-4">
-                                    {order.items.map((item, index) => {
-                                        // Get variant size label
-                                        const sizeLabel = item.variant?.size_label || item.size_label;
-                                        // Use variant image if available, otherwise use product image
-                                        const displayImage = item.variant?.variant_image_url || item.product?.images?.[0];
-                                        // Use price_per_unit from order item (reflects variant price at time of purchase)
-                                        const unitPrice = item.price_per_unit || item.product?.price || 0;
+                                    {(() => {
+                                        // Calculate Non-Refundable Total to Bundle
+                                        const refundableTotal = (order.items || []).reduce((sum: number, item: any) => {
+                                            const snapshot = item.delivery_calculation_snapshot || {};
+                                            if (snapshot.source !== 'global' && snapshot.delivery_refund_policy === 'REFUNDABLE') {
+                                                return sum + (item.delivery_charge || 0) + (item.delivery_gst || 0);
+                                            }
+                                            return sum;
+                                        }, 0);
 
-                                        return (
-                                            <div key={index} className="flex gap-4 items-start border-b pb-4 last:border-0 last:pb-0">
-                                                <div className="w-16 h-16 bg-muted rounded-md overflow-hidden">
-                                                    {displayImage && (
-                                                        <img
-                                                            src={displayImage}
-                                                            alt={item.product?.title}
-                                                            className="w-full h-full object-cover"
-                                                        />
-                                                    )}
-                                                </div>
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <h4 className="font-medium">{item.product?.title || "Product"}</h4>
-                                                        {sizeLabel && (
-                                                            <Badge variant="secondary" className="text-xs font-normal">
-                                                                {sizeLabel}
-                                                            </Badge>
+                                        const deliveryTotal = (order.delivery_charge || 0) + (order.delivery_gst || 0);
+                                        const nonRefundableTotalToBundle = Math.max(0, deliveryTotal - refundableTotal);
+
+                                        // Total for pro-rating
+                                        const itemsTotalAmount = order.items.reduce((sum, item) => sum + (item.quantity * (item.price_per_unit || item.product?.price || 0)), 0);
+
+                                        return order.items.map((item, index) => {
+                                            // Get variant size label
+                                            const sizeLabel = item.variant?.size_label || item.size_label;
+                                            // Use variant image if available, otherwise use product image
+                                            const displayImage = item.variant?.variant_image_url || item.product?.images?.[0];
+
+                                            // Calculate Bundled Price
+                                            const rawUnitPrice = item.price_per_unit || item.product?.price || 0;
+                                            const itemTotalRaw = item.quantity * rawUnitPrice;
+
+                                            let bundledUnitPrice = rawUnitPrice;
+                                            if (nonRefundableTotalToBundle > 0 && itemsTotalAmount > 0) {
+                                                const portion = (itemTotalRaw / itemsTotalAmount) * nonRefundableTotalToBundle;
+                                                bundledUnitPrice = rawUnitPrice + (portion / item.quantity);
+                                            }
+
+                                            return (
+                                                <div key={index} className="flex gap-4 items-start border-b pb-4 last:border-0 last:pb-0">
+                                                    <div className="w-16 h-16 bg-muted rounded-md overflow-hidden">
+                                                        {displayImage && (
+                                                            <img
+                                                                src={displayImage}
+                                                                alt={item.product?.title}
+                                                                className="w-full h-full object-cover"
+                                                            />
                                                         )}
                                                     </div>
-                                                    <p className="text-sm text-muted-foreground">
-                                                        Qty: {item.quantity} × ₹{unitPrice}
-                                                    </p>
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <h4 className="font-medium">{item.product?.title || "Product"}</h4>
+                                                            {sizeLabel && (
+                                                                <Badge variant="secondary" className="text-xs font-normal">
+                                                                    {sizeLabel}
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-sm text-muted-foreground">
+                                                            Qty: {item.quantity} × ₹{bundledUnitPrice.toFixed(2)}
+                                                            <span className="text-xs ml-2 text-muted-foreground/80">
+                                                                ({(item.product?.price_includes_tax ?? item.product?.default_price_includes_tax ?? true) ? 'Inc. Tax' : 'Excl. Tax'})
+                                                            </span>
+                                                        </p>
+                                                    </div>
+                                                    <div className="text-right font-medium">
+                                                        ₹{(item.quantity * bundledUnitPrice).toFixed(2)}
+                                                    </div>
                                                 </div>
-                                                <div className="text-right font-medium">
-                                                    ₹{(item.quantity * unitPrice).toFixed(2)}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        });
+                                    })()}
                                 </div>
                                 <Separator className="my-4" />
                                 <div className="space-y-2 text-sm">
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Subtotal</span>
-                                        <span>₹{order.subtotal?.toFixed(2) || (order.total_amount - (order.delivery_charge || 0)).toFixed(2)}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Delivery Charge</span>
-                                        <span>₹{order.delivery_charge?.toFixed(2) || "0.00"}</span>
-                                    </div>
-                                    {(order.delivery_gst || 0) > 0 && (
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Delivery GST (18%)</span>
-                                            <span>₹{order.delivery_gst?.toFixed(2)}</span>
-                                        </div>
-                                    )}
+                                    {(() => {
+                                        const refundableTotal = (order.items || []).reduce((sum: number, item: any) => {
+                                            const snapshot = item.delivery_calculation_snapshot || {};
+                                            if (snapshot.source !== 'global' && snapshot.delivery_refund_policy === 'REFUNDABLE') {
+                                                return sum + (item.delivery_charge || 0) + (item.delivery_gst || 0);
+                                            }
+                                            return sum;
+                                        }, 0);
+
+                                        const deliveryTotal = (order.delivery_charge || 0) + (order.delivery_gst || 0);
+                                        const nonRefundableTotalToBundle = Math.max(0, deliveryTotal - refundableTotal);
+                                        const subtotal = order.subtotal || (order.total_amount - deliveryTotal);
+
+                                        return (
+                                            <>
+                                                <div className="flex justify-between">
+                                                    <span className="text-muted-foreground">Subtotal</span>
+                                                    <span>₹{(subtotal + nonRefundableTotalToBundle).toFixed(2)}</span>
+                                                </div>
+                                                {refundableTotal > 0 && (
+                                                    <div className="flex justify-between">
+                                                        <span className="text-muted-foreground flex items-center gap-1.5">
+                                                            Delivery & Handling
+                                                            <Badge variant="outline" className="text-[10px] h-4 font-normal text-blue-600 border-blue-200 bg-blue-50">Refundable</Badge>
+                                                        </span>
+                                                        <span>₹{refundableTotal.toFixed(2)}</span>
+                                                    </div>
+                                                )}
+                                            </>
+                                        );
+                                    })()}
                                     <Separator className="my-2" />
                                     <div className="flex justify-between font-bold text-lg">
                                         <span>Total Payable</span>

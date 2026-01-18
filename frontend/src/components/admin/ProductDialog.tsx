@@ -160,6 +160,27 @@ export function ProductDialog({
             default_tax_applicable: (productData as any).default_tax_applicable ?? productData.default_tax_applicable ?? true,
             default_price_includes_tax: (productData as any).default_price_includes_tax ?? productData.default_price_includes_tax ?? true,
           });
+
+          // Initialize Delivery Config
+          if ((productData as any).delivery_config) {
+            const config = (productData as any).delivery_config;
+            setDeliveryConfig({
+              calculation_type: config.calculation_type,
+              base_delivery_charge: config.base_delivery_charge,
+              gst_percentage: config.gst_percentage,
+              delivery_refund_policy: config.delivery_refund_policy,
+              is_active: config.is_active,
+            });
+          } else {
+            // Reset to defaults if no config exists for this product
+            setDeliveryConfig({
+              calculation_type: "FLAT_PER_ORDER",
+              base_delivery_charge: 0,
+              gst_percentage: 18,
+              delivery_refund_policy: "NON_REFUNDABLE",
+              is_active: false,
+            });
+          }
         }
 
         // Update ref for the next render

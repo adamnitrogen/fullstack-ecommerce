@@ -278,14 +278,24 @@ async function handleOrderWebhook(event, data, payment) {
                 // Send Order Confirmation Email
                 if (updatedOrder) {
                     try {
-                        const items = updatedOrder.order_items || []; // Need to fetch items properly if not selected
+                        const items = updatedOrder.order_items || [];
 
-                        // We might need to refetch items if not joined above, but let's assume standard order processing
-                        // For robustness, let's fetch items explicitly
-                        const { data: orderItems } = await supabase
-                            .from('order_items')
-                            .select('*')
-                            .eq('order_id', updatedOrder.id);
+                        // Ensure invoice link is present for the email
+                        if (!updatedOrder.invoice_url) {
+                            try {
+                                const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
+                                logger.info({ orderId: updatedOrder.id }, 'Generating missing invoice link via webhook');
+                                const result = await InvoiceOrchestrator.generateRazorpayInvoice({
+                                    ...updatedOrder,
+                                    items: items
+                                });
+                                if (result.success && result.invoiceUrl) {
+                                    updatedOrder.invoice_url = result.invoiceUrl;
+                                }
+                            } catch (invErr) {
+                                logger.warn({ err: invErr }, 'Failed to generate invoice link in webhook');
+                            }
+                        }
 
                         await emailService.sendOrderConfirmationEmail(
                             updatedOrder.customer_email,

@@ -63,10 +63,10 @@ function getOrderConfirmationEmail({ order, customerName }) {
         invoiceSection = `
         <div style="margin-top: 20px; margin-bottom: 20px; text-align: center;">
             <a href="${order.invoiceUrl}" style="background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
-                📄 Download Tax Invoice
+                📄 Download Payment Receipt
             </a>
             <p style="margin-top: 10px; font-size: 13px; color: #666;">
-                Your GST Invoice is ready. Click above to download.
+                Your payment receipt is ready. Click above to download.
             </p>
         </div>
         `;
@@ -207,7 +207,44 @@ function getOrderStatusUpdateEmail({ order, customerName, newStatus }) {
     };
 }
 
+/**
+ * Order cancellation email
+ */
+function getOrderCancellationEmail({ order, customerName }) {
+    const firstName = customerName ? customerName.split(' ')[0] : 'Customer';
+    const displayOrderNumber = order.orderNumber || order.order_number || order.id;
+
+    const content = `
+        <h2>Order Cancelled 🛑</h2>
+        <p>Hi ${firstName},</p>
+        <p>Your order <strong>${displayOrderNumber}</strong> has been cancelled as per your request.</p>
+        
+        <div class="info-box" style="background-color: #fee2e2; border: 1px solid #fecaca; color: #b91c1c;">
+            <strong>Status:</strong> CANCELLED
+        </div>
+
+        ${(order.paymentStatus === 'paid' || order.paymentStatus === 'refund_initiated' || order.paymentStatus === 'refunded') ? `
+        <div style="margin-top: 20px; padding: 15px; background-color: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 5px;">
+            <p style="margin: 0; color: #374151;">
+                <strong>Refund Initiated:</strong><br>
+                A refund for <strong>₹${(order.totalAmount || 0).toFixed(2)}</strong> has been initiated to your original payment method.<br>
+                It typically takes <strong>5-7 business days</strong> to reflect in your account.
+            </p>
+        </div>
+        ` : ''}
+        
+        <p class="text-muted" style="margin-top: 20px;">If you didn't request this cancellation, please contact our support team immediately.</p>
+        <p class="text-muted">We hope to serve you again soon!</p>
+    `;
+
+    return {
+        subject: `Order Cancelled - ${displayOrderNumber}`,
+        html: wrapInTemplate(content)
+    };
+}
+
 module.exports = {
     getOrderConfirmationEmail,
-    getOrderStatusUpdateEmail
+    getOrderStatusUpdateEmail,
+    getOrderCancellationEmail
 };

@@ -82,7 +82,8 @@ class DeliveryChargeService {
                 base_delivery_charge: globalSettings.delivery_charge,
                 gst_percentage: globalSettings.delivery_gst,
                 is_taxable: (globalSettings.delivery_gst > 0),
-                source: 'global'
+                source: 'global',
+                delivery_refund_policy: 'NON_REFUNDABLE'
                 // We don't store threshold here, it's applied at cart level
             };
 
@@ -189,7 +190,8 @@ class DeliveryChargeService {
                 delivery_gst: deliveryGST,
                 is_taxable: config.is_taxable,
                 total_delivery: totalDelivery,
-                config_id: config.id || null
+                config_id: config.id || null,
+                delivery_refund_policy: config.delivery_refund_policy || 'REFUNDABLE'
             };
 
             log.operationSuccess('CALCULATE_DELIVERY', {

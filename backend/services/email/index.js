@@ -19,7 +19,7 @@ const SmtpProvider = require('./providers/smtp.provider');
 
 // Templates
 const { getRegistrationEmail, getEmailVerificationEmail, getEmailConfirmationEmail } = require('./templates/registration.template');
-const { getOrderConfirmationEmail, getOrderStatusUpdateEmail } = require('./templates/order.template');
+const { getOrderConfirmationEmail, getOrderStatusUpdateEmail, getOrderCancellationEmail } = require('./templates/order.template');
 const { getEventRegistrationEmail, getEventCancellationEmail, getEventUpdateEmail } = require('./templates/event.template');
 const { getDonationReceiptEmail, getSubscriptionConfirmationEmail, getSubscriptionCancellationEmail } = require('./templates/donation.template');
 const { getContactFormEmail, getContactAutoReplyEmail } = require('./templates/contact.template');
@@ -84,6 +84,9 @@ class EmailService {
             case EmailEventTypes.ORDER_SHIPPED:
             case EmailEventTypes.ORDER_DELIVERED:
                 return getOrderStatusUpdateEmail(data);
+
+            case EmailEventTypes.ORDER_CANCELLED:
+                return getOrderCancellationEmail(data);
 
             case EmailEventTypes.EVENT_REGISTRATION:
                 return getEventRegistrationEmail(data);
@@ -330,6 +333,13 @@ class EmailService {
      */
     async sendOrderStatusUpdateEmail(to, { order, customerName, newStatus }, userId = null) {
         return this.send(EmailEventTypes.ORDER_STATUS_UPDATE, to, { order, customerName, newStatus }, { userId, referenceId: order.id });
+    }
+
+    /**
+     * Send order cancellation email
+     */
+    async sendOrderCancellationEmail(to, { order, customerName }, userId = null) {
+        return this.send(EmailEventTypes.ORDER_CANCELLED, to, { order, customerName }, { userId, referenceId: order.id });
     }
 
     /**

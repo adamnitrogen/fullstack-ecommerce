@@ -10,6 +10,7 @@ const checkoutService = require('./checkout.service');
 // GST Invoice and Audit
 const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
 const { FinancialEventLogger } = require('./financial-event-logger.service');
+const { RefundService, REFUND_TYPES } = require('./refund.service');
 
 const ORDER_STATUS = {
     PENDING: 'pending',
@@ -169,7 +170,7 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
             .from('orders')
             .update({
                 status: newStatus,
-                updatedAt: new Date().toISOString()
+                updated_at: new Date().toISOString()
             })
             .eq('id', orderId)
             .select()
@@ -209,19 +210,17 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
                 await logStatusHistory(orderId, ORDER_STATUS.CANCELLED, userId, 'Refund Initiated: Amount will be credited within 5-7 business days');
                 refundInitiated = true;
 
-                // Process actual Razorpay refund in background (non-blocking)
-                const { processRefund } = checkoutService;
-                processRefund(resolvedPaymentId)
+                // Process actual Razorpay refund in background (non-blocking) using RefundService
+                RefundService.asyncProcessRefund(orderId, REFUND_TYPES.BUSINESS_REFUND, userId, 'Cancelled before shipping')
                     .then(refundResult => {
-                        if (refundResult?.skipped) {
-                            logger.info(`[Order ${orderId}] Refund skipped: ${refundResult.reason}`);
+                        if (refundResult?.success) {
+                            logger.info(`[Order ${orderId}] Business refund processed successfully via RefundService`);
                         } else {
-                            logger.info(`[Order ${orderId}] Razorpay refund processed successfully`);
+                            logger.info(`[Order ${orderId}] Refund skipped or failed: ${refundResult.reason}`);
                         }
                     })
                     .catch(refundErr => {
                         logger.error(`[Order ${orderId}] Background refund failed:`, refundErr.message);
-                        // TODO: Could add to a retry queue or alert admin
                     });
             }
 
@@ -267,16 +266,17 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
                             logger.error(`[Order ${orderId}] Verified Refund Verification Failed: Calculated amount is ${verifiedRefundAmount}. Skipping refund to avoid full charge reversal.`);
                             // Do not complete the refund if amount is invalid
                         } else {
-                            const { processRefund } = checkoutService;
+                            // Execute Refund via RefundService for manual returns
+                            const refundResult = await RefundService.asyncProcessRefund(
+                                orderId,
+                                REFUND_TYPES.BUSINESS_REFUND,
+                                userId,
+                                'Manual return processed',
+                                false,
+                                verifiedRefundAmount
+                            );
 
-                            // Pass specific amount to refund service
-                            const refundResult = await processRefund(resolvedPaymentId, verifiedRefundAmount);
-
-                            if (refundResult?.skipped) {
-                                logger.info(`[Order ${orderId}] Refund skipped: ${refundResult.reason}`);
-                            } else {
-                                await supabase.from('orders').update({ paymentStatus: 'refund_initiated' }).eq('id', orderId);
-
+                            if (refundResult?.success) {
                                 await supabase.from('refunds').insert({
                                     return_id: returnReq.id,
                                     order_id: orderId,
@@ -285,7 +285,7 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
                                     status: 'processed'
                                 });
 
-                                logger.info(`[Order ${orderId}] Verified Refund successfully processed.`);
+                                logger.info(`[Order ${orderId}] Verified Refund successfully processed via RefundService.`);
                                 refundInitiated = true;
                             }
                         }
@@ -522,7 +522,7 @@ async function getOrderById(id, user) {
                 notes,
                 created_at,
                 updated_by,
-                updater:profiles!order_status_history_updated_by_profile_fk (
+                updater:profiles (
                     first_name,
                     last_name,
                     email,
@@ -653,13 +653,14 @@ async function getOrderById(id, user) {
         items: mappedItems,
         created_at: data.created_at || data.createdAt,
         total_amount: data.total_amount || data.totalAmount || data.total || 0,
-        total_amount: data.total_amount || data.totalAmount || data.total || 0,
         payment_status: data.payment_status || data.paymentStatus || 'pending',
         // Return readable Razorpay ID if available, otherwise internal ID
         payment_id: paymentDetails?.razorpay_payment_id || data.payment_id,
-        payment_id: paymentDetails?.razorpay_payment_id || data.payment_id,
         payment_method: paymentDetails?.method,
-        email_logs: emailLogs
+        email_logs: emailLogs,
+        // Explicitly pass delivery fields if they exist on order
+        delivery_charge: data.delivery_charge || 0,
+        delivery_gst: data.delivery_gst || 0
     };
 }
 
@@ -670,7 +671,7 @@ async function cancelOrder(id, userId, reason, userEmail, userName) {
     // 1. Verify Ownership
     const { data: order, error } = await supabase
         .from('orders')
-        .select('user_id, status, customerEmail, customerName')
+        .select('user_id, status, customer_email, customer_name')
         .eq('id', id)
         .single();
 
@@ -706,12 +707,11 @@ async function cancelOrder(id, userId, reason, userEmail, userName) {
     // Send Cancellation Email
     const customerEmail = result.order.customerEmail || result.order.customer_email || userEmail;
     if (customerEmail) {
-        emailService.sendOrderStatusUpdateEmail(
+        emailService.sendOrderCancellationEmail(
             customerEmail,
             {
                 order: result.order,
-                customerName: result.order.customerName || result.order.customer_name || userName,
-                newStatus: 'cancelled'
+                customerName: result.order.customerName || result.order.customer_name || userName
             },
             userId
         ).catch(err => logger.error({ err }, 'Failed to send cancellation email'));

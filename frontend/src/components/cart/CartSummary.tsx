@@ -109,9 +109,9 @@ export const CartSummary = ({
                 )}
 
                 {/* Price Breakdown */}
-                <div className="space-y-3 text-sm">
+                <div className="space-y-4 text-sm relative">
                     <div className={cn(
-                        "space-y-4 relative transition-all duration-300",
+                        "space-y-3",
                         isCalculating && "opacity-50 blur-[1px] pointer-events-none"
                     )}>
                         <div className="flex justify-between text-muted-foreground font-medium">
@@ -129,175 +129,207 @@ export const CartSummary = ({
                             </div>
                         )}
 
-                        <div className="flex flex-col gap-2 pt-1">
-                            <div className="flex flex-col gap-0.5">
-                                <div className="flex justify-between items-center group/delivery">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100/50">
-                                            <Truck className="w-3.5 h-3.5" />
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <span className="text-muted-foreground font-medium">Standard Delivery</span>
+                        {/* Delivery & Handling Section */}
+                        {((totals?.deliveryCharge || 0) + (totals?.deliveryGST || 0)) > 0 && (
+                            <div className="pt-2 border-t border-dashed border-border/40 space-y-2">
+                                <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] font-bold uppercase tracking-wider mb-1">
+                                    <Truck className="w-3.5 h-3.5" />
+                                    Delivery & Handling
+                                </div>
+
+                                {/* Standard Delivery */}
+                                {(totals?.globalDeliveryCharge ?? 0) > 0 && (
+                                    <div className="flex justify-between items-center group/del">
+                                        <span className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium">
+                                            Standard Delivery
+                                            <span className="text-[9px] opacity-40 font-normal">(Non-Ref)</span>
                                             {(totals?.globalDeliveryGST ?? 0) > 0 && (
                                                 <span className="text-[8px] uppercase tracking-wider text-emerald-600 bg-emerald-50/50 border border-emerald-100/50 px-1 py-0 rounded-sm font-bold">
                                                     Incl. Tax
                                                 </span>
                                             )}
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        {totals?.globalDeliveryCharge === 0 ? (
-                                            <span className="text-emerald-600 font-black text-[10px] uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">Free</span>
-                                        ) : (
-                                            <div className="flex flex-col items-end">
-                                                <span className="font-bold text-foreground">
-                                                    ₹{((totals?.globalDeliveryCharge ?? 0) + (totals?.globalDeliveryGST ?? 0)).toFixed(2)}
-                                                </span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                                {totals && (totals.globalDeliveryGST ?? 0) > 0 && (
-                                    <div className="flex justify-between items-center pl-8">
-                                        <span className="text-[10px] text-muted-foreground/50 italic leading-tight">
-                                            Includes ₹{(totals.globalDeliveryGST ?? 0).toFixed(2)} GST
+                                        </span>
+                                        <span className="font-bold text-foreground text-xs">
+                                            ₹{((totals?.globalDeliveryCharge ?? 0) + (totals?.globalDeliveryGST ?? 0)).toFixed(2)}
                                         </span>
                                     </div>
                                 )}
-                            </div>
 
-                            {totals && (totals.productDeliveryCharges || 0) > 0 && (
-                                <div className="flex flex-col gap-0.5 mt-1 border-t border-dashed border-orange-100/50 pt-2 animate-in slide-in-from-left-2 duration-500">
-                                    <div className="flex justify-between items-center">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-6 h-6 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center border border-orange-100/50">
-                                                <Truck className="w-3.5 h-3.5" />
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-muted-foreground font-medium">Item Surcharges</span>
-                                                {(totals.productDeliveryGST ?? 0) > 0 && (
-                                                    <span className="text-[8px] uppercase tracking-wider text-orange-600 bg-orange-50/50 border border-orange-100/50 px-1 py-0 rounded-sm font-bold">
-                                                        Incl. Tax
+                                {/* Surcharges IIFE */}
+                                {(() => {
+                                    let refundableBase = 0;
+                                    let refundableGst = 0;
+                                    let nonRefundableBase = 0;
+                                    let nonRefundableGst = 0;
+
+                                    (items || []).forEach(item => {
+                                        const meta = item.delivery_meta || {};
+                                        const base = item.delivery_charge || 0;
+                                        const gst = item.delivery_gst || 0;
+
+                                        if (meta.source !== 'global') {
+                                            if (meta.delivery_refund_policy === 'REFUNDABLE') {
+                                                refundableBase += base;
+                                                refundableGst += gst;
+                                            } else {
+                                                nonRefundableBase += base;
+                                                nonRefundableGst += gst;
+                                            }
+                                        }
+                                    });
+
+                                    const refundableTotal = refundableBase + refundableGst;
+                                    const nonRefundableTotal = nonRefundableBase + nonRefundableGst;
+
+                                    return (
+                                        <>
+                                            {refundableTotal > 0 && (
+                                                <div className="flex justify-between items-center pl-1 group/sur">
+                                                    <span className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-blue-400/60" />
+                                                        Refundable Surcharge
+                                                        {refundableGst > 0 && (
+                                                            <span className="text-[8px] uppercase tracking-wider text-blue-600 bg-blue-50/50 border border-blue-100/50 px-1 py-0 rounded-sm font-bold">
+                                                                Incl. Tax
+                                                            </span>
+                                                        )}
                                                     </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <span className="font-bold text-orange-600">₹{((totals.productDeliveryCharges || 0) + (totals.productDeliveryGST || 0)).toFixed(2)}</span>
-                                    </div>
-                                    {(totals.productDeliveryGST ?? 0) > 0 && (
-                                        <div className="flex justify-between items-center pl-8">
-                                            <span className="text-[10px] text-muted-foreground/50 italic leading-tight">
-                                                Includes ₹{(totals.productDeliveryGST ?? 0).toFixed(2)} Surcharge GST
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Tax Breakdown */}
-                            {totals && totals.tax && totals.tax.totalTax > 0 && (
-                                <div className="flex flex-col gap-0.5 mt-1 border-t border-dashed border-border/50 pt-2">
-                                    <div className="flex justify-between items-center px-1">
-                                        <span className="text-[10px] text-muted-foreground/50 italic leading-tight font-medium">
-                                            Total Tax (Included)
-                                        </span>
-                                        <span className="text-[10px] text-muted-foreground/50 italic font-medium">₹{totals.tax.totalTax.toFixed(2)}</span>
-                                    </div>
-
-                                    {/* Product-wise Tax Breakdown (Collapsible) */}
-                                    {items && items.length > 0 && (
-                                        <div className="mt-1 px-1">
-                                            <details className="group">
-                                                <summary className="text-[9px] text-primary cursor-pointer hover:underline mb-1 list-none flex items-center gap-1 font-medium opacity-80 hover:opacity-100">
-                                                    <span>View Product Tax Breakdown</span>
-                                                </summary>
-                                                <div className="bg-muted/30 rounded p-2 space-y-1.5 mt-1 max-h-[120px] overflow-y-auto custom-scrollbar">
-                                                    {items.map((item, idx) => {
-                                                        const qty = item.quantity || 1;
-                                                        const taxRate = item.variant?.gst_rate ?? item.product?.default_gst_rate ?? 0;
-                                                        const title = item.product?.title || "Product";
-
-                                                        // Estimation logic
-                                                        const sellingPrice = item.variant?.selling_price ?? item.product?.price ?? 0;
-                                                        const itemTotal = sellingPrice * qty;
-                                                        const itemTax = itemTotal - (itemTotal / (1 + (taxRate / 100)));
-
-                                                        if (taxRate <= 0) return null;
-
-                                                        return (
-                                                            <div key={idx} className="flex flex-col text-[8px] text-muted-foreground border-b border-dashed border-border/40 last:border-0 pb-1 last:pb-0">
-                                                                <div className="flex justify-between font-medium text-foreground/70">
-                                                                    <span className="truncate max-w-[120px]" title={title}>{title}</span>
-                                                                    <span>{taxRate}% GST</span>
-                                                                </div>
-                                                                <div className="flex justify-between pl-1 opacity-70">
-                                                                    <span>Tax Amount</span>
-                                                                    <span>₹{itemTax.toFixed(2)}</span>
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                    {/* Delivery Tax Line Item */}
-                                                    {(totals.globalDeliveryCharge ?? 0) > 0 && (totals.globalDeliveryGST ?? 0) > 0 && (
-                                                        <div className="flex flex-col text-[8px] text-muted-foreground border-b border-dashed border-border/40 last:border-0 pb-1 last:pb-0">
-                                                            <div className="flex justify-between font-medium text-foreground/70">
-                                                                <span>Delivery Charges</span>
-                                                                <span>18% GST</span>
-                                                            </div>
-                                                            <div className="flex justify-between pl-1 opacity-70">
-                                                                <span>Tax Amount</span>
-                                                                <span>₹{(totals.globalDeliveryGST || 0).toFixed(2)}</span>
-                                                            </div>
-                                                        </div>
-                                                    )}
+                                                    <span className="font-bold text-xs text-blue-600/90">
+                                                        ₹{refundableTotal.toFixed(2)}
+                                                    </span>
                                                 </div>
-                                            </details>
-                                        </div>
-                                    )}
+                                            )}
+                                            {nonRefundableTotal > 0 && (
+                                                <div className="flex justify-between items-center pl-1 group/sur">
+                                                    <span className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-orange-400/60" />
+                                                        Addt. Processing
+                                                        <span className="text-[9px] opacity-40 font-normal">(Non-Ref)</span>
+                                                        {nonRefundableGst > 0 && (
+                                                            <span className="text-[8px] uppercase tracking-wider text-orange-600 bg-orange-50/50 border border-orange-100/50 px-1 py-0 rounded-sm font-bold">
+                                                                Incl. Tax
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                    <span className="font-bold text-xs text-orange-600/90">
+                                                        ₹{nonRefundableTotal.toFixed(2)}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </>
+                                    );
+                                })()}
+                            </div>
+                        )}
+
+                        {/* Tax Details Section */}
+                        {totals && (totals.tax?.totalTax ?? 0) > 0 && (
+                            <div className="pt-2 border-t border-dashed border-border/40">
+                                <div className="flex justify-between items-center px-1">
+                                    <span className="text-[10px] text-muted-foreground/50 italic leading-tight font-medium">
+                                        Total Tax (Included)
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground/50 italic font-medium">
+                                        ₹{totals.tax.totalTax.toFixed(2)}
+                                    </span>
                                 </div>
-                            )}
 
-                        </div>
+                                <details className="group mt-1 px-1">
+                                    <summary className="text-[9px] text-primary cursor-pointer hover:underline mb-1 list-none flex items-center gap-1 font-medium opacity-80 hover:opacity-100">
+                                        <span>View Tax Breakdown</span>
+                                    </summary>
+                                    <div className="bg-muted/30 rounded p-2 space-y-1.5 mt-1 max-h-[120px] overflow-y-auto custom-scrollbar">
+                                        {/* Product Tax */}
+                                        {(items || []).map((item, idx) => {
+                                            const taxRate = item.variant?.gst_rate ?? item.product?.default_gst_rate ?? 0;
+                                            if (taxRate <= 0) return null;
+                                            const sellingPrice = item.variant?.selling_price ?? item.product?.price ?? 0;
+                                            const itemTotal = sellingPrice * (item.quantity || 1);
+                                            const itemTax = itemTotal - (itemTotal / (1 + (taxRate / 100)));
 
-                        {/* Relative Loader for Calculation */}
-                        {isCalculating && (
-                            <div className="absolute inset-0 flex items-center justify-center z-10">
-                                <span className="flex items-center gap-2 px-3 py-1 bg-background/80 backdrop-blur-sm rounded-full border shadow-sm text-[10px] font-bold uppercase tracking-widest animate-pulse">
-                                    Recalculating...
-                                </span>
+                                            return (
+                                                <div key={`tax-${idx}`} className="flex flex-col text-[8px] text-muted-foreground border-b border-dashed border-border/40 last:border-0 pb-1 last:pb-0">
+                                                    <div className="flex justify-between font-medium text-foreground/70">
+                                                        <span className="truncate max-w-[120px]">{item.product?.title}</span>
+                                                        <span>{taxRate}% GST</span>
+                                                    </div>
+                                                    <div className="flex justify-between pl-1 opacity-70">
+                                                        <span>Tax Amount</span>
+                                                        <span>₹{itemTax.toFixed(2)}</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+
+                                        {/* Delivery Tax */}
+                                        {(() => {
+                                            const delTaxLines = [];
+                                            if ((totals?.globalDeliveryGST ?? 0) > 0) {
+                                                delTaxLines.push({ label: "Standard Delivery GST", amount: totals.globalDeliveryGST || 0 });
+                                            }
+                                            let surchargeGST = 0;
+                                            (items || []).forEach(it => { if (it.delivery_meta?.source !== 'global') surchargeGST += (it.delivery_gst || 0); });
+                                            if (surchargeGST > 0) {
+                                                delTaxLines.push({ label: "Sur-Charge GST", amount: surchargeGST });
+                                            }
+
+                                            return delTaxLines.map((line, lidx) => (
+                                                <div key={`del-tax-${lidx}`} className="flex flex-col text-[8px] text-muted-foreground border-b border-dashed border-border/40 last:border-0 pb-1 last:pb-0">
+                                                    <div className="flex justify-between font-medium text-foreground/70">
+                                                        <span>{line.label}</span>
+                                                        <span>18% GST</span>
+                                                    </div>
+                                                    <div className="flex justify-between pl-1 opacity-70">
+                                                        <span>Tax Amount</span>
+                                                        <span>₹{line.amount.toFixed(2)}</span>
+                                                    </div>
+                                                </div>
+                                            ));
+                                        })()}
+                                    </div>
+                                </details>
                             </div>
                         )}
                     </div>
 
-                    {/* Delivery Progress Bar for Free Shipping */}
-                    {totals && (totals.globalDeliveryCharge || 0) > 0 && (
-                        <div className="mt-2 space-y-2 pb-1">
-                            <div className="h-1.5 w-full bg-muted/60 rounded-full overflow-hidden border border-border/10">
-                                <div
-                                    className="h-full bg-primary transition-all duration-700 ease-out"
-                                    style={{ width: `${deliveryProgress}%` }}
-                                />
-                            </div>
-                            <p className="text-[11px] text-muted-foreground text-center italic">
-                                Add <span className="font-bold text-foreground">₹{remainingForFreeDelivery.toFixed(2)}</span> more for <span className="text-emerald-600 font-bold uppercase tracking-tighter">Free Delivery</span>
-                            </p>
-                        </div>
-                    )}
-
-                    {totals?.coupon && totals.couponDiscount > 0 && (
-                        <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-black animate-in zoom-in-95 leading-tight pt-1">
-                            <span className="flex items-center gap-1.5">
-                                <Sparkles className="w-3.5 h-3.5" />
-                                Coupon ({totals.coupon.code})
+                    {/* Loader */}
+                    {isCalculating && (
+                        <div className="absolute inset-0 flex items-center justify-center z-10 bg-background/20 backdrop-blur-[1px]">
+                            <span className="flex items-center gap-2 px-3 py-1 bg-background/80 rounded-full border shadow-sm text-[10px] font-bold uppercase tracking-widest animate-pulse">
+                                Updating...
                             </span>
-                            <span>-₹{(totals.couponDiscount || 0).toFixed(2)}</span>
                         </div>
                     )}
                 </div>
 
+                {/* Delivery Progress */}
+                {totals && (totals.globalDeliveryCharge || 0) > 0 && (
+                    <div className="space-y-2">
+                        <div className="h-1.5 w-full bg-muted/60 rounded-full overflow-hidden border border-border/10">
+                            <div
+                                className="h-full bg-primary transition-all duration-700 ease-out"
+                                style={{ width: `${deliveryProgress}%` }}
+                            />
+                        </div>
+                        <p className="text-[11px] text-muted-foreground text-center italic">
+                            Add <span className="font-bold text-foreground">₹{remainingForFreeDelivery.toFixed(2)}</span> more for <span className="text-emerald-600 font-bold uppercase tracking-tighter">Free Delivery</span>
+                        </p>
+                    </div>
+                )}
+
+                {totals?.coupon && totals.couponDiscount > 0 && (
+                    <div className="flex justify-between text-emerald-600 font-black pt-1 border-t border-dashed border-emerald-100/50">
+                        <span className="flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5" />
+                            Coupon ({totals.coupon.code})
+                        </span>
+                        <span>-₹{totals.couponDiscount.toFixed(2)}</span>
+                    </div>
+                )}
+
                 <Separator className="opacity-50" />
 
-                {/* Coupon Section */}
+                {/* Promotional Section */}
                 <div className="space-y-4">
                     <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-muted-foreground">
                         <TagIcon className="w-3.5 h-3.5" />
@@ -305,7 +337,7 @@ export const CartSummary = ({
                     </div>
 
                     {totals?.coupon ? (
-                        <div className="flex items-center justify-between p-3.5 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl animate-in zoom-in-95 shadow-inner">
+                        <div className="flex items-center justify-between p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl animate-in zoom-in-95">
                             <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center">
                                     <Gift className="w-4 h-4" />
@@ -319,34 +351,26 @@ export const CartSummary = ({
                                 variant="ghost"
                                 size="sm"
                                 onClick={onRemoveCoupon}
-                                className="h-8 w-8 p-0 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
-                                disabled={isLoading}
+                                className="h-8 w-8 p-0 rounded-full hover:bg-destructive/10 hover:text-destructive"
                             >
                                 <X className="w-4 h-4" />
                             </Button>
                         </div>
                     ) : (
-                        <div className="flex gap-2 relative">
+                        <div className="flex gap-2">
                             <Input
                                 placeholder="PROMO CODE"
                                 value={couponCode}
                                 onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                                className="uppercase placeholder:normal-case font-bold h-11 rounded-xl border-border/50 bg-background/50 focus:ring-primary/20"
-                                disabled={isLoading || isApplyingCoupon}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter") handleApplyCoupon();
-                                }}
+                                className="uppercase font-bold h-10 rounded-xl"
+                                onKeyDown={(e) => e.key === "Enter" && handleApplyCoupon()}
                             />
                             <Button
                                 onClick={() => handleApplyCoupon()}
                                 disabled={!couponCode || isLoading || isApplyingCoupon}
-                                className="shrink-0 h-11 px-5 rounded-xl font-black uppercase tracking-widest text-[10px]"
+                                className="h-10 px-4 rounded-xl font-black uppercase tracking-widest text-[10px]"
                             >
-                                {isApplyingCoupon ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                    "Redeem"
-                                )}
+                                {isApplyingCoupon ? <Loader2 className="w-4 h-4 animate-spin" /> : "Apply"}
                             </Button>
                         </div>
                     )}
@@ -354,11 +378,8 @@ export const CartSummary = ({
 
                 <Separator className="opacity-50" />
 
-                {/* Total & Checkout */}
-                <div className={cn(
-                    "space-y-5 transition-all duration-300",
-                    isCalculating && "opacity-50 blur-[1px] pointer-events-none"
-                )}>
+                {/* Final Total */}
+                <div className="space-y-4">
                     <div className="flex justify-between items-end">
                         <span className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Total Pay</span>
                         <div className="text-right">
@@ -372,38 +393,39 @@ export const CartSummary = ({
                     </div>
 
                     {totals && (totals.discount + totals.couponDiscount) > 0 && (
-                        <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-[11px] p-3 rounded-xl text-center font-bold animate-pulse">
+                        <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 text-[11px] p-2.5 rounded-xl text-center font-bold">
                             Congrats! You are saving ₹{(totals.discount + totals.couponDiscount).toFixed(2)}
                         </div>
                     )}
+
+                    <Button
+                        size="lg"
+                        className="w-full h-14 text-lg font-black uppercase tracking-widest shadow-xl rounded-2xl"
+                        onClick={onCheckout}
+                        disabled={isLoading || itemsCount === 0}
+                    >
+                        {isLoading ? <Loader2 className="animate-spin mr-2" /> : "Checkout Securely"}
+                    </Button>
                 </div>
 
-                <Button
-                    size="lg"
-                    className="w-full h-14 text-lg font-black uppercase tracking-widest shadow-2xl shadow-primary/20 hover:shadow-primary/40 transition-all active:scale-95 rounded-2xl"
-                    onClick={onCheckout}
-                    disabled={isLoading || itemsCount === 0}
-                >
-                    {isLoading ? <Loader2 className="animate-spin mr-2" /> : null}
-                    Checkout Securely
-                </Button>
+                <Separator className="opacity-30" />
 
                 {/* Trust Badges */}
-                <div className="grid grid-cols-3 gap-2 pt-2">
-                    <div className="flex flex-col items-center justify-center text-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
-                        <ShieldCheck className="w-5 h-5 text-primary" />
-                        <span className="text-[10px] font-bold text-muted-foreground leading-tight uppercase tracking-tighter">Safe & Secure</span>
+                <div className="grid grid-cols-3 gap-2">
+                    <div className="flex flex-col items-center gap-1 opacity-60">
+                        <ShieldCheck className="w-4 h-4 text-primary" />
+                        <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter">Secure</span>
                     </div>
-                    <div className="flex flex-col items-center justify-center text-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
-                        <Truck className="w-5 h-5 text-primary" />
-                        <span className="text-[10px] font-bold text-muted-foreground leading-tight uppercase tracking-tighter">Fast Shipping</span>
+                    <div className="flex flex-col items-center gap-1 opacity-60">
+                        <Truck className="w-4 h-4 text-primary" />
+                        <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter">Fast</span>
                     </div>
-                    <div className="flex flex-col items-center justify-center text-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
-                        <RotateCcw className="w-5 h-5 text-primary" />
-                        <span className="text-[10px] font-bold text-muted-foreground leading-tight uppercase tracking-tighter">Easy Return</span>
+                    <div className="flex flex-col items-center gap-1 opacity-60">
+                        <RotateCcw className="w-4 h-4 text-primary" />
+                        <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter">Returns</span>
                     </div>
                 </div>
-            </CardContent >
-        </Card >
+            </CardContent>
+        </Card>
     );
 };

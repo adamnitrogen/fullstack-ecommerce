@@ -142,18 +142,50 @@ class InternalInvoiceService {
         let totalSgst = 0;
         let totalIgst = 0;
 
+        // Identify and Bundle Non-Refundable Delivery Charges
+        let nonRefundableDeliveryTotal = 0;
+        let nonRefundableDeliveryGst = 0;
+
+        // Rule: order.delivery_charge and order.delivery_gst include BOTH standard and surcharges.
+        // We need to look at item snapshots to find refundable portions.
+        let refundableDeliveryCharge = 0;
+        let refundableDeliveryGst = 0;
+
+        (order.items || []).forEach(item => {
+            const snap = item.delivery_calculation_snapshot || {};
+            if (snap.source !== 'global' && snap.delivery_refund_policy === 'REFUNDABLE') {
+                refundableDeliveryCharge += (item.delivery_charge || 0);
+                refundableDeliveryGst += (item.delivery_gst || 0);
+            }
+        });
+
+        // Non-refundable is everything else
+        nonRefundableDeliveryTotal = (order.delivery_charge || 0) - refundableDeliveryCharge;
+        nonRefundableDeliveryGst = (order.delivery_gst || 0) - refundableDeliveryGst;
+
+        const totalNonRefundableToBundle = nonRefundableDeliveryTotal + nonRefundableDeliveryGst;
+
         const items = order.items.map((item, index) => {
             const quantity = item.quantity || 1;
-            // Use precise totals from order item if available (best source of truth)
-            const amount = parseFloat(item.total_amount || 0);
-
-            // Tax calculation
-            // Fallback to recalculating if fields missing (legacy orders)
-            // But usually we have them now.
-            const taxable = parseFloat(item.taxable_amount || 0);
+            let amount = parseFloat(item.total_amount || 0);
+            let taxable = parseFloat(item.taxable_amount || 0);
             const cgst = parseFloat(item.cgst || 0);
             const sgst = parseFloat(item.sgst || 0);
             const igst = parseFloat(item.igst || 0);
+
+            // Distribution Logic for non-refundable delivery
+            if (totalNonRefundableToBundle > 0) {
+                // Pro-rate based on order's item total
+                const totalItemsPlain = order.items.reduce((sum, it) => sum + parseFloat(it.total_amount || 0), 0);
+                const portion = (amount / totalItemsPlain) * totalNonRefundableToBundle;
+
+                // We add the portion to both taxable and total
+                // This is a "silent" bundling. Since we've already calculated GST, 
+                // we technically just increase the "gross" value for display.
+                // However, for Tax Invoices, we should probably bundle it into the Rate/Taxable.
+                taxable += (portion * (taxable / amount)); // Pro-rate taxable within item
+                amount += portion;
+            }
 
             totalTaxable += taxable;
             totalCgst += cgst;
@@ -161,7 +193,7 @@ class InternalInvoiceService {
             totalIgst += igst;
             grandTotal += amount;
 
-            // Rate display: Taxable Value / Quantity usually
+            // Rate display: Taxable Value / Quantity
             const rate = quantity > 0 ? (taxable / quantity).toFixed(2) : "0.00";
 
             return {
@@ -180,32 +212,16 @@ class InternalInvoiceService {
             };
         });
 
-        // Add Delivery if exists
-        if (order.delivery_charge > 0) {
-            const deliveryCharge = parseFloat(order.delivery_charge);
-            const deliveryGst = parseFloat(order.delivery_gst || 0);
+        // Add Refundable Delivery if exists
+        if (refundableDeliveryCharge > 0) {
+            grandTotal += (refundableDeliveryCharge + refundableDeliveryGst);
 
-            grandTotal += (deliveryCharge + deliveryGst);
-
-            // Delivery GST logic - separate or added to totals for summary
-            // For summary table, we add to totals
-            // Note: In template typically delivery is shown separately or as a line item.
-            // Our template expects summary fields.
             if (isInterState) {
-                totalIgst += deliveryGst;
+                totalIgst += refundableDeliveryGst;
             } else {
-                totalCgst += (deliveryGst / 2);
-                totalSgst += (deliveryGst / 2);
+                totalCgst += (refundableDeliveryGst / 2);
+                totalSgst += (refundableDeliveryGst / 2);
             }
-            // Delivery Taxable is the charge itself
-            // Wait, usually delivery_charge is exclusive of tax? 
-            // Yes, standard ecommerce practice.
-            // So we shouldn't add deliveryCharge to grandTotal twice if it was already part of order.total_amount?
-            // `order.total_amount` usually includes delivery.
-            // In the loop above: `items` loop sums up item totals. 
-            // If `order.total_amount` == item sums + delivery + delivery gst.
-            // We are recalculating `grandTotal` from components.
-            // So adding here is correct.
         }
 
         const amountInWords = this._amountToWords(grandTotal);
@@ -233,7 +249,7 @@ class InternalInvoiceService {
                 totalCgst: totalCgst.toFixed(2),
                 totalSgst: totalSgst.toFixed(2),
                 totalIgst: totalIgst.toFixed(2),
-                deliveryCharge: (order.delivery_charge || 0).toFixed(2),
+                deliveryCharge: refundableDeliveryCharge.toFixed(2),
                 grandTotal: grandTotal.toFixed(2)
             },
             amountInWords

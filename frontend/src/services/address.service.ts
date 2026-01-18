@@ -21,7 +21,7 @@ interface BackendAddress {
     updatedAt: string;
 }
 
-const transformToCheckoutAddress = (data: any): CheckoutAddress => ({
+export const transformToCheckoutAddress = (data: any): CheckoutAddress => ({
     id: data.id,
     user_id: data.user_id || data.userId,
     // Preserve the actual backend type (home/work/other)

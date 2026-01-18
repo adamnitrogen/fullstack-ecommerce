@@ -51,12 +51,12 @@ class InvoiceOrchestrator {
                     status: 'GENERATED'
                 });
 
-                // Backward compatibility: Update order columns if needed, or deprecate them.
-                // We will update them for now to avoid breaking existing frontend logic that checks order.invoice_url
-                // BUT strict separation means we shouldn't confuse this with TAX invoice.
-                // The user requirement says: "Never treat Razorpay invoice as product GST invoice".
-                // So we should NOT update `invoice_url` on orders table if that is used for Tax Invoice.
-                // We will store it ONLY in `invoices` table.
+                // Backward compatibility: Update order columns if needed.
+                // We update invoice_url so that confirmation emails and frontend can show the "Download Receipt" link immediately.
+                await supabase.from('orders').update({
+                    invoice_url: invoice.invoiceUrl,
+                    invoice_status: 'generated'
+                }).eq('id', order.id);
 
                 log.operationSuccess('GENERATE_RAZORPAY_INVOICE', { invoiceId: invoice.invoiceId });
                 return invoice;
@@ -123,35 +123,97 @@ class InvoiceOrchestrator {
     // --- Helpers ---
 
     static _prepareRazorpayData(order) {
-        // Logic similar to existing code but strictly for Payment Receipt
-        const lineItems = (order.items || []).map(item => ({
-            name: item.title || 'Product',
-            amount: Math.round((item.price || 0) * 100),
-            currency: 'INR',
-            quantity: item.quantity || 1
-        }));
+        // Prepare product line items
+        // Note: order.items contains snapshots with product metadata
+        const lineItems = (order.items || []).map(item => {
+            const product = item.product || item.products || {};
+            const variant = item.variant_snapshot || item.product_variants || {};
 
-        // Add delivery
-        if (order.delivery_charge) {
-            lineItems.push({
-                name: 'Delivery Charge',
-                amount: Math.round(order.delivery_charge * 100),
+            return {
+                name: (product.title || 'Product') + (variant.size_label ? ` (${variant.size_label})` : ''),
+                amount: Math.round((product.price || item.price_per_unit || 0) * 100),
                 currency: 'INR',
-                quantity: 1
+                quantity: item.quantity || 1
+            };
+        });
+
+        // Identify and Bundle Non-Refundable Delivery Charges
+        // Rule: Standard/Global is always non-refundable. Product surcharge depends on policy.
+        let nonRefundableDeliveryTotal = 0;
+        const refundableDeliveryItems = [];
+
+        (order.items || []).forEach(item => {
+            const deliveryCharge = item.delivery_charge || 0;
+            const deliveryGst = item.delivery_gst || 0;
+            const totalItemDelivery = deliveryCharge + deliveryGst;
+            const snapshot = item.delivery_calculation_snapshot || {};
+
+            if (totalItemDelivery > 0) {
+                const isGlobal = (snapshot.source === 'global');
+                const isRefundable = (snapshot.delivery_refund_policy === 'REFUNDABLE');
+
+                if (!isGlobal && isRefundable) {
+                    // This one stays as an explicit line item
+                    refundableDeliveryItems.push({
+                        name: `Delivery Charge: ${item.product?.title || 'Product'}`,
+                        amount: Math.round(totalItemDelivery * 100),
+                        currency: 'INR',
+                        quantity: 1
+                    });
+                } else {
+                    // Standard/Global or Non-Refundable Product Surcharge
+                    // These get BUNDLED into products
+                    nonRefundableDeliveryTotal += totalItemDelivery;
+                }
+            }
+        });
+
+        // Distribute non-refundable total across existing product lineItems
+        if (nonRefundableDeliveryTotal > 0 && lineItems.length > 0) {
+            // Pro-rate distribution based on amount
+            const currentTotalAmount = lineItems.reduce((sum, item) => sum + (item.amount * item.quantity), 0);
+
+            lineItems.forEach((item, index) => {
+                // Calculate portion for this item
+                // If it's the last item, we give it the remainder to avoid rounding issues
+                if (index === lineItems.length - 1) {
+                    const distributedSoFar = lineItems.slice(0, -1).reduce((sum, it) => sum + (it._addedAmount || 0) * it.quantity, 0);
+                    const remainder = Math.round(nonRefundableDeliveryTotal * 100) - distributedSoFar;
+                    item.amount += Math.round(remainder / item.quantity);
+                } else {
+                    const portion = (item.amount * item.quantity / currentTotalAmount) * (nonRefundableDeliveryTotal * 100);
+                    const addedPerUnit = Math.round(portion / item.quantity);
+                    item.amount += addedPerUnit;
+                    item._addedAmount = addedPerUnit; // Temporary tracking
+                }
+                delete item._addedAmount;
             });
+            log.info({ orderId: order.id, bundledAmount: nonRefundableDeliveryTotal }, "Bundled non-refundable delivery into product items");
         }
 
-        return {
+        // Add explicit refundable delivery items to the list
+        lineItems.push(...refundableDeliveryItems);
+
+        const data = {
             type: 'invoice',
             customer: {
-                name: order.customer_name,
-                email: order.customer_email,
-                contact: order.customer_phone
+                name: order.customer_name || order.customerName,
+                email: order.customer_email || order.customerEmail,
+                contact: order.customer_phone || order.customerPhone
             },
             line_items: lineItems,
-            receipt: order.order_number,
-            description: `Payment Receipt for Order ${order.order_number}`
+            receipt: order.order_number || order.orderNumber,
+            description: `Payment Receipt for Order ${order.order_number || order.orderNumber}`
         };
+
+        // Add Coupon Discount via top-level discount_amount (in paise)
+        const couponDiscount = order.coupon_discount || 0;
+        if (couponDiscount > 0) {
+            data.discount_amount = Math.round(couponDiscount * 100);
+            log.info({ orderId: order.id, discount: couponDiscount }, 'Adding discount_amount to Razorpay invoice');
+        }
+
+        return data;
     }
 
     static async _sendInvoiceEmail(order, invoiceResult) {

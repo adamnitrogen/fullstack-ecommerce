@@ -83,6 +83,7 @@ export interface Product {
   default_price_includes_tax?: boolean;
   delivery_refund_policy?: 'REFUNDABLE' | 'NON_REFUNDABLE';
   delivery_config?: DeliveryConfig;
+  price_includes_tax?: boolean;
 }
 
 export type VariantUnit = 'kg' | 'gm' | 'ltr' | 'ml' | 'pcs';

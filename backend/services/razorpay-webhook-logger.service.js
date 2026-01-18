@@ -8,6 +8,7 @@ const supabase = require('../config/supabase');
 const { createModuleLogger } = require('../utils/logging-standards');
 const { getTraceContext } = require('../utils/async-context');
 const { FinancialEventLogger } = require('./financial-event-logger.service');
+const webhookService = require('./webhook.service');
 
 const log = createModuleLogger('RazorpayWebhookLogger');
 
@@ -112,28 +113,11 @@ class RazorpayWebhookLogger {
         // 2. Log the event
         const webhookLog = await this.logWebhookEvent(event, verified);
 
-        // 3. Process based on event type
+        // 3. Process Logic
         try {
-            switch (event.event) {
-                case WEBHOOK_EVENTS.PAYMENT_CAPTURED:
-                    await this._handlePaymentCaptured(event.payload);
-                    break;
-
-                case WEBHOOK_EVENTS.PAYMENT_FAILED:
-                    await this._handlePaymentFailed(event.payload);
-                    break;
-
-                case WEBHOOK_EVENTS.REFUND_PROCESSED:
-                    await this._handleRefundProcessed(event.payload);
-                    break;
-
-                case WEBHOOK_EVENTS.REFUND_FAILED:
-                    await this._handleRefundFailed(event.payload);
-                    break;
-
-                default:
-                    log.debug('WEBHOOK_UNHANDLED', `Unhandled webhook event: ${event.event}`);
-            }
+            // Delegate business logic to the central Webhook Service
+            // This ensures all event types (Donations, Registrations, Orders) are handled consistently
+            await webhookService.handleEvent(event);
 
             // Mark as processed
             if (webhookLog) {
@@ -147,6 +131,9 @@ class RazorpayWebhookLogger {
 
         } catch (error) {
             log.operationError('PROCESS_WEBHOOK', error);
+            // We return success: false BUT we don't want Razorpay to retry endlessly if it's a logic error
+            // usually. However, if DB is down, we do want retry. 
+            // For now, allow retry on error.
             return { success: false, verified, error: error.message };
         }
     }

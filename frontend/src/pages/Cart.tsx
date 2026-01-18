@@ -35,10 +35,10 @@ const Cart = () => {
 
   // Fetch cart on mount
   useEffect(() => {
-    if (isAuthenticated && !initialized) {
+    if (isAuthenticated) {
       fetchCart();
     }
-  }, [isAuthenticated, initialized, fetchCart]);
+  }, [isAuthenticated, fetchCart]);
 
   // Fetch available coupons
   useEffect(() => {

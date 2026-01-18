@@ -58,6 +58,14 @@ export function OrderSummary({ items }: OrderSummaryProps) {
                                                 ₹{((item.variant?.mrp ?? item.product.mrp ?? 0) * item.quantity).toFixed(2)}
                                             </p>
                                         )}
+
+                                        {(item.delivery_charge ?? 0) > 0 && (
+                                            <div className="text-[9px] text-orange-600/70 font-bold flex items-center gap-1 mt-1 justify-end">
+                                                <Truck className="w-2.5 h-2.5" />
+                                                +₹{((item.delivery_charge ?? 0) + (item.delivery_gst ?? 0)).toFixed(2)} Delivery
+                                            </div>
+                                        )}
+
                                         {/* Tax Info */}
                                         {(() => {
                                             const rate = item.variant?.gst_rate ?? item.product?.default_gst_rate ?? 0;
@@ -65,31 +73,14 @@ export function OrderSummary({ items }: OrderSummaryProps) {
                                             const price = (item.variant?.selling_price ?? item.product.price) * item.quantity;
                                             const tax = price - (price / (1 + rate / 100));
                                             return (
-                                                <p className="text-[9px] text-muted-foreground/60 italic tabular-nums mt-0.5">
-                                                    Incl. ₹{tax.toFixed(2)} Tax ({rate}%)
+                                                <p className="text-[9px] text-muted-foreground/50 italic tabular-nums mt-0.5">
+                                                    Incl. ₹{tax.toFixed(2)} Tax
                                                 </p>
                                             );
                                         })()}
                                     </div>
                                 </div>
                             </div>
-                            {(item.delivery_charge ?? 0) > 0 && (
-                                <div className="text-[10px] text-orange-600 font-medium flex flex-col gap-0.5 mt-1 bg-orange-50/50 p-1.5 rounded border border-orange-100/50">
-                                    <span className="font-bold flex items-center gap-1">
-                                        <Truck className="w-3 h-3" />
-                                        ₹{(item.delivery_charge ?? 0).toFixed(2)} Delivery
-                                        {(item.delivery_gst ?? 0) > 0 && ` + ₹${(item.delivery_gst ?? 0).toFixed(2)} GST`}
-                                    </span>
-                                    {item.delivery_meta && (
-                                        <span className="text-[9px] text-orange-600/80 pl-4">
-                                            {item.delivery_meta.calculation_type === 'PER_ITEM' && `(₹${item.delivery_meta.base_charge} / item)`}
-                                            {item.delivery_meta.calculation_type === 'FLAT_PER_ORDER' && `(Flat ₹${item.delivery_meta.base_charge} / order)`}
-                                            {item.delivery_meta.calculation_type === 'PER_PACKAGE' && `(₹${item.delivery_meta.base_charge} / package of ${item.delivery_meta.max_items_per_package})`}
-                                            {item.delivery_meta.calculation_type === 'WEIGHT_BASED' && `(Weight Based)`}
-                                        </span>
-                                    )}
-                                </div>
-                            )}
                         </div>
                     ))}
                 </div>
@@ -97,4 +88,3 @@ export function OrderSummary({ items }: OrderSummaryProps) {
         </div>
     );
 }
-

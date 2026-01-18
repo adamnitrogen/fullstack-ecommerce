@@ -85,9 +85,22 @@ export default function Checkout() {
 
       setSummary(data);
 
-      // Pre-select addresses if available
-      if (data.shipping_address) setShippingAddress(data.shipping_address);
-      if (data.billing_address) setBillingAddress(data.billing_address);
+      // Pre-select addresses if available, but only if not already set or specifically requested
+      if (data.shipping_address) {
+        const newShipping = data.shipping_address;
+        setShippingAddress(prev => {
+          // If we already have a selection from AddressSelector (manual click), don't overwrite it with same data
+          if (prev?.id === newShipping.id) return prev;
+          return newShipping;
+        });
+      }
+      if (data.billing_address) {
+        const newBilling = data.billing_address;
+        setBillingAddress(prev => {
+          if (prev?.id === newBilling.id) return prev;
+          return newBilling;
+        });
+      }
 
     } catch (error) {
       logger.error("Checkout error", error);
@@ -129,8 +142,15 @@ export default function Checkout() {
           setSummary(data);
 
           // Pre-select addresses if available
-          if (data.shipping_address) setShippingAddress(data.shipping_address);
-          if (data.billing_address) setBillingAddress(data.billing_address);
+          // Pre-select addresses if available
+          if (data.shipping_address) {
+            const newShipping = data.shipping_address;
+            setShippingAddress(prev => prev?.id === newShipping.id ? prev : newShipping);
+          }
+          if (data.billing_address) {
+            const newBilling = data.billing_address;
+            setBillingAddress(prev => prev?.id === newBilling.id ? prev : newBilling);
+          }
         } catch (error) {
           logger.error("Buy Now checkout error", error);
           const errorMsg = getErrorMessage(error) || "Unable to load checkout. Please try again.";
@@ -419,12 +439,22 @@ export default function Checkout() {
                 <CardContent className="p-6 space-y-2">
                   {/* Define mapped items to reuse */}
                   {(() => {
-                    const cartItems = summary.cart.cart_items.map((item) => ({
-                      ...item,
-                      productId: item.product_id,
-                      product: item.products,
-                      variant: item.product_variants
-                    }));
+                    const cartItems = summary.cart.cart_items.map((item) => {
+                      const itemDetail = summary.totals.itemBreakdown?.find((id: any) =>
+                        (id.variant_id && id.variant_id === item.variant_id) ||
+                        (!id.variant_id && id.product_id === item.product_id)
+                      );
+
+                      return {
+                        ...item,
+                        productId: item.product_id,
+                        product: item.products,
+                        variant: item.product_variants,
+                        delivery_charge: itemDetail?.delivery_charge || 0,
+                        delivery_gst: itemDetail?.delivery_gst || 0,
+                        delivery_meta: itemDetail?.delivery_meta
+                      };
+                    });
 
                     return (
                       <>

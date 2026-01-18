@@ -5,9 +5,10 @@ const { getTraceContext } = require('../utils/async-context');
 const crypto = require('crypto');
 const supabase = require('../config/supabase');
 const { calculateCartTotals, getUserCart } = require('./cart.service');
-const { getPrimaryAddress, getLatestAddress } = require('./address.service');
+const { getPrimaryAddress, getLatestAddress, getAddressById } = require('./address.service');
 const { checkStockAvailability, decreaseInventory } = require('./inventory.service');
 const emailService = require('./email');
+const { RefundService, REFUND_TYPES } = require('./refund.service');
 const { capturePayment, voidAuthorization } = require('../utils/razorpay-helper');
 // Tax and Pricing
 const { TaxEngine } = require('./tax-engine.service');
@@ -47,8 +48,11 @@ const getCheckoutSummary = async (userId, addressId = null) => {
     let shippingAddress = null;
     if (addressId) {
         // If specific address requested (e.g. user changed selection), fetch it
-        const { data } = await supabase.from('addresses').select('*').eq('id', addressId).single();
-        if (data) shippingAddress = data;
+        try {
+            shippingAddress = await getAddressById(addressId, userId);
+        } catch (error) {
+            logger.warn({ error, addressId }, 'Failed to fetch requested address, falling back to default');
+        }
     }
 
     if (!shippingAddress) {
@@ -145,17 +149,69 @@ const createRazorpayInvoice = async (amount, receipt, customer, lineItems) => {
             return rest;
         });
 
-        // Add delivery charges as separate Razorpay line item (GST-compliant)
+        // Bundle Non-Refundable Delivery Logic
+        // In local checkout service, we should determine which charges are refundable
+        let nonRefundableDeliveryTotal = 0;
+        let refundableDeliveryCharge = 0;
+
+        // The lineItems passed here might already contain the delivery info if it was extracted before
+        // However, the items typically have the delivery metadata if mapped from checkout.
+        // Let's use the logic: Standard Delivery is always non-refundable.
+        // Refundable is only if specific surcharge has policy.
+
+        // If we don't have the full snapshots here, we look at the deliveryCharge passed
+        // Note: createOrder calls this. 
+        // Let's check how lineItems are passed to this function.
+        // Wait, lineItems here are usually prepared in a way that matches Razorpay expected format.
+
         if (deliveryCharge > 0) {
-            cleanLineItems.push({
-                name: "Delivery Charges",
-                description: "Courier and handling charges",
-                amount: Math.round(deliveryCharge * 100), // Paisa (before GST)
-                currency: "INR",
-                quantity: 1,
-                tax_rate: deliveryGSTRate,
-                hsn_code: "996812" // SAC code for courier services
+            // Assume the global portion is non-refundable 
+            // This is a bit tricky if we don't have item-level metadata here.
+            // But usually this function is called from Checkout where we have the totals.
+
+            // To be safe and consistent with InvoiceOrchestrator:
+            // If the user wants to HIDE non-refundable charges (base or total),
+            // and Standard Delivery is always non-refundable, we bundle the global portion.
+
+            // FOR NOW: Treat ALL deliveryCharge passed here as non-refundable and bundle it
+            // UNLESS it's explicitly marked as refundable (which it isn't in current signature).
+            nonRefundableDeliveryTotal = deliveryCharge + deliveryGST;
+        }
+
+        // Pro-rate non-refundable delivery into product items
+        if (nonRefundableDeliveryTotal > 0 && cleanLineItems.length > 0) {
+            // Ensure first all items have a base amount (fallback to 0) to avoid NaN in reduce
+            cleanLineItems.forEach(item => {
+                if (item.amount === undefined || isNaN(item.amount)) {
+                    item.amount = 0;
+                }
             });
+
+            const currentTotalAmount = cleanLineItems.reduce((sum, item) => sum + (item.amount * item.quantity), 0);
+
+            if (currentTotalAmount > 0) {
+                cleanLineItems.forEach((item, index) => {
+                    // Remove item_id if bundling to ensure Razorpay uses our modified amount
+                    delete item.item_id;
+
+                    if (index === cleanLineItems.length - 1) {
+                        const distributedSoFar = cleanLineItems.slice(0, -1).reduce((sum, it) => sum + (it._addedAmount || 0) * it.quantity, 0);
+                        const remainder = Math.round(nonRefundableDeliveryTotal * 100) - distributedSoFar;
+                        item.amount += Math.round(remainder / item.quantity);
+                    } else {
+                        const portion = (item.amount * item.quantity / currentTotalAmount) * (nonRefundableDeliveryTotal * 100);
+                        const addedPerUnit = Math.round(portion / item.quantity);
+                        item.amount += addedPerUnit;
+                        item._addedAmount = addedPerUnit;
+                    }
+                    delete item._addedAmount;
+                });
+                log.info({ receipt, bundled: nonRefundableDeliveryTotal }, "Bundled delivery into Razorpay checkout line items");
+            } else {
+                // If total amount is 0 (e.g. donation?), just add it to the first item
+                delete cleanLineItems[0].item_id;
+                cleanLineItems[0].amount += Math.round(nonRefundableDeliveryTotal * 100);
+            }
         }
 
         // Construct Invoice Payload
@@ -170,8 +226,8 @@ const createRazorpayInvoice = async (amount, receipt, customer, lineItems) => {
             },
             line_items: cleanLineItems,
             receipt: receipt,
-            sms_notify: 1,
-            email_notify: 1
+            sms_notify: 0,
+            email_notify: 0
         };
 
         // Ensure proper contact format if possible, otherwise Razorpay might complain.
@@ -363,6 +419,9 @@ const createOrder = async (userId, checkoutData, cart) => {
         coupon_discount: totals.couponDiscount || 0,
         delivery_charge: totals.deliveryCharge || 0,
         delivery_gst: totals.deliveryGST || 0,
+        // Refund Metadata
+        is_delivery_refundable: !(totals.deliveryCharge > 0 && (totals.globalDeliveryCharge > 0 || totals.itemBreakdown?.some(i => i.delivery_meta?.delivery_refund_policy === 'NON_REFUNDABLE'))),
+        delivery_tax_type: 'GST', // System default for now
         status: 'pending', // Orders start as pending until admin/manager confirms
         payment_status: 'paid',
         notes: notes || null,
@@ -375,6 +434,7 @@ const createOrder = async (userId, checkoutData, cart) => {
 
     // Prepare order items with tax and delivery snapshots
     const orderItems = [];
+    let globalDeliveryApplied = false;
     for (const [index, item] of cart.cart_items.entries()) {
         const taxBreakdown = taxResult?.items[index]?.taxBreakdown || {};
         const variant = item.product_variants || item.variant || {};
@@ -392,11 +452,6 @@ const createOrder = async (userId, checkoutData, cart) => {
         let deliverySnapshot = null;
 
         try {
-            // Determine if free delivery applies based on totals
-            // We use the same logic as cart service: if total delivery is 0 and subtotal > 0, it's likely free delivery
-            // But to be precise, we should check against threshold or if totals.deliveryCharge is 0
-            // Since we trust calculateCartTotals, if totals.deliveryCharge is 0, then for FLAT_PER_ORDER it means free delivery.
-            // However, to be 100% safe and consistent with DeliveryChargeService signature:
             const settingsService = require('./settings.service');
             const globalSettings = await settingsService.getDeliverySettings();
             const isFreeDelivery = totals.totalPrice >= (globalSettings.delivery_threshold || 0);
@@ -407,9 +462,26 @@ const createOrder = async (userId, checkoutData, cart) => {
                 item.quantity,
                 isFreeDelivery
             );
-            itemDeliveryCharge = deliveryResult.deliveryCharge;
-            itemDeliveryGST = deliveryResult.deliveryGST;
-            deliverySnapshot = deliveryResult.snapshot;
+
+            // If it's a global charge, only apply it to the first item that uses it
+            // This mirrors the logic in DeliveryChargeService.calculateCartDelivery
+            if (deliveryResult.snapshot.source === 'global') {
+                if (!globalDeliveryApplied) {
+                    itemDeliveryCharge = deliveryResult.deliveryCharge;
+                    itemDeliveryGST = deliveryResult.deliveryGST;
+                    deliverySnapshot = deliveryResult.snapshot;
+                    globalDeliveryApplied = true;
+                } else {
+                    itemDeliveryCharge = 0;
+                    itemDeliveryGST = 0;
+                    deliverySnapshot = { ...deliveryResult.snapshot, base_delivery_charge: 0, applied_as_global: true };
+                }
+            } else {
+                // Product/Variant specific charges are always applied
+                itemDeliveryCharge = deliveryResult.deliveryCharge;
+                itemDeliveryGST = deliveryResult.deliveryGST;
+                deliverySnapshot = deliveryResult.snapshot;
+            }
         } catch (error) {
             logger.warn({ err: error, product_id: item.product_id }, 'Failed to calculate item delivery');
         }
@@ -423,7 +495,10 @@ const createOrder = async (userId, checkoutData, cart) => {
                 title: product.title || 'Product',
                 price: variant.selling_price || product.price || 0,
                 images: product.images || [],
-                isReturnable: product.isReturnable ?? product.is_returnable ?? true
+                isReturnable: product.isReturnable ?? product.is_returnable ?? true,
+                price_includes_tax: variant.id
+                    ? (variant.price_includes_tax ?? product.default_price_includes_tax ?? true)
+                    : (product.default_price_includes_tax ?? true)
             },
             // Financial details
             delivery_charge: itemDeliveryCharge,
@@ -477,6 +552,40 @@ const createOrder = async (userId, checkoutData, cart) => {
         orderNumber: rpcResult.order_number
     }, '[Checkout] Order created successfully via transaction');
 
+    // Prepare Presentation-Ready Order Object (Bundled for Clean UI)
+    // Rule: Hide non-refundable delivery charges by bundling them into items
+    let nonRefundableDeliveryTotal = 0;
+    let refundableDeliveryTotal = 0;
+    let nonRefundableDeliveryGST = 0;
+    let refundableDeliveryGST = 0;
+
+    const presentationItems = orderItems.map(item => {
+        const snap = item.delivery_calculation_snapshot || {};
+        const isRefundable = (snap.source !== 'global' && snap.delivery_refund_policy === 'REFUNDABLE');
+
+        if (isRefundable) {
+            refundableDeliveryTotal += (item.delivery_charge || 0);
+            refundableDeliveryGST += (item.delivery_gst || 0);
+        } else {
+            nonRefundableDeliveryTotal += (item.delivery_charge || 0);
+            nonRefundableDeliveryGST += (item.delivery_gst || 0);
+        }
+        return { ...item };
+    });
+
+    const totalToBundle = nonRefundableDeliveryTotal + nonRefundableDeliveryGST;
+    if (totalToBundle > 0 && presentationItems.length > 0) {
+        const currentItemsTotal = presentationItems.reduce((sum, it) => sum + (it.total_amount || 0), 0);
+
+        presentationItems.forEach((item, index) => {
+            const portion = (item.total_amount / currentItemsTotal) * totalToBundle;
+            // Bundling into price_per_unit and total_amount for display
+            // Note: We don't change quantity.
+            item.price_per_unit = (item.price_per_unit || item.product.price) + (portion / item.quantity);
+            item.total_amount += portion;
+        });
+    }
+
     // Construct order object for response and email
     const order = {
         id: rpcResult.id,
@@ -486,12 +595,12 @@ const createOrder = async (userId, checkoutData, cart) => {
         totalAmount: rpcResult.totalAmount || rpcResult.total_amount,
         customerName: profile.name,
         customerEmail: profile.email,
-        items: orderItems,
+        items: presentationItems, // Use bundled items for email/response
         // Add missing details for email template
         shippingAddress: shippingAddr,
         billingAddress: billingAddr,
-        subtotal: totals.totalPrice,
-        delivery_charge: totals.deliveryCharge || 0,
+        subtotal: totals.totalPrice + totalToBundle, // Subtotal absorbs non-refundable delivery
+        delivery_charge: refundableDeliveryTotal, // Only show refundable delivery explicitly
         coupon_discount: totals.couponDiscount || 0,
         createdAt: new Date(),
         // Tax summary
@@ -978,7 +1087,8 @@ async function processPaymentAndOrder(userId, {
                 shipping_address_id,
                 billing_address_id,
                 payment_id,
-                notes
+                notes,
+                payment_status: 'paid'
             },
             cart
         );
@@ -1016,13 +1126,16 @@ async function processPaymentAndOrder(userId, {
         // Only refund if we have a real (non-mock) payment
         if (!isMockPayment && razorpay_payment_id) {
             try {
-                // Determine amount to refund (full amount)
-                const refundAmount = captureAmount;
-                const { refundPayment } = require('../utils/razorpay-helper');
-
-                await refundPayment(razorpay_payment_id, null, {
-                    reason: `Order creation failed: ${systemError.message}`
-                });
+                // Use RefundService for TECHNICAL_REFUND (100% amount)
+                if (payment_id) {
+                    await RefundService.asyncProcessRefund(payment_id, REFUND_TYPES.TECHNICAL_REFUND, 'SYSTEM', `Order creation failed: ${systemError.message}`, true);
+                } else {
+                    // Fallback for extreme cases where even internal payment_id is missing but we have RP ID
+                    const { refundPayment } = require('../utils/razorpay-helper');
+                    await refundPayment(razorpay_payment_id, null, {
+                        reason: `Order creation failed: ${systemError.message}`
+                    });
+                }
 
                 // Update payment record to refunded
                 if (payment_id) {
@@ -1238,6 +1351,8 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
             coupon_discount: 0,
             delivery_charge: deliveryCharge,
             delivery_gst: deliveryGST, // Add missing delivery GST field
+            is_delivery_refundable: !(deliveryCharge > 0 && deliveryResult.snapshot?.delivery_refund_policy === 'NON_REFUNDABLE'),
+            delivery_tax_type: 'GST',
             status: 'pending',
             payment_status: 'paid',
             notes: notes || 'Buy Now Order',
@@ -1311,6 +1426,31 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
 
         log.info('BUY_NOW_SUCCESS', 'Buy Now order created successfully', { orderId: order?.id });
 
+        // Generate Invoice immediately after successful RPC (since payment is already verified/paid)
+        try {
+            const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
+            log.info({ orderId: order.id }, 'Generating immediate Razorpay Payment Receipt for Buy Now');
+            const result = await InvoiceOrchestrator.generateRazorpayInvoice({
+                ...order,
+                customer_name: profile.name,
+                customer_email: profile.email,
+                customer_phone: profile.phone || shippingAddr?.phone,
+                items: orderItems,
+                shippingAddress: shippingAddr,
+                billingAddress: billingAddr,
+                subtotal,
+                delivery_charge: deliveryCharge,
+                delivery_gst: deliveryGST,
+                coupon_discount: 0
+            });
+
+            if (result.success && result.invoiceUrl) {
+                order.invoiceUrl = result.invoiceUrl;
+            }
+        } catch (invError) {
+            log.warn('BUY_NOW_INVOICE_ERROR', 'Failed to generate immediate invoice', { error: invError.message });
+        }
+
         // Send confirmation email
         try {
             await emailService.sendOrderConfirmationEmail(
@@ -1341,10 +1481,15 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
         // Refund payment if order creation failed
         if (razorpay_payment_id) {
             try {
-                const { refundPayment } = require('../utils/razorpay-helper');
-                await refundPayment(razorpay_payment_id, null, {
-                    reason: `Buy Now order failed: ${error.message}`
-                });
+                // Use RefundService for TECHNICAL_REFUND (100% amount)
+                if (payment_id) {
+                    await RefundService.asyncProcessRefund(payment_id, REFUND_TYPES.TECHNICAL_REFUND, 'SYSTEM', `Buy Now order failed: ${error.message}`, true);
+                } else {
+                    const { refundPayment } = require('../utils/razorpay-helper');
+                    await refundPayment(razorpay_payment_id, null, {
+                        reason: `Buy Now order failed: ${error.message}`
+                    });
+                }
 
                 if (payment_id) {
                     await updatePaymentRecord(payment_id, {
