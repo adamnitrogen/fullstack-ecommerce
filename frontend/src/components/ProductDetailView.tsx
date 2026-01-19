@@ -130,9 +130,22 @@ export const ProductDetailView = ({
   };
 
   const handleBuyNow = async () => {
+    // 1. Check Authentication First
+    if (!user) {
+      toast("Authentication Required", {
+        description: "Please login to continue with your purchase.",
+        action: {
+          label: "Login",
+          onClick: () => navigate(`/auth?returnUrl=${encodeURIComponent(window.location.pathname)}`)
+        }
+      });
+      return;
+    }
+
+    // 2. Check for Email (Required for Razorpay Invoice/Receipts)
     if (!user?.email || user.email.trim() === "") {
-      toast.error("Email Required", {
-        description: "Please add your email address in profile settings before making a purchase.",
+      toast.error("Contact Email Needed", {
+        description: "We need an email address to send your receipt and order updates. Please add it in your profile settings.",
       });
       return;
     }

@@ -1227,6 +1227,10 @@ async function processPaymentAndOrder(userId, {
  * Process Buy Now Order
  * Creates an order for a single item without using the cart
  */
+/**
+ * Process Buy Now flow
+ * Refactored to reuse standard createOrder logic via a virtual cart
+ */
 const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
     const {
         razorpay_order_id,
@@ -1243,12 +1247,43 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
     log.info('BUY_NOW_START', 'Processing Buy Now order', { userId, productId, variantId, quantity });
 
     // Verify payment signature
-    const isValidSignature = verifyRazorpayPayment(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+    let isValidSignature = verifyRazorpayPayment(razorpay_order_id, razorpay_payment_id, razorpay_signature);
     if (!isValidSignature) {
-        log.warn('BUY_NOW_INVALID_SIGNATURE', 'Invalid payment signature');
-        const error = new Error('Payment verification failed. Please contact support if money was deducted.');
-        error.status = 400;
-        throw error;
+        log.warn('BUY_NOW_INVALID_SIGNATURE', 'Invalid payment signature. Attempting S2S verification.', {
+            razorpay_payment_id,
+            razorpay_order_id
+        });
+
+        try {
+            // Server-to-Server Verification (Source of Truth)
+            const payment = await razorpay.payments.fetch(razorpay_payment_id);
+
+            log.info({
+                fetched_order_id: payment.order_id,
+                expected_order_id: razorpay_order_id,
+                status: payment.status
+            }, 'S2S Buy Now Payment Fetched');
+
+            // Check 1: Is payment successful?
+            if (payment.status !== 'captured' && payment.status !== 'authorized') {
+                throw new Error(`Payment status is ${payment.status} (not captured)`);
+            }
+
+            // Check 2: Does Order ID match?
+            if (razorpay_order_id && payment.order_id !== razorpay_order_id) {
+                throw new Error(`Order ID mismatch: Payment is for ${payment.order_id}, expected ${razorpay_order_id}`);
+            }
+
+            // If we are here, S2S is valid!
+            isValidSignature = true;
+            log.info('BUY_NOW_S2S_SUCCESS', 'S2S verification passed for Buy Now. Proceeding with order creation.');
+
+        } catch (s2sError) {
+            log.error({ err: s2sError }, 'Buy Now S2S Verification Failed.');
+            const error = new Error('Payment verification failed. Please contact support if money was deducted.');
+            error.status = 400;
+            throw error;
+        }
     }
 
     // Update payment record
@@ -1261,20 +1296,15 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
     }
 
     try {
-        // Fetch product
-        const { data: product, error: productError } = await supabase
+        // 1. Fetch Product & Variant Details
+        const { data: product } = await supabase
             .from('products')
             .select('*')
             .eq('id', productId)
             .single();
 
-        if (productError || !product) {
-            const error = new Error('This product is no longer available.');
-            error.status = 404;
-            throw error;
-        }
+        if (!product) throw new Error('Product not found');
 
-        // Fetch variant if provided
         let variant = null;
         if (variantId) {
             const { data: v } = await supabase
@@ -1285,280 +1315,49 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
             variant = v;
         }
 
-        // Check stock
-        const stockCheck = await checkStockAvailability([{
-            product_id: productId,
-            variant_id: variantId,
-            quantity,
-            products: product,
-            product_variants: variant
-        }]);
-
-        if (!stockCheck.available) {
-            const error = new Error(`Sorry, "${product.title}" is currently out of stock. Your payment will be refunded.`);
-            error.status = 400;
-            throw error;
-        }
-
-        // Get user profile
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('name, email, phone')
-            .eq('id', userId)
-            .single();
-
-        if (!profile) {
-            const error = new Error('Please complete your profile before placing an order.');
-            error.status = 400;
-            throw error;
-        }
-
-        // Get addresses
-        const { data: shippingAddrData } = await supabase
-            .from('addresses')
-            .select('*, phone_numbers(phone_number)')
-            .eq('id', shipping_address_id)
-            .single();
-
-        if (!shippingAddrData) {
-            const error = new Error('Shipping address not found. Please add an address to continue.');
-            error.status = 400;
-            throw error;
-        }
-
-        const shippingAddr = {
-            ...shippingAddrData,
-            phone: shippingAddrData.phone_numbers?.phone_number
+        // 2. Construct Virtual Cart
+        const virtualCart = {
+            id: null, // Indicates virtual cart to createOrder
+            user_id: userId,
+            applied_coupon_code: null,
+            cart_items: [
+                {
+                    product_id: productId,
+                    variant_id: variantId || (variant ? variant.id : null),
+                    quantity: quantity,
+                    products: product,
+                    product_variants: variant
+                }
+            ]
         };
 
-        const { data: billingAddrData } = await supabase
-            .from('addresses')
-            .select('*, phone_numbers(phone_number)')
-            .eq('id', billing_address_id)
-            .single();
+        // 3. Reuse standard createOrder logic
+        // We need to fetch the invoice_id from the payment record if it exists
+        let invoice_id = null;
+        if (payment_id) {
+            const { data: paymentRecord } = await supabase
+                .from('payments')
+                .select('invoice_id')
+                .eq('id', payment_id)
+                .single();
+            invoice_id = paymentRecord?.invoice_id;
+        }
 
-        const billingAddr = billingAddrData ? {
-            ...billingAddrData,
-            phone: billingAddrData.phone_numbers?.phone_number
-        } : shippingAddr;
-
-        // Calculate totals
-        const unitPrice = variant?.selling_price || product.price;
-        const unitMrp = variant?.mrp || product.mrp || unitPrice;
-        const subtotal = unitPrice * quantity;
-
-        // Fetch delivery settings and calculate charge via Service
-        const { DeliveryChargeService } = require('./delivery-charge.service');
-        const settingsService = require('./settings.service');
-        const globalSettings = await settingsService.getDeliverySettings();
-
-        // Determine isFreeDelivery based on threshold
-        const isFreeDelivery = subtotal >= (globalSettings.delivery_threshold || 0);
-
-        const deliveryResult = await DeliveryChargeService.calculateDeliveryCharge(
-            productId,
-            variantId,
-            quantity,
-            isFreeDelivery
+        const order = await createOrder(
+            userId,
+            {
+                shipping_address_id,
+                billing_address_id,
+                payment_id,
+                notes: notes || 'Buy Now Order',
+                payment_status: 'paid',
+                razorpay_payment_id,
+                invoice_id
+            },
+            virtualCart
         );
 
-        const deliveryCharge = deliveryResult.deliveryCharge;
-        const deliveryGST = deliveryResult.deliveryGST;
-        const totalAmount = subtotal + deliveryResult.totalDelivery;
-
-        // Build virtual cart item for tax calculation
-        const virtualCartItem = {
-            product_id: productId,
-            variant_id: variantId,
-            quantity,
-            products: product,
-            product_variants: variant
-        };
-
-        // Calculate taxes
-        let taxResult = null;
-        try {
-            taxResult = TaxEngine.calculateOrderTax([virtualCartItem], shippingAddr);
-        } catch (err) {
-            log.warn('BUY_NOW_TAX_ERROR', 'Failed to calculate taxes', { error: err.message });
-        }
-
-        // Prepare order data
-        const orderData = {
-            customer_name: profile?.name,
-            customer_email: profile?.email,
-            customer_phone: profile?.phone || shippingAddr?.phone,
-            shipping_address_id,
-            billing_address_id,
-            shipping_address: shippingAddr,
-            total_amount: totalAmount,
-            subtotal,
-            coupon_code: null,
-            coupon_discount: 0,
-            delivery_charge: deliveryCharge,
-            delivery_gst: deliveryGST, // Add missing delivery GST field
-            is_delivery_refundable: !(deliveryCharge > 0 && deliveryResult.snapshot?.delivery_refund_policy === 'NON_REFUNDABLE'),
-            delivery_tax_type: 'GST',
-            status: 'pending',
-            payment_status: 'paid',
-            notes: notes || 'Buy Now Order',
-            // Tax summary including delivery
-            total_taxable_amount: (taxResult?.summary.totalTaxableAmount || 0) + deliveryCharge,
-            total_cgst: (taxResult?.summary.totalCgst || 0) + ((!taxResult?.summary.isInterState && deliveryGST) ? (deliveryGST / 2) : 0),
-            total_sgst: (taxResult?.summary.totalSgst || 0) + ((!taxResult?.summary.isInterState && deliveryGST) ? (deliveryGST / 2) : 0),
-            total_igst: (taxResult?.summary.totalIgst || 0) + ((taxResult?.summary.isInterState && deliveryGST) ? deliveryGST : 0)
-        };
-
-        // Prepare order item
-        const taxBreakdown = taxResult?.items[0]?.taxBreakdown || {};
-        const orderItems = [{
-            product_id: productId,
-            variant_id: variantId,
-            quantity,
-            product: {
-                id: product.id,
-                title: product.title,
-                price: unitPrice,
-                images: product.images || [],
-                isReturnable: product.isReturnable ?? product.is_returnable ?? true
-            },
-            delivery_charge: deliveryCharge,
-            delivery_gst: deliveryGST, // Add delivery GST
-            delivery_calculation_snapshot: deliveryResult.snapshot, // Add snapshot
-            coupon_id: null,
-            coupon_code: null,
-            coupon_discount: 0,
-            taxable_amount: taxBreakdown.taxableAmount || null,
-            cgst: taxBreakdown.cgst || 0,
-            sgst: taxBreakdown.sgst || 0,
-            igst: taxBreakdown.igst || 0,
-            hsn_code: taxBreakdown.hsnCode || null,
-            gst_rate: taxBreakdown.gstRate || null,
-            total_amount: taxBreakdown.totalAmount || null,
-            variant_snapshot: variant ? {
-                variant_id: variant.id,
-                size_label: variant.size_label,
-                selling_price: variant.selling_price,
-                mrp: variant.mrp,
-                description: variant.description,
-                tax_applicable: variant.tax_applicable || false,
-                price_includes_tax: variant.price_includes_tax ?? true
-            } : null
-        }];
-
-        log.info('BUY_NOW_CREATE_ORDER', 'Creating Buy Now order via RPC', { userId, itemCount: 1 });
-
-        // Use transactional RPC (skip cart clearing since we're not using cart)
-        const { data: rpcResult, error: rpcError } = await supabase
-            .rpc('create_order_transactional', {
-                p_user_id: userId,
-                p_order_data: orderData,
-                p_order_items: orderItems,
-                p_cart_id: null, // No cart to clear
-                p_payment_id: payment_id,
-                p_coupon_code: null
-            });
-
-        if (rpcError) {
-            log.operationError('BUY_NOW_RPC_ERROR', rpcError, { orderNumber: checkoutData.receipt });
-            throw rpcError;
-        }
-
-        const order = rpcResult;
-
-        // Log functionality for Timeline (Fix for missing history)
-        const { logStatusHistory } = require('./history.service');
-        // User requested that orders NOT be auto-confirmed by system. Leaving status as 'pending'.
-
-        log.info('BUY_NOW_SUCCESS', 'Buy Now order created successfully', { orderId: order?.id });
-
-        // Generate Invoice immediately after successful RPC (since payment is already verified/paid)
-        try {
-            // OPTIMIZATION: Check for existing invoice linked to payment to avoid duplicates
-            let existingInvoiceId = null;
-            if (payment_id) {
-                const { data: payRecord } = await supabase.from('payments').select('invoice_id').eq('id', payment_id).single();
-                existingInvoiceId = payRecord?.invoice_id;
-            }
-
-            if (existingInvoiceId) {
-                log.info({ orderId: order.id, invoiceId: existingInvoiceId }, 'Linking existing Razorpay Invoice (Receipt) for Buy Now');
-                let inv = await razorpay.invoices.fetch(existingInvoiceId);
-
-                // FIX: Ensure invoice is issued to get the short_url if it's still in draft
-                if (inv && inv.status === 'draft') {
-                    log.info({ invoiceId: inv.id }, '[Checkout] Issuing draft invoice (Buy Now) to generate URL');
-                    inv = await razorpay.invoices.issue(inv.id);
-                }
-
-                if (inv && inv.short_url) {
-                    order.invoiceUrl = inv.short_url;
-
-                    await supabase.from('orders').update({
-                        invoice_url: inv.short_url,
-                        invoice_id: inv.id,
-                        invoice_status: inv.status
-                    }).eq('id', order.id);
-
-                    await supabase.from('invoices').insert({
-                        order_id: order.id,
-                        type: 'RAZORPAY',
-                        invoice_number: inv.invoice_number,
-                        provider_id: inv.id,
-                        public_url: inv.short_url,
-                        status: inv.status
-                    });
-                }
-            } else {
-                const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
-                log.info({ orderId: order.id }, 'Generating immediate Razorpay Payment Receipt for Buy Now');
-                const result = await InvoiceOrchestrator.generateRazorpayInvoice({
-                    ...order,
-                    customer_name: profile.name,
-                    customer_email: profile.email,
-                    customer_phone: profile.phone || shippingAddr?.phone,
-                    items: orderItems,
-                    shippingAddress: shippingAddr,
-                    billingAddress: billingAddr,
-                    subtotal,
-                    delivery_charge: deliveryCharge,
-                    delivery_gst: deliveryGST,
-                    coupon_discount: 0
-                });
-
-                if (result.success && result.invoiceUrl) {
-                    order.invoiceUrl = result.invoiceUrl;
-                }
-            }
-        } catch (invError) {
-            log.warn('BUY_NOW_INVOICE_ERROR', 'Failed to link/generate immediate invoice', { error: invError.message });
-        }
-
-        // Log initial timeline event for Buy Now
-        try {
-            const { logStatusHistory } = require('./history.service');
-            // Duplicate 'ORDER_PLACED' check removed as per user feedback
-
-            // Buy Now is always paid immediately
-            await logStatusHistory(order.id, 'PAYMENT_SUCCESS', userId, `Payment verified (ID: ${razorpay_payment_id || paymentData.payment_id || 'N/A'})`, 'SYSTEM');
-            // Auto-confirm removed as per business rule
-        } catch (histError) {
-            log.warn({ err: histError, orderId: order.id }, '[Checkout] Failed to log Buy Now status history');
-        }
-
-        // Send confirmation email
-        try {
-            await emailService.sendOrderConfirmationEmail(
-                profile.email,
-                {
-                    order: order,
-                    customerName: profile.name
-                },
-                userId
-            );
-        } catch (emailErr) {
-            log.warn('BUY_NOW_EMAIL_ERROR', 'Failed to send confirmation email', { error: emailErr.message });
-        }
+        log.info('BUY_NOW_SUCCESS', 'Buy Now order created successfully', { orderId: order.id });
 
         return {
             success: true,
@@ -1573,10 +1372,10 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
     } catch (error) {
         log.operationError('BUY_NOW_ERROR', error);
 
-        // Refund payment if order creation failed
+        // TECHNICAL REFUND: If order creation fails after payment
         if (razorpay_payment_id) {
             try {
-                // Use RefundService for TECHNICAL_REFUND (100% amount)
+                const { RefundService, REFUND_TYPES } = require('./refund.service');
                 if (payment_id) {
                     await RefundService.asyncProcessRefund(payment_id, REFUND_TYPES.TECHNICAL_REFUND, 'SYSTEM', `Buy Now order failed: ${error.message}`, true);
                 } else {
@@ -1585,34 +1384,100 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
                         reason: `Buy Now order failed: ${error.message}`
                     });
                 }
-
-                if (payment_id) {
-                    await updatePaymentRecord(payment_id, {
-                        status: 'refunded',
-                        error_description: 'Buy Now order failed - payment refunded'
-                    });
-                }
-
-                const userError = new Error('Order creation failed and payment has been refunded. Please try again.');
-                userError.status = 500;
-                throw userError;
-            } catch (refundError) {
-                if (refundError.message.includes('Order creation failed')) {
-                    throw refundError;
-                }
-                log.operationError('BUY_NOW_REFUND_ERROR', refundError);
-                const criticalError = new Error('Order failed and we encountered an issue processing your refund. Please contact support immediately with your payment ID.');
-                criticalError.status = 500;
-                throw criticalError;
+            } catch (refundErr) {
+                log.error({ err: refundErr }, 'Double fault: Failed to process technical refund');
             }
         }
 
         throw error;
     }
-};
+}
+
+/**
+ * Get summary for Buy Now flow
+ * Reuses standard calculation logic by constructing a virtual cart
+ */
+const getBuyNowSummary = async (userId, buyNowData, addressId = null) => {
+    try {
+        const { productId, variantId, quantity = 1 } = buyNowData;
+        const cartService = require('./cart.service');
+        const addressService = require('./address.service');
+
+        // 1. Fetch Product & Variant
+        const { data: product } = await supabase
+            .from('products')
+            .select('*')
+            .eq('id', productId)
+            .single();
+
+        if (!product) {
+            const error = new Error('This product is no longer available.');
+            error.status = 404;
+            throw error;
+        }
+
+        let variant = null;
+        if (variantId) {
+            const { data: v } = await supabase
+                .from('product_variants')
+                .select('*')
+                .eq('id', variantId)
+                .single();
+            variant = v;
+            if (!variant) {
+                const error = new Error('The selected variant is no longer available.');
+                error.status = 404;
+                throw error;
+            }
+        }
+
+        // 2. Build mock cart item for UI compatibility
+        const mockCartItem = {
+            id: `buynow-${productId}-${variantId || 'default'}`,
+            product_id: productId,
+            variant_id: variantId,
+            quantity,
+            products: product,
+            product_variants: variant
+        };
+
+        const virtualCart = {
+            id: 'buy-now',
+            user_id: userId,
+            cart_items: [mockCartItem]
+        };
+
+        // 3. Calculate totals using standard service
+        const totals = await cartService.calculateCartTotals(userId, null, virtualCart);
+
+        // 4. Fetch addresses
+        const addresses = await addressService.getUserAddresses(userId);
+        const primaryAddress = addresses.find(a => a.is_primary) || addresses[0];
+
+        let shipping_address = null;
+        if (addressId) {
+            shipping_address = addresses.find(a => a.id === addressId);
+        }
+        if (!shipping_address) {
+            shipping_address = primaryAddress;
+        }
+
+        return {
+            cart: virtualCart,
+            totals,
+            shipping_address,
+            billing_address: shipping_address, // Default billing to shipping
+            isBuyNow: true
+        };
+    } catch (error) {
+        log.error({ err: error }, 'Error in getBuyNowSummary');
+        throw error;
+    }
+}
 
 module.exports = {
     getCheckoutSummary,
+    getBuyNowSummary,
     createRazorpayInvoice,
     verifyRazorpayPayment,
     createPaymentRecord,

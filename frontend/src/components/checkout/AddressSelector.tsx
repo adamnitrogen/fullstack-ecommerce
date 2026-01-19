@@ -56,6 +56,8 @@ export function AddressSelector({ type, selectedAddressId, onSelect, forceEditId
 
     // Auto-select primary address only if no address is currently selected
     useEffect(() => {
+        // Only auto-select if we have addresses and NO selectedAddressId is provided
+        // and we are not currently loading
         if (!isLoading && addresses.length > 0 && !selectedAddressId) {
             const primary = addresses.find((addr) => addr.is_primary);
             if (primary) {

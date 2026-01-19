@@ -86,20 +86,24 @@ export default function Checkout() {
 
       setSummary(data);
 
-      // Pre-select addresses if available, but only if not already set or specifically requested
+      // Pre-select addresses if available
       if (data.shipping_address) {
         const newShipping = data.shipping_address;
         setShippingAddress(prev => {
-          // If we already have a selection from AddressSelector (manual click), don't overwrite it with same data
-          if (prev?.id === newShipping.id) return prev;
-          return newShipping;
+          // Only update if current is null or ID differs
+          if (!prev || prev.id !== newShipping.id) {
+            return newShipping;
+          }
+          return prev;
         });
       }
       if (data.billing_address) {
         const newBilling = data.billing_address;
         setBillingAddress(prev => {
-          if (prev?.id === newBilling.id) return prev;
-          return newBilling;
+          if (!prev || prev.id !== newBilling.id) {
+            return newBilling;
+          }
+          return prev;
         });
       }
 
@@ -391,8 +395,11 @@ export default function Checkout() {
                   type="shipping"
                   selectedAddressId={shippingAddress?.id}
                   onSelect={(address) => {
-                    setShippingAddress(address);
-                    fetchCheckoutSummary(address.id);
+                    // Only refetch if address actually changed
+                    if (shippingAddress?.id !== address.id) {
+                      setShippingAddress(address);
+                      fetchCheckoutSummary(address.id);
+                    }
                   }}
                   forceEditId={addressIdToEdit}
                   onEditOpened={() => setAddressIdToEdit(null)}

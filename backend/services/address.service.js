@@ -290,8 +290,8 @@ const setPrimaryAddress = async (id, userId, type, correlationId = null) => {
     return formatAddress(data);
 };
 
-// Get primary address of a specific type
-const getPrimaryAddress = async (userId, type) => {
+// Get primary address (with type-specific fallback)
+const getPrimaryAddress = async (userId, type = null) => {
     const { data, error } = await supabase
         .from('addresses')
         .select(`
@@ -301,14 +301,19 @@ const getPrimaryAddress = async (userId, type) => {
             )
         `)
         .eq('user_id', userId)
-        .eq('type', type)
-        .eq('is_primary', true)
-        .single();
+        .eq('is_primary', true);
 
-    if (error && error.code === 'PGRST116') return null;
     if (error) throw error;
+    if (!data || data.length === 0) return null;
 
-    return formatAddress(data);
+    // If a specific type was requested, try to find an exact match first
+    if (type) {
+        const typeMatch = data.find(addr => addr.type === type);
+        if (typeMatch) return formatAddress(typeMatch);
+    }
+
+    // Default: return the first primary address found (global primary)
+    return formatAddress(data[0]);
 };
 
 // Get latest address (optional type filter)

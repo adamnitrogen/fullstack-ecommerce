@@ -246,7 +246,7 @@ router.post('/buy-now/summary', async (req, res) => {
             return res.status(401).json({ error: 'Authentication required' });
         }
 
-        const { productId, variantId, quantity = 1 } = req.body;
+        const { productId, variantId, quantity = 1, addressId } = req.body;
 
         // Validation
         if (!productId) {
@@ -256,116 +256,13 @@ router.post('/buy-now/summary', async (req, res) => {
             return res.status(400).json({ error: 'Please select a valid quantity (1-100).' });
         }
 
-        const supabase = require('../config/supabase');
-        const addressService = require('../services/address.service');
-
-        // Fetch product
-        const { data: product, error: productError } = await supabase
-            .from('products')
-            .select('*')
-            .eq('id', productId)
-            .single();
-
-        if (productError || !product) {
-            return res.status(404).json({ error: 'This product is no longer available. Please try a different product.' });
-        }
-
-        // Fetch variant if provided
-        let variant = null;
-        if (variantId) {
-            const { data: v } = await supabase
-                .from('product_variants')
-                .select('*')
-                .eq('id', variantId)
-                .single();
-            variant = v;
-            if (!variant) {
-                return res.status(404).json({ error: 'The selected variant is no longer available. Please select a different option.' });
-            }
-        }
-
-        // Calculate prices
-        const unitPrice = variant?.selling_price || product.price;
-        const unitMrp = variant?.mrp || product.mrp || unitPrice;
-        const subtotal = unitPrice * quantity;
-        const mrpTotal = unitMrp * quantity;
-        const discount = mrpTotal - subtotal;
-
-        // Calculate totals using legacy logic? No, use DeliveryChargeService for accuracy
-        const { DeliveryChargeService } = require('../services/delivery-charge.service');
-        let deliveryCharge = 0;
-        let deliveryGST = 0;
-        let deliveryResult = null;
-
-        try {
-            deliveryResult = await DeliveryChargeService.calculateDeliveryCharge(productId, variantId, quantity);
-            deliveryCharge = deliveryResult.deliveryCharge;
-            deliveryGST = deliveryResult.deliveryGST;
-        } catch (deliveryError) {
-            logger.warn({ err: deliveryError }, 'Failed to calculate Buy Now delivery, using defaults');
-        }
-
-        // Fetch addresses
-        let shippingAddress = null;
-        let billingAddress = null;
-        try {
-            const addresses = await addressService.getAddresses(userId);
-            shippingAddress = addresses.find(a => a.is_primary) || addresses[0];
-            billingAddress = shippingAddress;
-        } catch (e) {
-            // No addresses yet
-        }
-
-        // Build mock cart item for UI compatibility
-        const mockCartItem = {
-            id: `buynow-${productId}-${variantId || 'default'}`,
-            product_id: productId,
-            variant_id: variantId,
-            quantity,
-            products: product,
-            product_variants: variant
-        };
-
-        const totals = {
-            totalMrp: Math.round(mrpTotal * 100) / 100,
-            totalPrice: Math.round(subtotal * 100) / 100,
-            discount: Math.round(discount * 100) / 100,
-            couponDiscount: 0,
-            deliveryCharge: Math.round(deliveryCharge * 100) / 100,
-            deliveryGST: Math.round(deliveryGST * 100) / 100,
-            finalAmount: Math.round((subtotal + deliveryCharge + deliveryGST) * 100) / 100,
-            itemsCount: quantity,
-            globalDeliveryCharge: deliveryResult?.snapshot?.calculation_type === 'FLAT_PER_ORDER' ? deliveryCharge : 0,
-            productDeliveryCharges: deliveryResult?.snapshot?.calculation_type !== 'FLAT_PER_ORDER' ? deliveryCharge : 0,
-            itemBreakdown: [
-                {
-                    product_id: productId,
-                    variant_id: variantId,
-                    quantity,
-                    mrp: unitMrp,
-                    price: unitPrice,
-                    delivery_charge: deliveryCharge,
-                    delivery_gst: deliveryGST,
-                    delivery_meta: deliveryResult?.snapshot
-                }
-            ]
-        };
-
-        const summary = {
-            cart: {
-                id: 'buy-now',
-                cart_items: [mockCartItem]
-            },
-            totals,
-            shipping_address: shippingAddress,
-            billing_address: billingAddress,
-            isBuyNow: true
-        };
+        const { getBuyNowSummary } = require('../services/checkout.service');
+        const summary = await getBuyNowSummary(userId, { productId, variantId, quantity }, addressId);
 
         res.json(summary);
     } catch (error) {
         logger.error({ err: error }, 'Error fetching buy now summary:');
-        res.status(500).json({ error: 'Unable to load checkout details. Please try again or contact support if the issue persists.' });
+        res.status(error.status || 500).json({ error: error.message || 'Unable to load checkout details. Please try again.' });
     }
 });
 
@@ -464,8 +361,11 @@ router.post('/buy-now/create-payment-order', requestLock('create-payment-order')
             return res.status(400).json({ error: 'Please select a valid quantity (1-100).' });
         }
 
-        const supabase = require('../config/supabase');
+        const { getBuyNowSummary, createRazorpayInvoice, createPaymentRecord } = require('../services/checkout.service');
+        const summary = await getBuyNowSummary(userId, { productId, variantId, quantity });
+        const amount = summary.totals.finalAmount;
 
+        const supabase = require('../config/supabase');
         // Get User Profile
         const { data: profile } = await supabase
             .from('profiles')
@@ -477,94 +377,45 @@ router.post('/buy-now/create-payment-order', requestLock('create-payment-order')
             return res.status(404).json({ error: 'Please complete your profile to continue with the purchase.' });
         }
 
-        // Fetch product
-        const { data: product, error: productError } = await supabase
-            .from('products')
-            .select('*')
-            .eq('id', productId)
-            .single();
-
-        if (productError || !product) {
-            return res.status(404).json({ error: 'This product is no longer available for purchase.' });
-        }
-
-        // Fetch variant if provided
-        let variant = null;
-        if (variantId) {
-            const { data: v } = await supabase
-                .from('product_variants')
-                .select('*')
-                .eq('id', variantId)
-                .single();
-            variant = v;
-            if (!variant) {
-                return res.status(404).json({ error: 'The selected variant is no longer available.' });
-            }
-        }
-
-        // Calculate totals
-        const unitPrice = variant?.selling_price || product.price;
-        const subtotal = unitPrice * quantity;
-
-        // NEW DYNAMIC DELIVERY LOGIC for Buy Now
-        const { DeliveryChargeService } = require('../services/delivery-charge.service');
-        let deliveryCharge = 0;
-        let deliveryGST = 0;
-
-        try {
-            const deliveryResult = await DeliveryChargeService.calculateDeliveryCharge(productId, variantId, quantity);
-            deliveryCharge = deliveryResult.deliveryCharge;
-            deliveryGST = deliveryResult.deliveryGST;
-        } catch (error) {
-            logger.warn({ err: error }, 'Failed to calculate Buy Now delivery, using 0');
-        }
-
-        const amount = subtotal + deliveryCharge + deliveryGST;
-
         // Receipt ID
         const receipt = `buynow_${Date.now()}_${userId.substring(0, 8)}`;
 
-        // Build line items
-        const lineItems = [];
+        // Build line items for Razorpay Invoice
+        const lineItems = summary.cart.cart_items.map((item, index) => {
+            const variant = item.product_variants;
+            const product = item.products;
 
-        let razorpayItem;
-        if (variant?.razorpay_item_id) {
-            razorpayItem = {
-                item_id: variant.razorpay_item_id,
+            let razorpayItem = {
+                item_id: variant?.razorpay_item_id || null,
                 name: `${product.title}${variant ? ` - ${variant.size_label}` : ''}`,
-                amount: Math.round(unitPrice * 100),
+                amount: Math.round((variant?.selling_price || product.price) * 100),
                 currency: 'INR',
-                quantity
+                quantity: item.quantity
             };
-        } else {
-            razorpayItem = {
-                name: `${product.title}${variant ? ` - ${variant.size_label}` : ''}`,
-                amount: Math.round(unitPrice * 100),
-                currency: 'INR',
-                quantity
-            };
-        }
 
-        // Attach delivery metadata to the first item for createRazorpayInvoice to extract
-        razorpayItem.deliveryCharge = deliveryCharge;
-        razorpayItem.deliveryGST = deliveryGST;
-        razorpayItem.deliveryGSTRate = 18;
+            // Attach delivery metadata to the first item
+            if (index === 0) {
+                razorpayItem.deliveryCharge = summary.totals.deliveryCharge || 0;
+                razorpayItem.deliveryGST = summary.totals.deliveryGST || 0;
+                razorpayItem.deliveryGSTRate = 18;
+            }
 
-        lineItems.push(razorpayItem);
+            return razorpayItem;
+        });
 
         // Create Razorpay Invoice
-        const razorpayResponse = await createRazorpayInvoice(amount, receipt, profile, lineItems);
+        const razorpayResponse = await createRazorpayInvoice(amount, receipt, profile, lineItems, summary.totals);
 
-        // Create Payment Record (without metadata since table doesn't support it)
+        // Create Payment Record
         const payment = await createPaymentRecord({
             user_id: userId,
             razorpay_order_id: razorpayResponse.id,
+            invoice_id: razorpayResponse.invoice_id,
             amount,
             currency: 'INR',
             status: 'created'
         });
 
-        // Return buy now details for frontend to pass to verify-payment
         res.json({
             order_id: razorpayResponse.id,
             amount: razorpayResponse.amount,
@@ -580,7 +431,7 @@ router.post('/buy-now/create-payment-order', requestLock('create-payment-order')
         });
     } catch (error) {
         logger.error({ err: error }, 'Error creating buy now payment order:');
-        res.status(500).json({ error: 'Unable to initiate payment. Please try again or use a different payment method.' });
+        res.status(error.status || 500).json({ error: error.message || 'Unable to initiate payment. Please try again.' });
     }
 });
 
