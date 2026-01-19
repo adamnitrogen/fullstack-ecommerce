@@ -26,6 +26,8 @@ import { Order, CartItem, Product, Address } from "@/types";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { TaxBreakdown } from "@/components/orders/TaxBreakdown";
 import { InvoiceActions } from "@/components/orders/InvoiceActions";
+import { supabase } from "@/lib/supabase";
+import { Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
 
 interface OrderResponse {
     id: string;
@@ -33,6 +35,7 @@ interface OrderResponse {
     created_at: string;
     createdAt?: string;
     status: string;
+    user_id: string; // Added to fix type error
     invoice_id?: string; // Added missing field
     invoice_url?: string;
     invoices?: Array<{
@@ -98,6 +101,7 @@ interface ReturnableItem {
     remaining_quantity: number;
     return_days?: number;
     return_deadline?: string;
+    variant_snapshot?: any; // To allow access if returning full object
 }
 
 export default function UserOrderDetail() {
@@ -115,6 +119,10 @@ export default function UserOrderDetail() {
     const [returnOpen, setReturnOpen] = useState(false);
     const [selectedReturnItems, setSelectedReturnItems] = useState<{ id: string; quantity: number }[]>([]);
     const [returnableItems, setReturnableItems] = useState<ReturnableItem[]>([]);
+    // Enhanced Return State
+    const [itemReasons, setItemReasons] = useState<Record<string, string>>({});
+    const [itemImages, setItemImages] = useState<Record<string, File[]>>({});
+    const [itemConditions, setItemConditions] = useState<Record<string, string>>({});
 
     const handleReturnItemChange = (orderItemId: string, quantity: number, maxQuantity: number) => {
         if (quantity < 0 || quantity > maxQuantity) return;
@@ -165,29 +173,113 @@ export default function UserOrderDetail() {
         }
     };
 
+    const handleImageChange = (itemId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const newFiles = Array.from(e.target.files);
+
+            setItemImages(prev => {
+                const currentFiles = prev[itemId] || [];
+                const totalFiles = [...currentFiles, ...newFiles];
+
+                if (totalFiles.length > 3) {
+                    toast.error("Maximum 3 images allowed per item");
+                    return prev;
+                }
+
+                // Validate size (5MB limit)
+                const invalidFile = newFiles.find(f => f.size > 5 * 1024 * 1024);
+                if (invalidFile) {
+                    toast.error(`File ${invalidFile.name} exceeds 5MB limit`);
+                    return prev;
+                }
+
+                return { ...prev, [itemId]: totalFiles };
+            });
+        }
+    };
+
+    const removeImage = (itemId: string, index: number) => {
+        setItemImages(prev => {
+            const currentFiles = prev[itemId] || [];
+            const newFiles = currentFiles.filter((_, i) => i !== index);
+            return { ...prev, [itemId]: newFiles };
+        });
+    };
+
     const handleReturnOrder = async () => {
         try {
             if (selectedReturnItems.length === 0) {
                 toast.error("Please select at least one item to return");
                 return;
             }
-            setLoadingMessage("Submitting your return request...");
+
+            // Validation
+            for (const item of selectedReturnItems) {
+                const reason = itemReasons[item.id];
+                const images = itemImages[item.id];
+
+                if (!reason || !reason.trim()) {
+                    toast.error("Please provide a return reason for all selected items");
+                    return;
+                }
+                if (!images || images.length < 1) {
+                    toast.error("Please upload at least 1 image for each selected item");
+                    return;
+                }
+            }
+
+            setLoadingMessage("Uploading images and submitting request...");
             setActionLoading(true);
             setReturnOpen(false);
 
-            const itemsToReturn = selectedReturnItems.map(item => ({
-                orderItemId: item.id,
-                quantity: item.quantity
+            // 1. Upload Images
+            const itemsWithMetadata = await Promise.all(selectedReturnItems.map(async (item) => {
+                const images = itemImages[item.id] || [];
+                const imageUrls: string[] = [];
+
+                for (const file of images) {
+                    const fileExt = file.name.split('.').pop();
+                    const fileName = `${order?.user_id || 'guest'}/${id}/${item.id}/${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+                    const { error: uploadError } = await supabase.storage
+                        .from('return_images')
+                        .upload(`returns/${fileName}`, file);
+
+                    if (uploadError) {
+                        console.error('Upload error:', uploadError);
+                        throw new Error(`Failed to upload image for item`);
+                    }
+
+                    const { data: { publicUrl } } = supabase.storage
+                        .from('return_images')
+                        .getPublicUrl(`returns/${fileName}`);
+
+                    imageUrls.push(publicUrl);
+                }
+
+                return {
+                    orderItemId: item.id,
+                    quantity: item.quantity,
+                    reason: itemReasons[item.id],
+                    images: imageUrls,
+                    condition: itemConditions[item.id] || 'opened'
+                };
             }));
 
+            // 2. Submit Request
             await apiClient.post(`/returns/request`, {
                 orderId: id,
-                items: itemsToReturn,
-                reason: returnReason
+                items: itemsWithMetadata,
+                reason: returnReason // Keeping global reason optional or as summary
             });
 
-            toast.success("Return request submitted");
+            toast.success("Return request submitted successfully");
             setReturnOpen(false);
+            // Reset state
+            setItemImages({});
+            setItemReasons({});
+            setSelectedReturnItems([]);
+
             fetchOrderDetail();
         } catch (error: unknown) {
             toast.error(getErrorMessage(error, "Failed to submit return request"));
@@ -404,7 +496,14 @@ export default function UserOrderDetail() {
                                                                     className={isSelected ? 'border-orange-500 data-[state=checked]:bg-orange-500' : ''}
                                                                 />
                                                                 <div className="flex-1">
-                                                                    <p className="text-sm font-medium">{item.title}</p>
+                                                                    <p className="text-sm font-medium">
+                                                                        {item.title}
+                                                                        {item.variant_snapshot?.size_label && (
+                                                                            <span className="text-muted-foreground font-normal ml-1">
+                                                                                ({item.variant_snapshot.size_label})
+                                                                            </span>
+                                                                        )}
+                                                                    </p>
                                                                     <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 mt-1">
                                                                         <span className="text-xs text-muted-foreground">₹{item.price_per_unit}</span>
                                                                         <span className="text-xs text-muted-foreground">•</span>
@@ -457,14 +556,83 @@ export default function UserOrderDetail() {
                                             )}
                                         </div>
 
-                                        {/* Reason Input */}
+
+
+                                        {/* Dynamic Sections for Selected Items */}
+                                        {selectedReturnItems.length > 0 && (
+                                            <div className="space-y-4 border-t pt-4">
+                                                <Label className="text-sm font-semibold">Item Details & Condition</Label>
+                                                {selectedReturnItems.map(selectedItem => {
+                                                    const itemDef = returnableItems.find(i => i.id === selectedItem.id);
+                                                    if (!itemDef) return null;
+
+                                                    return (
+                                                        <div key={selectedItem.id} className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-3">
+                                                            <div className="font-medium text-sm flex justify-between">
+                                                                <span>{itemDef.title}</span>
+                                                                <Badge variant="outline">Qty: {selectedItem.quantity}</Badge>
+                                                            </div>
+
+                                                            {/* Reason */}
+                                                            <div>
+                                                                <Label className="text-xs text-muted-foreground mb-1 block">Reason for Return *</Label>
+                                                                <Textarea
+                                                                    placeholder="Why are you returning this?"
+                                                                    value={itemReasons[selectedItem.id] || ''}
+                                                                    onChange={e => setItemReasons(prev => ({ ...prev, [selectedItem.id]: e.target.value }))}
+                                                                    className="text-sm min-h-[60px] resize-none bg-white"
+                                                                />
+                                                            </div>
+
+                                                            {/* Images */}
+                                                            <div>
+                                                                <Label className="text-xs text-muted-foreground mb-1 block">
+                                                                    Upload Images (Min 1, Max 3) *
+                                                                </Label>
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {(itemImages[selectedItem.id] || []).map((file, idx) => (
+                                                                        <div key={idx} className="relative w-16 h-16 border rounded bg-white overflow-hidden group">
+                                                                            <img
+                                                                                src={URL.createObjectURL(file)}
+                                                                                className="w-full h-full object-cover"
+                                                                                alt="preview"
+                                                                            />
+                                                                            <button
+                                                                                onClick={() => removeImage(selectedItem.id, idx)}
+                                                                                className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                            >
+                                                                                <X className="h-3 w-3" />
+                                                                            </button>
+                                                                        </div>
+                                                                    ))}
+                                                                    {(itemImages[selectedItem.id]?.length || 0) < 3 && (
+                                                                        <label className="w-16 h-16 border-2 border-dashed border-gray-300 rounded flex flex-col items-center justify-center cursor-pointer hover:bg-gray-100 transition-colors">
+                                                                            <Upload className="h-4 w-4 text-gray-400" />
+                                                                            <span className="text-[9px] text-gray-500 mt-1">Add</span>
+                                                                            <input
+                                                                                type="file"
+                                                                                accept="image/*"
+                                                                                className="hidden"
+                                                                                onChange={(e) => handleImageChange(selectedItem.id, e)}
+                                                                            />
+                                                                        </label>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                        {/* Global Reason Input (Optional/Summary) */}
                                         <div className="space-y-2">
-                                            <Label className="text-sm font-semibold">Reason for Return *</Label>
+                                            <Label className="text-sm font-semibold">Additional Comments (Optional)</Label>
                                             <Textarea
-                                                placeholder="Please describe why you want to return these items..."
+                                                placeholder="Any other feedback about this order?"
                                                 value={returnReason}
                                                 onChange={e => setReturnReason(e.target.value)}
-                                                className="min-h-[80px] resize-none"
+                                                className="min-h-[60px] resize-none"
                                             />
                                         </div>
                                     </div>
@@ -475,7 +643,7 @@ export default function UserOrderDetail() {
                                         <Button
                                             className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
                                             onClick={handleReturnOrder}
-                                            disabled={actionLoading || !returnReason.trim() || selectedReturnItems.length === 0}
+                                            disabled={actionLoading || selectedReturnItems.length === 0}
                                         >
                                             {actionLoading ? (
                                                 <>
@@ -494,7 +662,7 @@ export default function UserOrderDetail() {
                             </Dialog>
                         )}
                     </div>
-                </div>
+                </div >
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {/* Left Column - Order Info */}

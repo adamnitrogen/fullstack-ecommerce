@@ -126,6 +126,11 @@ const getReturnableItems = async (orderId, userId) => {
 // Note: Centralized logStatusHistory from order.service is used instead of local helper
 
 const createReturnRequest = async (userId, orderId, returnItems, reason) => {
+    // Note: returnItems is now expected to be an array of objects:
+    // { orderItemId, quantity, reason, images: [url1, url2], condition }
+    // The 'reason' param at top level is kept for backward compatibility or as a general note,
+    // but item-level reasons are preferred.
+
     // 1. Validate Returnable Items
     const availableItems = await getReturnableItems(orderId, userId);
 
@@ -133,8 +138,22 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
     for (const reqItem of returnItems) {
         const validItem = availableItems.find(i => i.id === reqItem.orderItemId);
         if (!validItem) throw new Error(`Item ${reqItem.orderItemId} is not eligible for return`);
+
         if (reqItem.quantity > validItem.remaining_quantity) {
             throw new Error(`Requested quantity ${reqItem.quantity} exceeds returnable quantity for item ${validItem.title}`);
+        }
+
+        // Validate Mandatory Fields
+        if (!reqItem.reason || reqItem.reason.trim() === '') {
+            throw new Error(`Return reason is required for item ${validItem.title}`);
+        }
+
+        if (!reqItem.images || !Array.isArray(reqItem.images) || reqItem.images.length < 1) {
+            throw new Error(`At least 1 image is required for item ${validItem.title}`);
+        }
+
+        if (reqItem.images.length > 3) {
+            throw new Error(`Maximum 3 images allowed for item ${validItem.title}`);
         }
     }
 
@@ -156,7 +175,7 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
             user_id: userId,
             status: 'requested',
             refund_amount: estimatedRefund,
-            reason: reason,
+            reason: reason || 'Item-level reasons provided', // General reason or fallback
             // Store tax refund breakdown
             refund_breakdown: refundBreakdown.summary
         })
@@ -165,11 +184,14 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
 
     if (createError) throw createError;
 
-    // 4. Create Return Items
+    // 4. Create Return Items with detailed info
     const returnItemsData = returnItems.map(item => ({
         return_id: returnRequest.id,
         order_item_id: item.orderItemId,
-        quantity: item.quantity
+        quantity: item.quantity,
+        reason: item.reason,
+        images: item.images, // text[] array
+        condition: item.condition || 'opened' // Default or passed from frontend
     }));
 
     const { error: itemsInsertError } = await supabase
@@ -186,7 +208,7 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
 
     // 6. Log History
     const orderService = require('./order.service');
-    await orderService.logStatusHistory(orderId, 'return_requested', userId, `Return requested for items: ${returnItems.map(i => i.quantity + 'x Item').join(', ')}. Reason: ${reason}`, 'USER');
+    await orderService.logStatusHistory(orderId, 'return_requested', userId, `Return requested. Refund Est: ₹${estimatedRefund}`, 'USER');
 
     // 7. Log Financial Event
     FinancialEventLogger.logReturnRequested(orderId, returnRequest.id, returnItems, userId)
@@ -206,9 +228,10 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
             returnItems: returnItems.map((ri, i) => ({
                 title: availableItems.find(a => a.id === ri.orderItemId)?.title || 'Product',
                 quantity: ri.quantity,
-                variantLabel: availableItems.find(a => a.id === ri.orderItemId)?.variant_snapshot?.size_label
+                variantLabel: availableItems.find(a => a.id === ri.orderItemId)?.variant_snapshot?.size_label,
+                reason: ri.reason
             })),
-            reason
+            reason: reason || 'See item details'
         }, userId, returnRequest.id).catch(err => log.warn('EMAIL_ERROR', 'Failed to send return requested email', { error: err.message }));
     }
 
