@@ -30,6 +30,10 @@ export interface CreateUserDto extends Partial<User> {
 
 export interface ApiErrorResponse {
   error: string;
+  status?: number;
+  code?: string;
+  requestId?: string;
+  stack?: string;
   details?: Array<{
     field: string;
     message: string;

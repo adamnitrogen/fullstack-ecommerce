@@ -499,7 +499,7 @@ async function getOrderById(id, user) {
     // Try catching errors here gracefully so it doesn't break the whole page
     promises.push(
         supabase.from('refunds')
-            .select('id, razorpay_refund_id, amount, status, created_at, notes')
+            .select('id, razorpay_refund_id, amount, status, created_at, reason')
             .eq('order_id', id)
             .then(({ data, error }) => {
                 if (error) {
@@ -603,7 +603,7 @@ async function getOrderById(id, user) {
                         invoice_number: inv.invoice_number,
                         provider_id: inv.id,
                         public_url: inv.short_url,
-                        status: inv.status
+                        status: (inv.status === 'paid' || inv.status === 'issued' || inv.status === 'issued') ? 'GENERATED' : inv.status.toUpperCase()
                     }).then(() => logger.info(`[Order ${id}] Self-healed missing invoice record in DB`))
                         .catch(e => logger.warn(`[Order ${id}] Failed to persist self-healed invoice`, e));
                 }

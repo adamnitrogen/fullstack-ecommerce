@@ -1,4 +1,4 @@
-const supabase = require('../config/supabase');
+const { supabase, supabaseAdmin } = require('../lib/supabase');
 const logger = require('../utils/logger');
 
 const ORDER_STATUS = {
@@ -73,13 +73,14 @@ async function logStatusHistory(orderId, statusOrEventType, updatedBy, notes = '
     // Mapping of internal statuses to descriptive timeline event types
     const EVENT_TYPE_MAP = {
         'pending': 'ORDER_PLACED',
-        'confirmed': 'STATUS_CHANGE',
-        'processing': 'STATUS_CHANGE',
-        'packed': 'STATUS_CHANGE',
-        'shipped': 'STATUS_CHANGE',
-        'delivered': 'STATUS_CHANGE',
-        'cancelled': 'CANCELLED',
-        'returned': 'RETURNED',
+        'confirmed': 'ORDER_CONFIRMED',
+        'processing': 'ORDER_PROCESSING',
+        'packed': 'ORDER_PACKED',
+        'shipped': 'ORDER_SHIPPED',
+        'out_for_delivery': 'OUT_FOR_DELIVERY',
+        'delivered': 'ORDER_DELIVERED',
+        'cancelled': 'ORDER_CANCELLED',
+        'returned': 'ORDER_RETURNED',
         'return_requested': 'RETURN_REQUESTED',
         'return_approved': 'RETURN_APPROVED',
         'return_rejected': 'RETURN_REJECTED',
@@ -104,7 +105,9 @@ async function logStatusHistory(orderId, statusOrEventType, updatedBy, notes = '
     }
 
     try {
-        let { error } = await supabase
+        // Use direct insert to bypass any proxy issues if needed, or stick to standard supabase client
+        // but ensure we use the one with service role key (which is our standard proxied client)
+        let { error } = await supabaseAdmin
             .from('order_status_history')
             .insert({
                 order_id: orderId,
@@ -121,7 +124,7 @@ async function logStatusHistory(orderId, statusOrEventType, updatedBy, notes = '
 
             if (error.code === '23503') {
                 logger.info(`Retrying log history with updated_by=null for order ${orderId}`);
-                await supabase.from('order_status_history').insert({
+                await supabaseAdmin.from('order_status_history').insert({
                     order_id: orderId,
                     status: status,
                     event_type: finalEventType,

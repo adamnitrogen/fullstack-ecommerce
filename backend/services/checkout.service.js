@@ -394,8 +394,8 @@ const createOrder = async (userId, checkoutData, cart) => {
 
     // Prepare order data for transactional RPC
     const orderData = {
-        customer_name: profile.name,
-        customer_email: profile.email,
+        customer_name: profile.name || 'Valued Customer',
+        customer_email: profile.email || 'no-email@provided.com',
         customer_phone: profile.phone || shippingAddr?.phone,
         shipping_address_id,
         billing_address_id,
@@ -586,16 +586,9 @@ const createOrder = async (userId, checkoutData, cart) => {
         } : null
     };
 
-    // --- FIX: Log Initial Order History ---
-    // Manually log initial history since we used RPC
-    logStatusHistory(
-        order.id,
-        ORDER_STATUS.PENDING,
-        userId,
-        'Order placed successfully',
-        'USER',
-        'ORDER_PLACED'
-    ).catch(err => log.warn('HISTORY_LOG_ERROR', 'Failed to log initial history', { err }));
+    // --- HISTORY LOGGING ---
+    // Handled atomically by create_order_transactional RPC
+    // We do NOT log here to avoid duplicates or race conditions.
 
     // Log financial event for audit (non-blocking)
     FinancialEventLogger.logOrderCreated(order, taxResult?.summary, userId)
@@ -772,6 +765,20 @@ const handleWebhookEvent = async (payload) => {
                         .from('orders')
                         .update({ paymentStatus: 'paid', status: 'confirmed' })
                         .eq('id', dbPayment.order_id);
+
+                    // Log history for confirmation
+                    try {
+                        const { logStatusHistory } = require('./history.service');
+                        await logStatusHistory(
+                            dbPayment.order_id,
+                            'confirmed', // Will map to ORDER_CONFIRMED
+                            null, // System action, no user ID
+                            'Payment captured via Razorpay Webhook',
+                            'SYSTEM'
+                        );
+                    } catch (histError) {
+                        logger.warn({ err: histError, orderId: dbPayment.order_id }, 'Failed to log history in webhook');
+                    }
                 }
             } else {
                 logger.warn(`Webhook: Payment record not found for Razorpay Order ${payment.order_id}`);
@@ -794,6 +801,21 @@ const handleWebhookEvent = async (payload) => {
 
                 // If order exists, mark as pending payment or cancelled?
                 // Usually keep as 'created' or 'pending_payment'
+
+                if (dbPayment.order_id) {
+                    try {
+                        const { logStatusHistory } = require('./history.service');
+                        await logStatusHistory(
+                            dbPayment.order_id,
+                            'PAYMENT_FAILED',
+                            null,
+                            payment.error_description || 'Payment Failed via Webhook',
+                            'SYSTEM'
+                        );
+                    } catch (histError) {
+                        logger.warn({ err: histError }, 'Failed to log payment failure in webhook');
+                    }
+                }
             }
         } else if (event === 'refund.processed' && data.refund) {
             // Refund Processed
@@ -1073,7 +1095,6 @@ async function processPaymentAndOrder(userId, {
         // Fetch user email if not available in scope (we have userId)
         const { data: userProfile } = await supabase.from('profiles').select('email, name').eq('id', userId).single();
         if (userProfile?.email) {
-            const emailService = require('./email'); // Lazy load to avoid circular deps if any
             emailService.send('PAYMENT_CONFIRMED', userProfile.email, {
                 customerName: userProfile.name,
                 order: { id: razorpay_order_id, orderNumber: razorpay_order_id }, // We don't have our internal order ID yet, use Razorpay Order ID for ref
@@ -1375,7 +1396,6 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
         // TECHNICAL REFUND: If order creation fails after payment
         if (razorpay_payment_id) {
             try {
-                const { RefundService, REFUND_TYPES } = require('./refund.service');
                 if (payment_id) {
                     await RefundService.asyncProcessRefund(payment_id, REFUND_TYPES.TECHNICAL_REFUND, 'SYSTEM', `Buy Now order failed: ${error.message}`, true);
                 } else {

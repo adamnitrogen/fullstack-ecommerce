@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import { loadRazorpay } from "@/lib/razorpay";
 import type { CheckoutSummary, CheckoutAddress, Product } from "@/types";
-import { getErrorMessage } from "@/lib/errorUtils";
+import { getErrorMessage, isNetworkError } from "@/lib/errorUtils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -274,16 +274,23 @@ export default function Checkout() {
           } catch (error: unknown) {
             logger.error("Order creation error", error);
 
-            // Use server error message - it's now user-friendly
-            const serverMsg = getErrorMessage(error);
+            if (isNetworkError(error)) {
+              toast.error(
+                "Network Error: Payment was successful but order verification timed out. Please DO NOT retry. Your order will be processed shortly. Contact support if you don't receive an email within 10 minutes.",
+                { duration: 10000 }
+              );
+            } else {
+              // Use server error message - it's now user-friendly
+              const serverMsg = getErrorMessage(error);
 
-            // The backend now provides user-friendly messages
-            let userMsg = serverMsg || "Unable to complete your order. Please try again or contact support.";
+              // The backend now provides user-friendly messages
+              let userMsg = serverMsg || "Unable to complete your order. Please try again or contact support.";
 
-            // Extend duration for important messages
-            const duration = serverMsg?.includes('refund') || serverMsg?.includes('contact support') ? 8000 : 5000;
+              // Extend duration for important messages
+              const duration = serverMsg?.includes('refund') || serverMsg?.includes('contact support') ? 8000 : 5000;
 
-            toast.error(userMsg, { duration });
+              toast.error(userMsg, { duration });
+            }
           } finally {
             setProcessing(false);
             setLoading(false);

@@ -272,6 +272,28 @@ async function initializeAndStart() {
         process.on('SIGTERM', () => shutdown('SIGTERM'));
         process.on('SIGINT', () => shutdown('SIGINT'));
 
+        // Process-level crash listeners
+        process.on('unhandledRejection', (reason, promise) => {
+            logger.fatal({
+                module: 'Server',
+                operation: 'CRASH_PREVENTION',
+                err: reason,
+                context: { promise }
+            }, 'Unhandled Rejection at Promise');
+            // Trace context might not be available here, but logger.fatal uses the base logger.
+        });
+
+        process.on('uncaughtException', (error) => {
+            logger.fatal({
+                module: 'Server',
+                operation: 'CRASH_PREVENTION',
+                err: error
+            }, 'Uncaught Exception thrown');
+
+            // For uncaught exceptions, we should probably shutdown because the process state might be corrupted
+            shutdown('UNCAUGHT_EXCEPTION');
+        });
+
     } catch (error) {
         console.error('Failed to initialize server:', error);
         logger.fatal({ err: error }, 'Failed to initialize server');

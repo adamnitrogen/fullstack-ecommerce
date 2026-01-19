@@ -1,10 +1,9 @@
 import { ApiErrorResponse } from "@/types";
-import { AxiosError } from "axios";
+import axios, { AxiosError } from "axios";
 
 export function getApiError(error: unknown): ApiErrorResponse | undefined {
-    if (error && typeof error === 'object' && 'response' in error) {
-        const axiosError = error as AxiosError<ApiErrorResponse>;
-        return axiosError.response?.data;
+    if (axios.isAxiosError(error)) {
+        return error.response?.data as ApiErrorResponse;
     }
     return undefined;
 }
@@ -28,18 +27,37 @@ export function getErrorDetails(error: unknown): Array<{ path: string[]; message
     const apiError = getApiError(error);
     // Support both 'details' (new structure) and direct 'details' from error object (legacy/Supabase)
     if (apiError?.details && Array.isArray(apiError.details)) {
-        // Map our ApiErrorResponse details (field/message) to a standard path/message if needed,
-        // or just return as is if the component expects field/message.
-        // Looking at Auth.tsx, it expects path/message.
         return apiError.details.map(d => ({
             path: [d.field],
             message: d.message
         }));
     }
 
-    if (error && typeof error === 'object' && 'details' in error && Array.isArray((error as { details: unknown[] }).details)) {
-        return (error as { details: Array<{ path: string[]; message: string }> }).details;
+    // Checking for raw details in the error object (e.g. from Supabase or custom errors)
+    if (error && typeof error === 'object' && 'details' in error) {
+        const potentialDetails = (error as any).details;
+        if (Array.isArray(potentialDetails)) {
+            return potentialDetails as Array<{ path: string[]; message: string }>;
+        }
     }
 
     return undefined;
+}
+
+export function isNetworkError(error: unknown): boolean {
+    if (axios.isAxiosError(error)) {
+        // Network errors (like connection refused, DNS fail) usually have no response
+        return !error.response && !!error.code && error.code !== 'ERR_CANCELED';
+    }
+    return false;
+}
+
+export function isNotFoundError(error: unknown): boolean {
+    const apiError = getApiError(error);
+    if (apiError?.status === 404) return true;
+
+    if (axios.isAxiosError(error)) {
+        return error.response?.status === 404;
+    }
+    return false;
 }

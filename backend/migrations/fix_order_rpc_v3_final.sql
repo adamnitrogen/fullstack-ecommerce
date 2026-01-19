@@ -1,7 +1,6 @@
--- Migration: Fix Order Transaction Function (Add payment_id AND Initial History Log)
--- Purpose: 
--- 1. Include payment_id when creating the order record
--- 2. Insert initial entry into order_status_history
+-- Migration: Fix Order Transaction RPC (V3 Final)
+-- Purpose: Fix mismatch between JSON keys (snake_case from JS) and SQL extraction regarding customer_name.
+-- Also ensure history is logged.
 
 CREATE OR REPLACE FUNCTION create_order_transactional(
     p_user_id UUID,
@@ -63,20 +62,20 @@ BEGIN
         p_user_id,
         v_order_number,
         p_payment_id,
-        p_order_data->>'customerName',
-        p_order_data->>'customerEmail',
-        p_order_data->>'customerPhone',
+        p_order_data->>'customer_name',  -- FIX: Read snake_case key
+        p_order_data->>'customer_email', -- FIX: Read snake_case key
+        p_order_data->>'customer_phone', -- FIX: Read snake_case key
         (p_order_data->>'shipping_address_id')::UUID,
         (p_order_data->>'billing_address_id')::UUID,
-        p_order_data->'shippingAddress',
+        p_order_data->'shipping_address', -- FIX: Read snake_case key
         p_order_items,
-        (p_order_data->>'totalAmount')::NUMERIC,
+        (p_order_data->>'total_amount')::NUMERIC, -- FIX: Read snake_case key
         (p_order_data->>'subtotal')::NUMERIC,
         p_order_data->>'coupon_code',
         (p_order_data->>'coupon_discount')::NUMERIC,
         (p_order_data->>'delivery_charge')::NUMERIC,
         COALESCE(p_order_data->>'status', 'pending'),
-        COALESCE(p_order_data->>'paymentStatus', 'paid'),
+        COALESCE(p_order_data->>'payment_status', 'paid'), -- FIX: Read snake_case key
         p_order_data->>'notes',
         NOW(),
         NOW()
@@ -104,7 +103,7 @@ BEGIN
         );
     END LOOP;
 
-    -- 3. LOG INITIAL HISTORY (New Step)
+    -- 3. LOG INITIAL HISTORY
     INSERT INTO order_status_history (
         order_id,
         status,
@@ -156,7 +155,7 @@ BEGIN
         END IF;
         
         UPDATE products 
-        SET inventory = inventory - v_quantity, "updatedAt" = NOW()
+        SET inventory = inventory - v_quantity, updated_at = NOW()
         WHERE id = v_product_id;
     END LOOP;
 

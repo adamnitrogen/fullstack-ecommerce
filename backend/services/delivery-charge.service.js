@@ -44,13 +44,15 @@ class DeliveryChargeService {
     static async getDeliveryConfig(productId, variantId = null) {
         try {
             // First, try to get variant-level config if variantId provided
-            if (variantId) {
-                const { data: variantConfig, error: variantError } = await supabase
+            if (variantId && variantId !== 'null' && variantId !== 'undefined') {
+                const { data: variantConfigs, error: variantError } = await supabase
                     .from('delivery_configs')
                     .select('*')
                     .eq('scope', 'VARIANT')
                     .eq('variant_id', variantId)
-                    .single();
+                    .limit(1);
+
+                const variantConfig = variantConfigs?.[0];
 
                 if (!variantError && variantConfig && variantConfig.is_active !== false) {
                     log.debug('DELIVERY_CONFIG', 'Using variant-level config', { variantId });
@@ -63,20 +65,24 @@ class DeliveryChargeService {
             }
 
             // Fall back to product-level config
-            const { data: productConfig, error: productError } = await supabase
-                .from('delivery_configs')
-                .select('*')
-                .eq('scope', 'PRODUCT')
-                .eq('product_id', productId)
-                .single();
+            if (productId && productId !== 'null' && productId !== 'undefined') {
+                const { data: productConfigs, error: productError } = await supabase
+                    .from('delivery_configs')
+                    .select('*')
+                    .eq('scope', 'PRODUCT')
+                    .eq('product_id', productId)
+                    .limit(1);
 
-            if (!productError && productConfig && productConfig.is_active !== false) {
-                log.debug('DELIVERY_CONFIG', 'Using product-level config', { productId });
-                return {
-                    ...productConfig,
-                    source: 'product',
-                    delivery_refund_policy: productConfig.delivery_refund_policy || 'REFUNDABLE'
-                };
+                const productConfig = productConfigs?.[0];
+
+                if (!productError && productConfig && productConfig.is_active !== false) {
+                    log.debug('DELIVERY_CONFIG', 'Using product-level config', { productId });
+                    return {
+                        ...productConfig,
+                        source: 'product',
+                        delivery_refund_policy: productConfig.delivery_refund_policy || 'REFUNDABLE'
+                    };
+                }
             }
 
             // No config found, use global defaults from Settings Service
