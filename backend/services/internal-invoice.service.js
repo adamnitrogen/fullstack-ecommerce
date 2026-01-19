@@ -188,13 +188,15 @@ class InternalInvoiceService {
         });
 
         // Delivery breakdown
+        // PARTIAL policy means delivery is refundable on return, so it should be on separate invoice
         let totalRefundableDelivery = 0;
         let totalRefundableDeliveryGst = 0;
         let deliveryGstRate = 0;
 
         order.items.forEach(item => {
             const snapshot = item.delivery_calculation_snapshot || {};
-            if (snapshot.delivery_refund_policy === 'REFUNDABLE') {
+            // Include both REFUNDABLE and PARTIAL policies
+            if (snapshot.delivery_refund_policy === 'REFUNDABLE' || snapshot.delivery_refund_policy === 'PARTIAL') {
                 totalRefundableDelivery += (item.delivery_charge || 0);
                 totalRefundableDeliveryGst += (item.delivery_gst || 0);
                 if (item.delivery_gst > 0 && !deliveryGstRate) {

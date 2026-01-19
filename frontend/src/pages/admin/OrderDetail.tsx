@@ -31,6 +31,7 @@ import { getErrorMessage } from "@/lib/errorUtils";
 import { CheckoutAddress, Order, Product, CartItem, OrderItem, ReturnRequest } from "@/types";
 import { TaxBreakdown } from "@/components/orders/TaxBreakdown";
 import { InvoiceActions } from "@/components/orders/InvoiceActions";
+import { RegenerateInvoiceButton } from "@/components/orders/RegenerateInvoiceButton";
 
 interface OrderStatusHistory {
     status: string;
@@ -254,21 +255,6 @@ export default function OrderDetail() {
         }
     };
 
-    const handleRetryInvoice = async () => {
-        try {
-            setUpdating(true);
-            toast.info("Retrying invoice generation...");
-            const response = await apiClient.post(`/invoices/orders/${id}/retry`, {});
-            if (response.data.success) {
-                toast.success("Invoice generated successfully");
-                fetchOrderDetail(); // Refresh
-            }
-        } catch (error) {
-            toast.error(getErrorMessage(error, "Failed to generate invoice"));
-        } finally {
-            setUpdating(false);
-        }
-    };
 
     if (loading) return <LoadingOverlay isLoading={true} message="Loading order details..." />;
     if (error) return (
@@ -905,18 +891,14 @@ export default function OrderDetail() {
                         role="admin"
                     />
 
-                    {!order.invoice_url && order.payment_status === 'paid' && (
+                    {order.payment_status === 'paid' && (
                         <Card>
                             <CardContent className="pt-6">
-                                <Button
-                                    variant="outline"
+                                <RegenerateInvoiceButton
+                                    orderId={order.id}
+                                    onSuccess={fetchOrderDetail}
                                     className="w-full"
-                                    onClick={handleRetryInvoice}
-                                    disabled={updating}
-                                >
-                                    <FileText className="mr-2 h-4 w-4" />
-                                    Generate / Retry Invoice
-                                </Button>
+                                />
                             </CardContent>
                         </Card>
                     )}

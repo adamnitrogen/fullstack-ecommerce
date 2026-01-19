@@ -66,4 +66,32 @@ router.get('/:id/download', requireAuth, async (req, res) => {
     }
 });
 
+/**
+ * Regenerate Order Invoice
+ * POST /api/invoices/orders/:id/retry
+ */
+router.post('/orders/:id/retry', requireAuth, async (req, res) => {
+    try {
+        const orderId = req.params.id;
+        const isAdmin = req.user.roles?.includes('admin') || req.user.role === 'admin';
+        const isManager = req.user.roles?.includes('manager') || req.user.role === 'manager';
+
+        if (!isAdmin && !isManager) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+
+        const { InvoiceOrchestrator } = require('../services/invoice-orchestrator.service');
+        const result = await InvoiceOrchestrator.generateInternalInvoice(orderId);
+
+        if (result.success) {
+            res.json({ success: true, message: 'Invoice regenerated successfully', invoiceId: result.invoiceId });
+        } else {
+            res.status(500).json({ error: result.error || 'Failed to regenerate invoice' });
+        }
+    } catch (err) {
+        logger.error('Regenerate Invoice Error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 module.exports = router;
