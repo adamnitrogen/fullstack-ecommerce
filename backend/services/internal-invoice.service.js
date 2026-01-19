@@ -197,9 +197,20 @@ class InternalInvoiceService {
             const snapshot = item.delivery_calculation_snapshot || {};
             // Include both REFUNDABLE and PARTIAL policies
             if (snapshot.delivery_refund_policy === 'REFUNDABLE' || snapshot.delivery_refund_policy === 'PARTIAL') {
-                totalRefundableDelivery += (item.delivery_charge || 0);
-                totalRefundableDeliveryGst += (item.delivery_gst || 0);
-                if (item.delivery_gst > 0 && !deliveryGstRate) {
+                let charge = (item.delivery_charge || 0);
+                let gst = (item.delivery_gst || 0);
+
+                // For PARTIAL policies, we must subtract the non-refundable portion (Standard Delivery)
+                // that might be bundled into this item's base charge in the database.
+                if (snapshot.delivery_refund_policy === 'PARTIAL') {
+                    charge -= (snapshot.non_refundable_delivery_charge || 0);
+                    gst -= (snapshot.non_refundable_delivery_gst || 0);
+                }
+
+                totalRefundableDelivery += charge;
+                totalRefundableDeliveryGst += gst;
+
+                if (gst > 0 && !deliveryGstRate) {
                     deliveryGstRate = 18;
                 }
             }
