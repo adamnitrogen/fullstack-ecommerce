@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Eye, Search, Filter } from "lucide-react";
+import { Eye, Search, Filter, CreditCard } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
@@ -50,24 +50,25 @@ export default function OrdersManagement() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "all");
+  const [paymentFilter, setPaymentFilter] = useState(searchParams.get("payment_status") || "all");
   const initialLoadDone = useRef(false);
 
   // Sync status filter with URL on mount only if not already set
   useEffect(() => {
     if (!initialLoadDone.current) {
       const urlStatus = searchParams.get("status");
-      if (urlStatus && urlStatus !== statusFilter) {
-        setStatusFilter(urlStatus);
-      }
+      const urlPayment = searchParams.get("payment_status");
+      if (urlStatus && urlStatus !== statusFilter) setStatusFilter(urlStatus);
+      if (urlPayment && urlPayment !== paymentFilter) setPaymentFilter(urlPayment);
       initialLoadDone.current = true;
     }
-  }, [searchParams, statusFilter]);
+  }, [searchParams, statusFilter, paymentFilter]);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalOrders, setTotalOrders] = useState(0);
-  const ITEMS_PER_PAGE = 10;
+  const ITEMS_PER_PAGE = 20;
 
   const fetchOrders = useCallback(async (page = 1) => {
     try {
@@ -81,6 +82,7 @@ export default function OrdersManagement() {
 
       if (searchTerm) params.orderNumber = searchTerm;
       if (statusFilter !== 'all') params.status = statusFilter;
+      if (paymentFilter !== 'all') params.payment_status = paymentFilter;
 
       const response = await apiClient.get("/orders", { params });
       const result = response.data;
@@ -97,12 +99,12 @@ export default function OrdersManagement() {
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, statusFilter]);
+  }, [searchTerm, statusFilter, paymentFilter]);
 
   // Handle search and filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter]);
+  }, [searchTerm, statusFilter, paymentFilter]);
 
   // Fetch orders whenever page, search, or filter changes
   useEffect(() => {
@@ -111,7 +113,7 @@ export default function OrdersManagement() {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [currentPage, searchTerm, statusFilter, fetchOrders]);
+  }, [currentPage, searchTerm, statusFilter, paymentFilter, fetchOrders]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -168,14 +170,37 @@ export default function OrdersManagement() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="active_returns">Actionable Returns</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="confirmed">Confirmed</SelectItem>
             <SelectItem value="processing">Processing</SelectItem>
+            <SelectItem value="packed">Packed</SelectItem>
             <SelectItem value="shipped">Shipped</SelectItem>
+            <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
             <SelectItem value="delivered">Delivered</SelectItem>
-            <SelectItem value="active_returns">Actionable Returns</SelectItem>
             <SelectItem value="return_requested">Return Requested</SelectItem>
             <SelectItem value="return_approved">Return Approved</SelectItem>
+            <SelectItem value="return_rejected">Return Rejected</SelectItem>
+            <SelectItem value="partially_returned">Partially Returned</SelectItem>
+            <SelectItem value="returned">Returned</SelectItem>
+            <SelectItem value="refunded">Refunded</SelectItem>
             <SelectItem value="cancelled">Cancelled</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+          <SelectTrigger className="w-[180px]">
+            <CreditCard className="mr-2 h-4 w-4" />
+            <SelectValue placeholder="Payment Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Payments</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="paid">Paid</SelectItem>
+            <SelectItem value="failed">Failed</SelectItem>
+            <SelectItem value="refund_initiated">Refund Initiated</SelectItem>
+            <SelectItem value="partially_refunded">Partially Refunded</SelectItem>
+            <SelectItem value="refunded">Refunded</SelectItem>
           </SelectContent>
         </Select>
       </div>

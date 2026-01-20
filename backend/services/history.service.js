@@ -87,6 +87,9 @@ async function logStatusHistory(orderId, statusOrEventType, updatedBy, notes = '
         'refund_initiated': 'REFUND_INITIATED',
         'refunded': 'REFUND_COMPLETED',
         'partially_refunded': 'REFUND_PARTIAL',
+        'partially_returned': 'PARTIALLY_RETURNED',
+        'return_pickup_scheduled': 'PICKUP_SCHEDULED',
+        'return_picked_up': 'RETURN_PICKED_UP',
         'ITEM_RETURNED': 'ITEM_RETURNED',
         'PAYMENT_SUCCESS': 'PAYMENT_SUCCESS',
         'PAYMENT_FAILED': 'PAYMENT_FAILED'
