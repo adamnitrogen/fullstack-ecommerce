@@ -73,6 +73,7 @@ interface OrderResponse {
             size_value: number;
             unit: string;
             variant_image_url?: string;
+            gst_rate?: number;
         };
         size_label?: string;
         // Delivery snapshots
@@ -107,16 +108,14 @@ interface ReturnRequest {
     refund_amount: number;
     reason: string;
     created_at: string;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    refund_breakdown?: any;
+    refund_breakdown?: Record<string, unknown>;
     return_items: Array<{
         quantity: number;
         reason: string;
         order_item_id: string;
         order_items: {
             title: string;
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            variant_snapshot?: any;
+            variant_snapshot?: { size_label?: string; color_label?: string;[key: string]: unknown };
         }
     }>;
 }
@@ -128,8 +127,7 @@ interface ReturnableItem {
     remaining_quantity: number;
     return_days?: number;
     return_deadline?: string;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    variant_snapshot?: any;
+    variant_snapshot?: { size_label?: string; color_label?: string;[key: string]: unknown };
 }
 
 export default function UserOrderDetail() {
@@ -177,6 +175,15 @@ export default function UserOrderDetail() {
         }
     }, [id]);
 
+    const fetchReturnableItems = useCallback(async () => {
+        try {
+            const response = await apiClient.get(`/returns/orders/${id}/items`);
+            setReturnableItems(response.data);
+        } catch (error) {
+            logger.error("Failed to fetch returnable items", error);
+        }
+    }, [id]);
+
     const fetchOrderDetail = useCallback(async () => {
         try {
             setLoading(true);
@@ -191,13 +198,17 @@ export default function UserOrderDetail() {
         } finally {
             setLoading(false);
         }
-    }, [id, navigate, fetchReturns]);
+    }, [id, navigate, fetchReturns, fetchReturnableItems]);
 
     useEffect(() => {
         fetchOrderDetail();
     }, [fetchOrderDetail]);
 
     const handleCancelOrder = async () => {
+        if (!cancelReason || !cancelReason.trim()) {
+            toast.error("Please provide a reason for cancellation");
+            return;
+        }
         try {
             setLoadingMessage("Cancelling your order...");
             setActionLoading(true);
@@ -345,14 +356,7 @@ export default function UserOrderDetail() {
         }
     };
 
-    const fetchReturnableItems = async () => {
-        try {
-            const response = await apiClient.get(`/returns/orders/${id}/items`);
-            setReturnableItems(response.data);
-        } catch (error) {
-            logger.error("Failed to fetch returnable items", error);
-        }
-    };
+
 
     const handleCancelReturn = async (returnId: string) => {
         try {
@@ -477,7 +481,7 @@ export default function UserOrderDetail() {
                                         </DialogDescription>
                                     </DialogHeader>
                                     <div className="space-y-2 py-4">
-                                        <Label>Reason for cancellation (optional)</Label>
+                                        <Label>Reason for cancellation <span className="text-red-500">*</span></Label>
                                         <Textarea
                                             placeholder="Changed my mind, found better price, etc."
                                             value={cancelReason}
@@ -1189,8 +1193,29 @@ export default function UserOrderDetail() {
 
                             // Calculate expected total including delivery
                             const deliveryCharge = order.delivery_charge || 0;
-                            const deliveryGST = order.delivery_gst || 0;
                             const totalAmount = order.total_amount || 0;
+
+                            // Calculate effective delivery GST with fallbacks
+                            const itemizedDeliveryGST = (order.items || []).reduce((sum, item) => sum + (Number(item.delivery_gst) || 0), 0);
+                            let effectiveDeliveryGST = Number(order.delivery_gst) || itemizedDeliveryGST;
+
+                            // Last resort: implied tax if tax info missing but amounts suggest it
+                            if (effectiveDeliveryGST === 0 && deliveryCharge > 0) {
+                                // Estimate product tax
+                                const productTax = (order.items || []).reduce((sum, item) => {
+                                    const qty = item.quantity || 1;
+                                    const taxRate = item.variant?.gst_rate ?? item.gst_rate ?? item.product?.gst_rate ?? item.product?.default_gst_rate ?? 0;
+                                    const rawPrice = (item.price_per_unit || item.product?.price || 0) * qty;
+                                    const taxable = rawPrice / (1 + (taxRate / 100));
+                                    return sum + (rawPrice - taxable);
+                                }, 0);
+
+                                const totalRecordedTax = (order.total_cgst || 0) + (order.total_sgst || 0) + (order.total_igst || 0);
+                                const gap = totalRecordedTax - productTax;
+                                if (gap > 0 && gap < deliveryCharge) {
+                                    effectiveDeliveryGST = gap; // Assume gap is delivery tax
+                                }
+                            }
 
                             // Check mismatch (Legacy: storedSum ~= ProductTotal vs TotalAmount ~= ProductTotal + Delivery)
                             const isLegacyMismatch = Math.abs(totalAmount - storedSum) > 1.0;
@@ -1227,7 +1252,7 @@ export default function UserOrderDetail() {
                                     })()}
                                     items={order.items}
                                     deliveryCharge={deliveryCharge}
-                                    deliveryGST={deliveryGST}
+                                    deliveryGST={effectiveDeliveryGST}
                                     role="customer"
                                 />
                             );

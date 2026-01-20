@@ -123,6 +123,9 @@ export default function Checkout() {
         return;
       }
 
+      // If we are already in Buy Now mode (e.g. after state clear), don't fallback to cart
+      if (isBuyNow) return;
+
       // Check for Buy Now flow
       const state = location.state as BuyNowState | undefined;
       if (state?.buyNowItem) {
@@ -263,9 +266,11 @@ export default function Checkout() {
                 shipping_address_id: shippingAddress.id,
                 billing_address_id: billingSameAsShipping ? shippingAddress.id : billingAddress!.id,
               });
-              // Refresh cart only for regular checkout (not buy now)
-              await fetchCart();
             }
+
+
+            // Always refresh cart to reflect changes (Buy Now might remove items, Regular clears cart)
+            await fetchCart();
 
             if (result.success) {
               toast.success("Order placed successfully!");

@@ -456,7 +456,7 @@ async function getOrderById(id, user) {
             )
         `)
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
     if (error) throw error;
 

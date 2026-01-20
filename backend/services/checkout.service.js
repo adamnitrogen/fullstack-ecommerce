@@ -38,6 +38,81 @@ const razorpay = new Razorpay({
     key_secret: key_secret
 });
 
+
+/**
+ * Create a virtual cart for Buy Now, merging with user's existing cart items if present
+ */
+const createBuyNowVirtualCart = async (userId, guestId, buyNowData) => {
+    const { productId, variantId, quantity = 1 } = buyNowData;
+
+    // 1. Fetch Product & Variant Details
+    const { data: product } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', productId)
+        .single();
+
+    if (!product) {
+        const error = new Error('Product not found or no longer available');
+        error.status = 404;
+        throw error;
+    }
+
+    let variant = null;
+    if (variantId) {
+        const { data: v } = await supabase
+            .from('product_variants')
+            .select('*')
+            .eq('id', variantId)
+            .single();
+        variant = v;
+        if (!variant) {
+            const error = new Error('Selected variant not found or no longer available');
+            error.status = 404;
+            throw error;
+        }
+    }
+
+    // 2. Check for matching item in User's Cart to Merge Quantity
+    let finalQuantity = quantity;
+    if (userId || guestId) {
+        try {
+            const cart = await getUserCart(userId, guestId);
+            if (cart && cart.cart_items) {
+                const matchingItem = cart.cart_items.find(item =>
+                    item.product_id === productId &&
+                    (item.variant_id === variantId || (!item.variant_id && !variantId))
+                );
+
+                if (matchingItem) {
+                    finalQuantity += matchingItem.quantity;
+                    log.info({ userId, productId, originalQty: quantity, addedQty: matchingItem.quantity }, 'Merged Buy Now quantity with existing cart item');
+                }
+            }
+        } catch (error) {
+            log.warn({ err: error }, 'Failed to check user cart for merging Buy Now quantity (Non-critical)');
+        }
+    }
+
+    // 3. Construct Virtual Cart
+    return {
+        id: 'buy-now-virtual', // Use null when creating order to prevent DB updates
+        user_id: userId,
+        guest_id: guestId,
+        applied_coupon_code: null,
+        cart_items: [
+            {
+                product_id: productId,
+                variant_id: variantId || (variant ? variant.id : null),
+                quantity: finalQuantity,
+                products: product,
+                product_variants: variant,
+                id: `buynow-${productId}-${variantId || 'def'}`
+            }
+        ]
+    };
+};
+
 // Get checkout summary (cart + addresses + totals + tax)
 const getCheckoutSummary = async (userId, addressId = null) => {
     // Get cart with totals
@@ -1316,40 +1391,9 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
     }
 
     try {
-        // 1. Fetch Product & Variant Details
-        const { data: product } = await supabase
-            .from('products')
-            .select('*')
-            .eq('id', productId)
-            .single();
-
-        if (!product) throw new Error('Product not found');
-
-        let variant = null;
-        if (variantId) {
-            const { data: v } = await supabase
-                .from('product_variants')
-                .select('*')
-                .eq('id', variantId)
-                .single();
-            variant = v;
-        }
-
-        // 2. Construct Virtual Cart
-        const virtualCart = {
-            id: null, // Indicates virtual cart to createOrder
-            user_id: userId,
-            applied_coupon_code: null,
-            cart_items: [
-                {
-                    product_id: productId,
-                    variant_id: variantId || (variant ? variant.id : null),
-                    quantity: quantity,
-                    products: product,
-                    product_variants: variant
-                }
-            ]
-        };
+        // 2. Construct Virtual Cart (Merged with existing cart item if present)
+        const virtualCart = await createBuyNowVirtualCart(userId, null, { productId, variantId, quantity });
+        virtualCart.id = null; // Explicitly set to null for createOrder to treat it as virtual (no DB updates)
 
         // 3. Reuse standard createOrder logic
         // We need to fetch the invoice_id from the payment record if it exists
@@ -1433,49 +1477,8 @@ const getBuyNowSummary = async (userId, buyNowData, addressId = null) => {
         const cartService = require('./cart.service');
         const addressService = require('./address.service');
 
-        // 1. Fetch Product & Variant
-        const { data: product } = await supabase
-            .from('products')
-            .select('*')
-            .eq('id', productId)
-            .single();
-
-        if (!product) {
-            const error = new Error('This product is no longer available.');
-            error.status = 404;
-            throw error;
-        }
-
-        let variant = null;
-        if (variantId) {
-            const { data: v } = await supabase
-                .from('product_variants')
-                .select('*')
-                .eq('id', variantId)
-                .single();
-            variant = v;
-            if (!variant) {
-                const error = new Error('The selected variant is no longer available.');
-                error.status = 404;
-                throw error;
-            }
-        }
-
-        // 2. Build mock cart item for UI compatibility
-        const mockCartItem = {
-            id: `buynow-${productId}-${variantId || 'default'}`,
-            product_id: productId,
-            variant_id: variantId,
-            quantity,
-            products: product,
-            product_variants: variant
-        };
-
-        const virtualCart = {
-            id: 'buy-now',
-            user_id: userId,
-            cart_items: [mockCartItem]
-        };
+        // 2. Build mock cart using helper (merges quantity)
+        const virtualCart = await createBuyNowVirtualCart(userId, null, { productId, variantId, quantity });
 
         // 3. Calculate totals using standard service
         const totals = await cartService.calculateCartTotals(userId, null, virtualCart);
