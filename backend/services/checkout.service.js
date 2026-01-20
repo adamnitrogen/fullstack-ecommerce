@@ -4,7 +4,7 @@ const { createModuleLogger } = require('../utils/logging-standards');
 const { getTraceContext } = require('../utils/async-context');
 const crypto = require('crypto');
 const supabase = require('../config/supabase');
-const { calculateCartTotals, getUserCart } = require('./cart.service');
+const { calculateCartTotals, getUserCart, removeFromCart } = require('./cart.service');
 const { getPrimaryAddress, getLatestAddress, getAddressById } = require('./address.service');
 const { checkStockAvailability, decreaseInventory } = require('./inventory.service');
 const emailService = require('./email');
@@ -1376,6 +1376,17 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
             },
             virtualCart
         );
+
+
+        // 4. CLEANUP: Remove the purchased item from cart if it exists
+        if (userId) {
+            try {
+                await removeFromCart(userId, null, productId, variantId);
+                log.info('BUY_NOW_CART_CLEANUP', 'Removed purchased Buy Now item from cart', { productId, variantId });
+            } catch (cleanupError) {
+                log.warn({ err: cleanupError }, 'Failed to remove Buy Now item from cart (Non-critical)');
+            }
+        }
 
         log.info('BUY_NOW_SUCCESS', 'Buy Now order created successfully', { orderId: order.id });
 
