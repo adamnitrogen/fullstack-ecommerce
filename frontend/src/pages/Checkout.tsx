@@ -209,7 +209,11 @@ export default function Checkout() {
         if (isBuyNow && buyNowData) {
           orderData = await checkoutService.createPaymentOrderForBuyNow(buyNowData);
         } else {
-          orderData = await checkoutService.createPaymentOrder(summary.totals.finalAmount);
+          // PHASE 3A: Pass profile from summary to avoid duplicate fetch
+          orderData = await checkoutService.createPaymentOrder(
+            summary.totals.finalAmount,
+            summary.user_profile
+          );
         }
       } catch (error: any) {
         // Handle inline stock validation failures from payment creation

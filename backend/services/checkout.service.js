@@ -99,12 +99,20 @@ const createBuyNowVirtualCart = async (userId, guestId, buyNowData) => {
     };
 };
 
-// Get checkout summary (cart + addresses + totals + tax)
+// Get checkout summary (cart + addresses + totals + tax + profile)
+// PHASE 3A: Now includes user_profile to eliminate duplicate fetch in payment creation
 const getCheckoutSummary = async (userId, addressId = null) => {
     // Get cart with totals
     const cart = await getUserCart(userId);
     // PERFORMANCE: Pass existing cart to avoid refetching in calculateCartTotals
     const totals = await calculateCartTotals(userId, null, cart);
+
+    // PHASE 3A OPTIMIZATION: Fetch user profile once (eliminates duplicate fetch in payment endpoint)
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
     // Get shipping address
     let shippingAddress = null;
@@ -175,6 +183,7 @@ const getCheckoutSummary = async (userId, addressId = null) => {
         totals,
         shipping_address: shippingAddress,
         billing_address: billingAddress,
+        user_profile: profile, // PHASE 3A: Include profile in summary
         tax: taxResult ? {
             ...taxResult.summary,
             items: taxResult.items.map(item => ({
@@ -1450,8 +1459,19 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
 const getBuyNowSummary = async (userId, buyNowData, addressId = null) => {
     try {
         const { productId, variantId, quantity = 1 } = buyNowData;
-        // 3. Calculate totals using standard service
+
+        // 1. Create virtual cart
+        const virtualCart = await createBuyNowVirtualCart(userId, null, buyNowData);
+
+        // 2. Calculate totals using standard service
         const totals = await calculateCartTotals(userId, null, virtualCart);
+
+        // 3. PHASE 3A OPTIMIZATION: Fetch user profile once
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
 
         // 4. Fetch addresses
         const addresses = await getUserAddresses(userId);
@@ -1470,6 +1490,7 @@ const getBuyNowSummary = async (userId, buyNowData, addressId = null) => {
             totals,
             shipping_address,
             billing_address: shipping_address, // Default billing to shipping
+            user_profile: profile, // PHASE 3A: Include profile
             isBuyNow: true
         };
     } catch (error) {

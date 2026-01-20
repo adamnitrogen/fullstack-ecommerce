@@ -476,12 +476,8 @@ router.post('/buy-now/create-payment-order', requestLock('create-payment-order')
         const summary = await getBuyNowSummary(userId, { productId, variantId, quantity });
         const amount = summary.totals.finalAmount;
 
-        // Get User Profile
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', userId)
-            .single();
+        // PHASE 3A OPTIMIZATION: Use profile from summary (eliminates duplicate fetch)
+        const profile = summary.user_profile;
 
         if (!profile) {
             return res.status(404).json({ error: 'Please complete your profile to continue with the purchase.' });

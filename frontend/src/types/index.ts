@@ -626,6 +626,7 @@ export interface CheckoutSummary {
   shipping_address?: CheckoutAddress;
   billing_address?: CheckoutAddress;
   razorpay_key_id?: string; // PHASE 2B: Razorpay key for optimization
+  user_profile?: any; // PHASE 3A: User profile for optimization
 }
 
 export interface RazorpayOrderResponse {
