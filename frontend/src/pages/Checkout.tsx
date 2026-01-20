@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { BackButton } from "@/components/ui/BackButton";
-import favicon from "@/assets/favicon.png";
+
 
 // Type for Buy Now navigation state
 interface BuyNowState {
@@ -252,7 +252,7 @@ export default function Checkout() {
         currency: orderData.currency,
         name: "MeriGauMata",
         description: isBuyNow ? "Buy Now Order" : "Order Payment",
-        image: favicon,
+        image: "/favicon.ico",
         order_id: orderData.order_id,
         handler: async function (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) {
           // Show full screen loader during verification
