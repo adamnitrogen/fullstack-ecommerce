@@ -276,7 +276,7 @@ export default function OrderDetail() {
 
         try {
             setUpdating(true);
-            setLoadingMessage("Updating status...");
+            setLoadingMessage("Updating order status...");
 
             // SPECIAL LOGIC: Return Approval/Rejection
             // (Compatibility fallback for old single active return logic)
@@ -325,7 +325,8 @@ export default function OrderDetail() {
 
         try {
             setUpdating(true);
-            setLoadingMessage(`${action.replace('_', ' ')} logic...`);
+            const friendlyAction = action === 'approve' ? 'Approving return' : action === 'reject' ? 'Rejecting return' : 'Marking as picked up';
+            setLoadingMessage(`${friendlyAction}...`);
 
             if (action === 'picked_up') {
                 await apiClient.post(`/returns/${returnId}/status`, { status: 'picked_up', notes });
@@ -352,7 +353,7 @@ export default function OrderDetail() {
     const handleReturnItemStatus = async (item: ReturnRequestItem, status: string) => {
         try {
             setUpdating(true);
-            setLoadingMessage(`Updating item status to ${status}...`);
+            setLoadingMessage(`Marking item as ${status.replace('_', ' ')}...`);
 
             await apiClient.post(`/returns/items/${item.id}/status`, { status });
             toast.success(`Item marked as ${status.replace('_', ' ')}`);
@@ -368,7 +369,7 @@ export default function OrderDetail() {
     };
 
 
-    if (loading) return <LoadingOverlay isLoading={true} message="Loading order details..." />;
+    if (loading) return <LoadingOverlay isLoading={true} message="Loading order information..." />;
     if (error) return (
         <div className="flex flex-col items-center justify-center p-8 text-center text-red-600">
             <p className="text-lg font-semibold mb-2">Error</p>

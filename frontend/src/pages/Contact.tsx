@@ -160,7 +160,7 @@ export default function Contact() {
   };
 
   if (isLoadingFAQs || isLoadingSocial || isLoadingContact) {
-    return <LoadingOverlay isLoading={true} message="Loading contact information..." />;
+    return <LoadingOverlay isLoading={true} message="Getting contact details..." />;
   }
 
   const primaryPhone = contactInfo?.phones.find(p => p.is_primary) || contactInfo?.phones[0];

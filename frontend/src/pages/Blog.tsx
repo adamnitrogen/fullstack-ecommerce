@@ -99,7 +99,7 @@ export default function Blog() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background relative">
-        <LoadingOverlay message="Loading blogs..." isLoading={true} />
+        <LoadingOverlay message="Curating Latest Stories..." isLoading={true} />
       </div>
     );
   }

@@ -486,7 +486,7 @@ export default function ProductsManagement() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="text-center py-12">Loading...</div>
+            <div className="text-center py-12">Loading products...</div>
           ) : !data?.products || data.products.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />

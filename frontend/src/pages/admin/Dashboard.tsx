@@ -187,7 +187,7 @@ export default function AdminDashboard() {
   }
 
   if (isStatsLoading) {
-    return <LoadingOverlay isLoading={true} message="Loading dashboard data..." />;
+    return <LoadingOverlay isLoading={true} message="Loading dashboard..." />;
   }
 
   return (
@@ -422,12 +422,12 @@ export default function AdminDashboard() {
         <CardContent className="relative">
           {/* Table Loading Overlay - Only on pagination/search (placeholder data) */}
           {(isOrdersFetching && !isOrdersLoading) && (
-            <LoadingOverlayRelative isLoading={true} message="Updating orders..." className="z-10 bg-white/40 backdrop-blur-[1px]" />
+            <LoadingOverlayRelative isLoading={true} message="Syncing orders..." className="z-10 bg-white/40 backdrop-blur-[1px]" />
           )}
 
           {isOrdersLoading ? (
             <div className="h-48 flex items-center justify-center">
-              <LoadingOverlayRelative isLoading={true} message="Loading orders..." />
+              <LoadingOverlayRelative isLoading={true} message="Loading order details..." />
             </div>
           ) : (
             <div className="rounded-xl border border-border/50 bg-white overflow-hidden">
@@ -471,7 +471,7 @@ export default function AdminDashboard() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right font-bold text-[#2C1810]">
-                          ₹{order.total_amount || order.total}
+                          ₹{(order.total_amount ?? order.total ?? 0).toFixed(2)}
                         </TableCell>
                       </TableRow>
                     ))

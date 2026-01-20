@@ -29,7 +29,7 @@ export function ProtectedRoute({
 
     // Show loading while auth is initializing
     if (!isInitialized) {
-        return <LoadingOverlay isLoading={true} message="Checking authentication..." />;
+        return <LoadingOverlay isLoading={true} message="Just a moment..." />;
     }
 
     // Check if authentication is required

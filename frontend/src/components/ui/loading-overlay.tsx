@@ -16,7 +16,7 @@ interface LoadingOverlayProps {
  */
 export function LoadingOverlay({
     isLoading,
-    message = "Please wait...",
+    message = "Just a moment...",
     className
 }: LoadingOverlayProps) {
     if (!isLoading) return null;
@@ -44,7 +44,7 @@ export function LoadingOverlay({
  */
 export function LoadingOverlayRelative({
     isLoading,
-    message = "Loading...",
+    message = "Just a moment...",
     className
 }: LoadingOverlayProps) {
     if (!isLoading) return null;

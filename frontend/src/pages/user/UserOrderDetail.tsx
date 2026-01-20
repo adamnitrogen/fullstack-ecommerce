@@ -279,7 +279,7 @@ export default function UserOrderDetail() {
                 }
             }
 
-            setLoadingMessage("Uploading images and submitting request...");
+            setLoadingMessage("Submitting your return request...");
             setActionLoading(true);
             setReturnOpen(false);
 
@@ -360,7 +360,7 @@ export default function UserOrderDetail() {
 
     const handleCancelReturn = async (returnId: string) => {
         try {
-            setLoadingMessage("Cancelling return request...");
+            setLoadingMessage("Cancelling your return request...");
             setActionLoading(true);
             await apiClient.post(`/returns/${returnId}/cancel`);
             toast.success("Return request cancelled");
@@ -375,7 +375,7 @@ export default function UserOrderDetail() {
 
     if (loading) return (
         <div className="min-h-screen flex items-center justify-center">
-            <LoadingOverlay isLoading={true} message="Loading order details..." />
+            <LoadingOverlay isLoading={true} message="Getting your order details..." />
         </div>
     );
     if (!order) return <div className="p-8 text-center">Order not found</div>;

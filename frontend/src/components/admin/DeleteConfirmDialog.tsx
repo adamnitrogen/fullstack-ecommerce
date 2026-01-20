@@ -32,7 +32,7 @@ export function DeleteConfirmDialog({
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
-        <LoadingOverlay isLoading={isLoading} message="Deleting..." />
+        <LoadingOverlay isLoading={isLoading} message="Removing..." />
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
@@ -47,7 +47,7 @@ export function DeleteConfirmDialog({
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Deleting...
+                Removing...
               </>
             ) : (
               'Delete'

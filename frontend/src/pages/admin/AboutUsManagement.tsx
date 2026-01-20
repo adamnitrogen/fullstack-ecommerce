@@ -211,7 +211,7 @@ export default function AboutUsManagement() {
   };
 
   if (!aboutContent) {
-    return <div>Loading...</div>;
+    return <div>Loading content...</div>;
   }
 
   // Ensure sectionVisibility exists with defaults

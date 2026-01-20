@@ -56,7 +56,7 @@ export default function BlogPost() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#FAF7F2] relative">
-        <LoadingOverlay message="Loading blog post..." isLoading={true} />
+        <LoadingOverlay message="Just a moment..." isLoading={true} />
       </div>
     );
   }

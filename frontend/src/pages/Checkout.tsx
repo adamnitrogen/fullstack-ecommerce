@@ -354,7 +354,7 @@ export default function Checkout() {
   };
 
   if (loading && !summary) {
-    return <LoadingOverlay isLoading={true} message="Loading checkout details..." />;
+    return <LoadingOverlay isLoading={true} message="Preparing your checkout..." />;
   }
 
   if (!summary) return null;
@@ -363,7 +363,7 @@ export default function Checkout() {
     <div className="min-h-screen bg-background pb-20">
       <LoadingOverlay
         isLoading={processing && loading}
-        message="Verifying payment and creating order..."
+        message="Placing your order..."
       />
 
       {/* Compact Premium Hero Section */}

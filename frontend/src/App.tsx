@@ -148,7 +148,7 @@ const App = () => {
             <CookieConsent />
             <ForceChangePasswordDialog />
             <ReactivationModal />
-            <Suspense fallback={<LoadingOverlay isLoading={true} message="Loading..." />}>
+            <Suspense fallback={<LoadingOverlay isLoading={true} message="Just a moment..." />}>
               <Routes>
                 <Route element={<MainLayout />}>
                   <Route path="/" element={<Index />} />

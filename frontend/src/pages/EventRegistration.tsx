@@ -88,7 +88,7 @@ const EventRegistration = () => {
 
   // Early return for loading state
   if (isLoading) {
-    return <LoadingOverlay isLoading={true} message="Loading event details..." />;
+    return <LoadingOverlay isLoading={true} message="Getting event details..." />;
   }
 
   // Early return if event not found

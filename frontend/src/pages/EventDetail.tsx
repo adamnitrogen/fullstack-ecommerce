@@ -44,7 +44,7 @@ const EventDetail = () => {
   };
 
   if (isLoading) {
-    return <LoadingOverlay isLoading={true} message="Loading event details..." />;
+    return <LoadingOverlay isLoading={true} message="Getting event details..." />;
   }
 
   if (!event) {

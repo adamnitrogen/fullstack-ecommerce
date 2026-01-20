@@ -412,7 +412,7 @@ export function ProductDialog({
         {/* Loading Overlay for Save Operations */}
         <LoadingOverlay
           isLoading={isSaving}
-          message={product ? "Updating product..." : "Creating product..."}
+          message={product ? "Saving product changes..." : "Creating new product..."}
         />
 
         <ScrollArea className="max-h-[calc(90vh-120px)] pr-4">

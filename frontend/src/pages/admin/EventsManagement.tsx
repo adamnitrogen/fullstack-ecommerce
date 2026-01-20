@@ -296,7 +296,7 @@ export default function EventsManagement() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="text-center py-12">Loading...</div>
+            <div className="text-center py-12">Loading event records...</div>
           ) : !data?.events || data.events.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />

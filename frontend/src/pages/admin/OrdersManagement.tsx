@@ -151,7 +151,7 @@ export default function OrdersManagement() {
         </div>
       </div>
 
-      <LoadingOverlay isLoading={loading} message="Loading orders..." />
+      <LoadingOverlay isLoading={loading} message="Getting order records..." />
 
       <div className="flex gap-4 items-center bg-card p-4 rounded-lg border shadow-sm">
         <div className="relative flex-1 max-w-sm">

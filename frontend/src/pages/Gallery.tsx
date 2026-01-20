@@ -52,7 +52,7 @@ export default function Gallery() {
   if (loadingFolders) {
     return (
       <div className="min-h-screen bg-background relative">
-        <LoadingOverlay message="Loading gallery..." isLoading={true} />
+        <LoadingOverlay message="Unveiling Sacred Moments..." isLoading={true} />
       </div>
     );
   }

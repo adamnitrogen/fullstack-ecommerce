@@ -63,7 +63,7 @@ export default function FAQ() {
   });
 
   if (isLoading) {
-    return <LoadingOverlay isLoading={true} message="Loading questions..." />;
+    return <LoadingOverlay isLoading={true} message="Just a moment..." />;
   }
 
   const primaryPhone = contactInfo?.phones.find(p => p.is_primary) || contactInfo?.phones[0];

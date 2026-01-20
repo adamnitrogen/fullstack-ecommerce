@@ -179,7 +179,7 @@ export default function CategoriesManagement() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="text-center py-12">Loading...</div>
+            <div className="text-center py-12">Loading categories...</div>
           ) : categories.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Folder className="h-12 w-12 mx-auto mb-4 opacity-50" />

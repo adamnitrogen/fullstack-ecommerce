@@ -275,7 +275,7 @@ export function LoginForm({
           size="lg"
           disabled={isLoading}
         >
-          {isLoading ? "Please wait..." : (showOtp ? "Verify & Login" : (showPasswordField ? "Sign In" : "Continue"))}
+          {isLoading ? "Signing you in..." : (showOtp ? "Verify & Login" : (showPasswordField ? "Sign In" : "Continue"))}
         </Button>
       </form>
 

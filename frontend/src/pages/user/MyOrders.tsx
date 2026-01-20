@@ -273,7 +273,7 @@ export default function MyOrders() {
                                             <TableCell className="py-6">
                                                 <span className="text-sm font-medium text-muted-foreground">
                                                     {(() => {
-                                                        const dateStr = order.createdAt || order.created_at || "";
+                                                        const dateStr = order.created_at || "";
                                                         const date = dateStr ? new Date(dateStr) : new Date();
                                                         return !isNaN(date.getTime()) ? format(date, "MMM d, yyyy") : "N/A";
                                                     })()}
@@ -287,13 +287,13 @@ export default function MyOrders() {
                                             <TableCell className="py-6">
                                                 <div className="flex items-center gap-1.5">
                                                     <Badge variant="secondary" className="rounded-full bg-[#2C1810]/5 text-[#2C1810] hover:bg-[#2C1810]/5 font-bold text-[10px] tracking-widest py-0.5 px-2 uppercase shadow-none border-none">
-                                                        {order.paymentStatus || order.payment_status}
+                                                        {order.payment_status}
                                                     </Badge>
                                                 </div>
                                             </TableCell>
                                             <TableCell className="py-6 text-right">
                                                 <span className="text-sm font-bold text-[#2C1810]">
-                                                    ₹{(order.total || order.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                                    ₹{(order.total_amount ?? order.total ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </span>
                                             </TableCell>
                                             <TableCell className="py-6 text-right pr-8">

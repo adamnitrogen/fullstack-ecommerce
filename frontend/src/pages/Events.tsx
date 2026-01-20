@@ -112,7 +112,7 @@ export default function Events() {
     if (isLoading) {
       return (
         <div className="min-h-[400px] relative">
-          <LoadingOverlay message="Loading events..." isLoading={true} />
+          <LoadingOverlay message="Gathering Sacred Events..." isLoading={true} />
         </div>
       );
     }

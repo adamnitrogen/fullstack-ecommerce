@@ -268,14 +268,14 @@ export default function Profile() {
     deleteAvatarMutation.isPending;
 
   const actionMessage =
-    addAddressMutation.isPending ? "Creating new sanctuary..." :
-      updateAddressMutation.isPending ? "Updating your sanctuary..." :
-        deleteAddressMutation.isPending ? "Removing sanctuary..." :
-          setPrimaryMutation.isPending ? "Setting primary sanctuary..." :
-            updateProfileMutation.isPending ? "Saving profile changes..." :
-              uploadAvatarMutation.isPending ? "Updating profile picture..." :
-                deleteAvatarMutation.isPending ? "Removing profile picture..." :
-                  "Loading...";
+    addAddressMutation.isPending ? "Adding your new address..." :
+      updateAddressMutation.isPending ? "Updating your address..." :
+        deleteAddressMutation.isPending ? "Removing address..." :
+          setPrimaryMutation.isPending ? "Setting your primary address..." :
+            updateProfileMutation.isPending ? "Saving your profile changes..." :
+              uploadAvatarMutation.isPending ? "Updating your profile picture..." :
+                deleteAvatarMutation.isPending ? "Removing your profile picture..." :
+                  "Just a moment...";
 
   return (
     <div className="min-h-screen bg-background text-foreground">

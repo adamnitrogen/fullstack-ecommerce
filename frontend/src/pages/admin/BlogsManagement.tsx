@@ -246,7 +246,7 @@ export default function BlogsManagement() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="text-center py-12">Loading...</div>
+            <div className="text-center py-12">Loading blog posts...</div>
           ) : blogs.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />

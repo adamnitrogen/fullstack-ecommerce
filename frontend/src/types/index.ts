@@ -274,6 +274,7 @@ export interface Order {
   customer_phone?: string;
   items: CartItem[] | OrderItem[];
   total_amount: number;
+  total?: number;
   status: OrderStatus;
   shipping_address: Address;
   billing_address?: Address;

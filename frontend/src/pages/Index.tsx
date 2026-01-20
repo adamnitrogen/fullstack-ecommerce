@@ -164,7 +164,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen">
-      <LoadingOverlay isLoading={isLoading} message="Loading..." />
+      <LoadingOverlay isLoading={isLoading} message="Just a moment..." />
       <ProductQuickView
         product={quickViewProduct}
         open={quickViewProduct !== null}

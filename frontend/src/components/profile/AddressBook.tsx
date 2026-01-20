@@ -71,7 +71,7 @@ export function AddressBook() {
   const handleDeleteAddress = async (addressId: string) => {
     try {
       setActionLoading(true);
-      setActionMessage("Deleting address...");
+      setActionMessage("Removing address...");
       await addressService.deleteAddress(addressId);
       toast.success("Address deleted successfully");
       fetchAddresses();
@@ -86,7 +86,7 @@ export function AddressBook() {
   const handleSaveAddress = async (addressData: Address) => {
     try {
       setActionLoading(true);
-      setActionMessage(editingAddress ? "Updating address..." : "Creating new address...");
+      setActionMessage(editingAddress ? "Updating your address..." : "Saving your new address...");
 
       const payload = {
         id: addressData.id,
@@ -122,7 +122,7 @@ export function AddressBook() {
   const handleSetDefault = async (addressId: string, type: 'home' | 'work' | 'other') => {
     try {
       setActionLoading(true);
-      setActionMessage("Setting primary address...");
+      setActionMessage("Setting your primary address...");
       await addressService.setPrimary(addressId, type);
       toast.success("Primary address updated");
       fetchAddresses();
@@ -136,7 +136,7 @@ export function AddressBook() {
 
   return (
     <div className="space-y-4 relative min-h-[200px]">
-      <LoadingOverlay isLoading={loading || actionLoading} message={actionLoading ? actionMessage : "Loading addresses..."} />
+      <LoadingOverlay isLoading={loading || actionLoading} message={actionLoading ? actionMessage : "Getting your addresses..."} />
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">

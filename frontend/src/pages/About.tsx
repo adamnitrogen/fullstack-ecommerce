@@ -53,7 +53,7 @@ export default function About() {
   });
 
   if (isLoading || !aboutContent) {
-    return <LoadingOverlay message="Loading about us content..." isLoading={true} />;
+    return <LoadingOverlay message="Just a moment..." isLoading={true} />;
   }
 
   const visibility = aboutContent.sectionVisibility || {
