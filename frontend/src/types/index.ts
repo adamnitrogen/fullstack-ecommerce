@@ -268,6 +268,7 @@ export interface Invoice {
 export interface Order {
   id: string;
   user_id: string;
+  userId?: string; // Alias for user_id
   order_number?: string;
   customer_name?: string;
   customer_email?: string;
@@ -277,21 +278,33 @@ export interface Order {
   total?: number;
   status: OrderStatus;
   shipping_address: Address;
+  shippingAddress?: Address; // Alias for shipping_address
   billing_address?: Address;
+  billingAddress?: Address; // Alias for billing_address
   payment_status: "pending" | "paid" | "failed" | "refunded" | "partially_refunded" | "refund_initiated";
+  paymentStatus?: "pending" | "paid" | "failed" | "refunded" | "partially_refunded" | "refund_initiated"; // Alias
   created_at: string;
+  createdAt?: string; // Alias for created_at
   updated_at?: string;
+  updatedAt?: string; // Alias for updated_at
   invoice_url?: string;
   invoices?: Invoice[];
   coupon_discount?: number;
   // Cancel/Return request details
   cancel_reason?: string;
+  cancelReason?: string; // Alias
   cancel_comments?: string;
+  cancelComments?: string; // Alias
   cancel_requested_at?: string;
+  cancelRequestedAt?: string; // Alias
   return_reason?: string;
+  returnReason?: string; // Alias
   return_issue?: string;
+  returnIssue?: string; // Alias
   return_images?: string[];
+  returnImages?: string[]; // Alias
   return_requested_at?: string;
+  returnRequestedAt?: string; // Alias
 }
 
 export interface GalleryImage {

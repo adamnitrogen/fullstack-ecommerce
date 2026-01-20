@@ -78,63 +78,19 @@ export default function OrdersManagement() {
   const [activeReturnRequest, setActiveReturnRequest] = useState<ReturnRequest | null>(null);
   const [returnDetailsLoading, setReturnDetailsLoading] = useState(false);
 
-  // Pagination and filtering state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalOrders, setTotalOrders] = useState(0);
-  const [searchParams] = useSearchParams();
-  const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "all");
-  const [paymentFilter, setPaymentFilter] = useState(searchParams.get("payment_status") || "all");
-  const [activeTab, setActiveTab] = useState("all");
-  const initialLoadDone = useRef(false);
-  const ITEMS_PER_PAGE = 20;
-
   const queryClient = useQueryClient();
 
-  // Sync filters with URL on mount
-  useEffect(() => {
-    if (!initialLoadDone.current) {
-      const urlStatus = searchParams.get("status");
-      const urlPayment = searchParams.get("payment_status");
-      if (urlStatus && urlStatus !== statusFilter) setStatusFilter(urlStatus);
-      if (urlPayment && urlPayment !== paymentFilter) setPaymentFilter(urlPayment);
-      initialLoadDone.current = true;
-    }
-  }, [searchParams, statusFilter, paymentFilter]);
-
-  // Reset to page 1 when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, statusFilter, paymentFilter, activeTab]);
-
-  const { data: ordersResponse, isLoading, refetch } = useQuery({
-    queryKey: ["admin-orders", currentPage, searchQuery, statusFilter, paymentFilter, activeTab],
+  const { data: allOrders = [], isLoading } = useQuery<Order[]>({
+    queryKey: ["admin-orders"],
     queryFn: async () => {
-      const params: Record<string, unknown> = {
-        page: currentPage,
-        limit: ITEMS_PER_PAGE,
-        all: 'true'
-      };
-
-      if (searchQuery) params.orderNumber = searchQuery;
-      if (statusFilter !== 'all') params.status = statusFilter;
-      if (paymentFilter !== 'all') params.payment_status = paymentFilter;
-
-      const response = await apiClient.get("/orders", { params });
+      // Fetch real orders from API
+      // We pass all=true to get all orders as admin
+      const response = await apiClient.get("/orders?all=true");
       return response.data;
     },
-    staleTime: 30000, // 30 seconds - no auto-refresh
+    // Refresh interval to catch webhook updates
+    refetchInterval: 5000,
   });
-
-  const allOrders = ordersResponse?.data || [];
-
-  // Update pagination meta
-  useEffect(() => {
-    if (ordersResponse?.meta) {
-      setTotalOrders(ordersResponse.meta.total || 0);
-      setTotalPages(ordersResponse.meta.totalPages || 1);
-    }
-  }, [ordersResponse]);
 
   // Filter orders by category
   const deliverableOrders = allOrders
@@ -153,7 +109,7 @@ export default function OrdersManagement() {
     )
     .sort(
       (a: Order, b: Order) =>
-        new Date(b.createdAt || b.created_at).getTime() - new Date(a.createdAt || a.created_at).getTime()
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
 
   const returnOrders = allOrders
@@ -183,8 +139,8 @@ export default function OrdersManagement() {
     )
     .sort(
       (a: Order, b: Order) =>
-        new Date(b.returnRequestedAt || b.return_requested_at || b.createdAt || b.created_at).getTime() -
-        new Date(a.returnRequestedAt || a.return_requested_at || a.createdAt || a.created_at).getTime()
+        new Date(b.returnRequestedAt || b.createdAt).getTime() -
+        new Date(a.returnRequestedAt || a.createdAt).getTime()
     );
 
   const cancelOrders = allOrders
@@ -206,8 +162,8 @@ export default function OrdersManagement() {
     )
     .sort(
       (a: Order, b: Order) =>
-        new Date(b.cancelRequestedAt || b.cancel_requested_at || b.createdAt || b.created_at).getTime() -
-        new Date(a.cancelRequestedAt || a.cancel_requested_at || a.createdAt || a.created_at).getTime()
+        new Date(b.cancelRequestedAt || b.createdAt).getTime() -
+        new Date(a.cancelRequestedAt || a.createdAt).getTime()
     );
 
   const updateStatusMutation = useMutation({
@@ -288,12 +244,12 @@ export default function OrdersManagement() {
         id: order.id,
         userId: order.userId,
         status: order.status,
-        paymentStatus: order.paymentStatus || order.payment_status,
+        paymentStatus: order.paymentStatus,
         total: order.total,
         itemCount: order.items.length,
-        createdAt: format(new Date(order.createdAt || order.created_at), "yyyy-MM-dd HH:mm:ss"),
-        shippingCity: order.shippingAddress?.city || order.shipping_address?.city || 'N/A',
-        shippingState: order.shippingAddress?.state || order.shipping_address?.state || 'N/A',
+        createdAt: format(new Date(order.createdAt), "yyyy-MM-dd HH:mm:ss"),
+        shippingCity: order.shippingAddress.city,
+        shippingState: order.shippingAddress.state,
       })
     );
 
@@ -620,49 +576,6 @@ export default function OrdersManagement() {
             className="pl-9"
           />
         </div>
-
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[180px]">
-            <Filter className="mr-2 h-4 w-4" />
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="confirmed">Confirmed</SelectItem>
-            <SelectItem value="processing">Processing</SelectItem>
-            <SelectItem value="packed">Packed</SelectItem>
-            <SelectItem value="shipped">Shipped</SelectItem>
-            <SelectItem value="delivered">Delivered</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
-            <SelectItem value="return_requested">Return Requested</SelectItem>
-            <SelectItem value="returned">Returned</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={paymentFilter} onValueChange={setPaymentFilter}>
-          <SelectTrigger className="w-[180px]">
-            <CreditCard className="mr-2 h-4 w-4" />
-            <SelectValue placeholder="Payment Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Payments</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="paid">Paid</SelectItem>
-            <SelectItem value="failed">Failed</SelectItem>
-            <SelectItem value="refunded">Refunded</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => refetch()}
-          disabled={isLoading}
-          title="Refresh orders"
-        >
-          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-        </Button>
       </div>
 
       <Tabs defaultValue="deliverable" className="space-y-4">
@@ -701,58 +614,6 @@ export default function OrdersManagement() {
                 </Button>
               </div>
               <OrdersTable orders={deliverableOrders} />
-
-              {totalPages > 1 && (
-                <div className="mt-4">
-                  <Pagination>
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            if (currentPage > 1) setCurrentPage(p => p - 1);
-                          }}
-                          className={currentPage <= 1 ? "pointer-events-none opacity-50" : ""}
-                        />
-                      </PaginationItem>
-
-                      {Array.from({ length: Math.min(totalPages, 5) }).map((_, i) => {
-                        const pageNum = i + 1;
-                        return (
-                          <PaginationItem key={i}>
-                            <PaginationLink
-                              href="#"
-                              isActive={currentPage === pageNum}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setCurrentPage(pageNum);
-                              }}
-                            >
-                              {pageNum}
-                            </PaginationLink>
-                          </PaginationItem>
-                        );
-                      })}
-
-                      <PaginationItem>
-                        <PaginationNext
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            if (currentPage < totalPages) setCurrentPage(p => p + 1);
-                          }}
-                          className={currentPage >= totalPages ? "pointer-events-none opacity-50" : ""}
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
-
-                  <p className="text-sm text-muted-foreground text-center mt-2">
-                    Page {currentPage} of {totalPages} • Total: {totalOrders} orders
-                  </p>
-                </div>
-              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -772,58 +633,6 @@ export default function OrdersManagement() {
                 </Button>
               </div>
               <OrdersTable orders={returnOrders} />
-
-              {totalPages > 1 && (
-                <div className="mt-4">
-                  <Pagination>
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            if (currentPage > 1) setCurrentPage(p => p - 1);
-                          }}
-                          className={currentPage <= 1 ? "pointer-events-none opacity-50" : ""}
-                        />
-                      </PaginationItem>
-
-                      {Array.from({ length: Math.min(totalPages, 5) }).map((_, i) => {
-                        const pageNum = i + 1;
-                        return (
-                          <PaginationItem key={i}>
-                            <PaginationLink
-                              href="#"
-                              isActive={currentPage === pageNum}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setCurrentPage(pageNum);
-                              }}
-                            >
-                              {pageNum}
-                            </PaginationLink>
-                          </PaginationItem>
-                        );
-                      })}
-
-                      <PaginationItem>
-                        <PaginationNext
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            if (currentPage < totalPages) setCurrentPage(p => p + 1);
-                          }}
-                          className={currentPage >= totalPages ? "pointer-events-none opacity-50" : ""}
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
-
-                  <p className="text-sm text-muted-foreground text-center mt-2">
-                    Page {currentPage} of {totalPages} • Total: {totalOrders} orders
-                  </p>
-                </div>
-              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -843,58 +652,6 @@ export default function OrdersManagement() {
                 </Button>
               </div>
               <OrdersTable orders={cancelOrders} />
-
-              {totalPages > 1 && (
-                <div className="mt-4">
-                  <Pagination>
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            if (currentPage > 1) setCurrentPage(p => p - 1);
-                          }}
-                          className={currentPage <= 1 ? "pointer-events-none opacity-50" : ""}
-                        />
-                      </PaginationItem>
-
-                      {Array.from({ length: Math.min(totalPages, 5) }).map((_, i) => {
-                        const pageNum = i + 1;
-                        return (
-                          <PaginationItem key={i}>
-                            <PaginationLink
-                              href="#"
-                              isActive={currentPage === pageNum}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setCurrentPage(pageNum);
-                              }}
-                            >
-                              {pageNum}
-                            </PaginationLink>
-                          </PaginationItem>
-                        );
-                      })}
-
-                      <PaginationItem>
-                        <PaginationNext
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            if (currentPage < totalPages) setCurrentPage(p => p + 1);
-                          }}
-                          className={currentPage >= totalPages ? "pointer-events-none opacity-50" : ""}
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
-
-                  <p className="text-sm text-muted-foreground text-center mt-2">
-                    Page {currentPage} of {totalPages} • Total: {totalOrders} orders
-                  </p>
-                </div>
-              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -914,7 +671,7 @@ export default function OrdersManagement() {
                   <div>
                     <Label className="text-muted-foreground">Order Date</Label>
                     <p className="text-sm font-medium">
-                      {format(new Date(selectedOrder.createdAt || selectedOrder.created_at), "PPpp")}
+                      {format(new Date(selectedOrder.createdAt), "PPpp")}
                     </p>
                   </div>
                   <div>
@@ -1017,7 +774,7 @@ export default function OrdersManagement() {
                               Images ({selectedOrder.returnImages.length})
                             </Label>
                             <div className="grid grid-cols-3 gap-2 mt-2">
-                              {selectedOrder.returnImages.map((img: string, idx: number) => (
+                              {selectedOrder.returnImages.map((img, idx) => (
                                 <img
                                   key={idx}
                                   src={img}
@@ -1052,14 +809,14 @@ export default function OrdersManagement() {
                     Shipping Address
                   </Label>
                   <div className="text-sm mt-2 space-y-1">
-                    <p>{selectedOrder.shippingAddress?.addressLine || selectedOrder.shipping_address?.addressLine}</p>
+                    <p>{selectedOrder.shippingAddress.addressLine}</p>
                     <p>
-                      {selectedOrder.shippingAddress?.city || selectedOrder.shipping_address?.city},{" "}
-                      {selectedOrder.shippingAddress?.state || selectedOrder.shipping_address?.state}
+                      {selectedOrder.shippingAddress.city},{" "}
+                      {selectedOrder.shippingAddress.state}
                     </p>
                     <p>
-                      {selectedOrder.shippingAddress?.country || selectedOrder.shipping_address?.country} -{" "}
-                      {selectedOrder.shippingAddress?.pincode || selectedOrder.shipping_address?.pincode}
+                      {selectedOrder.shippingAddress.country} -{" "}
+                      {selectedOrder.shippingAddress.pincode}
                     </p>
                   </div>
                 </div>

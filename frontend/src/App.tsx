@@ -68,7 +68,7 @@ import ContactMessageDetail from "./pages/admin/ContactMessageDetail";
 import AboutUsManagement from "./pages/admin/AboutUsManagement";
 import PolicyManagement from "./pages/admin/PolicyManagement";
 import JobsManagement from "./pages/admin/JobsManagement";
-import OrdersManagement from "./pages/admin/OrdersManagement";
+import OrdersManagement from "./pages/admin/OrdersManagementNew";
 import OrderDetail from "./pages/admin/OrderDetail";
 import SettingsManagement from "./pages/admin/SettingsManagement";
 
