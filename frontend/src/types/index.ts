@@ -87,6 +87,8 @@ export interface Product {
   default_price_includes_tax?: boolean;
   delivery_refund_policy?: 'REFUNDABLE' | 'NON_REFUNDABLE';
   delivery_config?: DeliveryConfig;
+  gst_rate?: number;
+  gstRate?: number;
   price_includes_tax?: boolean;
 }
 
@@ -265,36 +267,30 @@ export interface Invoice {
 
 export interface Order {
   id: string;
-  userId: string;
-  user_id?: string;
+  user_id: string;
   order_number?: string;
   customer_name?: string;
   customer_email?: string;
   customer_phone?: string;
   items: CartItem[] | OrderItem[];
-  total: number;
-  total_amount?: number;
+  total_amount: number;
   status: OrderStatus;
-  shippingAddress: Address;
-  shipping_address?: Address;
-  billingAddress?: Address;
+  shipping_address: Address;
   billing_address?: Address;
-  paymentStatus: "pending" | "paid" | "failed";
-  payment_status?: string;
-  createdAt: string;
-  created_at?: string;
-  updatedAt?: string;
+  payment_status: "pending" | "paid" | "failed" | "refunded" | "partially_refunded" | "refund_initiated";
+  created_at: string;
   updated_at?: string;
   invoice_url?: string;
   invoices?: Invoice[];
+  coupon_discount?: number;
   // Cancel/Return request details
-  cancelReason?: string;
-  cancelComments?: string;
-  cancelRequestedAt?: string;
-  returnReason?: string;
-  returnIssue?: string;
-  returnImages?: string[];
-  returnRequestedAt?: string;
+  cancel_reason?: string;
+  cancel_comments?: string;
+  cancel_requested_at?: string;
+  return_reason?: string;
+  return_issue?: string;
+  return_images?: string[];
+  return_requested_at?: string;
 }
 
 export interface GalleryImage {

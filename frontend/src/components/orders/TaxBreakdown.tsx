@@ -44,14 +44,14 @@ export function TaxBreakdown({
     // 1. Calculate Product-only tax from items
     const productTaxableFromItems = items.reduce((sum, item) => {
         const qty = item.quantity || 1;
-        const taxRate = item.variant?.gst_rate ?? item.product?.gstRate ?? item.gst_rate ?? 0;
+        const taxRate = item.variant?.gst_rate ?? item.gst_rate ?? item.product?.gst_rate ?? item.product?.default_gst_rate ?? 0;
         const itemTaxable = item.taxable_amount ?? ((item.total_amount || ((item.price_per_unit || item.product?.price || 0) * qty)) / (1 + (taxRate / 100)));
         return sum + itemTaxable;
     }, 0);
 
     const productTaxFromItems = items.reduce((sum, item) => {
         const qty = item.quantity || 1;
-        const taxRate = item.variant?.gst_rate ?? item.product?.gstRate ?? item.gst_rate ?? 0;
+        const taxRate = item.variant?.gst_rate ?? item.gst_rate ?? item.product?.gst_rate ?? item.product?.default_gst_rate ?? 0;
         const itemTaxable = item.taxable_amount ?? ((item.total_amount || ((item.price_per_unit || item.product?.price || 0) * qty)) / (1 + (taxRate / 100)));
         const totalItemTaxSnapshot = (item.cgst || 0) + (item.sgst || 0) + (item.igst || 0);
         const itemTax = totalItemTaxSnapshot > 0 ? totalItemTaxSnapshot : ((item.total_amount || (item.price_per_unit * qty)) - itemTaxable);
@@ -187,8 +187,8 @@ export function TaxBreakdown({
                             <div className="divide-y max-h-[250px] overflow-y-auto bg-white">
                                 {items.map((item, idx) => {
                                     const qty = item.quantity || 1;
-                                    const taxRate = item.variant?.gst_rate ?? item.product?.gstRate ?? item.gst_rate ?? 0;
-                                    const hsn = item.variant?.hsn_code ?? item.variant_snapshot?.hsn_code ?? item.product?.hsnCode ?? item.hsn_code ?? 'N/A';
+                                    const taxRate = item.variant?.gst_rate ?? item.gst_rate ?? item.product?.gst_rate ?? item.product?.default_gst_rate ?? 0;
+                                    const hsn = item.variant?.hsn_code ?? item.variant_snapshot?.hsn_code ?? item.product?.hsn_code ?? item.hsn_code ?? 'N/A';
 
                                     const itemTaxable = item.taxable_amount ?? ((item.total_amount || ((item.price_per_unit || item.product?.price || 0) * qty)) / (1 + (taxRate / 100)));
                                     const totalItemTaxSnapshot = (item.cgst || 0) + (item.sgst || 0) + (item.igst || 0);
@@ -268,7 +268,7 @@ export function TaxBreakdown({
                             className="text-sm font-bold text-white bg-primary hover:bg-primary/90 transition-all flex items-center gap-2 justify-center w-full py-3 rounded-lg shadow-sm"
                         >
                             <FileText size={16} />
-                            Download GST Invoice (PDF)
+                            Download Invoice
                         </a>
                     </div>
                 )}

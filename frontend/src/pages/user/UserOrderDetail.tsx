@@ -33,10 +33,9 @@ interface OrderResponse {
     id: string;
     order_number?: string;
     created_at: string;
-    createdAt?: string;
     status: string;
-    user_id: string; // Added to fix type error
-    invoice_id?: string; // Added missing field
+    user_id: string;
+    invoice_id?: string;
     invoice_url?: string;
     invoices?: Array<{
         id: string;
@@ -48,10 +47,10 @@ interface OrderResponse {
     total_amount: number;
     delivery_charge?: number;
     delivery_gst?: number;
-    shipping_address?: Address & { full_name?: string; address_line1?: string; address_line2?: string; postal_code?: string; };
-    billing_address?: Address & { full_name?: string; address_line1?: string; address_line2?: string; postal_code?: string; };
+    coupon_discount?: number; // Added
+    shipping_address?: Address & { full_name?: string; address_line1?: string; address_line2?: string; postal_code?: string; phone?: string; };
+    billing_address?: Address & { full_name?: string; address_line1?: string; address_line2?: string; postal_code?: string; phone?: string; };
     payment_status?: string;
-    paymentStatus?: string;
     payment_method?: string;
     payment_id?: string;
     // GST Tax fields
@@ -76,6 +75,14 @@ interface OrderResponse {
             variant_image_url?: string;
         };
         size_label?: string;
+        // Delivery snapshots
+        delivery_charge?: number;
+        delivery_gst?: number;
+        delivery_calculation_snapshot?: {
+            source?: string;
+            delivery_refund_policy?: 'REFUNDABLE' | 'NON_REFUNDABLE';
+        };
+        gst_rate?: number;
     }>;
     order_status_history?: Array<{
         status: string;
@@ -100,6 +107,7 @@ interface ReturnRequest {
     refund_amount: number;
     reason: string;
     created_at: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     refund_breakdown?: any;
     return_items: Array<{
         quantity: number;
@@ -107,6 +115,7 @@ interface ReturnRequest {
         order_item_id: string;
         order_items: {
             title: string;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             variant_snapshot?: any;
         }
     }>;
@@ -119,7 +128,8 @@ interface ReturnableItem {
     remaining_quantity: number;
     return_days?: number;
     return_deadline?: string;
-    variant_snapshot?: any; // To allow access if returning full object
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    variant_snapshot?: any;
 }
 
 export default function UserOrderDetail() {
@@ -394,7 +404,7 @@ export default function UserOrderDetail() {
                         </h1>
                         <div className="flex items-center gap-3 mt-2 text-muted-foreground">
                             <Badge variant="secondary" className="text-sm font-normal px-3 py-1">
-                                {order.createdAt || order.created_at ? format(new Date(order.createdAt || order.created_at), "PPP") : "N/A"}
+                                {order.created_at ? format(new Date(order.created_at), "PPP") : "N/A"}
                             </Badge>
                             <span>•</span>
                             <Badge
@@ -416,8 +426,8 @@ export default function UserOrderDetail() {
                             </Button>
                         )}
 
-                        {/* 2. Tax Invoice (Internal) */}
-                        {(order.invoice_url || order.invoices?.find(i => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type))) && (
+                        {/* 2. Tax Invoice (Internal) - Only show for DELIVERED orders */}
+                        {order.status === 'delivered' && (order.invoice_url || order.invoices?.find(i => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type))) && (
                             <Button variant="outline" size="sm" onClick={() => {
                                 // Prefer strict internal endpoint if available via order.invoice_url (set by orchestration)
                                 // or fallback to constructing it if we have the ID from invoices array
@@ -438,7 +448,7 @@ export default function UserOrderDetail() {
                                     window.open(fullUrl, '_blank');
                                 }
                             }}>
-                                <FileText className="mr-2 h-4 w-4" /> Tax Invoice
+                                <FileText className="mr-2 h-4 w-4" /> Invoice
                             </Button>
                         )}
 
@@ -725,7 +735,7 @@ export default function UserOrderDetail() {
                                 <div className="space-y-4">
                                     {(() => {
                                         // Calculate Non-Refundable Total to Bundle
-                                        const refundableTotal = (order.items || []).reduce((sum: number, item: any) => {
+                                        const refundableTotal = (order.items || []).reduce((sum: number, item) => {
                                             const snapshot = item.delivery_calculation_snapshot || {};
                                             if (snapshot.source !== 'global' && snapshot.delivery_refund_policy === 'REFUNDABLE') {
                                                 return sum + (item.delivery_charge || 0) + (item.delivery_gst || 0);
@@ -749,11 +759,8 @@ export default function UserOrderDetail() {
                                             const rawUnitPrice = item.price_per_unit || item.product?.price || 0;
                                             const itemTotalRaw = item.quantity * rawUnitPrice;
 
-                                            let bundledUnitPrice = rawUnitPrice;
-                                            if (nonRefundableTotalToBundle > 0 && itemsTotalAmount > 0) {
-                                                const portion = (itemTotalRaw / itemsTotalAmount) * nonRefundableTotalToBundle;
-                                                bundledUnitPrice = rawUnitPrice + (portion / item.quantity);
-                                            }
+                                            // Bundling logic removed for clarity, showing raw inclusive prices
+                                            const bundledUnitPrice = rawUnitPrice;
 
                                             return (
                                                 <div key={index} className="flex gap-4 items-start border-b pb-4 last:border-0 last:pb-0">
@@ -781,6 +788,16 @@ export default function UserOrderDetail() {
                                                                 ({(item.product?.price_includes_tax ?? item.product?.default_price_includes_tax ?? true) ? 'Inc. Tax' : 'Excl. Tax'})
                                                             </span>
                                                         </p>
+                                                        {/* Base Price Display */}
+                                                        {(() => {
+                                                            const gstRate = item.gst_rate || item.product?.gstRate || item.product?.gst_rate || item.product?.default_gst_rate || 0;
+                                                            const baseUnitPrice = gstRate > 0 ? bundledUnitPrice / (1 + gstRate / 100) : bundledUnitPrice;
+                                                            return (
+                                                                <p className="text-xs text-slate-500">
+                                                                    Base Price: ₹{baseUnitPrice.toFixed(2)} (Excl. Tax)
+                                                                </p>
+                                                            );
+                                                        })()}
                                                     </div>
                                                     <div className="text-right font-medium">
                                                         ₹{(item.quantity * bundledUnitPrice).toFixed(2)}
@@ -793,7 +810,7 @@ export default function UserOrderDetail() {
                                 <Separator className="my-4" />
                                 <div className="space-y-2 text-sm">
                                     {(() => {
-                                        const refundableTotal = (order.items || []).reduce((sum: number, item: any) => {
+                                        const refundableTotal = (order.items || []).reduce((sum: number, item) => {
                                             const snapshot = item.delivery_calculation_snapshot || {};
                                             if (snapshot.source !== 'global' && snapshot.delivery_refund_policy === 'REFUNDABLE') {
                                                 return sum + (item.delivery_charge || 0) + (item.delivery_gst || 0);
@@ -802,22 +819,29 @@ export default function UserOrderDetail() {
                                         }, 0);
 
                                         const deliveryTotal = (order.delivery_charge || 0) + (order.delivery_gst || 0);
-                                        const nonRefundableTotalToBundle = Math.max(0, deliveryTotal - refundableTotal);
-                                        const subtotal = order.subtotal || (order.total_amount - deliveryTotal);
+                                        const subtotal = (order.items || []).reduce((sum: number, item) => sum + (item.quantity * (item.price_per_unit || item.product?.price || 0)), 0);
 
                                         return (
                                             <>
                                                 <div className="flex justify-between">
                                                     <span className="text-muted-foreground">Subtotal</span>
-                                                    <span>₹{(subtotal + nonRefundableTotalToBundle).toFixed(2)}</span>
+                                                    <span>₹{subtotal.toFixed(2)}</span>
                                                 </div>
-                                                {refundableTotal > 0 && (
+                                                {deliveryTotal > 0 && (
                                                     <div className="flex justify-between">
                                                         <span className="text-muted-foreground flex items-center gap-1.5">
                                                             Delivery & Handling
-                                                            <Badge variant="outline" className="text-[10px] h-4 font-normal text-blue-600 border-blue-200 bg-blue-50">Refundable</Badge>
+                                                            {refundableTotal > 0 && (
+                                                                <Badge variant="outline" className="text-[10px] h-4 font-normal text-blue-600 border-blue-200 bg-blue-50">Refundable</Badge>
+                                                            )}
                                                         </span>
-                                                        <span>₹{refundableTotal.toFixed(2)}</span>
+                                                        <span>₹{deliveryTotal.toFixed(2)}</span>
+                                                    </div>
+                                                )}
+                                                {(order.coupon_discount ?? 0) > 0 && (
+                                                    <div className="flex justify-between text-green-600 font-medium">
+                                                        <span>Coupon Discount</span>
+                                                        <span>-₹{(order.coupon_discount ?? 0).toFixed(2)}</span>
                                                     </div>
                                                 )}
                                             </>
@@ -958,11 +982,11 @@ export default function UserOrderDetail() {
                                             h.event_type === 'ORDER_PLACED'
                                         );
 
-                                        if (!hasPlaced && (order.created_at || order.createdAt)) {
+                                        if (!hasPlaced && order.created_at) {
                                             historyItems.push({
                                                 status: 'pending',
                                                 event_type: 'ORDER_PLACED',
-                                                created_at: (order.created_at || order.createdAt) as string,
+                                                created_at: order.created_at,
                                                 notes: 'Order placed successfully.',
                                                 actor: 'SYSTEM'
                                             });
@@ -1086,13 +1110,13 @@ export default function UserOrderDetail() {
                                 <div className="grid grid-cols-1 gap-2 text-sm">
                                     <div>
                                         <span className="text-muted-foreground">Payment Status:</span>
-                                        <Badge variant={(order.paymentStatus || order.payment_status) === 'paid' ? 'default' :
-                                            ((order.paymentStatus || order.payment_status) === 'refunded' || (order.paymentStatus || order.payment_status) === 'partially_refunded') ? 'destructive' :
-                                                (order.paymentStatus || order.payment_status) === 'refund_initiated' ? 'outline' : 'secondary'}
+                                        <Badge variant={order.payment_status === 'paid' ? 'default' :
+                                            (order.payment_status === 'refunded' || order.payment_status === 'partially_refunded') ? 'destructive' :
+                                                order.payment_status === 'refund_initiated' ? 'outline' : 'secondary'}
                                             className="ml-2 uppercase">
-                                            {(order.paymentStatus || order.payment_status) === 'partially_refunded' ? 'Refunded' : (order.paymentStatus || order.payment_status)?.replace(/_/g, ' ')}
+                                            {order.payment_status === 'partially_refunded' ? 'Refunded' : order.payment_status?.replace(/_/g, ' ')}
                                         </Badge>
-                                        {(order.paymentStatus === 'refund_initiated' || order.payment_status === 'refund_initiated') && (
+                                        {order.payment_status === 'refund_initiated' && (
                                             <p className="text-xs text-orange-600 mt-1 font-medium">
                                                 Refund Initiated. Processing time: 5-7 business days.
                                             </p>
@@ -1120,7 +1144,7 @@ export default function UserOrderDetail() {
                                         <div className="pt-2 border-t mt-2">
                                             <span className="text-muted-foreground text-xs block mb-1">Refund Reference(s):</span>
                                             <div className="space-y-1">
-                                                {order.refunds.map((r: any, idx) => (
+                                                {order.refunds.map((r, idx) => (
                                                     <div key={idx} className="flex justify-between items-center text-xs bg-red-50 p-1 rounded border border-red-100">
                                                         <span className="font-mono text-red-800">{r.razorpay_refund_id || r.id}</span>
                                                         <span className="font-medium text-red-700">₹{r.amount}</span>

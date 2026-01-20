@@ -183,14 +183,14 @@ class TaxEngine {
         }
 
         return {
-            taxableAmount,
+            taxable_amount: taxableAmount,
             cgst,
             sgst,
             igst,
-            totalTax,
-            totalAmount: taxableAmount + totalTax,
-            gstRate,
-            taxType
+            total_tax: totalTax,
+            total_amount: taxableAmount + totalTax,
+            gst_rate: gstRate,
+            tax_type: taxType
         };
     }
 
@@ -212,12 +212,12 @@ class TaxEngine {
             itemCount: items.length
         });
 
-        let totalTaxableAmount = 0;
-        let totalCgst = 0;
-        let totalSgst = 0;
-        let totalIgst = 0;
-        let totalTax = 0;
-        let totalAmount = 0;
+        let total_taxable_amount = 0;
+        let total_cgst = 0;
+        let total_sgst = 0;
+        let total_igst = 0;
+        let total_tax = 0;
+        let total_amount = 0;
 
         const itemTaxBreakdowns = items.map(item => {
             // Extract tax metadata from variant or product
@@ -235,18 +235,18 @@ class TaxEngine {
 
             const taxResult = this.calculateItemTax(taxMeta, taxType);
 
-            totalTaxableAmount += taxResult.taxableAmount;
-            totalCgst += taxResult.cgst;
-            totalSgst += taxResult.sgst;
-            totalIgst += taxResult.igst;
-            totalTax += taxResult.totalTax;
-            totalAmount += taxResult.totalAmount;
+            total_taxable_amount += taxResult.taxable_amount;
+            total_cgst += taxResult.cgst;
+            total_sgst += taxResult.sgst;
+            total_igst += taxResult.igst;
+            total_tax += taxResult.total_tax;
+            total_amount += taxResult.total_amount;
 
             return {
                 ...item,
                 taxBreakdown: {
                     ...taxResult,
-                    hsnCode: taxMeta.hsnCode
+                    hsn_code: taxMeta.hsnCode
                 }
             };
         });
@@ -254,15 +254,15 @@ class TaxEngine {
         return {
             items: itemTaxBreakdowns,
             summary: {
-                totalTaxableAmount: Math.round(totalTaxableAmount * 100) / 100,
-                totalCgst: Math.round(totalCgst * 100) / 100,
-                totalSgst: Math.round(totalSgst * 100) / 100,
-                totalIgst: Math.round(totalIgst * 100) / 100,
-                totalTax: Math.round(totalTax * 100) / 100,
-                totalAmount: Math.round(totalAmount * 100) / 100,
-                taxType,
-                sellerStateCode,
-                buyerStateCode
+                total_taxable_amount: Math.round(total_taxable_amount * 100) / 100,
+                total_cgst: Math.round(total_cgst * 100) / 100,
+                total_sgst: Math.round(total_sgst * 100) / 100,
+                total_igst: Math.round(total_igst * 100) / 100,
+                total_tax: Math.round(total_tax * 100) / 100,
+                total_amount: Math.round(total_amount * 100) / 100,
+                tax_type: taxType,
+                seller_state_code: sellerStateCode,
+                buyer_state_code: buyerStateCode
             }
         };
     }

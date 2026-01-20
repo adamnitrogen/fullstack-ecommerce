@@ -126,15 +126,16 @@ async function logStatusHistory(orderId, statusOrEventType, updatedBy, notes = '
         if (error) {
             logger.warn(`Failed to log history for order ${orderId}. Error: ${error.message}`);
 
-            if (error.code === '23503') {
-                logger.info(`Retrying log history with updated_by=null for order ${orderId}`);
+            // Handle FK violation (23503) or Invalid UUID format (22P02)
+            if (error.code === '23503' || error.code === '22P02') {
+                logger.info(`Retrying log history with updated_by=null for order ${orderId} due to error ${error.code}`);
                 await supabaseAdmin.from('order_status_history').insert({
                     order_id: orderId,
                     status: status,
                     event_type: finalEventType,
-                    actor: 'SYSTEM',
+                    actor: finalActor, // Keep the final actor (ADMIN/SYSTEM/USER)
                     updated_by: null,
-                    notes: notes + ' [User ID invalid]',
+                    notes: notes + (error.code === '22P02' ? ' [Invalid UUID]' : ' [User ID invalid]'),
                     created_at: new Date().toISOString()
                 });
             }

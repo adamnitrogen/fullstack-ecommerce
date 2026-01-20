@@ -48,7 +48,7 @@ const getReturnableItems = async (orderId, userId) => {
         'return_closed'
     ];
     if (!allowedStatuses.includes(order.status)) {
-        throw new Error('Order must be delivered to request a return');
+        return []; // Return empty instead of throwing error to avoid frontend noise for non-returnable orders
     }
 
     // 2. Fetch Order Items with Product return_days
@@ -708,7 +708,6 @@ const aggregateOrderState = async (orderId) => {
     if (newStatus && newStatus !== order.status) updates.status = newStatus;
     if (newPaymentStatus !== order.payment_status) {
         updates.payment_status = newPaymentStatus;
-        updates.paymentStatus = newPaymentStatus; // Sync camelCase
     }
 
     if (Object.keys(updates).length > 0) {
@@ -716,7 +715,6 @@ const aggregateOrderState = async (orderId) => {
         // If the order status is 'returned', ensure payment_status is 'refunded'
         if (updates.status === 'returned') {
             updateData.payment_status = 'refunded';
-            updateData.paymentStatus = 'refunded';
         }
 
         await supabaseAdmin.from('orders').update(updateData).eq('id', orderId);

@@ -24,7 +24,7 @@ class RefundService {
      * @param {Array} items - Optional: Order items with snapshots for granular calculation
      */
     static calculateRefundAmount(order, refundType, items = []) {
-        const totalAmount = Number(order.total_amount || order.totalAmount || 0);
+        const totalAmount = Number(order.total_amount || 0);
 
         if (refundType === REFUND_TYPES.TECHNICAL_REFUND) {
             return {
@@ -114,7 +114,7 @@ class RefundService {
                     .from('payments')
                     .select('*, orders(*, order_items(*))')
                     .eq('id', identifier)
-                    .single();
+                    .maybeSingle();
 
                 if (pError || !paymentRecord) {
                     throw new Error(`Payment not found or fetch error: ${pError?.message}`);
@@ -126,7 +126,7 @@ class RefundService {
                     .from('orders')
                     .select('*, payments!order_id(*), order_items(*)')
                     .eq('id', identifier)
-                    .single();
+                    .maybeSingle();
 
                 if (oError || !orderRecord) {
                     throw new Error(`Order not found or fetch error: ${oError?.message}`);

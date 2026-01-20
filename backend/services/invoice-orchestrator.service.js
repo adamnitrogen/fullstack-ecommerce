@@ -170,13 +170,13 @@ class InvoiceOrchestrator {
         const data = {
             type: 'invoice',
             customer: {
-                name: order.customer_name || order.customerName,
-                email: order.customer_email || order.customerEmail,
-                contact: order.customer_phone || order.customerPhone
+                name: order.customer_name,
+                email: order.customer_email,
+                contact: order.customer_phone
             },
             line_items: lineItems,
-            receipt: order.order_number || order.orderNumber,
-            description: `Payment Receipt for Order ${order.order_number || order.orderNumber}`
+            receipt: order.order_number,
+            description: `Payment Receipt for Order ${order.order_number}`
         };
 
         // Add Coupon Discount via top-level discount_amount (in paise)

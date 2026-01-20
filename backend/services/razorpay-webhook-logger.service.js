@@ -186,8 +186,8 @@ class RazorpayWebhookLogger {
             await supabase
                 .from('orders')
                 .update({
-                    paymentStatus: 'refunded',
-                    updatedAt: new Date().toISOString()
+                    payment_status: 'refunded',
+                    updated_at: new Date().toISOString()
                 })
                 .eq('id', orderId);
 

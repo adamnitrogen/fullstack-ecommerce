@@ -85,61 +85,61 @@ class PricingCalculator {
             // 7. Calculate final amount
             // Note: Tax is calculated on selling price, coupon reduces the amount you pay
             // Final = (taxable + tax) - couponDiscount + delivery
-            const finalAmount = taxResult.summary.totalAmount - couponDiscount + deliveryCharge;
+            const finalAmount = taxResult.summary.total_amount - couponDiscount + deliveryCharge;
 
             const result = {
                 // Item details
-                itemsCount: normalizedItems.reduce((sum, item) => sum + item.quantity, 0),
+                items_count: normalizedItems.reduce((sum, item) => sum + item.quantity, 0),
                 items: taxResult.items.map(item => ({
                     product_id: item.product_id,
                     variant_id: item.variant_id,
                     quantity: item.quantity,
-                    unitPrice: item.unitPrice,
-                    unitMrp: item.unitMrp,
-                    lineTotal: item.unitPrice * item.quantity,
-                    taxBreakdown: item.taxBreakdown
+                    unit_price: item.unitPrice,
+                    unit_mrp: item.unitMrp,
+                    line_total: item.unitPrice * item.quantity,
+                    tax_breakdown: item.taxBreakdown
                 })),
 
                 // Price breakdown
-                totalMrp: Math.round(totalMrp * 100) / 100,
-                totalSellingPrice: Math.round(totalSellingPrice * 100) / 100,
-                mrpDiscount: Math.round(mrpDiscount * 100) / 100,
+                total_mrp: Math.round(totalMrp * 100) / 100,
+                total_selling_price: Math.round(totalSellingPrice * 100) / 100,
+                mrp_discount: Math.round(mrpDiscount * 100) / 100,
 
                 // Coupon
-                couponCode: validatedCoupon?.code || null,
-                couponDiscount: Math.round(couponDiscount * 100) / 100,
+                coupon_code: validatedCoupon?.code || null,
+                coupon_discount: Math.round(couponDiscount * 100) / 100,
 
                 // Subtotal (after MRP discount and coupon, before tax)
-                subtotalBeforeTax: Math.round((totalSellingPrice - couponDiscount) * 100) / 100,
+                subtotal_before_tax: Math.round((totalSellingPrice - couponDiscount) * 100) / 100,
 
                 // Tax breakdown
                 tax: {
-                    totalTaxableAmount: taxResult.summary.totalTaxableAmount,
-                    cgst: taxResult.summary.totalCgst,
-                    sgst: taxResult.summary.totalSgst,
-                    igst: taxResult.summary.totalIgst,
-                    totalTax: taxResult.summary.totalTax,
-                    taxType: taxResult.summary.taxType,
-                    isInterState: taxResult.summary.taxType === TAX_TYPE.INTER_STATE
+                    total_taxable_amount: taxResult.summary.total_taxable_amount,
+                    cgst: taxResult.summary.total_cgst,
+                    sgst: taxResult.summary.total_sgst,
+                    igst: taxResult.summary.total_igst,
+                    total_tax: taxResult.summary.total_tax,
+                    tax_type: taxResult.summary.tax_type,
+                    is_inter_state: taxResult.summary.tax_type === TAX_TYPE.INTER_STATE
                 },
 
                 // Delivery
-                deliveryCharge: Math.round(deliveryCharge * 100) / 100,
-                freeDeliveryThreshold: settings.delivery_threshold,
-                deliverySettings: {
+                delivery_charge: Math.round(deliveryCharge * 100) / 100,
+                free_delivery_threshold: settings.delivery_threshold,
+                delivery_settings: {
                     threshold: settings.delivery_threshold,
                     charge: settings.delivery_charge,
                     gst: settings.delivery_gst
                 },
 
                 // Final
-                finalAmount: Math.round(finalAmount * 100) / 100,
+                final_amount: Math.round(finalAmount * 100) / 100,
 
                 // Metadata for order creation
                 _meta: {
-                    sellerStateCode: taxResult.summary.sellerStateCode,
-                    buyerStateCode: taxResult.summary.buyerStateCode,
-                    calculatedAt: new Date().toISOString()
+                    seller_state_code: taxResult.summary.seller_state_code,
+                    buyer_state_code: taxResult.summary.buyer_state_code,
+                    calculated_at: new Date().toISOString()
                 }
             };
 

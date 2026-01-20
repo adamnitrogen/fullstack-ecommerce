@@ -1,4 +1,4 @@
-const supabase = require('../config/supabase');
+const { supabase, supabaseAdmin } = require('../config/supabase');
 const logger = require('../utils/logger');
 const { updatePaymentRecord } = require('./checkout.service');
 const emailService = require('./email');
@@ -227,7 +227,7 @@ async function handleEventWebhook(event, payment, notes) {
                         .from('events')
                         .select('title, date, location')
                         .eq('id', updatedReg.event_id)
-                        .single();
+                        .maybeSingle();
 
                     if (eventDetails) {
                         await emailService.sendEventRegistrationEmail(
@@ -259,7 +259,7 @@ async function handleOrderWebhook(event, payload, payment) {
             .from('payments')
             .select('*')
             .eq('razorpay_order_id', payment.order_id)
-            .single();
+            .maybeSingle();
 
         if (dbPayment) {
             if (dbPayment.status === 'PAYMENT_SUCCESS') {
@@ -275,12 +275,12 @@ async function handleOrderWebhook(event, payload, payment) {
             });
 
             if (dbPayment.order_id) {
-                const { data: updatedOrder } = await supabase
+                const { data: updatedOrder } = await supabaseAdmin
                     .from('orders')
                     .update({
-                        payment_status: 'paid', // Keep 'paid' for backward compatibility or UI mapping -> maps to PAYMENT_SUCCESS
+                        payment_status: 'paid',
                         status: 'confirmed',
-                        updated_at: new Date().toISOString() // Fixed case from updatedAt
+                        updated_at: new Date().toISOString()
                     })
                     .eq('id', dbPayment.order_id)
                     .select('*, order_items(*)')
@@ -317,10 +317,10 @@ async function handleOrderWebhook(event, payload, payment) {
                         }
 
                         await emailService.sendOrderConfirmationEmail(
-                            updatedOrder.customer_email || updatedOrder.customerEmail,
+                            updatedOrder.customer_email,
                             {
                                 order: updatedOrder,
-                                customerName: updatedOrder.customer_name || updatedOrder.customerName
+                                customerName: updatedOrder.customer_name
                             },
                             updatedOrder.user_id
                         );
@@ -338,7 +338,7 @@ async function handleOrderWebhook(event, payload, payment) {
             .from('payments')
             .select('*')
             .eq('razorpay_order_id', payment.order_id)
-            .single();
+            .maybeSingle();
 
         if (dbPayment) {
             await updatePaymentRecord(dbPayment.id, {
@@ -366,7 +366,7 @@ async function handleOrderWebhook(event, payload, payment) {
             .from('payments')
             .select('*, refunds(*)') // Fetch related refunds
             .eq('razorpay_payment_id', refundEntity.payment_id)
-            .single();
+            .maybeSingle();
 
         if (paymentError || !dbPayment) {
             logger.error(`[Webhook] Error finding payment for refund:`, paymentError);

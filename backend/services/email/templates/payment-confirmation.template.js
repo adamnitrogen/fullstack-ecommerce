@@ -7,7 +7,7 @@ const { wrapInTemplate, APP_NAME, FRONTEND_URL } = require('./base.template');
 
 function getPaymentConfirmationEmail({ customerName, order, paymentId, amount, method }) {
     const firstName = customerName ? customerName.split(' ')[0] : 'Customer';
-    const orderNumber = order.orderNumber || order.order_number || order.id;
+    const orderNumber = order.order_number || order.id;
 
     const content = `
         <h2>Payment Received! ✅</h2>

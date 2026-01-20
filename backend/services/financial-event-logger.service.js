@@ -94,7 +94,7 @@ class FinancialEventLogger {
                     }
                 })
                 .select('id')
-                .single();
+                .maybeSingle();
 
             if (error) {
                 log.operationError('LOG_FINANCIAL_EVENT', error, { eventType, entityId });

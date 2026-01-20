@@ -669,7 +669,7 @@ export default function OrderDetail() {
                                                         </p>
                                                         {/* Base Price Display */}
                                                         {(() => {
-                                                            const gstRate = item.gst_rate || 0;
+                                                            const gstRate = item.gst_rate || item.product?.gstRate || item.product?.gst_rate || item.product?.default_gst_rate || 0;
                                                             const baseUnitPrice = gstRate > 0 ? bundledUnitPrice / (1 + gstRate / 100) : bundledUnitPrice;
                                                             return (
                                                                 <p className="text-xs text-slate-500">
@@ -867,8 +867,8 @@ export default function OrderDetail() {
                                         )
                                     )}
 
-                                    {/* 2. Tax Invoice */}
-                                    {(order.invoice_url || order.invoices?.find(i => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type))) && (
+                                    {/* 2. Tax Invoice - Only show for DELIVERED orders */}
+                                    {order.status === 'delivered' && (order.invoice_url || order.invoices?.find(i => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type))) && (
                                         <Button
                                             variant="outline"
                                             size="sm"
@@ -882,7 +882,7 @@ export default function OrderDetail() {
                                                 }
                                             }}
                                         >
-                                            <FileText className="mr-1.5 h-3 w-3" /> Download GST Invoice
+                                            <FileText className="mr-1.5 h-3 w-3" /> Invoice
                                         </Button>
                                     )}
                                 </div>

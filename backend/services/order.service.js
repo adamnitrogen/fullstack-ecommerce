@@ -89,7 +89,7 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
 
         // 6. Handle Refund Logic
         const PRE_SHIP_STATUSES = [ORDER_STATUS.PENDING, ORDER_STATUS.CONFIRMED, ORDER_STATUS.PROCESSING, ORDER_STATUS.PACKED];
-        const isPaid = order.paymentStatus === 'paid' || order.payment_status === 'paid';
+        const isPaid = order.payment_status === 'paid';
         let refundInitiated = false;
 
         // Resolve payment_id: Use order.payment_id, or fallback to lookup via payments.order_id
@@ -100,7 +100,7 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
                 .from('payments')
                 .select('id')
                 .eq('order_id', orderId)
-                .single();
+                .maybeSingle();
             if (paymentRecord) {
                 resolvedPaymentId = paymentRecord.id;
                 logger.info(`[Order ${orderId}] Found payment via fallback: ${resolvedPaymentId}`);
@@ -150,7 +150,7 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
                         `)
                         .eq('order_id', orderId)
                         .eq('status', 'approved')
-                        .single();
+                        .maybeSingle();
 
                     if (retErr || !returnReq) {
                         logger.error(`[Order ${orderId}] No approved return request found for this order. Skipping refund.`);
@@ -245,7 +245,7 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
                     .select('refund_amount, refund_breakdown')
                     .eq('order_id', orderId)
                     .eq('status', 'approved')
-                    .single();
+                    .maybeSingle();
 
                 emailService.send('REFUND_INITIATED', orderWithUser.profiles.email, {
                     customerName: orderWithUser.profiles.name,
@@ -518,7 +518,7 @@ async function getOrderById(id, user) {
             supabase.from('payments')
                 .select('razorpay_payment_id, method, status, invoice_id, refunds(*)')
                 .eq('id', data.payment_id)
-                .single()
+                .maybeSingle()
                 .then(({ data }) => ({ type: 'payment_with_refunds', data }))
         );
     } else {
@@ -527,7 +527,7 @@ async function getOrderById(id, user) {
             supabase.from('payments')
                 .select('razorpay_payment_id, method, status, invoice_id, refunds(*)')
                 .eq('order_id', id)
-                .single()
+                .maybeSingle()
                 .then(({ data }) => ({ type: 'payment_with_refunds', data }))
                 .catch(() => ({ type: 'payment_with_refunds', data: null }))
         );
@@ -647,15 +647,15 @@ async function getOrderById(id, user) {
 
     return {
         ...data,
-        customer_name: profile.name || data.customer_name || data.customerName || 'Unknown',
-        customer_email: profile.email || data.customer_email || data.customerEmail || data.user_email,
-        customer_phone: profile.phone || data.customer_phone || data.customerPhone || data.user_phone || shippingAddress?.phone,
+        customer_name: profile.name || data.customer_name || 'Unknown',
+        customer_email: profile.email || data.customer_email || 'N/A',
+        customer_phone: profile.phone || data.customer_phone || shippingAddress?.phone,
         shipping_address: shippingAddress,
         billing_address: billingAddress,
         items: mappedItems,
-        created_at: data.created_at || data.createdAt,
-        total_amount: data.total_amount || data.totalAmount || data.total || 0,
-        payment_status: data.payment_status || data.paymentStatus || 'pending',
+        created_at: data.created_at,
+        total_amount: data.total_amount || 0,
+        payment_status: data.payment_status || 'pending',
         // Return readable Razorpay ID if available, otherwise internal ID
         payment_id: paymentDetails?.razorpay_payment_id || data.payment_id,
         payment_method: paymentDetails?.method,

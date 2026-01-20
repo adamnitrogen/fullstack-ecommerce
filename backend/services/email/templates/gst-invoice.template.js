@@ -14,33 +14,33 @@ function getGSTInvoiceEmail({ customerName, order, invoiceUrl, taxBreakdown }) {
 
     // Build tax summary section
     let taxSummaryHtml = '';
-    if (taxBreakdown && taxBreakdown.totalTax > 0) {
-        const isInterState = taxBreakdown.taxType === 'INTER';
+    if (taxBreakdown && taxBreakdown.total_tax > 0) {
+        const isInterState = taxBreakdown.tax_type === 'INTER';
 
         taxSummaryHtml = `
             <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
                 <tr style="background-color: #f8f9fa;">
                     <td style="padding: 12px; border: 1px solid #e9ecef;"><strong>Taxable Amount</strong></td>
-                    <td style="padding: 12px; border: 1px solid #e9ecef; text-align: right;">₹${taxBreakdown.totalTaxableAmount?.toFixed(2) || '0.00'}</td>
+                    <td style="padding: 12px; border: 1px solid #e9ecef; text-align: right;">₹${taxBreakdown.total_taxable_amount?.toFixed(2) || '0.00'}</td>
                 </tr>
                 ${isInterState ? `
                 <tr>
                     <td style="padding: 12px; border: 1px solid #e9ecef;">IGST</td>
-                    <td style="padding: 12px; border: 1px solid #e9ecef; text-align: right;">₹${taxBreakdown.totalIgst?.toFixed(2) || '0.00'}</td>
+                    <td style="padding: 12px; border: 1px solid #e9ecef; text-align: right;">₹${taxBreakdown.total_igst?.toFixed(2) || '0.00'}</td>
                 </tr>
                 ` : `
                 <tr>
                     <td style="padding: 12px; border: 1px solid #e9ecef;">CGST</td>
-                    <td style="padding: 12px; border: 1px solid #e9ecef; text-align: right;">₹${taxBreakdown.totalCgst?.toFixed(2) || '0.00'}</td>
+                    <td style="padding: 12px; border: 1px solid #e9ecef; text-align: right;">₹${taxBreakdown.total_cgst?.toFixed(2) || '0.00'}</td>
                 </tr>
                 <tr>
                     <td style="padding: 12px; border: 1px solid #e9ecef;">SGST</td>
-                    <td style="padding: 12px; border: 1px solid #e9ecef; text-align: right;">₹${taxBreakdown.totalSgst?.toFixed(2) || '0.00'}</td>
+                    <td style="padding: 12px; border: 1px solid #e9ecef; text-align: right;">₹${taxBreakdown.total_sgst?.toFixed(2) || '0.00'}</td>
                 </tr>
                 `}
                 <tr style="background-color: #e7f3ff;">
                     <td style="padding: 12px; border: 1px solid #e9ecef;"><strong>Total Tax</strong></td>
-                    <td style="padding: 12px; border: 1px solid #e9ecef; text-align: right;"><strong>₹${taxBreakdown.totalTax?.toFixed(2) || '0.00'}</strong></td>
+                    <td style="padding: 12px; border: 1px solid #e9ecef; text-align: right;"><strong>₹${taxBreakdown.total_tax?.toFixed(2) || '0.00'}</strong></td>
                 </tr>
                 <tr style="background-color: #d4edda;">
                     <td style="padding: 12px; border: 1px solid #e9ecef;"><strong>Total Paid</strong></td>

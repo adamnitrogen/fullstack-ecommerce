@@ -21,8 +21,8 @@ function getOrderConfirmationEmail({ order, customerName }) {
         const itemTotal = item.total_amount || (price * quantity);
 
         // Tax Info (if applicable)
-        const taxInfo = (item.gst_rate || item.gstRate) ?
-            `<br><span style="color: #888; font-size: 10px;">GST: ${item.gst_rate || item.gstRate}% (HSN: ${item.hsn_code || 'N/A'})</span>` : '';
+        const taxInfo = item.gst_rate ?
+            `<br><span style="color: #888; font-size: 10px;">GST: ${item.gst_rate}% (HSN: ${item.hsn_code || 'N/A'})</span>` : '';
 
         return `
         <tr>
@@ -40,7 +40,7 @@ function getOrderConfirmationEmail({ order, customerName }) {
         `;
     }).join('') || '';
 
-    const displayOrderNumber = order.orderNumber || order.order_number || order.id;
+    const displayOrderNumber = order.order_number || order.id;
 
     // Address Formatting
     const formatAddr = (addr) => {
@@ -54,8 +54,8 @@ function getOrderConfirmationEmail({ order, customerName }) {
         `;
     };
 
-    const shippingAddrHtml = formatAddr(order.shippingAddress || order.shipping_address);
-    const billingAddrHtml = formatAddr(order.billingAddress || order.billing_address);
+    const shippingAddrHtml = formatAddr(order.shipping_address);
+    const billingAddrHtml = formatAddr(order.billing_address);
 
     // Invoice Link Section
     let invoiceSection = '';
@@ -79,8 +79,8 @@ function getOrderConfirmationEmail({ order, customerName }) {
         
         <div class="success-box">
             <strong>Order Number:</strong> ${displayOrderNumber}<br>
-            <strong>Order Date:</strong> ${new Date(order.createdAt || order.created_at || Date.now()).toLocaleDateString()}<br>
-            <strong>Payment Status:</strong> ${(order.paymentStatus || 'Paid').toUpperCase()}
+            <strong>Order Date:</strong> ${new Date(order.created_at || Date.now()).toLocaleDateString()}<br>
+            <strong>Payment Status:</strong> ${(order.payment_status || 'Paid').toUpperCase()}
         </div>
 
         ${invoiceSection}
@@ -140,7 +140,7 @@ function getOrderConfirmationEmail({ order, customerName }) {
                 ` : ''}
                 <tr style="font-weight: bold; font-size: 16px;">
                     <td colspan="2" style="padding: 15px; text-align: right; border-top: 2px solid #eee;">Total:</td>
-                    <td style="padding: 15px; text-align: right; border-top: 2px solid #eee;">₹${(order.totalAmount || order.total_amount || order.amount || 0).toFixed(2)}</td>
+                    <td style="padding: 15px; text-align: right; border-top: 2px solid #eee;">₹${(order.total_amount || 0).toFixed(2)}</td>
                 </tr>
             </tfoot>
         </table>
@@ -159,7 +159,7 @@ function getOrderConfirmationEmail({ order, customerName }) {
  */
 function getOrderStatusUpdateEmail({ order, customerName, newStatus }) {
     const firstName = customerName ? customerName.split(' ')[0] : 'Customer';
-    const displayOrderNumber = order.orderNumber || order.order_number || order.id;
+    const displayOrderNumber = order.order_number || order.id;
 
     const statusMessages = {
         'shipped': 'Your order has been shipped! 🚚',
@@ -177,11 +177,11 @@ function getOrderStatusUpdateEmail({ order, customerName, newStatus }) {
             <strong>New Status:</strong> ${newStatus.toUpperCase()}
         </div>
 
-        ${newStatus === 'cancelled' && (order.paymentStatus === 'paid' || order.paymentStatus === 'refund_initiated' || order.paymentStatus === 'refunded') ? `
+        ${newStatus === 'cancelled' && (order.payment_status === 'paid' || order.payment_status === 'refund_initiated' || order.payment_status === 'refunded') ? `
         <div style="margin-top: 20px; padding: 15px; background-color: #e2e3e5; border: 1px solid #d6d8db; border-radius: 5px;">
             <p style="margin: 0; color: #383d41;">
                 <strong>Refund Information:</strong><br>
-                A refund for <strong>₹${(order.totalAmount || 0).toFixed(2)}</strong> has been initiated immediately to your original payment source.<br>
+                A refund for <strong>₹${(order.total_amount || 0).toFixed(2)}</strong> has been initiated immediately to your original payment source.<br>
                 It typically takes <strong>5-7 business days</strong> for the amount to reflect in your account.
             </p>
         </div>
@@ -212,7 +212,7 @@ function getOrderStatusUpdateEmail({ order, customerName, newStatus }) {
  */
 function getOrderCancellationEmail({ order, customerName }) {
     const firstName = customerName ? customerName.split(' ')[0] : 'Customer';
-    const displayOrderNumber = order.orderNumber || order.order_number || order.id;
+    const displayOrderNumber = order.order_number || order.id;
 
     const content = `
         <h2>Order Cancelled 🛑</h2>
@@ -223,11 +223,11 @@ function getOrderCancellationEmail({ order, customerName }) {
             <strong>Status:</strong> CANCELLED
         </div>
 
-        ${(order.paymentStatus === 'paid' || order.paymentStatus === 'refund_initiated' || order.paymentStatus === 'refunded') ? `
+        ${(order.payment_status === 'paid' || order.payment_status === 'refund_initiated' || order.payment_status === 'refunded') ? `
         <div style="margin-top: 20px; padding: 15px; background-color: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 5px;">
             <p style="margin: 0; color: #374151;">
                 <strong>Refund Initiated:</strong><br>
-                A refund for <strong>₹${(order.totalAmount || 0).toFixed(2)}</strong> has been initiated to your original payment method.<br>
+                A refund for <strong>₹${(order.total_amount || 0).toFixed(2)}</strong> has been initiated to your original payment method.<br>
                 It typically takes <strong>5-7 business days</strong> to reflect in your account.
             </p>
         </div>

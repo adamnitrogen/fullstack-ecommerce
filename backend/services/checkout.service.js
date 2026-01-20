@@ -87,22 +87,22 @@ const getCheckoutSummary = async (userId, addressId = null) => {
             // totals has deliveryGST which is the SUM of global and product delivery GSTs
             const deliveryGstTotal = totals.deliveryGST || 0;
             if (deliveryGstTotal > 0) {
-                taxResult.summary.totalTax += deliveryGstTotal;
-                taxResult.summary.totalAmount += deliveryGstTotal; // Note: totalAmount in TaxEngine is taxable+tax
+                taxResult.summary.total_tax += deliveryGstTotal;
+                taxResult.summary.total_amount += deliveryGstTotal; // Note: total_amount in TaxEngine is taxable+tax
 
-                if (taxResult.summary.taxType === 'INTER') {
-                    taxResult.summary.totalIgst += deliveryGstTotal;
+                if (taxResult.summary.tax_type === 'INTER') {
+                    taxResult.summary.total_igst += deliveryGstTotal;
                 } else {
                     const cgst = Math.round((deliveryGstTotal / 2) * 100) / 100;
                     const sgst = deliveryGstTotal - cgst;
-                    taxResult.summary.totalCgst += cgst;
-                    taxResult.summary.totalSgst += sgst;
+                    taxResult.summary.total_cgst += cgst;
+                    taxResult.summary.total_sgst += sgst;
                 }
             }
 
             log.debug('CHECKOUT_TAX', 'Tax calculated inclusive of delivery', {
-                taxType: taxResult.summary.taxType,
-                totalTax: taxResult.summary.totalTax
+                tax_type: taxResult.summary.tax_type,
+                total_tax: taxResult.summary.total_tax
             });
         } catch (err) {
             log.warn('CHECKOUT_TAX_ERROR', 'Failed to calculate taxes', { error: err.message });
@@ -384,9 +384,9 @@ const createOrder = async (userId, checkoutData, cart) => {
     try {
         taxResult = TaxEngine.calculateOrderTax(cart.cart_items, shippingAddr);
         log.info('ORDER_TAX', 'Tax calculated for order', {
-            taxType: taxResult.summary.taxType,
-            totalTax: taxResult.summary.totalTax,
-            totalAmount: taxResult.summary.totalAmount
+            tax_type: taxResult.summary.tax_type,
+            total_tax: taxResult.summary.total_tax,
+            total_amount: taxResult.summary.total_amount
         });
     } catch (err) {
         log.warn('ORDER_TAX_ERROR', 'Failed to calculate taxes, proceeding without', { error: err.message });
@@ -413,10 +413,10 @@ const createOrder = async (userId, checkoutData, cart) => {
         payment_status: 'paid',
         notes: notes || null,
         // Tax summary - Include Delivery logic
-        total_taxable_amount: (taxResult?.summary.totalTaxableAmount || 0) + (totals.deliveryCharge || 0),
-        total_cgst: (taxResult?.summary.totalCgst || 0) + ((!taxResult?.summary.isInterState && totals.deliveryGST) ? (totals.deliveryGST / 2) : 0),
-        total_sgst: (taxResult?.summary.totalSgst || 0) + ((!taxResult?.summary.isInterState && totals.deliveryGST) ? (totals.deliveryGST / 2) : 0),
-        total_igst: (taxResult?.summary.totalIgst || 0) + ((taxResult?.summary.isInterState && totals.deliveryGST) ? totals.deliveryGST : 0)
+        total_taxable_amount: (taxResult?.summary.total_taxable_amount || 0) + (totals.deliveryCharge || 0),
+        total_cgst: (taxResult?.summary.total_cgst || 0) + ((taxResult?.summary.tax_type !== 'INTER' && totals.deliveryGST) ? (totals.deliveryGST / 2) : 0),
+        total_sgst: (taxResult?.summary.total_sgst || 0) + ((taxResult?.summary.tax_type !== 'INTER' && totals.deliveryGST) ? (totals.deliveryGST / 2) : 0),
+        total_igst: (taxResult?.summary.total_igst || 0) + ((taxResult?.summary.tax_type === 'INTER' && totals.deliveryGST) ? totals.deliveryGST : 0)
     };
 
     // Determine free delivery status for item calculations
@@ -505,13 +505,13 @@ const createOrder = async (userId, checkoutData, cart) => {
             coupon_code: totals.coupon?.code || null,
             coupon_discount: itemDetail?.coupon_discount || 0,
             // Tax snapshot (immutable)
-            taxable_amount: taxBreakdown.taxableAmount || null,
+            taxable_amount: taxBreakdown.taxable_amount || null,
             cgst: taxBreakdown.cgst || 0,
             sgst: taxBreakdown.sgst || 0,
             igst: taxBreakdown.igst || 0,
-            hsn_code: taxBreakdown.hsnCode || null,
-            gst_rate: taxBreakdown.gstRate || null,
-            total_amount: taxBreakdown.totalAmount || null,
+            hsn_code: taxBreakdown.hsn_code || null,
+            gst_rate: taxBreakdown.gst_rate || null,
+            total_amount: taxBreakdown.total_amount || null,
             variant_snapshot: variant.id ? {
                 variant_id: variant.id,
                 size_label: variant.size_label,
@@ -561,28 +561,27 @@ const createOrder = async (userId, checkoutData, cart) => {
     // Prepare order object for response and email (no bundling)
     const order = {
         id: rpcResult.id,
-        order_number: rpcResult.order_number || rpcResult.orderNumber,
-        orderNumber: rpcResult.order_number || rpcResult.orderNumber,
+        order_number: rpcResult.order_number,
         status: rpcResult.status,
-        totalAmount: rpcResult.totalAmount || rpcResult.total_amount,
-        customerName: profile.name,
-        customerEmail: profile.email,
+        total_amount: rpcResult.total_amount,
+        customer_name: profile.name,
+        customer_email: profile.email,
         items: orderItems,
         // Add missing details for email template
-        shippingAddress: shippingAddr,
-        billingAddress: billingAddr,
+        shipping_address: shippingAddr,
+        billing_address: billingAddr,
         subtotal: totals.totalPrice,
         delivery_charge: totals.deliveryCharge, // Show full delivery charge
         coupon_discount: totals.couponDiscount || 0,
-        createdAt: new Date(),
-        // Tax summary
+        created_at: new Date(),
+        // Tax summary - Use snake_case from TaxEngine
         tax: taxResult ? {
-            totalTaxableAmount: (taxResult.summary.totalTaxableAmount || 0) + (totals.deliveryCharge || 0),
-            totalCgst: (taxResult.summary.totalCgst || 0) + ((!taxResult.summary.isInterState && totals.deliveryGST) ? (totals.deliveryGST / 2) : 0),
-            totalSgst: (taxResult.summary.totalSgst || 0) + ((!taxResult.summary.isInterState && totals.deliveryGST) ? (totals.deliveryGST / 2) : 0),
-            totalIgst: (taxResult.summary.totalIgst || 0) + ((taxResult.summary.isInterState && totals.deliveryGST) ? totals.deliveryGST : 0),
-            totalTax: (taxResult.summary.totalTax || 0) + (totals.deliveryGST || 0),
-            taxType: taxResult.summary.taxType
+            total_taxable_amount: (taxResult.summary.total_taxable_amount || 0) + (totals.deliveryCharge || 0),
+            total_cgst: (taxResult.summary.total_cgst || 0) + ((taxResult.summary.tax_type !== 'INTER' && totals.deliveryGST) ? (totals.deliveryGST / 2) : 0),
+            total_sgst: (taxResult.summary.total_sgst || 0) + ((taxResult.summary.tax_type !== 'INTER' && totals.deliveryGST) ? (totals.deliveryGST / 2) : 0),
+            total_igst: (taxResult.summary.total_igst || 0) + ((taxResult.summary.tax_type === 'INTER' && totals.deliveryGST) ? totals.deliveryGST : 0),
+            total_tax: (taxResult.summary.total_tax || 0) + (totals.deliveryGST || 0),
+            tax_type: taxResult.summary.tax_type
         } : null
     };
 
@@ -748,7 +747,7 @@ const handleWebhookEvent = async (payload) => {
                 .from('payments')
                 .select('*')
                 .eq('razorpay_order_id', payment.order_id)
-                .single();
+                .maybeSingle();
 
             if (dbPayment) {
                 // Update payment status
@@ -790,7 +789,7 @@ const handleWebhookEvent = async (payload) => {
                 .from('payments')
                 .select('*')
                 .eq('razorpay_order_id', payment.order_id) // Razorpay usually sends order_id even on fail
-                .single();
+                .maybeSingle();
 
             if (dbPayment) {
                 await updatePaymentRecord(dbPayment.id, {
@@ -1097,7 +1096,7 @@ async function processPaymentAndOrder(userId, {
         if (userProfile?.email) {
             emailService.send('PAYMENT_CONFIRMED', userProfile.email, {
                 customerName: userProfile.name,
-                order: { id: razorpay_order_id, orderNumber: razorpay_order_id }, // We don't have our internal order ID yet, use Razorpay Order ID for ref
+                order: { id: razorpay_order_id, order_number: razorpay_order_id },
                 paymentId: razorpay_payment_id,
                 amount: captureAmount,
                 method: 'razorpay'
@@ -1175,8 +1174,8 @@ async function processPaymentAndOrder(userId, {
             success: true,
             order: {
                 id: order.id,
-                orderNumber: order.orderNumber || order.order_number,
-                totalAmount: order.totalAmount || order.total_amount,
+                order_number: order.order_number,
+                total_amount: order.total_amount,
                 status: order.status
             }
         };
@@ -1384,8 +1383,8 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
             success: true,
             order: {
                 id: order.id,
-                orderNumber: order.orderNumber || order.order_number,
-                totalAmount: order.totalAmount || order.total_amount,
+                order_number: order.order_number,
+                total_amount: order.total_amount,
                 status: order.status
             }
         };
