@@ -312,7 +312,7 @@ async function getAllOrders(user, {
 
     // Apply Common Filters
     if (status === 'active_returns') {
-        query = query.in('status', ['return_requested', 'return_approved', 'partially_returned']);
+        query = query.in('status', ['return_requested', 'return_approved']);
     } else if (status && status !== 'all') {
         query = query.eq('status', status);
     }

@@ -636,15 +636,9 @@ export default function OrderDetail() {
                                         const displayImage = item.variant_snapshot?.variant_image_url || item.variant?.variant_image_url || item.product?.images?.[0];
                                         const itemTitle = item.title || item.product?.title || "Product";
 
-                                        // Calculate Bundled Price
+                                        // Bundling Logic Removed for Clarity
                                         const rawUnitPrice = item.price_per_unit || item.price || item.product?.price || item.variant_snapshot?.selling_price || 0;
-                                        const itemTotalRaw = item.quantity * rawUnitPrice;
-
-                                        let bundledUnitPrice = rawUnitPrice;
-                                        if (nonRefundableTotalToBundle > 0 && itemsTotalAmount > 0) {
-                                            const portion = (itemTotalRaw / itemsTotalAmount) * nonRefundableTotalToBundle;
-                                            bundledUnitPrice = rawUnitPrice + (portion / item.quantity);
-                                        }
+                                        const bundledUnitPrice = rawUnitPrice;
 
                                         return (
                                             <div key={index} className="border-b pb-4 last:border-0 last:pb-0">
@@ -673,6 +667,16 @@ export default function OrderDetail() {
                                                                 ({(item.product?.price_includes_tax ?? item.product?.default_price_includes_tax ?? true) ? 'Inc. Tax' : 'Excl. Tax'})
                                                             </span>
                                                         </p>
+                                                        {/* Base Price Display */}
+                                                        {(() => {
+                                                            const gstRate = item.gst_rate || 0;
+                                                            const baseUnitPrice = gstRate > 0 ? bundledUnitPrice / (1 + gstRate / 100) : bundledUnitPrice;
+                                                            return (
+                                                                <p className="text-xs text-slate-500">
+                                                                    Base Price: ₹{baseUnitPrice.toFixed(2)} (Excl. Tax)
+                                                                </p>
+                                                            );
+                                                        })()}
                                                         {(item.gst_rate || 0) > 0 && (
                                                             <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
                                                                 <p>Generic Tax: {item.gst_rate}% (HSN: {item.hsn_code || 'N/A'})</p>
@@ -794,7 +798,9 @@ export default function OrderDetail() {
 
                                 {order.payment_id && (
                                     <div className="col-span-2 pt-2 border-t border-dashed mt-2">
-                                        <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold mb-2">Razorpay Metadata</p>
+                                        <div className="flex justify-between items-end mb-2">
+                                            <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">Razorpay Metadata</p>
+                                        </div>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
                                                 <p className="text-muted-foreground text-[11px]">Payment ID</p>
@@ -807,6 +813,25 @@ export default function OrderDetail() {
                                                 </div>
                                             )}
                                         </div>
+
+                                        {/* Refund Metadata Display */}
+                                        {order.refunds && order.refunds.length > 0 && (
+                                            <div className="mt-3 space-y-2">
+                                                <p className="text-[10px] text-red-600 uppercase tracking-widest font-semibold">Refunds Processed</p>
+                                                {order.refunds.map((ref, idx) => (
+                                                    <div key={idx} className="grid grid-cols-2 gap-4 bg-red-50/50 p-2 rounded border border-red-100/50">
+                                                        <div>
+                                                            <p className="text-muted-foreground text-[11px]">Refund ID ({ref.status})</p>
+                                                            <code className="bg-white px-1 rounded text-[10px] break-all text-red-700 border border-red-100">{ref.razorpay_refund_id || ref.id}</code>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="text-muted-foreground text-[11px]">Amount</p>
+                                                            <span className="text-xs font-medium text-red-700">₹{(ref.amount || 0).toFixed(2)}</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
@@ -862,39 +887,6 @@ export default function OrderDetail() {
                                     )}
                                 </div>
                             </div>
-
-                            {/* NEW: Refund Information Section */}
-                            {order.refunds && order.refunds.length > 0 && (
-                                <div className="col-span-2 pt-0 mt-4">
-                                    <div className="bg-red-50 border border-red-100 rounded-md p-3">
-                                        <p className="text-[10px] text-red-800 uppercase tracking-widest font-semibold mb-3 flex items-center gap-2">
-                                            <RotateCcw className="h-3 w-3" />
-                                            Refund Details
-                                        </p>
-                                        <div className="space-y-3">
-                                            {(order.refunds || []).map((refund, idx) => (
-                                                <div key={idx} className="grid grid-cols-2 gap-4 text-xs border-b border-red-100 last:border-0 pb-2 last:pb-0">
-                                                    <div>
-                                                        <p className="text-red-700/70 mb-0.5">Processing ID (Razorpay)</p>
-                                                        <code className="bg-white px-1.5 py-0.5 border border-red-200 rounded text-[10px] break-all text-red-800 font-mono">
-                                                            {refund.razorpay_refund_id || refund.id}
-                                                        </code>
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-red-700/70 mb-0.5">Refundable Amount</p>
-                                                        <p className="font-bold text-red-700 text-sm">₹{refund.amount.toFixed(2)}</p>
-                                                    </div>
-                                                    {refund.notes && (
-                                                        <div className="col-span-2 text-[10px] text-red-600 italic bg-white/50 p-1.5 rounded">
-                                                            Note: {refund.notes}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
 
                         </CardContent>
                     </Card>
@@ -1003,58 +995,60 @@ export default function OrderDetail() {
                     </Card>
 
                     {/* Email History */}
-                    {order.email_logs && order.email_logs.length > 0 && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <Mail className="h-5 w-5" />
-                                    Email Notifications
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    {order.email_logs.map((email: EmailLog, index: number) => (
-                                        <div key={index} className="flex gap-4 items-start border-l-2 border-muted pl-4 ml-2 pb-4 last:pb-0">
-                                            <div className="flex-1">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="font-medium text-sm">{(email.event_type || 'Unknown').replace(/_/g, ' ')}</span>
-                                                    <Badge
-                                                        variant={email.status === 'SENT' ? 'default' : email.status === 'FAILED' ? 'destructive' : 'secondary'}
-                                                        className={`text-xs ${email.status === 'SENT' ? 'bg-green-100 text-green-800 border-green-200 hover:bg-green-100' : ''}`}
-                                                    >
-                                                        {email.status}
-                                                    </Badge>
+                    {
+                        order.email_logs && order.email_logs.length > 0 && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <Mail className="h-5 w-5" />
+                                        Email Notifications
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-4">
+                                        {order.email_logs.map((email: EmailLog, index: number) => (
+                                            <div key={index} className="flex gap-4 items-start border-l-2 border-muted pl-4 ml-2 pb-4 last:pb-0">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="font-medium text-sm">{(email.event_type || 'Unknown').replace(/_/g, ' ')}</span>
+                                                        <Badge
+                                                            variant={email.status === 'SENT' ? 'default' : email.status === 'FAILED' ? 'destructive' : 'secondary'}
+                                                            className={`text-xs ${email.status === 'SENT' ? 'bg-green-100 text-green-800 border-green-200 hover:bg-green-100' : ''}`}
+                                                        >
+                                                            {email.status}
+                                                        </Badge>
+                                                    </div>
+                                                    <div className="flex justify-between items-center mt-1">
+                                                        <p className="text-xs text-muted-foreground">
+                                                            To: {email.recipient}
+                                                        </p>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {(() => {
+                                                                try {
+                                                                    return format(new Date(email.created_at), "MMM d, h:mm a");
+                                                                } catch (e) {
+                                                                    return "Date N/A";
+                                                                }
+                                                            })()}
+                                                        </p>
+                                                    </div>
+                                                    {email.status === 'FAILED' && (
+                                                        <p className="text-xs text-red-600 mt-1 font-medium bg-red-50 p-1.5 rounded border border-red-100">
+                                                            Error: {email.error_message || 'Unknown error'} (Retries: {email.retry_count})
+                                                        </p>
+                                                    )}
                                                 </div>
-                                                <div className="flex justify-between items-center mt-1">
-                                                    <p className="text-xs text-muted-foreground">
-                                                        To: {email.recipient}
-                                                    </p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {(() => {
-                                                            try {
-                                                                return format(new Date(email.created_at), "MMM d, h:mm a");
-                                                            } catch (e) {
-                                                                return "Date N/A";
-                                                            }
-                                                        })()}
-                                                    </p>
-                                                </div>
-                                                {email.status === 'FAILED' && (
-                                                    <p className="text-xs text-red-600 mt-1 font-medium bg-red-50 p-1.5 rounded border border-red-100">
-                                                        Error: {email.error_message || 'Unknown error'} (Retries: {email.retry_count})
-                                                    </p>
-                                                )}
                                             </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
-                </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )
+                    }
+                </div >
 
                 {/* Right Column - Customer & Address */}
-                <div className="space-y-6">
+                < div className="space-y-6" >
                     <Card>
                         <CardHeader>
                             <CardTitle>Customer Details</CardTitle>
@@ -1150,22 +1144,24 @@ export default function OrderDetail() {
                         role="admin"
                     />
 
-                    {order.payment_status === 'paid' && (
-                        <Card>
-                            <CardContent className="pt-6">
-                                <RegenerateInvoiceButton
-                                    orderId={order.id}
-                                    onSuccess={fetchOrderDetail}
-                                    className="w-full"
-                                />
-                            </CardContent>
-                        </Card>
-                    )}
-                </div>
-            </div>
+                    {
+                        order.payment_status === 'paid' && (
+                            <Card>
+                                <CardContent className="pt-6">
+                                    <RegenerateInvoiceButton
+                                        orderId={order.id}
+                                        onSuccess={fetchOrderDetail}
+                                        className="w-full"
+                                    />
+                                </CardContent>
+                            </Card>
+                        )
+                    }
+                </div >
+            </div >
 
             {/* Status Update Confirmation Dialog */}
-            <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+            < AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen} >
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Confirm Status Update</AlertDialogTitle>
@@ -1187,10 +1183,10 @@ export default function OrderDetail() {
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
-            </AlertDialog>
+            </AlertDialog >
 
             {/* Rejection Reason Dialog */}
-            <AlertDialog open={rejectionDialogOpen} onOpenChange={setRejectionDialogOpen}>
+            < AlertDialog open={rejectionDialogOpen} onOpenChange={setRejectionDialogOpen} >
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Reject Return Request</AlertDialogTitle>
@@ -1232,10 +1228,10 @@ export default function OrderDetail() {
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
-            </AlertDialog>
+            </AlertDialog >
 
             {/* Admin Cancellation Reason Dialog */}
-            <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+            < AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen} >
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Cancel Order</AlertDialogTitle>
@@ -1270,7 +1266,7 @@ export default function OrderDetail() {
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
-            </AlertDialog>
+            </AlertDialog >
         </div >
     );
 }
