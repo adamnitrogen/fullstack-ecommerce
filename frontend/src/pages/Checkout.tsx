@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { BackButton } from "@/components/ui/BackButton";
+import favicon from "@/assets/favicon.png";
 
 // Type for Buy Now navigation state
 interface BuyNowState {
@@ -199,45 +200,59 @@ export default function Checkout() {
     try {
       setProcessing(true);
 
-      // Load Razorpay SDK first
-      const isLoaded = await loadRazorpay();
-      if (!isLoaded) {
-        toast.error("Failed to load payment gateway. Please check your connection.");
-        setProcessing(false);
-        return;
-      }
+      // PHASE 2B OPTIMIZATION: Stock validation now inline for both Buy Now AND Cart
+      // No separate validation API call needed - backend validates during payment creation
 
-      // Pre-payment stock validation (different endpoints for buy now vs cart)
-      let stockValidation;
-      if (isBuyNow && buyNowData) {
-        stockValidation = await checkoutService.validateStockForBuyNow(buyNowData);
-      } else {
-        stockValidation = await checkoutService.validateStock();
-      }
-
-      if (!stockValidation.valid) {
-        setStockIssues(stockValidation.items);
-        setShowStockModal(true);
-        setProcessing(false);
-        return;
-      }
-
-      // 1. Create Payment Order on Backend (different endpoints for buy now vs cart)
+      // 1. Create Payment Order on Backend (stock validation inline)
       let orderData;
-      if (isBuyNow && buyNowData) {
-        orderData = await checkoutService.createPaymentOrderForBuyNow(buyNowData);
-      } else {
-        orderData = await checkoutService.createPaymentOrder(summary.totals.finalAmount);
+      try {
+        if (isBuyNow && buyNowData) {
+          orderData = await checkoutService.createPaymentOrderForBuyNow(buyNowData);
+        } else {
+          orderData = await checkoutService.createPaymentOrder(summary.totals.finalAmount);
+        }
+      } catch (error: any) {
+        // Handle inline stock validation failures from payment creation
+        if (error?.response?.data?.stockIssue && isBuyNow) {
+          // Buy Now single item failure
+          const stockIssue = error.response.data.stockIssue;
+          const errorMsg = error.response.data.error || '';
+
+          // Extract product title from error message
+          const titleMatch = errorMsg.match(/Sorry, (.+?) is/);
+          const productTitle = titleMatch ? titleMatch[1] : 'Product';
+
+          setStockIssues([{
+            productId: stockIssue.productId,
+            variantId: stockIssue.variantId || null,
+            title: productTitle,
+            variantLabel: null,
+            requestedQty: stockIssue.requestedQty,
+            availableStock: stockIssue.availableStock,
+            image: null
+          }]);
+          setShowStockModal(true);
+          setProcessing(false);
+          return;
+        } else if (error?.response?.data?.stockIssues) {
+          // Cart multiple items failure  
+          setStockIssues(error.response.data.stockIssues);
+          setShowStockModal(true);
+          setProcessing(false);
+          return;
+        }
+        // Re-throw other errors to be handled by outer catch
+        throw error;
       }
 
       // 2. Initialize Razorpay Options
       const options = {
-        key: orderData.key_id,
+        key: summary.razorpay_key_id || orderData.key_id, // PHASE 2B: Use key from summary (fallback to orderData for compatibility)
         amount: orderData.amount,
         currency: orderData.currency,
         name: "MeriGauMata",
         description: isBuyNow ? "Buy Now Order" : "Order Payment",
-        image: "https://lovable.dev/opengraph-image-p98pqg.png",
+        image: favicon,
         order_id: orderData.order_id,
         handler: async function (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) {
           // Show full screen loader during verification

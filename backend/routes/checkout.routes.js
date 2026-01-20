@@ -36,6 +36,10 @@ router.get('/summary', async (req, res) => {
 
         const { addressId } = req.query;
         const summary = await getCheckoutSummary(userId, addressId);
+
+        // PHASE 2B OPTIMIZATION: Include Razorpay key in summary (one less data point in payment order response)
+        summary.razorpay_key_id = process.env.RAZORPAY_KEY_ID;
+
         res.json(summary);
     } catch (error) {
         logger.error({ err: error }, 'Error fetching checkout summary:');
@@ -117,6 +121,7 @@ router.get('/validate-stock', async (req, res) => {
 
 // Create Razorpay INVOICE (replaces Order)
 // Protected by request lock and idempotency to prevent duplicate invoices
+// NOW INCLUDES INLINE STOCK VALIDATION (Phase 2B Optimization)
 router.post('/create-payment-order', validate(createPaymentOrderSchema), requestLock('create-payment-order'), idempotency(), async (req, res) => {
     try {
         const userId = getUserId(req);
@@ -145,6 +150,61 @@ router.post('/create-payment-order', validate(createPaymentOrderSchema), request
 
         const totals = await cartService.calculateCartTotals(userId, cart);
         const amount = totals.finalAmount;
+
+        // PHASE 2B OPTIMIZATION: Inline stock validation (eliminates separate API call)
+        const supabase = require('../config/supabase');
+        const stockIssues = [];
+
+        for (const item of cart.cart_items) {
+            const variantId = item.variant_id;
+            const productId = item.product_id;
+            const requestedQty = item.quantity;
+
+            let availableStock = 0;
+            let productTitle = item.products?.title || 'Product';
+            let variantLabel = null;
+
+            if (variantId) {
+                // Check variant stock
+                const { data: variant } = await supabase
+                    .from('product_variants')
+                    .select('stock_quantity, size_label')
+                    .eq('id', variantId)
+                    .single();
+
+                availableStock = variant?.stock_quantity || 0;
+                variantLabel = variant?.size_label;
+            } else {
+                // Check product inventory
+                const { data: product } = await supabase
+                    .from('products')
+                    .select('inventory')
+                    .eq('id', productId)
+                    .single();
+
+                availableStock = product?.inventory || 0;
+            }
+
+            if (requestedQty > availableStock) {
+                stockIssues.push({
+                    productId,
+                    variantId,
+                    title: productTitle,
+                    variantLabel,
+                    requestedQty,
+                    availableStock,
+                    image: item.products?.images?.[0] || null
+                });
+            }
+        }
+
+        // Return user-friendly error if stock insufficient
+        if (stockIssues.length > 0) {
+            return res.status(400).json({
+                error: 'Some items in your cart are out of stock. Please review and update your cart.',
+                stockIssues
+            });
+        }
 
         // 3. Receipt ID
         const receipt = `order_${Date.now()}_${userId.substring(0, 8)}`;
@@ -259,6 +319,9 @@ router.post('/buy-now/summary', async (req, res) => {
         const { getBuyNowSummary } = require('../services/checkout.service');
         const summary = await getBuyNowSummary(userId, { productId, variantId, quantity }, addressId);
 
+        // PHASE 2B OPTIMIZATION: Include Razorpay key in summary
+        summary.razorpay_key_id = process.env.RAZORPAY_KEY_ID;
+
         res.json(summary);
     } catch (error) {
         logger.error({ err: error }, 'Error fetching buy now summary:');
@@ -344,6 +407,7 @@ router.post('/buy-now/validate-stock', async (req, res) => {
 });
 
 // Create payment order for Buy Now (single item)
+// NOW INCLUDES INLINE STOCK VALIDATION (Phase 2 Optimization)
 router.post('/buy-now/create-payment-order', requestLock('create-payment-order'), idempotency(), async (req, res) => {
     try {
         const userId = getUserId(req);
@@ -361,11 +425,61 @@ router.post('/buy-now/create-payment-order', requestLock('create-payment-order')
             return res.status(400).json({ error: 'Please select a valid quantity (1-100).' });
         }
 
+        const supabase = require('../config/supabase');
+
+        // PHASE 2 OPTIMIZATION: Inline stock validation (eliminates separate API call)
+        let availableStock = 0;
+        let productTitle = 'Product';
+        let variantLabel = null;
+
+        if (variantId) {
+            // Check variant stock
+            const { data: variant } = await supabase
+                .from('product_variants')
+                .select('stock_quantity, size_label')
+                .eq('id', variantId)
+                .single();
+
+            availableStock = variant?.stock_quantity || 0;
+            variantLabel = variant?.size_label;
+
+            // Get product title for error message
+            const { data: product } = await supabase
+                .from('products')
+                .select('title')
+                .eq('id', productId)
+                .single();
+            productTitle = product?.title || 'Product';
+        } else {
+            // Check product inventory
+            const { data: product } = await supabase
+                .from('products')
+                .select('title, inventory')
+                .eq('id', productId)
+                .single();
+
+            availableStock = product?.inventory || 0;
+            productTitle = product?.title || 'Product';
+        }
+
+        // Return user-friendly error if stock insufficient
+        if (quantity > availableStock) {
+            const itemDesc = variantLabel ? `${productTitle} (${variantLabel})` : productTitle;
+            return res.status(400).json({
+                error: `Sorry, ${itemDesc} is ${availableStock === 0 ? 'out of stock' : `low on stock (only ${availableStock} available)`}. Please adjust your quantity.`,
+                stockIssue: {
+                    productId,
+                    variantId,
+                    requestedQty: quantity,
+                    availableStock
+                }
+            });
+        }
+
         const { getBuyNowSummary, createRazorpayInvoice, createPaymentRecord } = require('../services/checkout.service');
         const summary = await getBuyNowSummary(userId, { productId, variantId, quantity });
         const amount = summary.totals.finalAmount;
 
-        const supabase = require('../config/supabase');
         // Get User Profile
         const { data: profile } = await supabase
             .from('profiles')
