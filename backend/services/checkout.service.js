@@ -73,26 +73,9 @@ const createBuyNowVirtualCart = async (userId, guestId, buyNowData) => {
         }
     }
 
-    // 2. Check for matching item in User's Cart to Merge Quantity
-    let finalQuantity = quantity;
-    if (userId || guestId) {
-        try {
-            const cart = await getUserCart(userId, guestId);
-            if (cart && cart.cart_items) {
-                const matchingItem = cart.cart_items.find(item =>
-                    item.product_id === productId &&
-                    (item.variant_id === variantId || (!item.variant_id && !variantId))
-                );
-
-                if (matchingItem) {
-                    finalQuantity += matchingItem.quantity;
-                    log.info({ userId, productId, originalQty: quantity, addedQty: matchingItem.quantity }, 'Merged Buy Now quantity with existing cart item');
-                }
-            }
-        } catch (error) {
-            log.warn({ err: error }, 'Failed to check user cart for merging Buy Now quantity (Non-critical)');
-        }
-    }
+    // 2. Use exact Buy Now quantity - do not merge with cart
+    // Buy Now intent is "purchase THIS item NOW", not "purchase this + cart items"
+    const finalQuantity = quantity;
 
     // 3. Construct Virtual Cart
     return {
