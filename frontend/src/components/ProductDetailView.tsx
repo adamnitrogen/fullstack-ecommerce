@@ -150,19 +150,9 @@ export const ProductDetailView = ({
       return;
     }
 
-    // Add to cart first (ensures item is in cart even if checkout is abandoned)
-    try {
-      setIsBuying(true);
-      await addItem(product, 1, selectedVariant?.id);
-    } catch (error) {
-      logger.error("Add to cart during Buy Now failed:", error);
-      // Logic continues even if cart add fails (e.g. if it was already there)
-    } finally {
-      setIsBuying(false);
-    }
-
-    // Navigate to checkout with buy now item in state
+    // Navigate directly to checkout with buy now item in state
     // This ensures only this item is checked out, not the entire cart
+    // No need to add to cart - Buy Now should skip cart entirely
     navigate("/checkout", {
       state: {
         buyNowItem: {
