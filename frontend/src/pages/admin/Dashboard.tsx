@@ -155,7 +155,7 @@ export default function AdminDashboard() {
       icon: RotateCcw,
       trend: (stats?.pendingReturns || 0) > 0 ? `${stats?.pendingReturns} awaiting action` : 'All caught up!',
       trendUp: false, // More is usually not better in this context
-      onClick: () => navigate("/admin/orders?status=return_requested")
+      onClick: () => navigate("/admin/orders?status=active_returns")
     },
   ];
 

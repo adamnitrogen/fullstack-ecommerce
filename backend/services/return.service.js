@@ -9,6 +9,7 @@ const emailService = require('./email');
 const { createModuleLogger } = require('../utils/logging-standards');
 
 const log = createModuleLogger('ReturnService');
+const { logStatusHistory } = require('./history.service');
 
 // Initialize Razorpay
 const razorpay = new Razorpay({
@@ -295,196 +296,66 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
 };
 
 const processReturnApproval = async (returnId, adminId) => {
-    // 1. Fetch Return Details with Items and User Info
+    // 1. Fetch Return Details
     const { data: returnRequest, error: fetchError } = await supabaseAdmin
         .from('returns')
         .select(`
-            *,
+            id,
+            status,
+            order_id,
+            user_id,
             orders (
                 id,
-                payment_id,
-                payment_status,
-                user_id,
+                order_number,
                 profiles(email, name)
-            ),
-            return_items (
-                quantity,
-                order_item_id,
-                order_items (
-                    price_per_unit,
-                    product_id,
-                    quantity,
-                    returned_quantity,
-                    taxable_amount,
-                    cgst,
-                    sgst,
-                    igst,
-                    total_amount,
-                    delivery_charge,
-                    delivery_gst,
-                    delivery_calculation_snapshot
-                )
             )
         `)
         .eq('id', returnId)
         .single();
 
     if (fetchError || !returnRequest) throw new Error('Return request not found');
-    if (!['requested', 'picked_up'].includes(returnRequest.status)) {
+    if (returnRequest.status !== 'requested') {
         throw new Error(`Return request cannot be approved from ${returnRequest.status} state`);
     }
 
-    // 2. Calculate Final Refund Amount (use stored breakdown if available)
-    const orderItemsData = returnRequest.return_items.map(ri => ({
-        ...ri.order_items,
-        id: ri.order_item_id
-    }));
-    const returnItems = returnRequest.return_items.map(ri => ({
-        orderItemId: ri.order_item_id,
-        quantity: ri.quantity
-    }));
-
-    // Calculate product refund
-    const refundCalc = RefundCalculator.calculateReturnTotal(orderItemsData, returnItems);
-    const productRefundAmount = refundCalc.summary.totalRefund;
-
-    // Calculate delivery refund with policy enforcement
-    let deliveryRefundAmount = 0;
-    let deliveryGSTRefundAmount = 0;
-    let deliveryPolicyDetails = [];
-
-    try {
-        const deliveryRefund = await DeliveryChargeService.calculateRefundDelivery(
-            orderItemsData,
-            returnItems
-        );
-
-        deliveryRefundAmount = deliveryRefund.refundDeliveryCharge;
-        deliveryGSTRefundAmount = deliveryRefund.refundDeliveryGST;
-        deliveryPolicyDetails = deliveryRefund.policyDetails;
-
-        log.info('RETURN_DELIVERY_REFUND', 'Delivery refund calculated', {
-            refundDelivery: deliveryRefundAmount,
-            refundDeliveryGST: deliveryGSTRefundAmount,
-            isRefundable: deliveryRefund.isRefundable
-        });
-    } catch (error) {
-        log.warn('RETURN_DELIVERY_REFUND_ERROR', 'Failed to calculate delivery refund', { error: error.message });
-    }
-
-    // Calculate total refund amount including delivery
-    const totalRefundAmount = productRefundAmount + deliveryRefundAmount + deliveryGSTRefundAmount;
-
-    // 3. Process Razorpay Refund
-    let payment;
-    if (returnRequest.orders.payment_id) {
-        const { data } = await supabaseAdmin
-            .from('payments')
-            .select('razorpay_payment_id')
-            .eq('id', returnRequest.orders.payment_id)
-            .single();
-        payment = data;
-    }
-
-    if (!payment?.razorpay_payment_id) {
-        // Fallback: search by order_id
-        const { data: fallbackPayment } = await supabaseAdmin
-            .from('payments')
-            .select('razorpay_payment_id')
-            .eq('order_id', returnRequest.order_id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-        payment = fallbackPayment;
-    }
-
-    if (!payment?.razorpay_payment_id) {
-        throw new Error('Razorpay payment ID not found for this order');
-    }
-
-    log.info('RAZORPAY_REFUND_START', 'Initiating Razorpay refund', {
-        paymentId: payment.razorpay_payment_id,
-        amount: totalRefundAmount
-    });
-
-    const refund = await razorpay.payments.refund(
-        payment.razorpay_payment_id,
-        {
-            amount: Math.round(totalRefundAmount * 100), // Amount in paise
-            notes: {
-                return_id: returnId,
-                product_refund: productRefundAmount,
-                delivery_refund: deliveryRefundAmount,
-                delivery_gst_refund: deliveryGSTRefundAmount,
-                delivery_policies: JSON.stringify(deliveryPolicyDetails.map(p => ({
-                    product_id: p.product_id,
-                    policy: p.policy
-                })))
-            }
-        }
-    );
-
-    // 4. Update Status and Records
-    const itemsToUpdate = [];
-    for (const item of returnRequest.return_items) {
-        itemsToUpdate.push({
-            id: item.order_item_id,
-            returned_quantity: item.order_items.returned_quantity + item.quantity
-        });
-    }
-
-    // Update Return Status
+    // 2. Update Statuses
+    // Update Return Request status
     await supabaseAdmin.from('returns').update({
         status: 'approved',
-        refund_amount: totalRefundAmount,
         updated_at: new Date().toISOString()
     }).eq('id', returnId);
 
-    // Create refund log
-    await supabaseAdmin.from('refunds').insert({
-        return_id: returnId,
-        order_id: returnRequest.order_id,
-        razorpay_refund_id: refund.id,
-        amount: totalRefundAmount,
-        status: refund.status,
-        created_at: new Date().toISOString()
-    });
+    // Update all Return Items status to approved
+    await supabaseAdmin.from('return_items').update({
+        status: 'approved'
+    }).eq('return_id', returnId);
 
-    // Update Order Items returned_quantity
-    for (const update of itemsToUpdate) {
-        await supabaseAdmin
-            .from('order_items')
-            .update({ returned_quantity: update.returned_quantity })
-            .eq('id', update.id);
-    }
-
-    // Update Order Status
+    // 3. Update Order Status
     await supabaseAdmin
         .from('orders')
         .update({ status: 'return_approved' })
         .eq('id', returnRequest.order_id);
 
-    // Log History
+    // 4. Log History
     const orderService = require('./order.service');
-    await orderService.logStatusHistory(returnRequest.order_id, 'return_approved', adminId, `Return approved! MeriGauMata has initiated your refund of ₹${totalRefundAmount}. It will reflect in your account soon.`, 'ADMIN');
+    await orderService.logStatusHistory(returnRequest.order_id, 'return_approved', adminId, 'Return approved! We will now proceed with picking up the items.', 'ADMIN');
 
-    // Log Financial Event
-    FinancialEventLogger.logReturnApproved(returnId, returnRequest.order_id, adminId, totalRefundAmount)
-        .catch(err => log.warn('AUDIT_LOG_ERROR', 'Failed to log return approval', { error: err.message }));
-
-    // Send RETURN_APPROVED Email
+    // 5. Send RETURN_APPROVED Email (using order_number for clarity)
     const userEmail = returnRequest.orders?.profiles?.email;
     const userName = returnRequest.orders?.profiles?.name;
+    const orderNumber = returnRequest.orders?.order_number || returnRequest.order_id.slice(0, 8).toUpperCase();
+
     if (userEmail) {
         emailService.send('RETURN_APPROVED', userEmail, {
             customerName: userName,
-            order: { id: returnRequest.order_id, order_number: returnRequest.order_id.slice(0, 8).toUpperCase() },
-            estimatedRefund: totalRefundAmount
-        }, returnRequest.orders?.user_id, returnRequest.id)
+            order: { id: returnRequest.order_id, order_number: orderNumber },
+            order_id: returnRequest.order_id,
+            order_number: orderNumber
+        }, returnRequest.user_id, returnId)
             .catch(err => log.warn('EMAIL_ERROR', 'Failed to send return approved email', { error: err.message }));
     }
 
-    return { success: true, refundId: refund.id, amount: totalRefundAmount };
+    return { success: true };
 };
 
 const processReturnRejection = async (returnId, adminId, reason) => {
@@ -493,8 +364,10 @@ const processReturnRejection = async (returnId, adminId, reason) => {
         .from('returns')
         .select(`
             order_id,
+            status,
             orders (
                 user_id,
+                order_number,
                 profiles(email, name)
             )
         `)
@@ -531,10 +404,12 @@ const processReturnRejection = async (returnId, adminId, reason) => {
         // Send RETURN_REJECTED Email
         const userEmail = returnRequest.orders?.profiles?.email;
         const userName = returnRequest.orders?.profiles?.name;
+        const orderNumber = returnRequest.orders?.order_number || returnRequest.order_id.slice(0, 8).toUpperCase();
+
         if (userEmail) {
             emailService.send('RETURN_REJECTED', userEmail, {
                 customerName: userName,
-                order: { id: returnRequest.order_id, order_number: returnRequest.order_id.slice(0, 8).toUpperCase() },
+                order: { id: returnRequest.order_id, order_number: orderNumber },
                 reason
             }, returnRequest.orders?.user_id, returnId)
                 .catch(err => log.warn('EMAIL_ERROR', 'Failed to send return rejected email', { error: err.message }));
@@ -591,13 +466,10 @@ const updateReturnStatus = async (returnId, status, adminId, notes = '') => {
     if (fetchError || !returnRequest) throw new Error('Return request not found');
 
     // 2. Validate Transition Logic
-    // requested -> picked_up
-    if (status === 'picked_up' && returnRequest.status !== 'requested') {
-        throw new Error('Can only mark as Picked Up from Requested status');
+    const validStatuses = ['approved', 'pickup_scheduled', 'picked_up', 'item_returned', 'cancelled', 'completed'];
+    if (!validStatuses.includes(status)) {
+        throw new Error(`Invalid return status: ${status}`);
     }
-
-    // approved/rejected are handled by specific functions, but we allow generic status sync if needed
-    // However, we strictly enforce picked_up here.
 
     // 3. Update Status
     const { error: updateError } = await supabaseAdmin
@@ -611,11 +483,257 @@ const updateReturnStatus = async (returnId, status, adminId, notes = '') => {
 
     if (updateError) throw updateError;
 
-    // 4. Log Status History match
+    // 4. Log Status History
     const orderService = require('./order.service');
     await orderService.logStatusHistory(returnRequest.order_id, `return_${status}`, adminId, `Return request status updated to ${status}. ${notes}`, 'ADMIN');
 
+    // 5. If marking as picked_up, update all items too if they are still 'approved'
+    if (status === 'picked_up') {
+        await supabaseAdmin
+            .from('return_items')
+            .update({ status: 'picked_up' })
+            .eq('return_id', returnId)
+            .eq('status', 'approved');
+    }
+
     return { success: true };
+};
+
+/**
+ * Marks a specific Return Item as returned at the warehouse/dealer.
+ * Triggers the refund for that specific item.
+ */
+const updateReturnItemStatus = async (returnItemId, status, adminId, notes = '') => {
+    // 1. Fetch Item Details with Return information
+    const { data: item, error: fetchError } = await supabaseAdmin
+        .from('return_items')
+        .select(`
+            *,
+            returns (
+                id,
+                order_id,
+                user_id,
+                refund_breakdown
+            ),
+            order_items (*)
+        `)
+        .eq('id', returnItemId)
+        .single();
+
+    if (fetchError || !item) throw new Error('Return item not found');
+
+    const oldStatus = item.status;
+    if (oldStatus === status) return { success: true };
+
+    log.info('UPDATE_RETURN_ITEM_STATUS', `Updating item ${returnItemId} to ${status}`, {
+        oldStatus,
+        newStatus: status
+    });
+
+    // 2. Update Status
+    const { error: updateError } = await supabaseAdmin
+        .from('return_items')
+        .update({ status })
+        .eq('id', returnItemId);
+
+    if (updateError) throw updateError;
+
+    // 3. If status is 'item_returned', trigger the refund trigger
+    if (status === 'item_returned') {
+        await handleItemRefund(item, adminId);
+    }
+
+    // 4. Re-aggregate Return Request and Order state
+    await aggregateReturnState(item.return_id);
+    await aggregateOrderState(item.returns.order_id);
+
+    // 5. Log detailed history for item receipt
+    await logStatusHistory(item.returns.order_id, 'ITEM_RETURNED', adminId, `Item received at warehouse: ${item.order_items.title} (Qty: ${item.quantity})`, 'ADMIN', 'ITEM_RETURNED');
+
+    return { success: true };
+};
+
+/**
+ * Handle specific item refund via Razorpay
+ */
+const handleItemRefund = async (item, adminId) => {
+    const returnId = item.return_id;
+    const orderId = item.returns.order_id;
+
+    // 1. Calculate specific item refund amount
+    // If it's a partial return, we use the price_per_unit * quantity
+    // Tax and Delivery should be handled correctly based on the breakdown
+
+    // Check if identifying as fully returned in order_items
+    const newReturnedQty = item.order_items.returned_quantity + item.quantity;
+
+    // Idempotency: skip if we've already refunded this specific return_item
+    const { data: existingRefund } = await supabaseAdmin
+        .from('refunds')
+        .select('id')
+        .eq('return_id', returnId)
+        .eq('status', 'processed')
+        .eq('metadata->return_item_id', item.id)
+        .maybeSingle();
+
+    if (existingRefund) {
+        log.warn('REFUND_IDEMPOTENCY_BLOCK', 'Refund already exists for this return item', { returnItemId: item.id });
+        return;
+    }
+
+    // Calculate product refund for this item
+    const itemSubtotal = item.order_items.price_per_unit * item.quantity;
+    const itemCGST = (item.order_items.cgst / item.order_items.quantity) * item.quantity;
+    const itemSGST = (item.order_items.sgst / item.order_items.quantity) * item.quantity;
+    const itemIGST = (item.order_items.igst / item.order_items.quantity) * item.quantity;
+
+    let refundAmount = itemSubtotal + itemCGST + itemSGST + itemIGST;
+
+    // Check if this is the LAST item of the return request 
+    // If so, we might want to attach the delivery refund if not already done.
+    const { data: otherItems } = await supabaseAdmin
+        .from('return_items')
+        .select('status')
+        .eq('return_id', returnId)
+        .neq('id', item.id);
+
+    const allOthersReturned = otherItems.every(oi => oi.status === 'item_returned');
+    if (allOthersReturned) {
+        const totalDeliveryRefund = item.returns.refund_breakdown?.totalDeliveryRefund || 0;
+        // In a real system, we might want to track if delivery refund was already processed.
+        // For simplicity, we add it to the last item's refund.
+        refundAmount += totalDeliveryRefund;
+    }
+
+    // 2. Fetch Razorpay Payment ID
+    const { data: payment } = await supabaseAdmin
+        .from('payments')
+        .select('razorpay_payment_id')
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+    if (!payment?.razorpay_payment_id) throw new Error('Payment ID not found');
+
+    // 3. Initiate Razorpay Refund
+    log.info('RAZORPAY_REFUND_INIT', `Refunding ₹${refundAmount} for item ${item.id}`, { paymentId: payment.razorpay_payment_id });
+
+    const refund = await razorpay.payments.refund(payment.razorpay_payment_id, {
+        amount: Math.round(refundAmount * 100),
+        notes: {
+            return_id: returnId,
+            return_item_id: item.id,
+            order_id: orderId
+        }
+    });
+
+    // 4. Log Refund and Update Order Item
+    await supabaseAdmin.from('refunds').insert({
+        return_id: returnId,
+        order_id: orderId,
+        razorpay_refund_id: refund.id,
+        amount: refundAmount,
+        status: refund.status,
+        metadata: { return_item_id: item.id }
+    });
+
+    await supabaseAdmin.from('order_items').update({
+        returned_quantity: newReturnedQty
+    }).eq('id', item.order_item_id);
+
+    // 5. Log detailed refund history
+    await logStatusHistory(orderId, 'refund_initiated', adminId, `Refund of ₹${refundAmount.toFixed(2)} processed for item: ${item.order_items.title}. (Razorpay Refund ID: ${refund.id})`, 'ADMIN', 'REFUND_INITIATED');
+
+    log.info('REFUND_SUCCESS', `Refund processed for item ${item.id}`, { refundId: refund.id });
+};
+
+/**
+ * Aggregates Return Request Status based on items
+ */
+const aggregateReturnState = async (returnId) => {
+    const { data: items } = await supabaseAdmin
+        .from('return_items')
+        .select('status')
+        .eq('return_id', returnId);
+
+    const allReturned = items.every(i => i.status === 'item_returned');
+    if (allReturned) {
+        await supabaseAdmin.from('returns').update({ status: 'completed' }).eq('id', returnId);
+    }
+};
+
+/**
+ * Aggregates Order Status and Payment Status based on all items and refunds
+ */
+const aggregateOrderState = async (orderId) => {
+    // 1. Calculate Order Status based ONLY on returnable items
+    const { data: orderItems } = await supabaseAdmin
+        .from('order_items')
+        .select('quantity, returned_quantity, products(isReturnable)')
+        .eq('order_id', orderId);
+
+    const returnableItems = (orderItems || []).filter(i => i.products?.isReturnable !== false);
+    const totalReturnableQty = returnableItems.reduce((s, i) => s + (i.quantity || 0), 0);
+    const totalReturnedQty = returnableItems.reduce((s, i) => s + (i.returned_quantity || 0), 0);
+
+    let newStatus = null;
+    if (totalReturnedQty > 0) {
+        newStatus = (totalReturnedQty >= totalReturnableQty) ? 'returned' : 'partially_returned';
+    }
+
+    // 2. Calculate Payment Status
+    const { data: refunds } = await supabaseAdmin
+        .from('refunds')
+        .select('amount')
+        .eq('order_id', orderId)
+        .eq('status', 'processed');
+
+    const totalRefunded = refunds.reduce((s, r) => s + Number(r.amount), 0);
+
+    // Get original order total
+    const { data: order } = await supabaseAdmin
+        .from('orders')
+        .select('total_amount, payment_status')
+        .eq('id', orderId)
+        .single();
+
+    let newPaymentStatus = order.payment_status;
+    if (totalRefunded > 0) {
+        newPaymentStatus = (totalRefunded >= order.total_amount) ? 'refunded' : 'partially_refunded';
+    }
+
+    // 3. Update Order
+    const updates = {};
+    if (newStatus && newStatus !== order.status) updates.status = newStatus;
+    if (newPaymentStatus !== order.payment_status) {
+        updates.payment_status = newPaymentStatus;
+        updates.paymentStatus = newPaymentStatus; // Sync camelCase
+    }
+
+    if (Object.keys(updates).length > 0) {
+        const updateData = { ...updates };
+        // If the order status is 'returned', ensure payment_status is 'refunded'
+        if (updates.status === 'returned') {
+            updateData.payment_status = 'refunded';
+            updateData.paymentStatus = 'refunded';
+        }
+
+        await supabaseAdmin.from('orders').update(updateData).eq('id', orderId);
+
+        const orderService = require('./order.service');
+        if (updates.status) {
+            const statusLabel = updates.status.replace('_', ' ');
+            const message = updates.status === 'returned'
+                ? 'All returnable items have been successfully received and refunded. Order status updated to Returned.'
+                : `Some items have been returned and refunded. Order status updated to Partially Returned.`;
+
+            await orderService.logStatusHistory(orderId, updates.status, 'SYSTEM', message, 'SYSTEM');
+        } else if (updates.payment_status) {
+            // Log payment status change if only payment status changed
+            await orderService.logStatusHistory(orderId, updates.payment_status, 'SYSTEM', `Order payment status automatically updated to ${updates.payment_status} due to item returns.`, 'SYSTEM');
+        }
+    }
 };
 
 const getOrderReturnRequests = async (orderId) => {
@@ -625,6 +743,8 @@ const getOrderReturnRequests = async (orderId) => {
         .select(`
             *,
             return_items (
+                id,
+                status,
                 quantity,
                 reason,
                 images,
@@ -652,5 +772,6 @@ module.exports = {
     processReturnRejection,
     cancelReturnRequest,
     updateReturnStatus,
-    getOrderReturnRequests
+    getOrderReturnRequests,
+    updateReturnItemStatus
 };

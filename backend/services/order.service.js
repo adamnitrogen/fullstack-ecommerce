@@ -311,7 +311,9 @@ async function getAllOrders(user, {
     }
 
     // Apply Common Filters
-    if (status && status !== 'all') {
+    if (status === 'active_returns') {
+        query = query.in('status', ['return_requested', 'return_approved', 'partially_returned']);
+    } else if (status && status !== 'all') {
         query = query.eq('status', status);
     }
     if (payment_status && payment_status !== 'all') {

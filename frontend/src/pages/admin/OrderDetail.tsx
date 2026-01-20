@@ -57,22 +57,39 @@ interface ReturnRequestItem {
     reason: string;
     images?: string[];
     condition?: string;
+    status: 'requested' | 'approved' | 'picked_up' | 'item_returned';
     order_item_id: string;
     order_items?: {
+        id: string;
         title: string;
         price_per_unit: number;
+        quantity: number;
+        cgst?: number;
+        sgst?: number;
+        igst?: number;
         variant_snapshot?: {
             size_label?: string;
             [key: string]: any;
         };
-    };
+    } | Array<{
+        id: string;
+        title: string;
+        price_per_unit: number;
+        quantity: number;
+        cgst?: number;
+        sgst?: number;
+        igst?: number;
+        variant_snapshot?: {
+            size_label?: string;
+            [key: string]: any;
+        };
+    }>;
 }
 
 interface ReturnRequest {
     id: string;
-    order_id: string;
     user_id: string;
-    status: 'requested' | 'picked_up' | 'approved' | 'rejected' | 'cancelled';
+    status: 'requested' | 'approved' | 'pickup_scheduled' | 'picked_up' | 'item_returned' | 'rejected' | 'cancelled' | 'completed';
     reason: string;
     refund_amount: number;
     created_at: string;
@@ -181,10 +198,11 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
     packed: ['shipped', 'cancelled'],
     shipped: ['out_for_delivery'],
     out_for_delivery: ['delivered', 'returned'],
-    delivered: [], // Return requests are customer-initiated only
+    delivered: [],
     return_requested: ['return_approved', 'return_rejected'],
-    return_approved: ['returned'],
-    returned: ['refunded'],
+    return_approved: ['partially_returned', 'returned'],
+    partially_returned: [],
+    returned: [],
     cancelled: ['refunded'],
     refunded: []
 };
@@ -262,7 +280,7 @@ export default function OrderDetail() {
 
             // SPECIAL LOGIC: Return Approval/Rejection
             // (Compatibility fallback for old single active return logic)
-            const activeRet = returnRequests.find(r => r.status === 'requested' || r.status === 'picked_up');
+            const activeRet = returnRequests.find(r => r.status === 'requested' || r.status === 'pickup_scheduled' || r.status === 'picked_up');
             if ((pendingStatus === 'return_approved' || pendingStatus === 'return_rejected') && activeRet) {
                 await handleReturnAction(
                     activeRet.id,
@@ -314,7 +332,7 @@ export default function OrderDetail() {
                 toast.success("Return marked as Picked Up");
             } else if (action === 'approve') {
                 await apiClient.post(`/returns/${returnId}/approve`, { notes });
-                toast.success("Return approved and refund processed");
+                toast.success("Return approved");
             } else if (action === 'reject') {
                 await apiClient.post(`/returns/${returnId}/reject`, { reason: notes });
                 toast.success("Return rejected");
@@ -328,6 +346,24 @@ export default function OrderDetail() {
             setUpdating(false);
             setLoadingMessage("");
             setPendingReturnId(null);
+        }
+    };
+
+    const handleReturnItemStatus = async (item: ReturnRequestItem, status: string) => {
+        try {
+            setUpdating(true);
+            setLoadingMessage(`Updating item status to ${status}...`);
+
+            await apiClient.post(`/returns/items/${item.id}/status`, { status });
+            toast.success(`Item marked as ${status.replace('_', ' ')}`);
+
+            fetchOrderDetail();
+            fetchReturns();
+        } catch (error) {
+            toast.error(getErrorMessage(error, "Failed to update item status"));
+        } finally {
+            setUpdating(false);
+            setLoadingMessage("");
         }
     };
 
@@ -427,18 +463,18 @@ export default function OrderDetail() {
 
                                         {/* Actions for Pending Transitions */}
                                         <div className="flex items-center gap-2">
-                                            {ret.status === 'requested' && (
+                                            {ret.status === 'approved' && (
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
-                                                    className="h-8 text-xs border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                                                    className="h-8 text-xs border-blue-200 text-blue-700 hover:bg-blue-50"
                                                     onClick={() => handleReturnAction(ret.id, 'picked_up')}
                                                     disabled={updating}
                                                 >
                                                     <Truck className="h-3.5 w-3.5 mr-1" /> Mark Picked Up
                                                 </Button>
                                             )}
-                                            {(ret.status === 'requested' || ret.status === 'picked_up') && (
+                                            {ret.status === 'requested' && (
                                                 <>
                                                     <Button
                                                         size="sm"
@@ -497,18 +533,38 @@ export default function OrderDetail() {
                                                         </div>
                                                     )}
                                                 </div>
-                                                <div className="text-right">
-                                                    <div className="font-bold">Qty: {item.quantity}</div>
-                                                    <div className="text-[10px] text-muted-foreground mt-1">
-                                                        ₹{(() => {
-                                                            const orderItem = Array.isArray(item.order_items) ? item.order_items[0] : item.order_items;
-                                                            // Calculate inclusive unit price if possible
-                                                            const base = orderItem?.price_per_unit || 0;
-                                                            const tax = (orderItem?.cgst || 0) + (orderItem?.sgst || 0) + (orderItem?.igst || 0);
-                                                            const unitTax = tax / (orderItem?.quantity || 1);
-                                                            return (base + unitTax).toFixed(2);
-                                                        })()}/unit (incl. tax)
+                                                <div className="flex items-center gap-4">
+                                                    <div className="text-right">
+                                                        <div className="font-bold">Qty: {item.quantity}</div>
+                                                        <div className="text-[10px] text-muted-foreground mt-1">
+                                                            ₹{(() => {
+                                                                const orderItem = Array.isArray(item.order_items) ? item.order_items[0] : item.order_items;
+                                                                // Calculate inclusive unit price if possible
+                                                                const base = orderItem?.price_per_unit || 0;
+                                                                const tax = (orderItem?.cgst || 0) + (orderItem?.sgst || 0) + (orderItem?.igst || 0);
+                                                                const unitTax = tax / (orderItem?.quantity || 1);
+                                                                return (base + unitTax).toFixed(2);
+                                                            })()}/unit (incl. tax)
+                                                        </div>
                                                     </div>
+                                                    {ret.status === 'picked_up' && (
+                                                        <div className="flex flex-col gap-1">
+                                                            <Badge variant={item.status === 'item_returned' ? 'default' : 'outline'} className={item.status === 'item_returned' ? 'bg-green-600' : ''}>
+                                                                {item.status?.replace('_', ' ') || 'Picked Up'}
+                                                            </Badge>
+                                                            {item.status !== 'item_returned' && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="default"
+                                                                    className="h-7 text-[10px] px-2 bg-indigo-600 hover:bg-indigo-700"
+                                                                    onClick={() => handleReturnItemStatus(item, 'item_returned')}
+                                                                    disabled={updating}
+                                                                >
+                                                                    Mark Returned
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))}
@@ -597,7 +653,7 @@ export default function OrderDetail() {
                                                         {displayImage && (
                                                             <img
                                                                 src={displayImage}
-                                                                alt={item.product?.title}
+                                                                alt={itemTitle}
                                                                 className="w-full h-full object-cover"
                                                             />
                                                         )}
@@ -826,7 +882,7 @@ export default function OrderDetail() {
                                                     </div>
                                                     <div>
                                                         <p className="text-red-700/70 mb-0.5">Refundable Amount</p>
-                                                        <p className="font-bold text-red-700 text-sm">₹{refund.amount}</p>
+                                                        <p className="font-bold text-red-700 text-sm">₹{refund.amount.toFixed(2)}</p>
                                                     </div>
                                                     {refund.notes && (
                                                         <div className="col-span-2 text-[10px] text-red-600 italic bg-white/50 p-1.5 rounded">

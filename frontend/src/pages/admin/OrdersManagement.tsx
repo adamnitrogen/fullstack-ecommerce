@@ -129,6 +129,12 @@ export default function OrdersManagement() {
         return "bg-orange-100 text-orange-800";
       case "return_approved":
         return "bg-orange-200 text-orange-900";
+      case "partially_returned":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      case "returned":
+        return "bg-green-100 text-green-800 border-green-200";
+      case "active_returns":
+        return "bg-indigo-100 text-indigo-800 font-bold border-indigo-200";
       default:
         return "bg-gray-100 text-gray-800";
     }
@@ -166,6 +172,7 @@ export default function OrdersManagement() {
             <SelectItem value="processing">Processing</SelectItem>
             <SelectItem value="shipped">Shipped</SelectItem>
             <SelectItem value="delivered">Delivered</SelectItem>
+            <SelectItem value="active_returns">Actionable Returns</SelectItem>
             <SelectItem value="return_requested">Return Requested</SelectItem>
             <SelectItem value="return_approved">Return Approved</SelectItem>
             <SelectItem value="cancelled">Cancelled</SelectItem>

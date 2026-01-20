@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, MapPin, Package, CreditCard, Clock, CheckCircle, AlertTriangle, XCircle, RotateCcw, FileText, CheckSquare } from "lucide-react";
+import { ArrowLeft, MapPin, Package, CreditCard, Clock, CheckCircle, AlertTriangle, XCircle, RotateCcw, FileText, CheckSquare, Truck } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errorUtils";
@@ -96,7 +96,7 @@ interface OrderResponse {
 
 interface ReturnRequest {
     id: string;
-    status: 'requested' | 'picked_up' | 'approved' | 'rejected' | 'cancelled';
+    status: 'requested' | 'approved' | 'pickup_scheduled' | 'picked_up' | 'item_returned' | 'rejected' | 'cancelled' | 'completed';
     refund_amount: number;
     reason: string;
     created_at: string;
@@ -854,45 +854,60 @@ export default function UserOrderDetail() {
                                             <div key={ret.id} className="p-4 space-y-4">
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex items-center gap-3">
-                                                        <div className={`p-1.5 rounded-full ${ret.status === 'approved' ? 'bg-green-100 text-green-700' :
-                                                            ret.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                                                                ret.status === 'cancelled' ? 'bg-gray-100 text-gray-500' :
-                                                                    'bg-orange-100 text-orange-700'
-                                                            }`}>
-                                                            {ret.status === 'approved' ? <CheckCircle className="h-4 w-4" /> :
-                                                                ret.status === 'rejected' ? <XCircle className="h-4 w-4" /> :
-                                                                    ret.status === 'cancelled' ? <XCircle className="h-4 w-4" /> :
-                                                                        <Clock className="h-4 w-4" />}
-                                                        </div>
-                                                        <div>
-                                                            <div className="font-semibold text-sm capitalize">
-                                                                {ret.status.replace('_', ' ')}
-                                                            </div>
-                                                            <div className="text-[10px] text-muted-foreground">
-                                                                Requested on {format(new Date(ret.created_at), "MMM d, yyyy")}
-                                                            </div>
-                                                        </div>
+                                                        <Badge variant={
+                                                            ret.status === 'approved' ? 'default' :
+                                                                ['picked_up', 'pickup_scheduled', 'item_returned'].includes(ret.status) ? 'outline' :
+                                                                    ret.status === 'rejected' ? 'destructive' : 'secondary'
+                                                        } className={`capitalize ${ret.status === 'approved' ? 'bg-green-600 text-white' :
+                                                            ['picked_up', 'pickup_scheduled'].includes(ret.status) ? 'border-blue-500 text-blue-700 bg-blue-50' :
+                                                                ret.status === 'item_returned' ? 'bg-green-50 text-green-700 border-green-200' : ''}`}>
+                                                            {ret.status.replace('_', ' ')}
+                                                        </Badge>
+                                                        <span className="text-xs text-muted-foreground">
+                                                            Requested on {format(new Date(ret.created_at), "MMM d, yyyy")}
+                                                        </span>
                                                     </div>
-
-                                                    <div className="flex items-center gap-2">
-                                                        {ret.status === 'requested' && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                className="h-8 text-xs text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 font-medium"
-                                                                onClick={() => handleCancelReturn(ret.id)}
-                                                                disabled={actionLoading}
-                                                            >
-                                                                Cancel Request
-                                                            </Button>
-                                                        )}
-                                                        {ret.status === 'picked_up' && (
-                                                            <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium border border-blue-100 flex items-center gap-1">
-                                                                <Package className="h-3 w-3" /> Picked Up
-                                                            </span>
-                                                        )}
-                                                    </div>
+                                                    {ret.status === 'requested' && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 text-xs"
+                                                            onClick={() => handleCancelReturn(ret.id)}
+                                                            disabled={actionLoading}
+                                                        >
+                                                            Cancel Request
+                                                        </Button>
+                                                    )}
                                                 </div>
+
+                                                {/* Informational Message about the new workflow */}
+                                                {ret.status === 'approved' && (
+                                                    <div className="bg-blue-50 border border-blue-100 rounded-md p-3 text-xs text-blue-800 flex items-start gap-2">
+                                                        <Clock className="h-4 w-4 mt-0.5 shrink-0" />
+                                                        <p>
+                                                            <strong>Next Step:</strong> Our courier partner will contact you shortly to schedule the pickup.
+                                                            Your refund will be initiated once the items reach our warehouse and are verified.
+                                                        </p>
+                                                    </div>
+                                                )}
+                                                {ret.status === 'picked_up' && (
+                                                    <div className="bg-indigo-50 border border-indigo-100 rounded-md p-3 text-xs text-indigo-800 flex items-start gap-2">
+                                                        <Truck className="h-4 w-4 mt-0.5 shrink-0" />
+                                                        <p>
+                                                            <strong>Item Picked Up:</strong> Your return is on its way to our warehouse.
+                                                            We will process your refund immediately upon receipt and verification of the items.
+                                                        </p>
+                                                    </div>
+                                                )}
+                                                {ret.status === 'item_returned' && (
+                                                    <div className="bg-green-50 border border-green-100 rounded-md p-3 text-xs text-green-800 flex items-start gap-2">
+                                                        <CheckCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                                                        <p>
+                                                            <strong>Returned & Verified:</strong> We have received your returned items.
+                                                            Your refund has been initiated and should reflect in your account within 5-7 business days.
+                                                        </p>
+                                                    </div>
+                                                )}
 
                                                 <div className="space-y-2 bg-gray-50/50 p-3 rounded-lg border border-gray-100">
                                                     {ret.return_items.map((item, idx) => (

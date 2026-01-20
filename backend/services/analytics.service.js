@@ -129,7 +129,7 @@ class AnalyticsService {
                 runSafe(supabase.from(CONFIG.TABLES.PROFILES).select('id', { count: 'exact', head: true }).eq(CONFIG.COLUMNS.ROLE_ID, ROLES.MANAGER), null, 'Total Managers'),
                 runSafe(supabase.from(CONFIG.TABLES.BLOGS).select('id', { count: 'exact', head: true }), null, 'Total Blogs'),
                 runSafe(supabase.from(CONFIG.TABLES.EVENTS).select('id', { count: 'exact', head: true }), null, 'Active Events'),
-                runSafe(supabase.from('returns').select('id', { count: 'exact', head: true }).eq('status', 'requested'), null, 'Pending Returns')
+                runSafe(supabase.from('returns').select('id', { count: 'exact', head: true }).in('status', ['requested', 'approved', 'pickup_scheduled', 'picked_up', 'item_returned']), null, 'Pending Returns')
             ]);
 
             const products = batch1[0];

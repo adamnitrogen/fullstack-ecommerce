@@ -87,6 +87,7 @@ async function logStatusHistory(orderId, statusOrEventType, updatedBy, notes = '
         'refund_initiated': 'REFUND_INITIATED',
         'refunded': 'REFUND_COMPLETED',
         'partially_refunded': 'REFUND_PARTIAL',
+        'ITEM_RETURNED': 'ITEM_RETURNED',
         'PAYMENT_SUCCESS': 'PAYMENT_SUCCESS',
         'PAYMENT_FAILED': 'PAYMENT_FAILED'
     };

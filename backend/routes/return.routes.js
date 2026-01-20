@@ -45,6 +45,20 @@ router.post('/:returnId/status', authenticateToken, requireRole('admin', 'manage
 });
 
 /**
+ * POST /api/returns/items/:returnItemId/status
+ * Admin: Update status of a specific return item (trigggers refund on 'item_returned')
+ */
+router.post('/items/:returnItemId/status', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+    try {
+        const { status, notes } = req.body;
+        await returnService.updateReturnItemStatus(req.params.returnItemId, status, req.user.id, notes);
+        res.json({ message: `Return item status updated to ${status}` });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+/**
  * GET /api/returns/orders/:orderId/items
  * Get eligible items for return for a specific order
  */
@@ -84,7 +98,7 @@ router.post('/request', authenticateToken, async (req, res) => {
 router.post('/:returnId/approve', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
     try {
         const result = await returnService.processReturnApproval(req.params.returnId, req.user.id);
-        res.json({ message: 'Return approved and refund processed', ...result });
+        res.json({ message: 'Return approved', ...result });
     } catch (error) {
         logger.error({ err: error }, 'Approval Error:');
         res.status(500).json({ error: error.message });
