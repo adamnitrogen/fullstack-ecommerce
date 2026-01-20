@@ -1,6 +1,6 @@
 import { logger } from "@/lib/logger";
-import { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiClient } from "@/lib/api-client";
 import {
   Table,
@@ -45,10 +45,23 @@ interface Order {
 
 export default function OrdersManagement() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "all");
+  const initialLoadDone = useRef(false);
+
+  // Sync status filter with URL on mount only if not already set
+  useEffect(() => {
+    if (!initialLoadDone.current) {
+      const urlStatus = searchParams.get("status");
+      if (urlStatus && urlStatus !== statusFilter) {
+        setStatusFilter(urlStatus);
+      }
+      initialLoadDone.current = true;
+    }
+  }, [searchParams, statusFilter]);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -74,10 +87,9 @@ export default function OrdersManagement() {
 
       setOrders(result.data || []);
 
-      // Calculate pagination from meta
       if (result.meta) {
         setTotalOrders(result.meta.total || 0);
-        setTotalPages(result.meta.pages || 1);
+        setTotalPages(result.meta.totalPages || 1);
       }
     } catch (error) {
       logger.error("Error fetching orders:", error);
@@ -87,32 +99,19 @@ export default function OrdersManagement() {
     }
   }, [searchTerm, statusFilter]);
 
+  // Handle search and filter changes
   useEffect(() => {
-    // Debounce search
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
+
+  // Fetch orders whenever page, search, or filter changes
+  useEffect(() => {
     const timer = setTimeout(() => {
-      // Whenever search or filter changes, we reset to page 1.
-      setCurrentPage(1);
-      // We don't fetch here directly to avoid race conditions with the page change effect,
-      // but since setting page to 1 might not trigger the effect if it's already 1,
-      // we need to ensure fetch happens.
-      // Easiest is to call fetchOrders(1) here explicitly.
-      fetchOrders(1);
-    }, 500);
+      fetchOrders(currentPage);
+    }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchTerm, statusFilter, fetchOrders]);
-
-  // Fetch on page change
-  useEffect(() => {
-    // Fetch only if page > 1, because page 1 is handled by the initial load and search debouncer.
-    // However, initial load needs to happen.
-    // Let's refine: The search debouncer runs on mount too (initial render with empty search).
-    // So it will fetch page 1.
-    // If we change page to 2, this effect runs.
-    if (currentPage > 1) {
-      fetchOrders(currentPage);
-    }
-  }, [currentPage, fetchOrders]);
+  }, [currentPage, searchTerm, statusFilter, fetchOrders]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -126,6 +125,10 @@ export default function OrdersManagement() {
         return "bg-green-100 text-green-800";
       case "cancelled":
         return "bg-red-100 text-red-800";
+      case "return_requested":
+        return "bg-orange-100 text-orange-800";
+      case "return_approved":
+        return "bg-orange-200 text-orange-900";
       default:
         return "bg-gray-100 text-gray-800";
     }
@@ -163,6 +166,8 @@ export default function OrdersManagement() {
             <SelectItem value="processing">Processing</SelectItem>
             <SelectItem value="shipped">Shipped</SelectItem>
             <SelectItem value="delivered">Delivered</SelectItem>
+            <SelectItem value="return_requested">Return Requested</SelectItem>
+            <SelectItem value="return_approved">Return Approved</SelectItem>
             <SelectItem value="cancelled">Cancelled</SelectItem>
           </SelectContent>
         </Select>
@@ -205,7 +210,7 @@ export default function OrdersManagement() {
                   <TableCell>{order.customer_name}</TableCell>
                   <TableCell>
                     <Badge variant="secondary" className={getStatusColor(order.status)}>
-                      {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                      {order.status.replace(/_/g, ' ').charAt(0).toUpperCase() + order.status.replace(/_/g, ' ').slice(1)}
                     </Badge>
                   </TableCell>
                   <TableCell>

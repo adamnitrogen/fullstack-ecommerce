@@ -112,7 +112,7 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
             if (newStatus === ORDER_STATUS.CANCELLED && PRE_SHIP_STATUSES.includes(previousStatus)) {
                 // Mark as refund_initiated immediately for UX
                 await supabase.from('orders').update({ payment_status: 'refund_initiated' }).eq('id', orderId); // Fix column name too
-                await logStatusHistory(orderId, 'refund_initiated', userId, 'Refund Initiated: Amount will be credited within 5-7 business days', actingRole);
+                await logStatusHistory(orderId, 'refund_initiated', userId, 'Refund Initiated: Your refund will be credited back to your original payment method within 5-7 business days.', actingRole);
                 refundInitiated = true;
 
                 // Process actual Razorpay refund in background (non-blocking) using RefundService

@@ -5,13 +5,40 @@ const returnService = require('../services/return.service');
 const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
 
 /**
- * GET /api/returns/orders/:orderId/active
- * Get active return request for a specific order (Admin/User)
+ * GET /api/returns/orders/:orderId/all
+ * Get all return requests for a specific order (Admin/User)
  */
-router.get('/orders/:orderId/active', authenticateToken, async (req, res) => {
+router.get('/orders/:orderId/all', authenticateToken, async (req, res) => {
     try {
-        const returnRequest = await returnService.getActiveReturnRequest(req.params.orderId);
-        res.json(returnRequest);
+        const returns = await returnService.getOrderReturnRequests(req.params.orderId);
+        res.json(returns);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+/**
+ * POST /api/returns/:returnId/cancel
+ * User: Cancel a return request (only if status is 'requested')
+ */
+router.post('/:returnId/cancel', authenticateToken, async (req, res) => {
+    try {
+        await returnService.cancelReturnRequest(req.params.returnId, req.user.id);
+        res.json({ message: 'Return request cancelled successfully' });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+/**
+ * POST /api/returns/:returnId/status
+ * Admin: Update return status (e.g., mark as picked_up)
+ */
+router.post('/:returnId/status', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+    try {
+        const { status, notes } = req.body;
+        await returnService.updateReturnStatus(req.params.returnId, status, req.user.id, notes);
+        res.json({ message: `Return status updated to ${status}` });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }

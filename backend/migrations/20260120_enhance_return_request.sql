@@ -17,7 +17,19 @@ BEGIN
     END IF;
 END $$;
 
--- 2. Create Storage Bucket for Return Images if it doesn't exist
+-- 2. Add new columns to returns table
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'returns' AND column_name = 'refund_breakdown') THEN
+        ALTER TABLE returns ADD COLUMN refund_breakdown JSONB;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'returns' AND column_name = 'staff_notes') THEN
+        ALTER TABLE returns ADD COLUMN staff_notes TEXT;
+    END IF;
+END $$;
+
+-- 3. Create Storage Bucket for Return Images if it doesn't exist
 -- Note: Bucket creation is usually done via API or Dashboard, but we can try to insert into storage.buckets if permissions allow.
 -- Ideally, we assume the bucket 'return_images' needs to be created.
 -- Since we are in SQL, we can try to insert if not exists.

@@ -428,6 +428,8 @@ class DeliveryChargeService {
             }
 
             // Recalculate delivery for remaining items + enforce refund policy
+            let globalChargeHandled = false;
+
             for (const [key, group] of itemGroups) {
                 const remainingQuantity = group.original_quantity - group.returned_quantity;
 
@@ -446,31 +448,44 @@ class DeliveryChargeService {
                     remaining_quantity: remainingQuantity
                 });
 
-                // POLICY ENFORCEMENT: Only recalculate if policy allows refunds
-                if (group.delivery_refund_policy === 'REFUNDABLE' && remainingQuantity > 0) {
+                // 1. If NON-REFUNDABLE policy, we keep the original charge as "remaining" to avoid refunding it
+                if (group.delivery_refund_policy === 'NON_REFUNDABLE') {
+                    totalRemainingDelivery += group.delivery_charge;
+                    totalRemainingGST += group.delivery_gst;
+
+                    if (config.source === 'global') globalChargeHandled = true;
+
+                    log.debug('REFUND_POLICY_NON_REFUNDABLE', 'Keeping original charge in remaining', {
+                        product_id: group.product_id,
+                        charge: group.delivery_charge
+                    });
+                    continue;
+                }
+
+                // 2. If REFUNDABLE and items remain, recalculate charge
+                if (remainingQuantity > 0) {
+                    const isGlobal = config.source === 'global';
+
+                    if (isGlobal && globalChargeHandled) {
+                        // Global charge already accounted for by another item or kept by non-refundable policy
+                        continue;
+                    }
+
                     // Recalculate delivery for remaining quantity
                     const result = await this.calculateDeliveryCharge(
                         group.product_id,
                         group.variant_id,
                         remainingQuantity
                     );
+
                     totalRemainingDelivery += result.deliveryCharge;
                     totalRemainingGST += result.deliveryGST;
 
-                    log.debug('REFUND_POLICY_REFUNDABLE', 'Delivery will be refunded', {
-                        product_id: group.product_id,
-                        original: group.delivery_charge,
-                        remaining: result.deliveryCharge
-                    });
-                } else if (group.delivery_refund_policy === 'NON_REFUNDABLE') {
-                    // If non-refundable, remaining delivery = original delivery (no refund)
-                    totalRemainingDelivery += group.delivery_charge;
-                    totalRemainingGST += group.delivery_gst;
+                    if (isGlobal) globalChargeHandled = true;
 
-                    log.info('REFUND_POLICY_NON_REFUNDABLE', 'Delivery charge is non-refundable', {
+                    log.debug('REFUND_CALC_REMAINING', 'Recalculated remaining delivery', {
                         product_id: group.product_id,
-                        delivery_charge: group.delivery_charge,
-                        delivery_gst: group.delivery_gst
+                        charge: result.deliveryCharge
                     });
                 }
             }

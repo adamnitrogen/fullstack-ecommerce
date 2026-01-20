@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Package, Calendar, FileText, ShoppingCart, Users, Heart, Shield, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Package, Calendar, FileText, ShoppingCart, Users, Heart, Shield, Activity, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { analyticsService, DashboardStats } from '@/services/analytics.service';
 import { format } from 'date-fns';
 import { useAuthStore } from '@/store/authStore';
@@ -25,6 +26,7 @@ import { Order } from '@/types';
 export default function AdminDashboard() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [ordersPage, setOrdersPage] = useState(1);
   const ordersLimit = 10;
 
@@ -76,12 +78,26 @@ export default function AdminDashboard() {
         });
         queryClient.invalidateQueries({ queryKey: ['admin-dashboard-stats'] });
       })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'returns' }, (payload) => {
+        // Only notify on initial request
+        if (payload.new.status === 'requested') {
+          toast.info(`New Return Request Received!`, {
+            duration: 60000,
+            icon: <RotateCcw className="h-4 w-4 text-orange-500" />,
+            action: {
+              label: "View Orders",
+              onClick: () => navigate("/admin/orders?status=return_requested")
+            }
+          });
+          queryClient.invalidateQueries({ queryKey: ['admin-dashboard-stats'] });
+        }
+      })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, [queryClient, navigate]);
 
   if (statsError) {
     return (
@@ -132,6 +148,14 @@ export default function AdminDashboard() {
       icon: ShoppingCart,
       trend: stats?.newOrdersCount ? `+${stats.newOrdersCount} this week` : 'No new orders',
       trendUp: (stats?.newOrdersCount || 0) > 0,
+    },
+    {
+      title: 'Pending Returns',
+      value: stats?.pendingReturns?.toString() || '0',
+      icon: RotateCcw,
+      trend: (stats?.pendingReturns || 0) > 0 ? `${stats?.pendingReturns} awaiting action` : 'All caught up!',
+      trendUp: false, // More is usually not better in this context
+      onClick: () => navigate("/admin/orders?status=return_requested")
     },
   ];
 
@@ -197,7 +221,8 @@ export default function AdminDashboard() {
         {dashboardStats.map((stat, index) => (
           <Card
             key={stat.title}
-            className="group relative overflow-hidden border-none shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+            className={`group relative overflow-hidden border-none shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 ${stat.onClick ? "cursor-pointer" : ""}`}
+            onClick={stat.onClick}
           >
             {/* Decorative gradient overlay */}
             <div className="absolute inset-0 bg-gradient-to-br from-white via-white to-[#FDFBF7] opacity-100" />

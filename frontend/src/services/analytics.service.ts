@@ -20,6 +20,7 @@ export interface DashboardStats {
         newOrdersCount: number;
         newCustomersCount: number;
         newDonationsAmount: number;
+        pendingReturns: number;
     };
     productCategories: Array<{
         category: string;

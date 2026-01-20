@@ -763,7 +763,7 @@ const handleWebhookEvent = async (payload) => {
                 if (dbPayment.order_id) {
                     await supabase
                         .from('orders')
-                        .update({ paymentStatus: 'paid', status: 'confirmed' })
+                        .update({ payment_status: 'paid', status: 'confirmed' })
                         .eq('id', dbPayment.order_id);
 
                     // Log history for confirmation
@@ -837,7 +837,7 @@ const handleWebhookEvent = async (payload) => {
                 if (dbPayment.order_id) {
                     await supabase
                         .from('orders')
-                        .update({ paymentStatus: 'refunded', status: 'refunded' })
+                        .update({ payment_status: 'refunded', status: 'refunded' })
                         .eq('id', dbPayment.order_id);
 
                     // Add timeline entry for refund completion

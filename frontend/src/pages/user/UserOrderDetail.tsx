@@ -94,6 +94,24 @@ interface OrderResponse {
     }>;
 }
 
+interface ReturnRequest {
+    id: string;
+    status: 'requested' | 'picked_up' | 'approved' | 'rejected' | 'cancelled';
+    refund_amount: number;
+    reason: string;
+    created_at: string;
+    refund_breakdown?: any;
+    return_items: Array<{
+        quantity: number;
+        reason: string;
+        order_item_id: string;
+        order_items: {
+            title: string;
+            variant_snapshot?: any;
+        }
+    }>;
+}
+
 interface ReturnableItem {
     id: string;
     title: string;
@@ -123,6 +141,7 @@ export default function UserOrderDetail() {
     const [itemReasons, setItemReasons] = useState<Record<string, string>>({});
     const [itemImages, setItemImages] = useState<Record<string, File[]>>({});
     const [itemConditions, setItemConditions] = useState<Record<string, string>>({});
+    const [returns, setReturns] = useState<ReturnRequest[]>([]);
 
     const handleReturnItemChange = (orderItemId: string, quantity: number, maxQuantity: number) => {
         if (quantity < 0 || quantity > maxQuantity) return;
@@ -139,11 +158,22 @@ export default function UserOrderDetail() {
         });
     };
 
+    const fetchReturns = useCallback(async () => {
+        try {
+            const response = await apiClient.get(`/returns/orders/${id}/all`);
+            setReturns(response.data);
+        } catch (error) {
+            logger.error("Error fetching returns:", error);
+        }
+    }, [id]);
+
     const fetchOrderDetail = useCallback(async () => {
         try {
             setLoading(true);
             const response = await apiClient.get(`/orders/${id}`);
             setOrder(response.data);
+            fetchReturns(); // Fetch returns together
+            fetchReturnableItems(); // Fetch items available for return
         } catch (error) {
             logger.error("Error fetching order:", error);
             // toast.error("Failed to load order details");
@@ -151,7 +181,7 @@ export default function UserOrderDetail() {
         } finally {
             setLoading(false);
         }
-    }, [id, navigate]);
+    }, [id, navigate, fetchReturns]);
 
     useEffect(() => {
         fetchOrderDetail();
@@ -232,6 +262,8 @@ export default function UserOrderDetail() {
             setActionLoading(true);
             setReturnOpen(false);
 
+            const uploadedPaths: string[] = [];
+
             // 1. Upload Images
             const itemsWithMetadata = await Promise.all(selectedReturnItems.map(async (item) => {
                 const images = itemImages[item.id] || [];
@@ -240,19 +272,22 @@ export default function UserOrderDetail() {
                 for (const file of images) {
                     const fileExt = file.name.split('.').pop();
                     const fileName = `${order?.user_id || 'guest'}/${id}/${item.id}/${Math.random().toString(36).substring(7)}.${fileExt}`;
+                    const path = `returns/${fileName}`;
 
                     const { error: uploadError } = await supabase.storage
                         .from('return_images')
-                        .upload(`returns/${fileName}`, file);
+                        .upload(path, file);
 
                     if (uploadError) {
                         console.error('Upload error:', uploadError);
                         throw new Error(`Failed to upload image for item`);
                     }
 
+                    uploadedPaths.push(path);
+
                     const { data: { publicUrl } } = supabase.storage
                         .from('return_images')
-                        .getPublicUrl(`returns/${fileName}`);
+                        .getPublicUrl(path);
 
                     imageUrls.push(publicUrl);
                 }
@@ -267,20 +302,31 @@ export default function UserOrderDetail() {
             }));
 
             // 2. Submit Request
-            await apiClient.post(`/returns/request`, {
-                orderId: id,
-                items: itemsWithMetadata,
-                reason: returnReason // Keeping global reason optional or as summary
-            });
+            try {
+                await apiClient.post(`/returns/request`, {
+                    orderId: id,
+                    items: itemsWithMetadata,
+                    reason: returnReason // Keeping global reason optional or as summary
+                });
 
-            toast.success("Return request submitted successfully");
-            setReturnOpen(false);
-            // Reset state
-            setItemImages({});
-            setItemReasons({});
-            setSelectedReturnItems([]);
+                toast.success("Return request submitted successfully");
+                setReturnOpen(false);
+                // Reset state
+                setItemImages({});
+                setItemReasons({});
+                setSelectedReturnItems([]);
 
-            fetchOrderDetail();
+                fetchOrderDetail();
+            } catch (apiError) {
+                // CLEANUP: If API fails, delete uploaded images to avoid orphaned files
+                if (uploadedPaths.length > 0) {
+                    console.log('Cleaning up uploaded images due to API failure...', uploadedPaths);
+                    await supabase.storage
+                        .from('return_images')
+                        .remove(uploadedPaths);
+                }
+                throw apiError;
+            }
         } catch (error: unknown) {
             toast.error(getErrorMessage(error, "Failed to submit return request"));
         } finally {
@@ -298,6 +344,21 @@ export default function UserOrderDetail() {
         }
     };
 
+    const handleCancelReturn = async (returnId: string) => {
+        try {
+            setLoadingMessage("Cancelling return request...");
+            setActionLoading(true);
+            await apiClient.post(`/returns/${returnId}/cancel`);
+            toast.success("Return request cancelled");
+            fetchOrderDetail(); // Refresh everything
+        } catch (error) {
+            toast.error(getErrorMessage(error, "Failed to cancel return"));
+        } finally {
+            setActionLoading(false);
+            setLoadingMessage("");
+        }
+    };
+
     if (loading) return (
         <div className="min-h-screen flex items-center justify-center">
             <LoadingOverlay isLoading={true} message="Loading order details..." />
@@ -309,26 +370,12 @@ export default function UserOrderDetail() {
 
     // Can return only if:
     // 1. Order status is 'delivered'
-    // 2. At least one item is returnable (default to true if not specified)
+    // 2. There are actual items available to return (fetched from backend)
     const canReturn = (() => {
-        if (!['delivered', 'return_rejected'].includes(order.status)) return false;
+        if (!['delivered', 'return_rejected', 'return_requested', 'return_approved'].includes(order.status)) return false;
 
-        // If no items data, default to allowing return for delivered orders
-        if (!order.items || order.items.length === 0) return true;
-
-        // Check if any item is returnable
-        // Default to returnable unless explicitly set to false
-        const hasReturnableItems = order.items.some((item) => {
-            const product = item.product;
-            if (!product) return true;
-
-            // Handle both camelCase and snake_case properties
-            const p = product as Product & { is_returnable?: boolean };
-            const isReturnable = p.isReturnable ?? p.is_returnable ?? true;
-            return isReturnable !== false;
-        });
-
-        return hasReturnableItems;
+        // If we have returnable items fetched, use that as the source of truth
+        return returnableItems.length > 0;
     })();
 
     return (
@@ -784,6 +831,99 @@ export default function UserOrderDetail() {
                                 </div>
                             </CardContent>
                         </Card>
+
+                        {/* Active/History Returns */}
+                        {returns.length > 0 && (
+                            <Card className="border-orange-100 shadow-sm overflow-hidden">
+                                <CardHeader className="bg-orange-50/50">
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="flex items-center gap-2 text-lg text-orange-950">
+                                            <RotateCcw className="h-5 w-5 text-orange-600" /> Return Requests
+                                        </CardTitle>
+                                        <Badge variant="outline" className="bg-white border-orange-200 text-orange-800">
+                                            {returns.length} Request{returns.length > 1 ? 's' : ''}
+                                        </Badge>
+                                    </div>
+                                    <CardDescription className="text-orange-800/70">
+                                        Track the status of your return and refund requests.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="p-0">
+                                    <div className="divide-y divide-orange-100">
+                                        {returns.map((ret) => (
+                                            <div key={ret.id} className="p-4 space-y-4">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`p-1.5 rounded-full ${ret.status === 'approved' ? 'bg-green-100 text-green-700' :
+                                                            ret.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                                                                ret.status === 'cancelled' ? 'bg-gray-100 text-gray-500' :
+                                                                    'bg-orange-100 text-orange-700'
+                                                            }`}>
+                                                            {ret.status === 'approved' ? <CheckCircle className="h-4 w-4" /> :
+                                                                ret.status === 'rejected' ? <XCircle className="h-4 w-4" /> :
+                                                                    ret.status === 'cancelled' ? <XCircle className="h-4 w-4" /> :
+                                                                        <Clock className="h-4 w-4" />}
+                                                        </div>
+                                                        <div>
+                                                            <div className="font-semibold text-sm capitalize">
+                                                                {ret.status.replace('_', ' ')}
+                                                            </div>
+                                                            <div className="text-[10px] text-muted-foreground">
+                                                                Requested on {format(new Date(ret.created_at), "MMM d, yyyy")}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2">
+                                                        {ret.status === 'requested' && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-8 text-xs text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 font-medium"
+                                                                onClick={() => handleCancelReturn(ret.id)}
+                                                                disabled={actionLoading}
+                                                            >
+                                                                Cancel Request
+                                                            </Button>
+                                                        )}
+                                                        {ret.status === 'picked_up' && (
+                                                            <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium border border-blue-100 flex items-center gap-1">
+                                                                <Package className="h-3 w-3" /> Picked Up
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-2 bg-gray-50/50 p-3 rounded-lg border border-gray-100">
+                                                    {ret.return_items.map((item, idx) => (
+                                                        <div key={idx} className="flex justify-between text-xs items-center">
+                                                            <span className="text-gray-600 flex items-center gap-2">
+                                                                <span className="w-4 h-4 rounded bg-gray-200 flex items-center justify-center text-[10px] font-bold">{item.quantity}</span>
+                                                                {item.order_items.title}
+                                                                {item.order_items.variant_snapshot?.size_label && (
+                                                                    <span className="text-muted-foreground">({item.order_items.variant_snapshot.size_label})</span>
+                                                                )}
+                                                            </span>
+                                                            <span className="text-[10px] text-muted-foreground italic max-w-[150px] truncate" title={item.reason}>
+                                                                "{item.reason}"
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                    {(ret.status === 'approved' || ret.refund_amount > 0) && (
+                                                        <div className="pt-2 mt-2 border-t border-dashed flex justify-between items-center">
+                                                            <span className="text-[11px] font-semibold text-gray-700">Refundable Amount</span>
+                                                            <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200 text-xs py-0">
+                                                                ₹{ret.refund_amount.toFixed(2)}
+                                                            </Badge>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
 
                         {/* Order Timeline */}
                         <Card>

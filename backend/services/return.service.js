@@ -1,4 +1,4 @@
-const supabase = require('../config/supabase');
+const { supabase, supabaseAdmin } = require('../config/supabase');
 const logger = require('../utils/logger');
 const Razorpay = require('razorpay');
 const { PricingCalculator } = require('./pricing-calculator.service');
@@ -31,8 +31,23 @@ const getReturnableItems = async (orderId, userId) => {
         .single();
 
     if (orderError || !order) throw new Error('Order not found or access denied');
-    if (!['delivered', 'return_rejected'].includes(order.status)) {
-        throw new Error('Order must be delivered or have a rejected return to request a return');
+    const allowedStatuses = [
+        'delivered',
+        'return_requested',
+        'return_rejected',
+        'return_approved',
+        'pickupscheduled',
+        'pickupattempted',
+        'pickupcompleted',
+        'intransittowarehouse',
+        'qcinprogress',
+        'qcpassed',
+        'qcfailed',
+        'return_completed',
+        'return_closed'
+    ];
+    if (!allowedStatuses.includes(order.status)) {
+        throw new Error('Order must be delivered to request a return');
     }
 
     // 2. Fetch Order Items with Product return_days
@@ -63,50 +78,55 @@ const getReturnableItems = async (orderId, userId) => {
         : null;
 
     // 4. Filter Returnable Items
-    // Must exclude items that are already in a PENDING return request to avoid double dipping
-    const { data: pendingReturns, error: pendingError } = await supabase
+    // Must exclude items that are already in a PENDING or COMPLETED return request to avoid double dipping
+    const { data: existingReturns, error: pendingError } = await supabase
         .from('returns')
         .select(`
             id,
+            status,
             return_items (
                 order_item_id,
                 quantity
             )
         `)
         .eq('order_id', orderId)
-        .eq('status', 'requested'); // Only check pending/requested
+        .in('status', ['requested', 'picked_up', 'approved']); // Check requested, picked up, and approved quantities
 
     if (pendingError) throw pendingError;
 
-    // Map pending quantities
-    const pendingQuantityMap = {};
-    if (pendingReturns) {
-        pendingReturns.forEach(ret => {
-            if (ret.return_items) {
-                ret.return_items.forEach(ri => {
-                    pendingQuantityMap[ri.order_item_id] = (pendingQuantityMap[ri.order_item_id] || 0) + ri.quantity;
-                });
-            }
-        });
-    }
+    // Filter logic: (quantity - returned_quantity - existing_quantity) > 0 AND within return window
+    // Note: returned_quantity in order_items is updated AFTER approval. 
+    // To be safe, we subtract any 'requested' or 'picked_up' quantities.
 
-    // Filter logic: (quantity - returned_quantity - pending_quantity) > 0 AND within return window
     const now = new Date();
     const returnableItems = items.filter(item => {
-        const pendingQty = pendingQuantityMap[item.id] || 0;
+        // Sum up quantities from active (requested/picked_up) returns
+        const pendingQty = existingReturns
+            ?.filter(r => ['requested', 'picked_up'].includes(r.status))
+            ?.reduce((sum, r) => {
+                const ri = r.return_items?.find(i => i.order_item_id === item.id);
+                return sum + (ri?.quantity || 0);
+            }, 0) || 0;
+
         const available = item.quantity - item.returned_quantity - pendingQty;
 
-        // Check if within return window
+        // Check if within return window (from delivery date)
         let withinReturnWindow = true;
         if (deliveryDate) {
-            const returnDays = item.products?.return_days ?? 7; // Default 7 days if not specified
+            const returnDays = item.products?.return_days ?? 7;
             const returnDeadline = new Date(deliveryDate.getTime() + (returnDays * 24 * 60 * 60 * 1000));
             withinReturnWindow = now <= returnDeadline;
         }
 
         return item.is_returnable && available > 0 && withinReturnWindow;
     }).map(item => {
-        const pendingQty = pendingQuantityMap[item.id] || 0;
+        const pendingQty = existingReturns
+            ?.filter(r => ['requested', 'picked_up'].includes(r.status))
+            ?.reduce((sum, r) => {
+                const ri = r.return_items?.find(i => i.order_item_id === item.id);
+                return sum + (ri?.quantity || 0);
+            }, 0) || 0;
+
         const returnDays = item.products?.return_days ?? 7;
         let returnDeadline = null;
         if (deliveryDate) {
@@ -158,17 +178,48 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
     }
 
     // 2. Calculate Refund Amount with Tax using RefundCalculator
+    logger.info({ orderId, itemCount: returnItems.length }, 'Calculating refund for return request');
     const refundBreakdown = RefundCalculator.calculateReturnTotal(availableItems, returnItems);
-    const estimatedRefund = refundBreakdown.summary.totalRefund;
+
+    // Log items for debugging tax presence
+    availableItems.forEach(item => {
+        logger.debug({
+            itemId: item.id,
+            taxable: item.taxable_amount,
+            cgst: item.cgst,
+            sgst: item.sgst,
+            total: item.total_amount
+        }, 'Available item tax details');
+    });
+
+    logger.info({ summary: refundBreakdown.summary }, 'Calculated product refund breakdown');
+
+    // 2.1 Calculate Delivery Refund using DeliveryChargeService (Selective Refundability)
+    let deliveryRefundAmount = 0;
+    let deliveryGSTRefundAmount = 0;
+    try {
+        const deliveryRefund = await DeliveryChargeService.calculateRefundDelivery(
+            availableItems,
+            returnItems
+        );
+        deliveryRefundAmount = deliveryRefund.refundDeliveryCharge;
+        deliveryGSTRefundAmount = deliveryRefund.refundDeliveryGST;
+    } catch (err) {
+        log.warn('RETURN_DELIVERY_REFUND_CALC_ERROR', 'Failed to calculate delivery refund during request', { error: err.message });
+    }
+
+    const estimatedRefund = refundBreakdown.summary.totalRefund + deliveryRefundAmount + deliveryGSTRefundAmount;
 
     log.info('RETURN_REFUND_CALCULATED', 'Calculated refund for return request', {
         orderId,
         estimatedRefund,
+        productRefund: refundBreakdown.summary.totalRefund,
+        deliveryRefund: deliveryRefundAmount + deliveryGSTRefundAmount,
         taxRefund: refundBreakdown.summary.totalTaxRefund
     });
 
     // 3. Create Return Record
-    const { data: returnRequest, error: createError } = await supabase
+    const { data: returnRequest, error: createError } = await supabaseAdmin
         .from('returns')
         .insert({
             order_id: orderId,
@@ -176,8 +227,13 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
             status: 'requested',
             refund_amount: estimatedRefund,
             reason: reason || 'Item-level reasons provided', // General reason or fallback
-            // Store tax refund breakdown
-            refund_breakdown: refundBreakdown.summary
+            // Store comprehensive refund breakdown
+            refund_breakdown: {
+                ...refundBreakdown.summary,
+                deliveryRefund: deliveryRefundAmount,
+                deliveryGSTRefund: deliveryGSTRefundAmount,
+                totalDeliveryRefund: deliveryRefundAmount + deliveryGSTRefundAmount
+            }
         })
         .select()
         .single();
@@ -194,7 +250,7 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
         condition: item.condition || 'opened' // Default or passed from frontend
     }));
 
-    const { error: itemsInsertError } = await supabase
+    const { error: itemsInsertError } = await supabaseAdmin
         .from('return_items')
         .insert(returnItemsData);
 
@@ -240,14 +296,14 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
 
 const processReturnApproval = async (returnId, adminId) => {
     // 1. Fetch Return Details with Items and User Info
-    const { data: returnRequest, error: fetchError } = await supabase
+    const { data: returnRequest, error: fetchError } = await supabaseAdmin
         .from('returns')
         .select(`
             *,
             orders (
                 id,
                 payment_id,
-                paymentStatus,
+                payment_status,
                 user_id,
                 profiles(email, name)
             ),
@@ -274,7 +330,9 @@ const processReturnApproval = async (returnId, adminId) => {
         .single();
 
     if (fetchError || !returnRequest) throw new Error('Return request not found');
-    if (returnRequest.status !== 'requested') throw new Error('Return request is not in requested state');
+    if (!['requested', 'picked_up'].includes(returnRequest.status)) {
+        throw new Error(`Return request cannot be approved from ${returnRequest.status} state`);
+    }
 
     // 2. Calculate Final Refund Amount (use stored breakdown if available)
     const orderItemsData = returnRequest.return_items.map(ri => ({
@@ -318,11 +376,27 @@ const processReturnApproval = async (returnId, adminId) => {
     const totalRefundAmount = productRefundAmount + deliveryRefundAmount + deliveryGSTRefundAmount;
 
     // 3. Process Razorpay Refund
-    const { data: payment } = await supabase
-        .from('payments')
-        .select('razorpay_payment_id')
-        .eq('id', returnRequest.orders.payment_id)
-        .single();
+    let payment;
+    if (returnRequest.orders.payment_id) {
+        const { data } = await supabaseAdmin
+            .from('payments')
+            .select('razorpay_payment_id')
+            .eq('id', returnRequest.orders.payment_id)
+            .single();
+        payment = data;
+    }
+
+    if (!payment?.razorpay_payment_id) {
+        // Fallback: search by order_id
+        const { data: fallbackPayment } = await supabaseAdmin
+            .from('payments')
+            .select('razorpay_payment_id')
+            .eq('order_id', returnRequest.order_id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        payment = fallbackPayment;
+    }
 
     if (!payment?.razorpay_payment_id) {
         throw new Error('Razorpay payment ID not found for this order');
@@ -360,14 +434,14 @@ const processReturnApproval = async (returnId, adminId) => {
     }
 
     // Update Return Status
-    await supabase.from('returns').update({
+    await supabaseAdmin.from('returns').update({
         status: 'approved',
         refund_amount: totalRefundAmount,
         updated_at: new Date().toISOString()
     }).eq('id', returnId);
 
     // Create refund log
-    await supabase.from('refunds').insert({
+    await supabaseAdmin.from('refunds').insert({
         return_id: returnId,
         order_id: returnRequest.order_id,
         razorpay_refund_id: refund.id,
@@ -378,21 +452,21 @@ const processReturnApproval = async (returnId, adminId) => {
 
     // Update Order Items returned_quantity
     for (const update of itemsToUpdate) {
-        await supabase
+        await supabaseAdmin
             .from('order_items')
             .update({ returned_quantity: update.returned_quantity })
             .eq('id', update.id);
     }
 
     // Update Order Status
-    await supabase
+    await supabaseAdmin
         .from('orders')
         .update({ status: 'return_approved' })
         .eq('id', returnRequest.order_id);
 
     // Log History
     const orderService = require('./order.service');
-    await orderService.logStatusHistory(returnRequest.order_id, 'return_approved', adminId, `Return approved and refund of ₹${totalRefundAmount} processed via Razorpay.`, 'ADMIN');
+    await orderService.logStatusHistory(returnRequest.order_id, 'return_approved', adminId, `Return approved! MeriGauMata has initiated your refund of ₹${totalRefundAmount}. It will reflect in your account soon.`, 'ADMIN');
 
     // Log Financial Event
     FinancialEventLogger.logReturnApproved(returnId, returnRequest.order_id, adminId, totalRefundAmount)
@@ -415,7 +489,7 @@ const processReturnApproval = async (returnId, adminId) => {
 
 const processReturnRejection = async (returnId, adminId, reason) => {
     // Fetch return with user info before updating
-    const { data: returnRequest, error: fetchError } = await supabase
+    const { data: returnRequest, error: fetchError } = await supabaseAdmin
         .from('returns')
         .select(`
             order_id,
@@ -429,7 +503,7 @@ const processReturnRejection = async (returnId, adminId, reason) => {
 
     if (fetchError) throw fetchError;
 
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
         .from('returns')
         .update({
             status: 'rejected',
@@ -442,7 +516,7 @@ const processReturnRejection = async (returnId, adminId, reason) => {
 
     // Update order status back to return_rejected
     if (returnRequest) {
-        await supabase
+        await supabaseAdmin
             .from('orders')
             .update({ status: 'return_rejected' })
             .eq('id', returnRequest.order_id);
@@ -470,29 +544,105 @@ const processReturnRejection = async (returnId, adminId, reason) => {
     return { success: true };
 };
 
-const getActiveReturnRequest = async (orderId) => {
-    const { data: returnRequest, error } = await supabase
+const cancelReturnRequest = async (returnId, userId) => {
+    // 1. Fetch Return Request
+    const { data: returnRequest, error: fetchError } = await supabaseAdmin
+        .from('returns')
+        .select('*')
+        .eq('id', returnId)
+        .eq('user_id', userId)
+        .single();
+
+    if (fetchError || !returnRequest) throw new Error('Return request not found');
+
+    // 2. Cancellation Check
+    // Customers can only cancel if it's in 'requested' status.
+    // Fixed: block if picked_up, approved, or rejected.
+    if (returnRequest.status !== 'requested') {
+        throw new Error(`Cannot cancel return in ${returnRequest.status} state. Picked up items cannot be cancelled.`);
+    }
+
+    // 3. Update Return Status to Cancelled
+    const { error: updateError } = await supabaseAdmin
+        .from('returns')
+        .update({
+            status: 'cancelled',
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', returnId);
+
+    if (updateError) throw updateError;
+
+    // 4. Log History
+    const orderService = require('./order.service');
+    await orderService.logStatusHistory(returnRequest.order_id, 'return_cancelled', userId, `Return request cancelled by you.`, 'USER');
+
+    return { success: true };
+};
+
+const updateReturnStatus = async (returnId, status, adminId, notes = '') => {
+    // 1. Fetch Return Request
+    const { data: returnRequest, error: fetchError } = await supabaseAdmin
+        .from('returns')
+        .select('*')
+        .eq('id', returnId)
+        .single();
+
+    if (fetchError || !returnRequest) throw new Error('Return request not found');
+
+    // 2. Validate Transition Logic
+    // requested -> picked_up
+    if (status === 'picked_up' && returnRequest.status !== 'requested') {
+        throw new Error('Can only mark as Picked Up from Requested status');
+    }
+
+    // approved/rejected are handled by specific functions, but we allow generic status sync if needed
+    // However, we strictly enforce picked_up here.
+
+    // 3. Update Status
+    const { error: updateError } = await supabaseAdmin
+        .from('returns')
+        .update({
+            status: status,
+            staff_notes: notes || returnRequest.staff_notes,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', returnId);
+
+    if (updateError) throw updateError;
+
+    // 4. Log Status History match
+    const orderService = require('./order.service');
+    await orderService.logStatusHistory(returnRequest.order_id, `return_${status}`, adminId, `Return request status updated to ${status}. ${notes}`, 'ADMIN');
+
+    return { success: true };
+};
+
+const getOrderReturnRequests = async (orderId) => {
+    // Fetch ALL return requests for an order to show history
+    const { data, error } = await supabase
         .from('returns')
         .select(`
             *,
             return_items (
                 quantity,
+                reason,
+                images,
+                condition,
                 order_item_id,
                 order_items (
                     title,
                     price_per_unit,
-                    product_id
+                    product_id,
+                    variant_snapshot
                 )
             )
         `)
         .eq('order_id', orderId)
-        .in('status', ['requested', 'approved', 'rejected']) // Fetch any recent return to show history if needed
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+        .order('created_at', { ascending: false });
 
-    if (error && error.code !== 'PGRST116') throw error; // PGRST116 is no rows
-    return returnRequest;
+    if (error) throw error;
+    return data;
 };
 
 module.exports = {
@@ -500,5 +650,7 @@ module.exports = {
     createReturnRequest,
     processReturnApproval,
     processReturnRejection,
-    getActiveReturnRequest
+    cancelReturnRequest,
+    updateReturnStatus,
+    getOrderReturnRequests
 };

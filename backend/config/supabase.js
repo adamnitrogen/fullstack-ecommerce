@@ -1,8 +1,8 @@
-/**
- * Supabase Config Bridge
- * This file redirects all supabase client requests to the consolidated provider in backend/lib/supabase.js
- */
-const { supabase } = require('../lib/supabase');
+const { supabase, supabaseAdmin } = require('../lib/supabase');
 
-// Export the proxied supabase client as the default
+// Export the proxied supabase client as the main export for backward compatibility
 module.exports = supabase;
+
+// Also provide named exports for cases where both or specific clients are needed
+module.exports.supabase = supabase;
+module.exports.supabaseAdmin = supabaseAdmin;

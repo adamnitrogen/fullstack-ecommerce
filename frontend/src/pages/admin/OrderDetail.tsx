@@ -23,14 +23,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, MapPin, Phone, Mail, CreditCard, Package, Clock, Truck, User, FileText, Info, IndianRupee, RotateCcw } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, Mail, CreditCard, Package, Clock, Truck, User, FileText, Info, IndianRupee, RotateCcw, CheckSquare, XCircle } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { getErrorMessage } from "@/lib/errorUtils";
-import { CheckoutAddress, Order, Product, CartItem, OrderItem, ReturnRequest } from "@/types";
+import { CheckoutAddress, Order, Product, CartItem, OrderItem } from "@/types";
 import { TaxBreakdown } from "@/components/orders/TaxBreakdown";
-import { InvoiceActions } from "@/components/orders/InvoiceActions";
 import { RegenerateInvoiceButton } from "@/components/orders/RegenerateInvoiceButton";
 
 interface OrderStatusHistory {
@@ -51,6 +50,75 @@ interface OrderStatusHistory {
     };
 }
 
+interface ReturnRequestItem {
+    id: string;
+    product_id: string;
+    quantity: number;
+    reason: string;
+    images?: string[];
+    condition?: string;
+    order_item_id: string;
+    order_items?: {
+        title: string;
+        price_per_unit: number;
+        variant_snapshot?: {
+            size_label?: string;
+            [key: string]: any;
+        };
+    };
+}
+
+interface ReturnRequest {
+    id: string;
+    order_id: string;
+    user_id: string;
+    status: 'requested' | 'picked_up' | 'approved' | 'rejected' | 'cancelled';
+    reason: string;
+    refund_amount: number;
+    created_at: string;
+    updated_at: string;
+    staff_notes?: string;
+    refund_breakdown?: any;
+    return_items: ReturnRequestItem[];
+}
+
+interface OrderDetailItem {
+    id: string;
+    product_id: string;
+    quantity: number;
+    price_per_unit: number;
+    title: string;
+    image?: string;
+    product?: Product;
+    variant_id?: string;
+    variant?: {
+        id: string;
+        size_label: string;
+        size_value: number;
+        unit: string;
+        variant_image_url?: string;
+    };
+    variant_snapshot?: {
+        variant_id?: string;
+        size_label?: string;
+        selling_price?: number;
+        mrp?: number;
+        variant_image_url?: string;
+        [key: string]: any;
+    };
+    size_label?: string;
+    hsn_code?: string;
+    gst_rate?: number;
+    taxable_amount?: number;
+    cgst?: number;
+    sgst?: number;
+    igst?: number;
+    delivery_charge?: number;
+    delivery_gst?: number;
+    delivery_calculation_snapshot?: any;
+    price?: number; // fallback
+}
+
 interface OrderDetail {
     id: string;
     order_number: string;
@@ -64,43 +132,19 @@ interface OrderDetail {
     coupon_discount: number;
     delivery_charge: number;
     created_at: string;
-    // Delivery fields (explicit)
     delivery_gst?: number;
     shipping_address: CheckoutAddress;
     billing_address: CheckoutAddress;
-    items: (CartItem & {
-        product?: Product;
-        title?: string;
-        price?: number;
-        price_per_unit?: number;
-        variant_id?: string;
-        variant?: {
-            id: string;
-            size_label: string;
-            size_value: number;
-            unit: string;
-            variant_image_url?: string;
-        };
-        size_label?: string;
-        hsn_code?: string;
-        gst_rate?: number;
-        taxable_amount?: number;
-        cgst?: number;
-        sgst?: number;
-        igst?: number;
-        delivery_gst?: number;
-        delivery_calculation_snapshot?: any;
-    })[];
+    items: OrderDetailItem[];
     payment_id: string;
     order_status_history?: OrderStatusHistory[];
-    // GST Tax fields
+    email_logs?: EmailLog[];
     total_taxable_amount?: number;
     total_cgst?: number;
     total_sgst?: number;
     total_igst?: number;
     invoice_id?: string;
     invoice_url?: string;
-    invoice_status?: string;
     invoices?: Array<{
         id: string;
         type: 'RAZORPAY' | 'TAX_INVOICE' | 'BILL_OF_SUPPLY';
@@ -109,24 +153,25 @@ interface OrderDetail {
         status: string;
         created_at: string;
     }>;
-    email_logs?: {
+    refunds?: Array<{
         id: string;
-        event_type: string;
-        recipient: string;
-        status: string;
-        created_at: string;
-        retry_count: number;
-        error_message?: string;
-
-    }[];
-    refunds?: {
-        id: string;
-        razorpay_refund_id: string;
+        razorpay_refund_id?: string;
         amount: number;
         status: string;
         notes?: string;
         created_at: string;
-    }[];
+    }>;
+}
+
+interface EmailLog {
+    id: string;
+    type: string;
+    recipient: string;
+    status: string;
+    error_message?: string;
+    retry_count: number;
+    created_at: string;
+    event_type: string;
 }
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
@@ -159,22 +204,21 @@ export default function OrderDetail() {
     const [rejectionReason, setRejectionReason] = useState("");
     const [cancelReason, setCancelReason] = useState("");
     const [pendingStatus, setPendingStatus] = useState<string | null>(null);
-    const [activeReturnRequest, setActiveReturnRequest] = useState<ReturnRequest | null>(null);
+    const [pendingReturnId, setPendingReturnId] = useState<string | null>(null);
+    const [returnRequests, setReturnRequests] = useState<ReturnRequest[]>([]);
 
-    const fetchActiveReturn = useCallback(async () => {
+    const fetchReturns = useCallback(async () => {
         try {
-            const response = await apiClient.get(`/returns/orders/${id}/active`);
-            setActiveReturnRequest(response.data);
+            const response = await apiClient.get(`/returns/orders/${id}/all`);
+            setReturnRequests(response.data);
         } catch (error) {
-            logger.error("Failed to fetch return details", error);
+            logger.error("Failed to fetch returns", error);
         }
     }, [id]);
 
     useEffect(() => {
-        if (order && ['return_requested', 'return_approved', 'return_rejected'].includes(order.status)) {
-            fetchActiveReturn();
-        }
-    }, [order, order?.status, fetchActiveReturn]);
+        fetchReturns();
+    }, [fetchReturns]);
 
     const fetchOrderDetail = useCallback(async () => {
         try {
@@ -217,15 +261,14 @@ export default function OrderDetail() {
             setLoadingMessage("Updating status...");
 
             // SPECIAL LOGIC: Return Approval/Rejection
-            if ((pendingStatus === 'return_approved' || pendingStatus === 'return_rejected') && activeReturnRequest) {
-                if (pendingStatus === 'return_approved') {
-                    await apiClient.post(`/returns/${activeReturnRequest.id}/approve`, {});
-                    toast.success("Return approved and refund processed");
-                } else {
-                    await apiClient.post(`/returns/${activeReturnRequest.id}/reject`, { reason: rejectionReason });
-                    toast.success("Return rejected");
-                }
-                fetchOrderDetail(); // Refresh
+            // (Compatibility fallback for old single active return logic)
+            const activeRet = returnRequests.find(r => r.status === 'requested' || r.status === 'picked_up');
+            if ((pendingStatus === 'return_approved' || pendingStatus === 'return_rejected') && activeRet) {
+                await handleReturnAction(
+                    activeRet.id,
+                    pendingStatus === 'return_approved' ? 'approve' : 'reject',
+                    pendingStatus === 'return_rejected' ? rejectionReason : undefined
+                );
                 return;
             }
 
@@ -235,10 +278,8 @@ export default function OrderDetail() {
             }
 
             const response = await apiClient.put(`/orders/${id}/status`, payload);
-            // Refresh full order to get history too
             fetchOrderDetail();
 
-            // Show appropriate toast based on refund status
             if (response.data?.refundInitiated) {
                 toast.success(`Order status updated to ${pendingStatus}. Refund has been initiated!`, {
                     description: "The refund will be processed to the customer's original payment method.",
@@ -252,6 +293,41 @@ export default function OrderDetail() {
         } finally {
             setUpdating(false);
             setPendingStatus(null);
+            setRejectionReason("");
+        }
+    };
+
+    const handleReturnAction = async (returnId: string, action: 'picked_up' | 'approve' | 'reject', notes?: string) => {
+        if (action === 'reject' && !notes) {
+            setPendingReturnId(returnId);
+            setRejectionReason("");
+            setRejectionDialogOpen(true);
+            return;
+        }
+
+        try {
+            setUpdating(true);
+            setLoadingMessage(`${action.replace('_', ' ')} logic...`);
+
+            if (action === 'picked_up') {
+                await apiClient.post(`/returns/${returnId}/status`, { status: 'picked_up', notes });
+                toast.success("Return marked as Picked Up");
+            } else if (action === 'approve') {
+                await apiClient.post(`/returns/${returnId}/approve`, { notes });
+                toast.success("Return approved and refund processed");
+            } else if (action === 'reject') {
+                await apiClient.post(`/returns/${returnId}/reject`, { reason: notes });
+                toast.success("Return rejected");
+            }
+
+            fetchOrderDetail();
+            fetchReturns();
+        } catch (error) {
+            toast.error(getErrorMessage(error, `Failed to ${action}`));
+        } finally {
+            setUpdating(false);
+            setLoadingMessage("");
+            setPendingReturnId(null);
         }
     };
 
@@ -297,51 +373,173 @@ export default function OrderDetail() {
                     </h1>
                 </div>
                 <div className="ml-auto flex items-center gap-3">
-                    {availableActions.map(action => (
-                        <Button
-                            key={action}
-                            size="sm"
-                            onClick={() => openStatusConfirmation(action)}
-                            disabled={updating}
-                            variant={action === 'cancelled' ? 'destructive' : 'default'}
-                        >
-                            Mark as {action.replace('return_', 'Return ').replace('_', ' ').toUpperCase()}
-                        </Button>
-                    ))}
+                    {availableActions
+                        .filter(action => {
+                            // Hide return approval/rejection from header if managed via return requests box
+                            if (returnRequests && returnRequests.length > 0) {
+                                return !['return_approved', 'return_rejected', 'return_requested'].includes(action);
+                            }
+                            return true;
+                        })
+                        .map(action => (
+                            <Button
+                                key={action}
+                                size="sm"
+                                onClick={() => openStatusConfirmation(action)}
+                                disabled={updating}
+                                variant={action === 'cancelled' ? 'destructive' : 'default'}
+                            >
+                                Mark as {action.replace('return_', 'Return ').replace('_', ' ').toUpperCase()}
+                            </Button>
+                        ))}
                 </div>
             </div>
 
-            {/* Active Return Request Details - Only show if pending action is needed */}
-            {activeReturnRequest && activeReturnRequest.status === 'requested' && (
-                <Card className="bg-purple-50 border-purple-200">
-                    <CardHeader>
-                        <CardTitle className="text-purple-800 flex items-center gap-2">
-                            <Clock className="h-5 w-5" />
-                            Active Return Request
+            {/* NEW: Comprehensive Return Management Section */}
+            {returnRequests.length > 0 && (
+                <Card className="bg-slate-50 border-slate-200 shadow-sm">
+                    <CardHeader className="py-4 bg-white/50 border-b">
+                        <CardTitle className="text-slate-800 flex items-center gap-2 text-lg">
+                            <RotateCcw className="h-5 w-5 text-indigo-600" />
+                            Return Management Requests ({returnRequests.length})
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex justify-between border-b border-purple-200 pb-2">
-                            <span className="text-gray-600">Reason:</span>
-                            <span className="font-medium text-right">{activeReturnRequest.reason}</span>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold text-sm mb-2 text-purple-800">Items Requested for Return:</h4>
-                            <div className="space-y-2 bg-white p-3 rounded border border-purple-100">
-                                {activeReturnRequest.return_items?.map((item, idx) => (
-                                    <div key={idx} className="flex justify-between items-center text-sm">
-                                        <div>
-                                            <p className="font-medium">{item.order_items?.title || item.product?.title || "Product"}</p>
-                                            <p className="text-xs text-muted-foreground">Unit Price: ₹{item.order_items?.price_per_unit || (item.product?.price || 0)}</p>
+                    <CardContent className="p-0">
+                        <div className="divide-y divide-slate-100">
+                            {returnRequests.map((ret) => (
+                                <div key={ret.id} className="p-4 space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-4">
+                                            <Badge variant={
+                                                ret.status === 'approved' ? 'default' :
+                                                    ret.status === 'rejected' ? 'destructive' :
+                                                        ret.status === 'cancelled' ? 'secondary' :
+                                                            ret.status === 'picked_up' ? 'outline' : 'secondary'
+                                            } className={`capitalize ${ret.status === 'approved' ? 'bg-green-600 text-white' :
+                                                ret.status === 'picked_up' ? 'border-blue-500 text-blue-700 bg-blue-50' :
+                                                    ret.status === 'rejected' ? 'bg-red-100 text-red-700 border-red-200' : ''}`}>
+                                                {ret.status.replace('_', ' ')}
+                                            </Badge>
+                                            <div className="text-xs text-muted-foreground">
+                                                ID: <span className="font-mono">{ret.id.split('-')[0]}</span> • {format(new Date(ret.created_at), "MMM d, h:mm a")}
+                                            </div>
                                         </div>
-                                        <div className="font-bold">Qty: {item.quantity}</div>
+
+                                        {/* Actions for Pending Transitions */}
+                                        <div className="flex items-center gap-2">
+                                            {ret.status === 'requested' && (
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="h-8 text-xs border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                                                    onClick={() => handleReturnAction(ret.id, 'picked_up')}
+                                                    disabled={updating}
+                                                >
+                                                    <Truck className="h-3.5 w-3.5 mr-1" /> Mark Picked Up
+                                                </Button>
+                                            )}
+                                            {(ret.status === 'requested' || ret.status === 'picked_up') && (
+                                                <>
+                                                    <Button
+                                                        size="sm"
+                                                        className="h-8 text-xs bg-green-600 hover:bg-green-700"
+                                                        onClick={() => handleReturnAction(ret.id, 'approve')}
+                                                        disabled={updating}
+                                                    >
+                                                        <CheckSquare className="h-3.5 w-3.5 mr-1" /> Approve
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-8 text-xs text-red-600 hover:bg-red-50"
+                                                        onClick={() => handleReturnAction(ret.id, 'reject')}
+                                                        disabled={updating}
+                                                    >
+                                                        <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+                                                    </Button>
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="flex justify-between pt-2">
-                            <span className="font-bold text-gray-700">Estimated Refund Amount:</span>
-                            <span className="font-bold text-xl text-purple-700">₹{activeReturnRequest.refund_amount}</span>
+
+                                    {/* Items List for this return */}
+                                    <div className="bg-white p-3 rounded border border-slate-200 space-y-3">
+                                        <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Requested Items</p>
+                                        {ret.return_items.map((item, idx) => (
+                                            <div key={idx} className="flex justify-between items-start text-sm border-b last:border-0 pb-2 last:pb-0">
+                                                <div>
+                                                    <div className="font-medium flex items-center gap-2">
+                                                        {(() => {
+                                                            const orderItem = Array.isArray(item.order_items) ? item.order_items[0] : item.order_items;
+                                                            return orderItem?.title;
+                                                        })()}
+                                                        {(() => {
+                                                            const orderItem = Array.isArray(item.order_items) ? item.order_items[0] : item.order_items;
+                                                            return orderItem?.variant_snapshot?.size_label && (
+                                                                <Badge variant="secondary" className="text-[10px] h-4 font-normal">
+                                                                    {orderItem.variant_snapshot.size_label}
+                                                                </Badge>
+                                                            );
+                                                        })()}
+                                                    </div>
+                                                    <p className="text-[11px] text-muted-foreground italic mt-0.5">"Reason: {item.reason}"</p>
+                                                    {item.images && item.images.length > 0 && (
+                                                        <div className="flex gap-1 mt-2">
+                                                            {item.images.map((img, i) => (
+                                                                <img
+                                                                    key={i}
+                                                                    src={img}
+                                                                    className="w-10 h-10 object-cover rounded border cursor-pointer hover:opacity-80"
+                                                                    onClick={() => window.open(img, '_blank')}
+                                                                    alt="return proof"
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="font-bold">Qty: {item.quantity}</div>
+                                                    <div className="text-[10px] text-muted-foreground mt-1">
+                                                        ₹{(() => {
+                                                            const orderItem = Array.isArray(item.order_items) ? item.order_items[0] : item.order_items;
+                                                            // Calculate inclusive unit price if possible
+                                                            const base = orderItem?.price_per_unit || 0;
+                                                            const tax = (orderItem?.cgst || 0) + (orderItem?.sgst || 0) + (orderItem?.igst || 0);
+                                                            const unitTax = tax / (orderItem?.quantity || 1);
+                                                            return (base + unitTax).toFixed(2);
+                                                        })()}/unit (incl. tax)
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        <div className="pt-2 border-t border-dashed space-y-1">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-xs font-semibold">Refund Impact</span>
+                                                <span className="text-sm font-bold text-indigo-700">₹{ret.refund_amount.toFixed(2)}</span>
+                                            </div>
+                                            {ret.refund_breakdown && (
+                                                <div className="flex flex-col gap-0.5 mt-1 border-t border-slate-100 pt-1">
+                                                    <div className="flex justify-between text-[10px] text-slate-500">
+                                                        <span>Products (incl. tax):</span>
+                                                        <span>₹{(ret.refund_breakdown.totalRefund || 0).toFixed(2)}</span>
+                                                    </div>
+                                                    {(ret.refund_breakdown.totalDeliveryRefund > 0) && (
+                                                        <div className="flex justify-between text-[10px] text-indigo-600 font-medium">
+                                                            <span>Delivery Refund:</span>
+                                                            <span>₹{ret.refund_breakdown.totalDeliveryRefund.toFixed(2)}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {ret.staff_notes && (
+                                        <p className="text-[10px] text-slate-500 italic bg-slate-100 p-2 rounded">
+                                            Admin Note: {ret.staff_notes}
+                                        </p>
+                                    )}
+                                </div>
+                            ))}
                         </div>
                     </CardContent>
                 </Card>
@@ -362,7 +560,7 @@ export default function OrderDetail() {
                             <div className="space-y-4">
                                 {(() => {
                                     // Calculate Non-Refundable Total to Bundle
-                                    const refundableTotal = (order.items || []).reduce((sum: number, item: any) => {
+                                    const refundableTotal = (order.items || []).reduce((sum: number, item: OrderDetailItem) => {
                                         const snapshot = item.delivery_calculation_snapshot || {};
                                         if (snapshot.source !== 'global' && snapshot.delivery_refund_policy === 'REFUNDABLE') {
                                             return sum + (item.delivery_charge || 0) + (item.delivery_gst || 0);
@@ -373,17 +571,17 @@ export default function OrderDetail() {
                                     const deliveryTotal = (order.delivery_charge || 0) + (order.delivery_gst || 0);
                                     const nonRefundableTotalToBundle = Math.max(0, deliveryTotal - refundableTotal);
 
-                                    // Total for pro-rating
-                                    const itemsTotalAmount = order.items.reduce((sum, item) => sum + (item.quantity * (item.price_per_unit || item.price || item.product?.price || 0)), 0);
+                                    const itemsTotalAmount = order.items.reduce((sum, item) => sum + (item.quantity * (item.price_per_unit || item.price || item.product?.price || item.variant_snapshot?.selling_price || 0)), 0);
 
                                     return order.items.map((item, index) => {
                                         // Get variant size label
-                                        const sizeLabel = item.variant?.size_label || item.size_label;
+                                        const sizeLabel = item.variant_snapshot?.size_label || item.variant?.size_label || item.size_label;
                                         // Use variant image if available, otherwise use product image
-                                        const displayImage = item.variant?.variant_image_url || item.product?.images?.[0];
+                                        const displayImage = item.variant_snapshot?.variant_image_url || item.variant?.variant_image_url || item.product?.images?.[0];
+                                        const itemTitle = item.title || item.product?.title || "Product";
 
                                         // Calculate Bundled Price
-                                        const rawUnitPrice = item.price_per_unit || item.price || item.product?.price || 0;
+                                        const rawUnitPrice = item.price_per_unit || item.price || item.product?.price || item.variant_snapshot?.selling_price || 0;
                                         const itemTotalRaw = item.quantity * rawUnitPrice;
 
                                         let bundledUnitPrice = rawUnitPrice;
@@ -406,7 +604,7 @@ export default function OrderDetail() {
                                                     </div>
                                                     <div className="flex-1">
                                                         <div className="flex items-center gap-2">
-                                                            <h4 className="font-medium">{item.product?.title || "Product"}</h4>
+                                                            <h4 className="font-medium">{itemTitle}</h4>
                                                             {sizeLabel && (
                                                                 <Badge variant="secondary" className="text-xs font-normal">
                                                                     {sizeLabel}
@@ -442,7 +640,7 @@ export default function OrderDetail() {
                                                         </div>
                                                         <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                                                             <p>Method: <span className="font-medium">{item.delivery_calculation_snapshot.calculation_type?.replace(/_/g, ' ')}</span></p>
-                                                            <p>Charge: <span className="font-medium">₹{item.delivery_calculation_snapshot.delivery_charge}</span></p>
+                                                            <p>Charge: <span className="font-medium">₹{Number(item.delivery_calculation_snapshot.delivery_charge).toFixed(2)}</span></p>
                                                             {item.delivery_gst ? <p>GST (18%): <span className="font-medium">₹{item.delivery_gst}</span></p> : null}
                                                             {item.delivery_calculation_snapshot.policy && (
                                                                 <p className={item.delivery_calculation_snapshot.policy === 'NON_REFUNDABLE' ? 'text-orange-600 font-medium' : 'text-green-600 font-medium'}>
@@ -462,7 +660,7 @@ export default function OrderDetail() {
 
                             <div className="space-y-2 text-sm">
                                 {(() => {
-                                    const refundableTotal = (order.items || []).reduce((sum: number, item: any) => {
+                                    const refundableTotal = (order.items || []).reduce((sum: number, item: OrderDetailItem) => {
                                         const snapshot = item.delivery_calculation_snapshot || {};
                                         if (snapshot.source !== 'global' && snapshot.delivery_refund_policy === 'REFUNDABLE') {
                                             return sum + (item.delivery_charge || 0) + (item.delivery_gst || 0);
@@ -618,7 +816,7 @@ export default function OrderDetail() {
                                             Refund Details
                                         </p>
                                         <div className="space-y-3">
-                                            {order.refunds.map((refund: any, idx: number) => (
+                                            {(order.refunds || []).map((refund, idx) => (
                                                 <div key={idx} className="grid grid-cols-2 gap-4 text-xs border-b border-red-100 last:border-0 pb-2 last:pb-0">
                                                     <div>
                                                         <p className="text-red-700/70 mb-0.5">Processing ID (Razorpay)</p>
@@ -627,7 +825,7 @@ export default function OrderDetail() {
                                                         </code>
                                                     </div>
                                                     <div>
-                                                        <p className="text-red-700/70 mb-0.5">Refunded Amount</p>
+                                                        <p className="text-red-700/70 mb-0.5">Refundable Amount</p>
                                                         <p className="font-bold text-red-700 text-sm">₹{refund.amount}</p>
                                                     </div>
                                                     {refund.notes && (
@@ -672,7 +870,7 @@ export default function OrderDetail() {
                                             notes: 'Order placed successfully.',
                                             actor: 'SYSTEM',
                                             updated_by: 'SYSTEM'
-                                        } as any);
+                                        } as OrderStatusHistory);
                                     }
 
                                     return historyItems
@@ -759,11 +957,11 @@ export default function OrderDetail() {
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-4">
-                                    {order.email_logs.map((email, index) => (
+                                    {order.email_logs.map((email: EmailLog, index: number) => (
                                         <div key={index} className="flex gap-4 items-start border-l-2 border-muted pl-4 ml-2 pb-4 last:pb-0">
                                             <div className="flex-1">
                                                 <div className="flex items-center justify-between">
-                                                    <span className="font-medium text-sm">{email.event_type.replace(/_/g, ' ')}</span>
+                                                    <span className="font-medium text-sm">{(email.event_type || 'Unknown').replace(/_/g, ' ')}</span>
                                                     <Badge
                                                         variant={email.status === 'SENT' ? 'default' : email.status === 'FAILED' ? 'destructive' : 'secondary'}
                                                         className={`text-xs ${email.status === 'SENT' ? 'bg-green-100 text-green-800 border-green-200 hover:bg-green-100' : ''}`}
@@ -776,11 +974,17 @@ export default function OrderDetail() {
                                                         To: {email.recipient}
                                                     </p>
                                                     <p className="text-xs text-muted-foreground">
-                                                        {format(new Date(email.created_at), "MMM d, h:mm a")}
+                                                        {(() => {
+                                                            try {
+                                                                return format(new Date(email.created_at), "MMM d, h:mm a");
+                                                            } catch (e) {
+                                                                return "Date N/A";
+                                                            }
+                                                        })()}
                                                     </p>
                                                 </div>
                                                 {email.status === 'FAILED' && (
-                                                    <p className="text-xs text-red-600 mt-1">
+                                                    <p className="text-xs text-red-600 mt-1 font-medium bg-red-50 p-1.5 rounded border border-red-100">
                                                         Error: {email.error_message || 'Unknown error'} (Retries: {email.retry_count})
                                                     </p>
                                                 )}
@@ -872,10 +1076,9 @@ export default function OrderDetail() {
 
                     <TaxBreakdown
                         totalTaxableAmount={(() => {
-                            // If we have a legacy mismatch (Total != ComponentSum), 
-                            // we pass the reconciled total taxable to the component.
                             const storedSum = (order.total_taxable_amount || 0) + (order.total_cgst || 0) + (order.total_sgst || 0) + (order.total_igst || 0);
                             const totalAmount = order.total_amount || 0;
+                            // Reconcile if total_taxable_amount seems to exclude delivery (migration artifact)
                             const isLegacyMismatch = Math.abs(totalAmount - storedSum) > 1.0;
                             return isLegacyMismatch ? (order.total_taxable_amount || 0) + (order.delivery_charge || 0) : (order.total_taxable_amount || 0);
                         })()}
@@ -883,9 +1086,9 @@ export default function OrderDetail() {
                         totalSgst={order.total_sgst}
                         totalIgst={order.total_igst}
                         totalAmount={order.total_amount}
-                        showInvoiceLink={order.status === 'delivered' || !!order.invoice_url}
-                        invoiceUrl={order.invoice_url}
-                        items={order.items}
+                        showInvoiceLink={order.status === 'delivered' || !!order.invoice_url || (order.invoices && order.invoices.length > 0)}
+                        invoiceUrl={order.invoice_url || order.invoices?.find(i => i.type === 'RAZORPAY')?.public_url}
+                        items={order.items || []}
                         deliveryCharge={order.delivery_charge || 0}
                         deliveryGST={order.delivery_gst || 0}
                         role="admin"
@@ -958,7 +1161,14 @@ export default function OrderDetail() {
                             Cancel
                         </AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={handleStatusUpdate}
+                            onClick={async () => {
+                                if (pendingReturnId) {
+                                    await handleReturnAction(pendingReturnId, 'reject', rejectionReason);
+                                    setRejectionDialogOpen(false);
+                                } else {
+                                    handleStatusUpdate();
+                                }
+                            }}
                             disabled={!rejectionReason.trim() || updating}
                             className="bg-red-600 hover:bg-red-700"
                         >

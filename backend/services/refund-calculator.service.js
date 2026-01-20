@@ -22,24 +22,29 @@ class RefundCalculator {
         }
 
         const quantity = orderItem.quantity;
-        // Ratio of return quantity to original quantity
-        // Use precision to avoid floating point drift for simple divisions
         const refundRatio = returnQuantity / quantity;
 
-        // Helper to proportionally scale and round to 2 decimals
         const proportional = (amount) => {
-            return Number((amount * refundRatio).toFixed(2));
+            return Number(((amount || 0) * refundRatio).toFixed(2));
         };
 
-        const taxableRefund = proportional(orderItem.taxable_amount);
+        // Fallback: If taxable_amount is missing, use price_per_unit
+        const baseAmount = orderItem.taxable_amount !== null && orderItem.taxable_amount !== undefined
+            ? orderItem.taxable_amount
+            : orderItem.price_per_unit;
+
+        const taxableRefund = proportional(baseAmount);
         const cgstRefund = proportional(orderItem.cgst);
         const sgstRefund = proportional(orderItem.sgst);
         const igstRefund = proportional(orderItem.igst);
 
-        // Calculate total refund carefully to match sum of components or proportional total
-        // Summing components ensures accounting consistency
-        // But verifying against proportional total_amount check is also good
-        const totalRefund = Number((taxableRefund + cgstRefund + sgstRefund + igstRefund).toFixed(2));
+        // If all tax components are 0 but total_amount exists, check for discrepancy
+        let totalRefund = Number((taxableRefund + cgstRefund + sgstRefund + igstRefund).toFixed(2));
+
+        // Final Safety Check: If total_amount snapshot exists, ensure we aren't under-refunding
+        if (orderItem.total_amount && totalRefund < proportional(orderItem.total_amount)) {
+            totalRefund = proportional(orderItem.total_amount);
+        }
 
         return {
             taxableRefund,

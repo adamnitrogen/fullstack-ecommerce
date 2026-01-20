@@ -92,7 +92,12 @@ class AnalyticsService {
      * Aggregates counts, revenue, and trends using a robust modular approach.
      */
     static async getDashboardStats(options = {}) {
-        const { ordersPage = 1, ordersLimit = 10 } = options;
+        let { ordersPage = 1, ordersLimit = 10 } = options;
+
+        // Sanitize inputs
+        ordersPage = Math.max(1, parseInt(ordersPage) || 1);
+        ordersLimit = Math.max(0, parseInt(ordersLimit) || 0);
+
         const ordersOffset = (ordersPage - 1) * ordersLimit;
 
         const sevenDaysAgo = new Date();
@@ -100,137 +105,154 @@ class AnalyticsService {
         const sevenDaysAgoStr = sevenDaysAgo.toISOString();
         const nowStr = new Date().toISOString();
 
-        // fetch dynamic role IDs
-        const ROLES = await this._getRoleIds();
+        try {
+            // fetch dynamic role IDs
+            const ROLES = await this._getRoleIds();
 
-        // Safe query execution pattern
-        const runSafe = async (operation, fallback = null, context = '') => {
-            try {
-                const { data, count, error } = await operation;
-                if (error) throw error;
-                return { data, count, success: true };
-            } catch (err) {
-                logger.error({ err, context }, `Dashboard query failed: ${context}`);
-                return { data: fallback, count: 0, success: false };
-            }
-        };
-
-        // --- BATCH 1: Core Counts (Fastest) ---
-        const batch1 = await Promise.all([
-            runSafe(supabase.from(CONFIG.TABLES.PRODUCTS).select('id', { count: 'exact', head: true }), null, 'Total Products'),
-            runSafe(supabase.from(CONFIG.TABLES.ORDERS).select('id', { count: 'exact', head: true }), null, 'Total Orders'),
-            runSafe(supabase.from(CONFIG.TABLES.PROFILES).select('id', { count: 'exact', head: true }).eq(CONFIG.COLUMNS.ROLE_ID, ROLES.CUSTOMER), null, 'Total Customers'),
-            runSafe(supabase.from(CONFIG.TABLES.PROFILES).select('id', { count: 'exact', head: true }).eq(CONFIG.COLUMNS.ROLE_ID, ROLES.MANAGER), null, 'Total Managers'),
-            runSafe(supabase.from(CONFIG.TABLES.BLOGS).select('id', { count: 'exact', head: true }), null, 'Total Blogs'),
-            runSafe(supabase.from(CONFIG.TABLES.EVENTS).select('id', { count: 'exact', head: true }).gte(CONFIG.COLUMNS.END_DATE, nowStr), null, 'Active Events')
-        ]);
-
-        const products = batch1[0];
-        const orders = batch1[1];
-        const customers = batch1[2];
-        const managers = batch1[3];
-        const blogs = batch1[4];
-        const activeEvents = batch1[5];
-
-        // --- BATCH 2: Trends & Aggregations (Mixed Complexity) ---
-        const batch2 = await Promise.all([
-            runSafe(supabase.from(CONFIG.TABLES.ORDERS).select('id', { count: 'exact', head: true }).gte(CONFIG.COLUMNS.CREATED_AT.ORDERS, sevenDaysAgoStr), 0, 'Orders Trend'),
-            runSafe(supabase.from(CONFIG.TABLES.PROFILES).select('id', { count: 'exact', head: true }).eq(CONFIG.COLUMNS.ROLE_ID, ROLES.CUSTOMER).gte(CONFIG.COLUMNS.CREATED_AT.PROFILES, sevenDaysAgoStr), 0, 'Customers Trend'),
-            runSafe(supabase.from(CONFIG.TABLES.DONATIONS).select('amount').eq(CONFIG.COLUMNS.PAYMENT_STATUS, 'success').gte(CONFIG.COLUMNS.CREATED_AT.DONATIONS, sevenDaysAgoStr), [], 'Donations Trend'),
-            this._getTotalDonationsSum(),
-            this._getCategoryStats()
-        ]);
-
-        const ordersTrend = batch2[0].count || 0;
-        const customersTrend = batch2[1].count || 0;
-        const donationsTrendData = batch2[2].data || [];
-        const totalDonationsSum = batch2[3].data || 0;
-        const categoryStats = batch2[4].data || [];
-        const newDonationsAmount = donationsTrendData.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
-
-        // --- BATCH 3: Lists & Heavy Data (Slowest) ---
-        const batch3 = await Promise.all([
-            runSafe(supabase.from(CONFIG.TABLES.ORDERS).select('id', { count: 'exact', head: true }), null, 'Recent Orders Count'),
-            runSafe(supabase.from(CONFIG.TABLES.ORDERS)
-                .select(`id, order_number, ${CONFIG.COLUMNS.CREATED_AT.ORDERS}, ${CONFIG.COLUMNS.TOTAL_AMOUNT}, status, profiles(name)`)
-                .order(CONFIG.COLUMNS.CREATED_AT.ORDERS, { ascending: false })
-                .range(ordersOffset, ordersOffset + ordersLimit - 1), [], 'Recent Orders Data'),
-            runSafe(supabase.from(CONFIG.TABLES.EVENTS).select(`id, title, ${CONFIG.COLUMNS.START_DATE}, ${CONFIG.COLUMNS.END_DATE}`).lte(CONFIG.COLUMNS.START_DATE, nowStr).gte(CONFIG.COLUMNS.END_DATE, nowStr).limit(5), [], 'Ongoing Events'),
-            runSafe(supabase.from(CONFIG.TABLES.EVENTS).select(`id, title, ${CONFIG.COLUMNS.START_DATE}`).gt(CONFIG.COLUMNS.START_DATE, nowStr).order(CONFIG.COLUMNS.START_DATE, { ascending: true }).limit(5), [], 'Upcoming Events'),
-            runSafe(supabase.from(CONFIG.TABLES.EVENTS).select(`id, title, ${CONFIG.COLUMNS.START_DATE}, ${CONFIG.COLUMNS.END_DATE}`).lt(CONFIG.COLUMNS.END_DATE, nowStr).order(CONFIG.COLUMNS.END_DATE, { ascending: false }).limit(5), [], 'Past Events')
-        ]);
-
-        const recentOrdersCount = batch3[0].count || 0;
-        const recentOrders = batch3[1].data || [];
-        const ongoingEvents = batch3[2].data || [];
-        const upcomingEvents = batch3[3].data || [];
-        const pastEvents = batch3[4].data || [];
-
-        // Process Event Registrations (Enrichment) - Done last
-        const [enrichedOngoing, enrichedUpcoming] = await Promise.all([
-            this._enrichEventsWithRegistrations(ongoingEvents),
-            this._enrichEventsWithRegistrations(upcomingEvents)
-        ]);
-
-        const finalStats = {
-            stats: {
-                totalProducts: products.count || 0,
-                activeEvents: activeEvents.count || 0,
-                blogPosts: blogs.count || 0,
-                totalOrders: orders.count || 0,
-                totalCustomers: customers.count || 0,
-                totalManagers: managers.count || 0,
-                totalDonations: totalDonationsSum,
-                newOrdersCount: ordersTrend,
-                newCustomersCount: customersTrend,
-                newDonationsAmount: newDonationsAmount
-            },
-            productCategories: categoryStats,
-            recentOrders: {
-                data: recentOrders.map(o => ({
-                    id: o.id,
-                    orderNumber: o.order_number,
-                    customerName: o.profiles?.name || 'Guest',
-                    amount: o.totalAmount,
-                    status: o.status,
-                    createdAt: o.createdAt
-                })),
-                pagination: {
-                    total: recentOrdersCount,
-                    page: ordersPage,
-                    limit: ordersLimit,
-                    totalPages: Math.ceil(recentOrdersCount / ordersLimit) || 1
+            // Safe query execution pattern
+            const runSafe = async (operation, fallback = null, context = '') => {
+                try {
+                    const { data, count, error } = await operation;
+                    if (error) throw error;
+                    return { data, count, success: true };
+                } catch (err) {
+                    logger.error({ err, context }, `Dashboard query failed: ${context}`);
+                    return { data: fallback, count: 0, success: false };
                 }
-            },
-            upcomingEvents: enrichedUpcoming.map(e => ({
-                id: e.id,
-                title: e.title,
-                date: e.start_date,
-                registeredCount: e.registeredCount,
-                cancelledCount: e.cancelledCount
-            })),
-            ongoingEvents: enrichedOngoing.map(e => ({
-                id: e.id,
-                title: e.title,
-                endDate: e.end_date,
-                registeredCount: e.registeredCount,
-                cancelledCount: e.cancelledCount
-            })),
-            pastEvents: pastEvents.map(e => ({
-                id: e.id,
-                title: e.title,
-                startDate: e.start_date,
-                endDate: e.end_date
-            }))
-        };
+            };
 
-        logger.info({
-            msg: '[AnalyticsService] Dashboard Data Generated',
-            stats: finalStats.stats,
-            roleIds: ROLES
-        });
+            // --- BATCH 1: Core Counts (Fastest) ---
+            const batch1 = await Promise.all([
+                runSafe(supabase.from(CONFIG.TABLES.PRODUCTS).select('id', { count: 'exact', head: true }), null, 'Total Products'),
+                runSafe(supabase.from(CONFIG.TABLES.ORDERS).select('id', { count: 'exact', head: true }), null, 'Total Orders'),
+                runSafe(supabase.from(CONFIG.TABLES.PROFILES).select('id', { count: 'exact', head: true }).eq(CONFIG.COLUMNS.ROLE_ID, ROLES.CUSTOMER), null, 'Total Customers'),
+                runSafe(supabase.from(CONFIG.TABLES.PROFILES).select('id', { count: 'exact', head: true }).eq(CONFIG.COLUMNS.ROLE_ID, ROLES.MANAGER), null, 'Total Managers'),
+                runSafe(supabase.from(CONFIG.TABLES.BLOGS).select('id', { count: 'exact', head: true }), null, 'Total Blogs'),
+                runSafe(supabase.from(CONFIG.TABLES.EVENTS).select('id', { count: 'exact', head: true }), null, 'Active Events'),
+                runSafe(supabase.from('returns').select('id', { count: 'exact', head: true }).eq('status', 'requested'), null, 'Pending Returns')
+            ]);
 
-        return finalStats;
+            const products = batch1[0];
+            const orders = batch1[1];
+            const customers = batch1[2];
+            const managers = batch1[3];
+            const blogs = batch1[4];
+            const activeEvents = batch1[5];
+            const pendingReturns = batch1[6];
+
+            // --- BATCH 2: Trends & Aggregations (Mixed Complexity) ---
+            const batch2 = await Promise.all([
+                runSafe(supabase.from(CONFIG.TABLES.ORDERS).select('id', { count: 'exact', head: true }).gte(CONFIG.COLUMNS.CREATED_AT.ORDERS, sevenDaysAgoStr), 0, 'Orders Trend'),
+                runSafe(supabase.from(CONFIG.TABLES.PROFILES).select('id', { count: 'exact', head: true }).eq(CONFIG.COLUMNS.ROLE_ID, ROLES.CUSTOMER).gte(CONFIG.COLUMNS.CREATED_AT.PROFILES, sevenDaysAgoStr), 0, 'Customers Trend'),
+                runSafe(supabase.from(CONFIG.TABLES.DONATIONS).select('amount').eq(CONFIG.COLUMNS.PAYMENT_STATUS, 'success').gte(CONFIG.COLUMNS.CREATED_AT.DONATIONS, sevenDaysAgoStr), [], 'Donations Trend'),
+                this._getTotalDonationsSum(),
+                this._getCategoryStats()
+            ]);
+
+            const ordersTrend = batch2[0].count || 0;
+            const customersTrend = batch2[1].count || 0;
+            const donationsTrendData = batch2[2].data || [];
+            const totalDonationsSum = batch2[3].data || 0;
+            const categoryStats = batch2[4].data || [];
+            const newDonationsAmount = donationsTrendData.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+
+            // --- BATCH 3: Lists & Heavy Data (Slowest) ---
+            const listQueries = [
+                runSafe(supabase.from(CONFIG.TABLES.ORDERS).select('id', { count: 'exact', head: true }), null, 'Recent Orders Count'),
+                null, // Placeholder for Recent Orders Data
+                runSafe(supabase.from(CONFIG.TABLES.EVENTS).select(`id, title, ${CONFIG.COLUMNS.START_DATE}, ${CONFIG.COLUMNS.END_DATE}`).lte(CONFIG.COLUMNS.START_DATE, nowStr).gte(CONFIG.COLUMNS.END_DATE, nowStr).limit(5), [], 'Ongoing Events'),
+                runSafe(supabase.from(CONFIG.TABLES.EVENTS).select(`id, title, ${CONFIG.COLUMNS.START_DATE}`).gt(CONFIG.COLUMNS.START_DATE, nowStr).order(CONFIG.COLUMNS.START_DATE, { ascending: true }).limit(5), [], 'Upcoming Events'),
+                runSafe(supabase.from(CONFIG.TABLES.EVENTS).select(`id, title, ${CONFIG.COLUMNS.START_DATE}, ${CONFIG.COLUMNS.END_DATE}`).lt(CONFIG.COLUMNS.END_DATE, nowStr).order(CONFIG.COLUMNS.END_DATE, { ascending: false }).limit(5), [], 'Past Events')
+            ];
+
+            // Only fetch orders list if limit > 0
+            if (ordersLimit > 0) {
+                listQueries[1] = runSafe(supabase.from(CONFIG.TABLES.ORDERS)
+                    .select(`id, order_number, ${CONFIG.COLUMNS.CREATED_AT.ORDERS}, ${CONFIG.COLUMNS.TOTAL_AMOUNT}, status, profiles(name)`)
+                    .order(CONFIG.COLUMNS.CREATED_AT.ORDERS, { ascending: false })
+                    .range(ordersOffset, ordersOffset + ordersLimit - 1), [], 'Recent Orders Data');
+            } else {
+                listQueries[1] = Promise.resolve({ data: [], success: true });
+            }
+
+            const batch3 = await Promise.all(listQueries);
+
+            const recentOrdersCount = batch3[0].count || 0;
+            const recentOrders = batch3[1].data || [];
+            const ongoingEvents = batch3[2].data || [];
+            const upcomingEvents = batch3[3].data || [];
+            const pastEvents = batch3[4].data || [];
+
+            // Process Event Registrations (Enrichment) - Done last
+            const [enrichedOngoing, enrichedUpcoming] = await Promise.all([
+                this._enrichEventsWithRegistrations(ongoingEvents),
+                this._enrichEventsWithRegistrations(upcomingEvents)
+            ]);
+
+            const finalStats = {
+                stats: {
+                    totalProducts: products.count || 0,
+                    activeEvents: activeEvents.count || 0,
+                    blogPosts: blogs.count || 0,
+                    totalOrders: orders.count || 0,
+                    totalCustomers: customers.count || 0,
+                    totalManagers: managers.count || 0,
+                    totalDonations: totalDonationsSum,
+                    newOrdersCount: ordersTrend,
+                    newCustomersCount: customersTrend,
+                    newDonationsAmount: newDonationsAmount,
+                    pendingReturns: pendingReturns.count || 0
+                },
+                productCategories: categoryStats,
+                recentOrders: {
+                    data: recentOrders.map(o => ({
+                        id: o.id,
+                        orderNumber: o.order_number,
+                        customerName: o.profiles?.name || 'Guest',
+                        amount: o.total_amount,
+                        status: o.status,
+                        createdAt: o.createdAt
+                    })),
+                    pagination: {
+                        total: recentOrdersCount,
+                        page: ordersPage,
+                        limit: ordersLimit,
+                        totalPages: ordersLimit > 0 ? Math.ceil(recentOrdersCount / ordersLimit) : 1
+                    }
+                },
+                upcomingEvents: enrichedUpcoming.map(e => ({
+                    id: e.id,
+                    title: e.title,
+                    date: e.start_date,
+                    registeredCount: e.registeredCount,
+                    cancelledCount: e.cancelledCount
+                })),
+                ongoingEvents: enrichedOngoing.map(e => ({
+                    id: e.id,
+                    title: e.title,
+                    endDate: e.end_date,
+                    registeredCount: e.registeredCount,
+                    cancelledCount: e.cancelledCount
+                })),
+                pastEvents: pastEvents.map(e => ({
+                    id: e.id,
+                    title: e.title,
+                    startDate: e.start_date,
+                    endDate: e.end_date
+                }))
+            };
+
+            logger.info({
+                msg: '[AnalyticsService] Dashboard Data Generated',
+                stats: finalStats.stats,
+                roleIds: ROLES
+            });
+
+            return finalStats;
+        } catch (error) {
+            logger.error({ err: error }, 'Critical breakdown in getDashboardStats');
+            throw error; // Re-throw to be handled by routes
+        }
     }
 
     // --- Private Helpers ---

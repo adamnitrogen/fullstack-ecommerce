@@ -46,17 +46,6 @@ class MockDeliveryService {
 
     // Mock Calculation
     static async calculateDeliveryCharge(pid, vid, qty) {
-        // Flat rate 50 + GST
-        const totalInclusive = 50;
-        // Logic: 50 is base? No, usually generic config is base.
-        // Let's assume 50 IS THE CHARGE. 
-        // If taxable, and inclusive/exclusive... 
-        // The service code says: "base = total / (1+rate)". 
-        // But usually base_delivery_charge is the Base.
-        // Wait, line 183 of service says "UNIVERSAL INCLUSIVE LOGIC".
-        // "All configured delivery amounts... ARE the final totals"
-        // So if config says 50, that's Total 50.
-
         const total = 50;
         const base = total / 1.18;
         const gst = total - base;
@@ -88,83 +77,19 @@ class MockDeliveryService {
         }
 
         // Recalculate
+        let globalChargeHandled = false;
         for (const group of itemGroups.values()) {
             const remaining = group.original_qty - group.returned_qty;
             if (remaining > 0) {
-                // If Flat Rate, it applies ONCE per order usually? 
-                // Wait, the Service logic groups by Product/Variant.
-                // If FLAT_PER_ORDER, it applies once globally?
-                // The service logic: 
-                // "for (const [key, group] of itemGroups) ... calculateDeliveryCharge(remaining)"
+                // Simulation: Assume all items are global for this flat-rate check
+                const isGlobal = true;
 
-                // CRITICAL OBSERVATION of Service Logic:
-                // It iterates over GROUPS. 
-                // If calculation_type is FLAT_PER_ORDER...
-                // It calls `calculateDeliveryCharge` for EACH group with remaining quantity.
-                // Inside `calculateDeliveryCharge`:
-                // If FLAT_PER_ORDER -> returns base_charge (e.g. 50).
-
-                // SO: If I have 2 items (Item A, Item B).
-                // Original: Logic in calculateCartDelivery handles "Global Charge Applied Once".
-                // But calculateRefundDelivery iterates groups and sums them up?
-                // Does it handle the "Global Once" logic?
-
-                // Looking at `calculateRefundDelivery` in service:
-                // It iterates `itemGroups`.
-                // It calls `calculateDeliveryCharge` for each group.
-                // If `calculateDeliveryCharge` returns 50 for Item A, and 50 for Item B...
-                // Then `totalRemainingDelivery` becomes 100.
-
-                // ERROR POTENTIAL: If `calculateCartDelivery` smartly applied it ONCE (total 50).
-                // But `calculateRefundDelivery` blindly sums re-calculations for each item...
-                // It might think remaining delivery is 100 (50+50).
-                // Original (50) - Remaining (100) = -50 refund?
-
-                // Let's verify `calculateDeliveryCharge` behavior in the service.
-                // It accepts `isFreeDelivery`.
-                // It DOES NOT know about other items. 
-                // So for Flat Rate, it returns 50.
-
-                // Checks `calculateCartDelivery`:
-                // It has `let globalChargeApplied = false`.
-                // It applies it only to the first item.
-
-                // Checks `calculateRefundDelivery`:
-                // It iterates groups.
-                // It seems to NOT have the "Global Once" check.
-                // It sums `totalRemainingDelivery += result.deliveryCharge`.
-
-                // THIS COULD BE A BUG if the implementation relies on `calculateDeliveryCharge` returning full flat rate per item.
-                // HOWEVER, `originalItems` usually have the charge distributed?
-                // `totalOriginalDelivery` loops original items and sums stored charges.
-                // If Item A had 50 and Item B had 0 (because global-once), sum is 50.
-
-                // If we return Item B (originally 0). Remaining is Item A (originally 50).
-                // Re-calc Item A: 50.
-                // Refund = 50 - 50 = 0. Correct.
-
-                // If we return Item A (originally 50). Remaining is Item B (originally 0).
-                // Re-calc Item B: 50 (because it's now the only item, or just re-evaluating).
-                // Remaining Total = 50.
-                // Refund = 50 - 50 = 0. Correct.
-
-                // Wait, will `calculateRefundDelivery` call calc for Item B?
-                // Yes, it iterates ALL groups.
-                // So Item B group. Remaining = 1.
-                // calls calculateDeliveryCharge(Item B). Returns 50.
-                // So Remaining Total becomes 50.
-
-                // Original Total = 50.
-                // Refund = 50 - 50 = 0. Correct.
-
-                // Scenario: Full Return.
-                // Item A (50), Item B (0). Both returned.
-                // Remaining A = 0. Remaining B = 0.
-                // Total Remaining = 0.
-                // Refund = 50 - 0 = 50. Correct.
+                if (isGlobal && globalChargeHandled) continue;
 
                 const res = await MockDeliveryService.calculateDeliveryCharge(null, null, remaining);
                 totalRemainingDelivery += res.totalDelivery;
+
+                if (isGlobal) globalChargeHandled = true;
             }
         }
 
@@ -172,7 +97,7 @@ class MockDeliveryService {
         return {
             original: totalOriginalDelivery,
             remaining: totalRemainingDelivery,
-            refund: refund
+            refund: Math.round(refund * 100) / 100
         };
     }
 }
@@ -198,30 +123,18 @@ async function run() {
     const originalItems = [item1, item2];
 
     console.log('SCENARIO 1: Return Item 1 (The one holding the charge)');
-    // Remaining: Item 2.
-    // Re-calc Item 2: Should be 50.
-    // Original (50) - Remaining (50) = 0 Refund.
     const res1 = await MockDeliveryService.calculateRefundDelivery(originalItems, [{ orderItemId: 'i1', quantity: 1 }]);
     console.log('Result 1:', res1);
 
     console.log('\nSCENARIO 2: Return Item 2 (The free one)');
-    // Remaining: Item 1.
-    // Re-calc Item 1: Should be 50.
-    // Original (50) - Remaining (50) = 0 Refund.
     const res2 = await MockDeliveryService.calculateRefundDelivery(originalItems, [{ orderItemId: 'i2', quantity: 1 }]);
     console.log('Result 2:', res2);
 
     console.log('\nSCENARIO 3: Return Both');
-    // Remaining: 0.
-    // Refund: 50.
     const res3 = await MockDeliveryService.calculateRefundDelivery(originalItems, [{ orderItemId: 'i1', quantity: 1 }, { orderItemId: 'i2', quantity: 1 }]);
     console.log('Result 3:', res3);
 
     console.log('\nSCENARIO 4: 3 Items (Flat Rate 50), Return 1');
-    // Item 1, 2, 3.
-    // Return Item 1. Remaining: Item 2, Item 3.
-    // Recalc Delivery for Remaining (Item 2+3): Still 50 (Flat Rate).
-    // Refund: 50 - 50 = 0.
     const items3 = [
         { id: 'a', quantity: 1, delivery_charge: 42.37, delivery_gst: 7.63 }, // Holds charge
         { id: 'b', quantity: 1, delivery_charge: 0, delivery_gst: 0 },

@@ -43,10 +43,10 @@ const STATUS_MESSAGES = {
     [ORDER_STATUS.DELIVERED]: 'Order has been delivered successfully.',
     [ORDER_STATUS.CANCELLED]: 'Order has been cancelled.',
     [ORDER_STATUS.RETURN_REQUESTED]: 'Return request submitted. Awaiting approval.',
-    [ORDER_STATUS.RETURN_APPROVED]: 'Return request approved. Please ship the items back.',
+    [ORDER_STATUS.RETURN_APPROVED]: 'Return request approved. We have initiated the processing of your request.',
     [ORDER_STATUS.RETURN_REJECTED]: 'Return request has been rejected.',
     [ORDER_STATUS.RETURNED]: 'Returned items received at warehouse.',
-    [ORDER_STATUS.REFUNDED]: 'Refund has been processed successfully.'
+    [ORDER_STATUS.REFUNDED]: 'The refund has been successfully completed and credited back.'
 };
 
 /**
