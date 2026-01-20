@@ -282,7 +282,12 @@ const setPrimaryAddress = async (id, userId, type, correlationId = null) => {
     // Fetch the updated address to return
     const { data, error: fetchError } = await supabase
         .from('addresses')
-        .select('*')
+        .select(`
+            *,
+            phone_numbers (
+                phone_number
+            )
+        `)
         .eq('id', id)
         .single();
 

@@ -432,7 +432,16 @@ export default function UserOrderDetail() {
                                 // Prefer strict internal endpoint if available via order.invoice_url (set by orchestration)
                                 // or fallback to constructing it if we have the ID from invoices array
                                 const internalInv = order.invoices?.find(i => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type));
-                                const url = order.invoice_url || (internalInv ? `${import.meta.env.VITE_API_URL || 'http://localhost:5001/api'}/invoices/${internalInv.id}/download` : null);
+                                let url = null;
+
+                                // 1. Priority: Trust the orchestrator-provided URL (handles strategy)
+                                if (order.invoice_url && !order.invoice_url.includes('razorpay')) {
+                                    url = order.invoice_url;
+                                }
+                                // 2. Fallback: Use invoices table entry (check public_url first for strategy compliance)
+                                else if (internalInv) {
+                                    url = internalInv.public_url || `/api/invoices/${internalInv.id}/download`;
+                                }
                                 if (url) {
                                     // If it's a relative API path, prepend backend URL manually if needed, 
                                     // or if order.invoice_url is already full URL (it was setting relative in Orchestrator)
@@ -818,8 +827,21 @@ export default function UserOrderDetail() {
                                             return sum;
                                         }, 0);
 
-                                        const deliveryTotal = (order.delivery_charge || 0) + (order.delivery_gst || 0);
+                                        const itemizedDeliveryGST = (order.items || []).reduce((sum, item) => sum + (Number(item.delivery_gst) || 0), 0);
+                                        let effectiveDeliveryGST = Number(order.delivery_gst) || itemizedDeliveryGST;
                                         const subtotal = (order.items || []).reduce((sum: number, item) => sum + (item.quantity * (item.price_per_unit || item.product?.price || 0)), 0);
+
+                                        // Fallback: If tax info is missing but total implies it exists (Total > Subtotal + Delivery)
+                                        // This fixes display for legacy orders or where item.delivery_gst is stripped
+                                        const deliveryBase = Number(order.delivery_charge) || 0;
+                                        if (effectiveDeliveryGST === 0 && deliveryBase > 0) {
+                                            const impliedTax = (order.total_amount || 0) + (order.coupon_discount || 0) - subtotal - deliveryBase;
+                                            if (impliedTax > 0 && impliedTax < deliveryBase) { // Sanity check
+                                                effectiveDeliveryGST = impliedTax;
+                                            }
+                                        }
+
+                                        const deliveryTotal = deliveryBase + effectiveDeliveryGST;
 
                                         return (
                                             <>
@@ -1191,8 +1213,18 @@ export default function UserOrderDetail() {
                                     totalSgst={order.total_sgst}
                                     totalIgst={order.total_igst}
                                     totalAmount={totalAmount}
-                                    showInvoiceLink={order.status === 'delivered' || !!order.invoice_url}
-                                    invoiceUrl={order.invoice_url}
+                                    showInvoiceLink={order.status === 'delivered' && (!!order.invoice_url || !!order.invoices?.find(i => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type)))}
+                                    invoiceUrl={(() => {
+                                        const internalInv = order.invoices?.find(i => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type));
+                                        let url = null;
+                                        if (order.invoice_url && !order.invoice_url.includes('razorpay')) {
+                                            url = order.invoice_url;
+                                        } else if (internalInv) {
+                                            url = internalInv.public_url || `/api/invoices/${internalInv.id}/download`;
+                                        }
+                                        if (!url) return undefined;
+                                        return url.startsWith('http') ? url : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${url}`;
+                                    })()}
                                     items={order.items}
                                     deliveryCharge={deliveryCharge}
                                     deliveryGST={deliveryGST}

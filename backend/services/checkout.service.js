@@ -619,11 +619,11 @@ const createOrder = async (userId, checkoutData, cart) => {
                     order.invoiceUrl = inv.short_url;
                     order.invoice_id = checkoutData.invoice_id; // Set internally for response
 
-                    // Update Order with this invoice
+                    // Update Order - NOTE: We do NOT set invoice_url here.
+                    // invoice_url is reserved for Internal GST Invoice (generated at delivery).
+                    // Razorpay receipts are accessed via invoices array (type='RAZORPAY').
                     await supabase.from('orders').update({
-                        invoice_url: inv.short_url,
-                        invoice_id: inv.id, // Store the Razorpay Invoice ID as the "invoice_id" (conceptually)
-                        invoice_status: inv.status
+                        invoice_status: 'receipt_generated'
                     }).eq('id', order.id);
 
                     // Also ensure we insert into 'invoices' table to keep Orchestrator happy/consistent?

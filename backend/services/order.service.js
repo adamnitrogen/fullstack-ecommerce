@@ -70,17 +70,30 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
         }
 
         // 4. Update Order
-        const { data: updatedOrder, error: updateError } = await supabase
+        logger.info({ orderId, newStatus }, 'Attempting DB Update...');
+
+        let query = supabase
             .from('orders')
             .update({
                 status: newStatus,
                 updated_at: new Date().toISOString()
             })
             .eq('id', orderId)
-            .select()
-            .single();
+            .select();
 
-        if (updateError) throw updateError;
+        const { data: updatedOrders, error: updateError } = await query;
+
+        if (updateError) {
+            logger.error({ err: updateError }, 'DB Update Error');
+            throw updateError;
+        }
+
+        if (!updatedOrders || updatedOrders.length === 0) {
+            logger.error({ orderId }, 'CRITICAL: Update returned 0 rows! Role: ' + role);
+            throw new Error('Update returned 0 rows - Check RLS or Triggers');
+        }
+
+        const updatedOrder = updatedOrders[0];
 
         // 5. Log History with descriptive message
         const statusMessage = notes || STATUS_MESSAGES[newStatus] || `Status updated to ${newStatus}`;

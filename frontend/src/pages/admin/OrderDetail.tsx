@@ -196,9 +196,9 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
     confirmed: ['processing', 'cancelled'],
     processing: ['packed', 'cancelled'],
     packed: ['shipped', 'cancelled'],
-    shipped: ['out_for_delivery'],
+    shipped: ['out_for_delivery', 'returned'],
     out_for_delivery: ['delivered', 'returned'],
-    delivered: [],
+    delivered: [], // 'return_requested' removed as per request to handle returns via dedicated flow
     return_requested: ['return_approved', 'return_rejected'],
     return_approved: ['partially_returned', 'returned'],
     partially_returned: [],
@@ -728,15 +728,16 @@ export default function OrderDetail() {
                                         return sum;
                                     }, 0);
 
-                                    const deliveryTotal = (order.delivery_charge || 0) + (order.delivery_gst || 0);
-                                    const nonRefundableTotalToBundle = Math.max(0, deliveryTotal - refundableTotal);
-                                    const subtotalToDisplay = order.subtotal + nonRefundableTotalToBundle;
+                                    const itemizedDeliveryGST = (order.items || []).reduce((sum, item) => sum + (item.delivery_gst || 0), 0);
+                                    const effectiveDeliveryGST = order.delivery_gst || itemizedDeliveryGST;
+                                    const deliveryTotal = (order.delivery_charge || 0) + effectiveDeliveryGST;
+                                    const nonRefundableTotal = Math.max(0, deliveryTotal - refundableTotal);
 
                                     return (
                                         <>
                                             <div className="flex justify-between">
-                                                <span className="text-muted-foreground">Subtotal</span>
-                                                <span>₹{subtotalToDisplay.toFixed(2)}</span>
+                                                <span className="text-muted-foreground">Product Subtotal</span>
+                                                <span>₹{(order.subtotal || 0).toFixed(2)}</span>
                                             </div>
                                             {order.coupon_discount > 0 && (
                                                 <div className="flex justify-between text-green-600">
@@ -751,6 +752,15 @@ export default function OrderDetail() {
                                                         <Badge variant="outline" className="text-[10px] h-4 font-normal text-blue-600 border-blue-200 bg-blue-50">Refundable</Badge>
                                                     </span>
                                                     <span>₹{refundableTotal.toFixed(2)}</span>
+                                                </div>
+                                            )}
+                                            {nonRefundableTotal > 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-muted-foreground flex items-center gap-1.5">
+                                                        Delivery & Handling
+                                                        <Badge variant="outline" className="text-[10px] h-4 font-normal text-orange-600 border-orange-200 bg-orange-50">Non-Refundable</Badge>
+                                                    </span>
+                                                    <span>₹{nonRefundableTotal.toFixed(2)}</span>
                                                 </div>
                                             )}
                                         </>
@@ -875,10 +885,22 @@ export default function OrderDetail() {
                                             className="h-8 text-xs"
                                             onClick={() => {
                                                 const internalInv = order.invoices?.find(i => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type));
-                                                const url = order.invoice_url || (internalInv ? `${import.meta.env.VITE_API_URL || 'http://localhost:5001/api'}/invoices/${internalInv.id}/download` : null);
+
+                                                let url = null;
+                                                // 1. Priority: Trust the orchestrator-provided URL (handles strategy)
+                                                if (order.invoice_url && !order.invoice_url.includes('razorpay')) {
+                                                    url = order.invoice_url;
+                                                }
+                                                // 2. Fallback: Use invoices table entry (check public_url first for strategy compliance)
+                                                else if (internalInv) {
+                                                    url = internalInv.public_url || `/api/invoices/${internalInv.id}/download`;
+                                                }
+
                                                 if (url) {
                                                     const fullUrl = url.startsWith('http') ? url : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${url}`;
                                                     window.open(fullUrl, '_blank');
+                                                } else {
+                                                    toast.error("Invoice link is unavailable.");
                                                 }
                                             }}
                                         >
@@ -1136,11 +1158,21 @@ export default function OrderDetail() {
                         totalSgst={order.total_sgst}
                         totalIgst={order.total_igst}
                         totalAmount={order.total_amount}
-                        showInvoiceLink={order.status === 'delivered' || !!order.invoice_url || (order.invoices && order.invoices.length > 0)}
-                        invoiceUrl={order.invoice_url || order.invoices?.find(i => i.type === 'RAZORPAY')?.public_url}
+                        showInvoiceLink={order.status === 'delivered' && (!!order.invoice_url || !!order.invoices?.find(i => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type)))}
+                        invoiceUrl={(() => {
+                            const internalInv = order.invoices?.find(i => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type));
+                            let url = null;
+                            if (order.invoice_url && !order.invoice_url.includes('razorpay')) {
+                                url = order.invoice_url;
+                            } else if (internalInv) {
+                                url = internalInv.public_url || `/api/invoices/${internalInv.id}/download`;
+                            }
+                            if (!url) return undefined;
+                            return url.startsWith('http') ? url : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${url}`;
+                        })()}
                         items={order.items || []}
                         deliveryCharge={order.delivery_charge || 0}
-                        deliveryGST={order.delivery_gst || 0}
+                        deliveryGST={order.delivery_gst || (order.items || []).reduce((sum, item) => sum + (item.delivery_gst || 0), 0)}
                         role="admin"
                     />
 

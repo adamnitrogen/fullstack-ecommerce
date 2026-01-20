@@ -231,7 +231,7 @@ export function TaxBreakdown({
                                             </div>
                                         </div>
                                         <div className="flex justify-between items-center text-[10px] bg-white/50 px-2 py-1 rounded mt-1 border border-amber-200">
-                                            <span className="text-muted-foreground">Service Value</span>
+                                            <span className="text-muted-foreground">Taxable Value</span>
                                             <span className="font-mono">{formatAmount(deliveryCharge)}</span>
                                         </div>
                                     </div>

@@ -153,11 +153,16 @@ export default function MyOrders() {
                                 </SelectTrigger>
                                 <SelectContent className="rounded-2xl border-none shadow-elevated">
                                     <SelectItem value="all">All Statuses</SelectItem>
+                                    <SelectItem value="pending">Pending</SelectItem>
+                                    <SelectItem value="confirmed">Confirmed</SelectItem>
                                     <SelectItem value="processing">Processing</SelectItem>
+                                    <SelectItem value="packed">Packed</SelectItem>
                                     <SelectItem value="shipped">Shipped</SelectItem>
+                                    <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
                                     <SelectItem value="delivered">Delivered</SelectItem>
-                                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                                    <SelectItem value="return_requested">Return Requested</SelectItem>
                                     <SelectItem value="returned">Returned</SelectItem>
+                                    <SelectItem value="cancelled">Cancelled</SelectItem>
                                 </SelectContent>
                             </Select>
 
@@ -173,6 +178,8 @@ export default function MyOrders() {
                                     <SelectItem value="paid">Paid</SelectItem>
                                     <SelectItem value="pending">Pending</SelectItem>
                                     <SelectItem value="failed">Failed</SelectItem>
+                                    <SelectItem value="refund_initiated">Refund Initiated</SelectItem>
+                                    <SelectItem value="partially_refunded">Partially Refunded</SelectItem>
                                     <SelectItem value="refunded">Refunded</SelectItem>
                                 </SelectContent>
                             </Select>
@@ -332,8 +339,8 @@ export default function MyOrders() {
                                                     variant={pageNum === meta.page ? "default" : "ghost"}
                                                     size="sm"
                                                     className={`h-8 w-8 rounded-full p-0 font-bold text-[10px] ${pageNum === meta.page
-                                                            ? "bg-[#B85C3C] text-white hover:bg-[#B85C3C] shadow-md shadow-[#B85C3C]/20"
-                                                            : "text-muted-foreground hover:bg-[#B85C3C]/10 hover:text-[#B85C3C]"
+                                                        ? "bg-[#B85C3C] text-white hover:bg-[#B85C3C] shadow-md shadow-[#B85C3C]/20"
+                                                        : "text-muted-foreground hover:bg-[#B85C3C]/10 hover:text-[#B85C3C]"
                                                         }`}
                                                     onClick={() => handlePageChange(pageNum)}
                                                 >

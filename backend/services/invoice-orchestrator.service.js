@@ -51,11 +51,11 @@ class InvoiceOrchestrator {
                     status: 'GENERATED'
                 });
 
-                // Backward compatibility: Update order columns if needed.
-                // We update invoice_url so that confirmation emails and frontend can show the "Download Receipt" link immediately.
+                // NOTE: We do NOT set invoice_url here anymore.
+                // invoice_url is reserved for the Internal GST Invoice (generated at delivery).
+                // Razorpay receipts are accessed via the invoices array (type='RAZORPAY').
                 await supabase.from('orders').update({
-                    invoice_url: invoice.invoiceUrl,
-                    invoice_status: 'generated'
+                    invoice_status: 'receipt_generated'
                 }).eq('id', order.id);
 
                 log.operationSuccess('GENERATE_RAZORPAY_INVOICE', { invoiceId: invoice.invoiceId });
@@ -97,15 +97,18 @@ class InvoiceOrchestrator {
 
             if (result.success) {
                 // Update Order Metadata to point to THIS as the official invoice
+                // Construct invoice URL based on storage strategy
+                const strategy = (process.env.INVOICE_STORAGE_STRATEGY || 'BOTH').toUpperCase();
+                const invoiceUrl = (['SUPABASE', 'BOTH'].includes(strategy) && result.publicUrl)
+                    ? result.publicUrl
+                    : `/api/invoices/${result.invoiceId}/download`;
+
                 await supabase.from('orders').update({
-                    invoice_id: result.invoiceId, // Now points to invoices table UUID
+                    invoice_id: result.invoiceId,
                     invoice_number: result.invoiceNumber,
                     invoice_status: 'generated',
                     invoice_generated_at: new Date().toISOString(),
-                    // We might need an endpoint to serve this file, e.g. /api/invoices/:id/download
-                    // So we don't put a direct URL here yet unless we have a public storage bucket.
-                    // For local file, we construct a backend route URL.
-                    invoice_url: result.publicUrl || `/api/invoices/${result.invoiceId}/download`
+                    invoice_url: invoiceUrl
                 }).eq('id', orderId);
 
                 // Send Email

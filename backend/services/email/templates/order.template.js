@@ -131,10 +131,10 @@ function getOrderConfirmationEmail({ order, customerName }) {
                 ${order.tax ? `
                 <tr>
                     <td colspan="2" style="padding: 10px; text-align: right; color: #666; font-size: 12px;">
-                        Tax (${order.tax.taxType === 'INTER' ? 'IGST' : 'CGST+SGST'}):
+                        Tax (${order.tax.tax_type === 'INTER' ? 'IGST' : 'CGST+SGST'}):
                     </td>
                     <td style="padding: 10px; text-align: right; color: #666; font-size: 12px;">
-                        ₹${(order.tax.totalTax || 0).toFixed(2)}
+                        ₹${(order.tax.total_tax || 0).toFixed(2)}
                     </td>
                 </tr>
                 ` : ''}

@@ -297,22 +297,23 @@ async function handleOrderWebhook(event, payload, payment) {
                 // Send Order Confirmation Email
                 if (updatedOrder) {
                     try {
+                        // Check if Razorpay receipt already exists in invoices array
                         const items = updatedOrder.order_items || [];
-                        if (!updatedOrder.invoice_url) {
+                        const hasRazorpayReceipt = (updatedOrder.invoices || []).some(inv => inv.type === 'RAZORPAY');
+                        if (!hasRazorpayReceipt) {
                             try {
                                 const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
-                                logger.info({ orderId: updatedOrder.id }, 'Generating missing invoice link via webhook');
+                                logger.info({ orderId: updatedOrder.id }, 'Generating missing Razorpay receipt via webhook');
                                 const result = await InvoiceOrchestrator.generateRazorpayInvoice({
                                     ...updatedOrder,
                                     items: items
                                 });
                                 if (result.success && result.invoiceUrl) {
-                                    updatedOrder.invoice_url = result.invoiceUrl;
-                                    // Persist valid invoice URL
-                                    await supabase.from('orders').update({ invoice_url: result.invoiceUrl }).eq('id', updatedOrder.id);
+                                    updatedOrder.invoiceUrl = result.invoiceUrl; // For email template
+                                    // NOTE: invoice_url is NOT set here - it's reserved for internal invoice at delivery
                                 }
                             } catch (invErr) {
-                                logger.warn({ err: invErr }, 'Failed to generate invoice link in webhook');
+                                logger.warn({ err: invErr }, 'Failed to generate Razorpay receipt in webhook');
                             }
                         }
 

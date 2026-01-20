@@ -28,7 +28,7 @@ export const transformToCheckoutAddress = (data: any): CheckoutAddress => ({
     type: data.type || 'other',
     is_primary: data.is_primary !== undefined ? data.is_primary : data.isPrimary,
     full_name: data.full_name || data.label || 'User', // Handle both field names
-    phone: data.phone || '', // Unified phone field
+    phone: data.phone || data.phone_numbers?.phone_number || '', // Handle both direct and nested phone
     address_line1: data.address_line1 || data.street_address || data.streetAddress, // Handle all variations
     address_line2: data.address_line2 || data.apartment,
     city: data.city,
