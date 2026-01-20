@@ -6,6 +6,7 @@ const EventService = require('../services/event.service');
 const emailService = require('../services/email');
 const logger = require('../utils/logger');
 const supabase = require('../config/supabase');
+const crypto = require('crypto');
 const { authenticateToken } = require('../middleware/auth.middleware');
 const { requireAdminOrManager } = require('../middleware/adminOnly.middleware');
 
@@ -21,7 +22,7 @@ router.post('/:id/cancel', async (req, res) => {
     try {
         const eventId = req.params.id;
         const { reason } = req.body;
-        const correlationId = req.headers['x-correlation-id'] || require('crypto').randomUUID();
+        const correlationId = req.headers['x-correlation-id'] || crypto.randomUUID();
 
         if (!reason) {
             return res.status(400).json({ error: 'Cancellation reason is required' });
@@ -57,7 +58,7 @@ router.post('/:id/update-schedule', async (req, res) => {
     try {
         const eventId = req.params.id;
         const { startDate, endDate, reason } = req.body;
-        const correlationId = req.headers['x-correlation-id'] || require('crypto').randomUUID();
+        const correlationId = req.headers['x-correlation-id'] || crypto.randomUUID();
 
         if (!startDate || !reason) {
             return res.status(400).json({ error: 'New start date and reason (for notification) are required' });
@@ -121,7 +122,7 @@ router.get('/:id/cancellation-job', async (req, res) => {
 router.post('/:id/retry-cancellation', async (req, res) => {
     try {
         const eventId = req.params.id;
-        const correlationId = req.headers['x-correlation-id'] || require('crypto').randomUUID();
+        const correlationId = req.headers['x-correlation-id'] || crypto.randomUUID();
 
         // Find the latest job for this event
         const { data: job, error: jobError } = await supabase

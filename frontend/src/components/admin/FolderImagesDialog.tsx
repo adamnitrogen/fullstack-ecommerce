@@ -12,6 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Trash2, Plus, Image as ImageIcon } from "lucide-react";
 import { ImageUpload } from "./ImageUpload";
 import { GalleryFolder } from "@/types";
+import { uploadService } from "@/services/upload.service";
 
 interface FolderImagesDialogProps {
   open: boolean;
@@ -36,8 +37,6 @@ export function FolderImagesDialog({
       const processedImages: string[] = [];
 
       try {
-        const { uploadService } = await import("@/services/upload.service");
-
         for (const img of newImages) {
           if (img instanceof File) {
             const response = await uploadService.uploadImage(img, 'gallery', folder.title);

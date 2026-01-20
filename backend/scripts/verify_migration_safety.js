@@ -5,6 +5,7 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 const supabase = createClient(
@@ -104,7 +105,6 @@ async function verifyMigrationSafety() {
     console.log('Checking history.service.js EVENT_TYPE_MAP...');
     console.log('');
 
-    const fs = require('fs');
     const historyServicePath = path.join(__dirname, '../services/history.service.js');
     const historyServiceCode = fs.readFileSync(historyServicePath, 'utf8');
 

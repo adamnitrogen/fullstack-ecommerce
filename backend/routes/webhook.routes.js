@@ -7,6 +7,7 @@ const express = require('express');
 const router = express.Router();
 const { RazorpayWebhookLogger } = require('../services/razorpay-webhook-logger.service');
 const { createModuleLogger } = require('../utils/logging-standards');
+const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
 
 const log = createModuleLogger('WebhookRoutes');
 
@@ -56,7 +57,6 @@ router.post('/razorpay', express.raw({ type: 'application/json' }), async (req, 
     }
 });
 
-const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
 
 /**
  * @route GET /api/webhooks/logs

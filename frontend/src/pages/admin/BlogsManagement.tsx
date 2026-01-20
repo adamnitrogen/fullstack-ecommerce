@@ -29,6 +29,8 @@ import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import type { Blog } from "@/types";
 import { format } from "date-fns";
+import { blogService } from "@/services/blog.service";
+import { uploadService } from "@/services/upload.service";
 
 import {
   Pagination,
@@ -53,7 +55,6 @@ export default function BlogsManagement() {
   const { data, isLoading } = useQuery({
     queryKey: ["admin-blogs", page, limit, searchQuery],
     queryFn: async () => {
-      const { blogService } = await import("@/services/blog.service");
       return blogService.getPaginated(page, limit, searchQuery);
     },
   });
@@ -68,13 +69,10 @@ export default function BlogsManagement() {
 
   const blogMutation = useMutation({
     mutationFn: async (blogData: Partial<Blog> & { imageFile?: File }) => {
-      const { blogService } = await import("@/services/blog.service");
-
       const finalBlog = { ...blogData };
 
       // Handle image upload if file is present
       if (blogData.imageFile) {
-        const { uploadService } = await import("@/services/upload.service");
         const response = await uploadService.uploadImage(blogData.imageFile, 'blog');
         finalBlog.image = response.url;
         // Remove imageFile from the object sent to API
@@ -109,14 +107,11 @@ export default function BlogsManagement() {
 
   const deleteMutation = useMutation({
     mutationFn: async (blogId: string) => {
-      const { blogService } = await import("@/services/blog.service");
-
       // Get the blog to access its image
       const blog = blogs.find(b => b.id === blogId);
 
       // Delete image from Supabase Storage if it exists
       if (blog && blog.image) {
-        const { uploadService } = await import("@/services/upload.service");
         try {
           logger.debug("Deleting blog image:", blog.image);
           await uploadService.deleteImageByUrl(blog.image);
@@ -157,7 +152,6 @@ export default function BlogsManagement() {
       id: string;
       published: boolean;
     }) => {
-      const { blogService } = await import("@/services/blog.service");
       await blogService.update(id, { published });
       return { id, published };
     },

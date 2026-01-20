@@ -13,8 +13,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Product, Testimonial } from "@/types";
 import { galleryFolderService } from "@/services/gallery-folder.service";
-import { galleryItemService, GalleryItem } from "@/services/gallery-item.service";
+import { GalleryItem, galleryItemService } from "@/services/gallery-item.service";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { productService } from "@/services/product.service";
+import { eventService } from "@/services/event.service";
+import { blogService } from "@/services/blog.service";
+import { testimonialService } from "@/services/testimonial.service";
 import {
   Milk,
   Leaf,
@@ -37,7 +41,6 @@ const Index = () => {
   const { data: productsData, isLoading: productsLoading } = useQuery({
     queryKey: ["products", "featured"],
     queryFn: async () => {
-      const { productService } = await import("@/services/product.service");
       const { products } = await productService.getAll({ limit: 8, page: 1 });
       // Sort by createdAt descending (newest first)
       const sortedProducts = products.sort((a, b) =>
@@ -50,7 +53,6 @@ const Index = () => {
   const { data: eventsData, isLoading: eventsLoading } = useQuery({
     queryKey: ["events", "upcoming"],
     queryFn: async () => {
-      const { eventService } = await import("@/services/event.service");
       const { events: allEvents } = await eventService.getAll();
 
       // Filter for ongoing and upcoming events only (no completed)
@@ -72,7 +74,6 @@ const Index = () => {
   const { data: blogsData, isLoading: blogsLoading } = useQuery({
     queryKey: ["blogs", "latest"],
     queryFn: async () => {
-      const { blogService } = await import("@/services/blog.service");
       const allBlogs = await blogService.getAll();
       // Filter published blogs and sort by date descending (newest first)
       const publishedBlogs = allBlogs
@@ -85,7 +86,6 @@ const Index = () => {
   const { data: testimonialsData, isLoading: testimonialsLoading } = useQuery({
     queryKey: ["testimonials"],
     queryFn: async () => {
-      const { testimonialService } = await import("@/services/testimonial.service");
       const allTestimonials = await testimonialService.getAll();
       return { data: allTestimonials };
     },

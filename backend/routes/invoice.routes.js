@@ -5,6 +5,7 @@ const path = require('path');
 const supabase = require('../config/supabase'); // Or lib/supabase
 const logger = require('../utils/logger');
 const { requireAuth } = require('../middleware/auth.middleware');
+const { InvoiceOrchestrator } = require('../services/invoice-orchestrator.service');
 
 /**
  * Download Invoice PDF
@@ -80,7 +81,6 @@ router.post('/orders/:id/retry', requireAuth, async (req, res) => {
             return res.status(403).json({ error: 'Unauthorized' });
         }
 
-        const { InvoiceOrchestrator } = require('../services/invoice-orchestrator.service');
         const result = await InvoiceOrchestrator.generateInternalInvoice(orderId);
 
         if (result.success) {

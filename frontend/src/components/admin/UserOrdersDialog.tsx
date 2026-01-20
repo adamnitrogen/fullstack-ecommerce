@@ -17,6 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import type { Order } from "@/types";
 import { format } from "date-fns";
+import { orderService } from "@/services/order.service";
 
 interface UserOrdersDialogProps {
   open: boolean;
@@ -33,7 +34,6 @@ export function UserOrdersDialog({
     queryKey: ["user-orders", userId],
     queryFn: async () => {
       if (!userId) return [];
-      const { orderService } = await import("@/services/order.service");
       const response = await orderService.getAll({ userId: userId || undefined });
       return response.data || [];
     },

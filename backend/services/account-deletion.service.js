@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { sendOTP, verifyOTP } = require('./otp.service');
 const emailService = require('./email');
 const DonationService = require('./donation.service');
+const { DeletionJobProcessor } = require('./deletion-job-processor');
 
 /**
  * Account Deletion Service
@@ -330,7 +331,7 @@ class AccountDeletionService {
             const oldEmail = profileData?.email;
             const userName = profileData?.name;
             // Use consistent anonymized email format (will be overwritten by DeletionJobProcessor anyway)
-            const anonymizedHash = require('crypto').createHash('sha256').update(userId).digest('hex').substring(0, 16);
+            const anonymizedHash = crypto.createHash('sha256').update(userId).digest('hex').substring(0, 16);
             const anonymizedEmail = `deleted-${anonymizedHash}@anonymous.local`;
 
             // Send deletion confirmation email BEFORE anonymizing, or use the captured email
@@ -382,7 +383,6 @@ class AccountDeletionService {
             // Trigger async processing (use setImmediate to return immediately)
             setImmediate(async () => {
                 try {
-                    const { DeletionJobProcessor } = require('./deletion-job-processor');
                     await DeletionJobProcessor.processJob(job.id);
                 } catch (err) {
                     logger.error({ err, jobId: job.id }, '[AccountDeletion] Job processing failed');

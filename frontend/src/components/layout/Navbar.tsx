@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LogoutConfirmDialog } from "@/components/LogoutConfirmDialog";
 import { PromotionalBanner } from "@/components/PromotionalBanner";
+import { logoutUser } from "@/lib/services/auth.service";
 
 export const Navbar = () => {
   const { t, i18n } = useTranslation();
@@ -77,7 +78,6 @@ export const Navbar = () => {
 
   const confirmLogout = async () => {
     try {
-      const { logoutUser } = await import("@/lib/services/auth.service");
       await logoutUser();
       logout();
       navigate("/");

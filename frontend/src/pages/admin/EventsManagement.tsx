@@ -26,6 +26,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { eventService } from "@/services/event.service";
+import { uploadService } from "@/services/upload.service";
 
 export default function EventsManagement() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -39,17 +41,14 @@ export default function EventsManagement() {
   const { data, isLoading } = useQuery({
     queryKey: ["admin-events", searchQuery, page],
     queryFn: async () => {
-      const { eventService } = await import("@/services/event.service");
       return eventService.getAll({ page, limit: 15, search: searchQuery });
     },
   });
 
   const eventMutation = useMutation({
     mutationFn: async (eventData: Partial<Event> & { imageFile?: File }) => {
-      const { eventService } = await import("@/services/event.service");
       const finalEvent = { ...eventData };
       if (eventData.imageFile) {
-        const { uploadService } = await import("@/services/upload.service");
         const response = await uploadService.uploadImage(eventData.imageFile, 'event');
         finalEvent.image = response.url;
         delete finalEvent.imageFile;
@@ -81,7 +80,6 @@ export default function EventsManagement() {
 
   const cancelMutation = useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
-      const { eventService } = await import("@/services/event.service");
       return eventService.cancel(id, reason);
     },
     onSuccess: () => {
@@ -104,7 +102,6 @@ export default function EventsManagement() {
 
   const rescheduleMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: { startDate: string; endDate?: string; reason: string } }) => {
-      const { eventService } = await import("@/services/event.service");
       return eventService.updateSchedule(id, data);
     },
     onSuccess: () => {
@@ -127,7 +124,6 @@ export default function EventsManagement() {
 
   const retryMutation = useMutation({
     mutationFn: async (eventId: string) => {
-      const { eventService } = await import("@/services/event.service");
       return eventService.retryCancellation(eventId);
     },
     onSuccess: (data) => {
@@ -198,7 +194,6 @@ export default function EventsManagement() {
     const { data: jobStatus } = useQuery<CancellationJobStatus | null>({
       queryKey: ["job-status", eventId],
       queryFn: async () => {
-        const { eventService } = await import("@/services/event.service");
         return eventService.getJobStatus(eventId);
       },
       refetchInterval: (query) => {

@@ -3,7 +3,8 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const { authenticateToken } = require('../middleware/auth.middleware');
-const { createAddress, updateAddress } = require('../services/address.service');
+const { getUserAddresses, setPrimaryAddress, formatAddress, createAddress, updateAddress } = require('../services/address.service');
+const crypto = require('crypto');
 
 /**
  * GET /api/addresses
@@ -12,7 +13,6 @@ const { createAddress, updateAddress } = require('../services/address.service');
 router.get('/', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.userId;
-        const { getUserAddresses } = require('../services/address.service');
 
         // Use service to get addresses with phone numbers
         const addresses = await getUserAddresses(userId);
@@ -246,7 +246,7 @@ router.post('/:id/set-primary', authenticateToken, async (req, res) => {
         const userId = req.user.userId;
         const { id } = req.params;
         let { type } = req.body; // Expect type to be passed from frontend
-        const correlationId = req.headers['x-correlation-id'] || require('crypto').randomUUID();
+        const correlationId = req.headers['x-correlation-id'] || crypto.randomUUID();
 
         logger.info({ id, type, userId }, '[AddressRoute] Set primary triggered');
 
@@ -267,7 +267,6 @@ router.post('/:id/set-primary', authenticateToken, async (req, res) => {
             logger.info({ id, type }, '[AddressRoute] Successfully looked up address type');
         }
 
-        const { setPrimaryAddress, formatAddress } = require('../services/address.service');
         const updatedAddress = await setPrimaryAddress(id, userId, type, correlationId);
 
         res.json({

@@ -5,17 +5,20 @@ const { getTraceContext } = require('../utils/async-context');
 const crypto = require('crypto');
 const supabase = require('../config/supabase');
 const { calculateCartTotals, getUserCart, removeFromCart } = require('./cart.service');
-const { getPrimaryAddress, getLatestAddress, getAddressById } = require('./address.service');
+const { getPrimaryAddress, getLatestAddress, getAddressById, getUserAddresses } = require('./address.service');
 const { checkStockAvailability, decreaseInventory } = require('./inventory.service');
 const emailService = require('./email');
 const { RefundService, REFUND_TYPES } = require('./refund.service');
-const { capturePayment, voidAuthorization } = require('../utils/razorpay-helper');
+const { capturePayment, voidAuthorization, refundPayment } = require('../utils/razorpay-helper');
 // Tax and Pricing
 const { TaxEngine } = require('./tax-engine.service');
 const { PricingCalculator } = require('./pricing-calculator.service');
 const { FinancialEventLogger } = require('./financial-event-logger.service');
 const { DeliveryChargeService } = require('./delivery-charge.service');
 const { logStatusHistory, ORDER_STATUS } = require('./history.service');
+const { validateCoupon } = require('./coupon.service');
+const { RazorpayInvoiceService } = require('./razorpay-invoice.service');
+const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
 
 // Create module-specific logger
 const log = createModuleLogger('CheckoutService');
@@ -381,7 +384,6 @@ const createOrder = async (userId, checkoutData, cart) => {
     // --- COUPON SAFETY GUARD ---
     if (cart.applied_coupon_code) {
         // Force live check for critical operation
-        const { validateCoupon } = require('./coupon.service');
         const validation = await validateCoupon(cart.applied_coupon_code, userId, cart.cart_items, totals.totalPrice, true);
 
         if (!validation.valid) {
@@ -661,8 +663,6 @@ const createOrder = async (userId, checkoutData, cart) => {
                 logger.info({ orderId: order.id, invoiceId: checkoutData.invoice_id }, '[Checkout] Linking existing Razorpay Invoice (Receipt)');
 
                 // Fetch the existing invoice to get the URL
-                // Fetch the existing invoice to get the URL
-                const { RazorpayInvoiceService } = require('./razorpay-invoice.service'); // Ensure this service exports what we need
                 // Actually, checkout.service.js doesn't import RazorpayInvoiceService directly yet, but InvoiceOrchestrator uses it.
                 // Or we can just use the razorpay instance directly since we are in checkout service.
                 let inv = await razorpay.invoices.fetch(checkoutData.invoice_id);
@@ -699,7 +699,6 @@ const createOrder = async (userId, checkoutData, cart) => {
             } else {
                 // Fallback: Create new invoice if one doesn't exist (e.g. Buy Now might not have created one? Or legacy flow?)
                 // Actually Buy Now uses createRazorpayInvoice too, so it should have one.
-                const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
                 logger.info({ orderId: order.id }, '[Checkout] Generating immediate Razorpay Payment Receipt');
                 // This is now purely for Payment Receipt, not the legal Tax Invoice
                 const result = await InvoiceOrchestrator.generateRazorpayInvoice(order);
@@ -720,7 +719,6 @@ const createOrder = async (userId, checkoutData, cart) => {
     // Log initial payment verification (PAYMENT_SUCCESS)
     // NOTE: 'ORDER_PLACED' is handled by the creation RPC or system trigger, so we avoid duplicating it here.
     try {
-        const { logStatusHistory } = require('./history.service');
 
         if (checkoutData.payment_status === 'paid') {
             await logStatusHistory(order.id, 'PAYMENT_SUCCESS', userId, `Payment verified (ID: ${razorpay_payment_id || payment_id || 'N/A'})`, 'SYSTEM');
@@ -825,7 +823,6 @@ const handleWebhookEvent = async (payload) => {
 
                     // Log history for confirmation
                     try {
-                        const { logStatusHistory } = require('./history.service');
                         await logStatusHistory(
                             dbPayment.order_id,
                             'confirmed', // Will map to ORDER_CONFIRMED
@@ -861,7 +858,6 @@ const handleWebhookEvent = async (payload) => {
 
                 if (dbPayment.order_id) {
                     try {
-                        const { logStatusHistory } = require('./history.service');
                         await logStatusHistory(
                             dbPayment.order_id,
                             'PAYMENT_FAILED',
@@ -1218,7 +1214,6 @@ async function processPaymentAndOrder(userId, {
         );
 
         // Log functionality for Timeline (Fix for missing history)
-        const { logStatusHistory } = require('./history.service');
         // User requested that orders NOT be auto-confirmed by system. Leaving status as 'pending'.
 
         // --- DB SUCCESS ---
@@ -1255,7 +1250,6 @@ async function processPaymentAndOrder(userId, {
                     await RefundService.asyncProcessRefund(payment_id, REFUND_TYPES.TECHNICAL_REFUND, 'SYSTEM', `Order creation failed: ${systemError.message}`, true);
                 } else {
                     // Fallback for extreme cases where even internal payment_id is missing but we have RP ID
-                    const { refundPayment } = require('../utils/razorpay-helper');
                     await refundPayment(razorpay_payment_id, null, {
                         reason: `Order creation failed: ${systemError.message}`
                     });
@@ -1436,7 +1430,6 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
                 if (payment_id) {
                     await RefundService.asyncProcessRefund(payment_id, REFUND_TYPES.TECHNICAL_REFUND, 'SYSTEM', `Buy Now order failed: ${error.message}`, true);
                 } else {
-                    const { refundPayment } = require('../utils/razorpay-helper');
                     await refundPayment(razorpay_payment_id, null, {
                         reason: `Buy Now order failed: ${error.message}`
                     });
@@ -1457,17 +1450,11 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
 const getBuyNowSummary = async (userId, buyNowData, addressId = null) => {
     try {
         const { productId, variantId, quantity = 1 } = buyNowData;
-        const cartService = require('./cart.service');
-        const addressService = require('./address.service');
-
-        // 2. Build mock cart using helper (merges quantity)
-        const virtualCart = await createBuyNowVirtualCart(userId, null, { productId, variantId, quantity });
-
         // 3. Calculate totals using standard service
-        const totals = await cartService.calculateCartTotals(userId, null, virtualCart);
+        const totals = await calculateCartTotals(userId, null, virtualCart);
 
         // 4. Fetch addresses
-        const addresses = await addressService.getUserAddresses(userId);
+        const addresses = await getUserAddresses(userId);
         const primaryAddress = addresses.find(a => a.is_primary) || addresses[0];
 
         let shipping_address = null;

@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
@@ -7,6 +7,8 @@ const AuthService = require('../services/auth.service');
 const multer = require('multer');
 const sharp = require('sharp');
 const { v4: uuidv4 } = require('uuid');
+const { getUserAddresses } = require('../services/address.service');
+const phoneValidator = require('../utils/phone-validator');
 
 // Configure multer for memory storage (we'll process before uploading)
 const upload = multer({
@@ -60,7 +62,7 @@ router.get('/', authenticateToken, async (req, res) => {
             .single();
 
         // Get user's addresses using service (includes phone numbers)
-        const { getUserAddresses } = require('../services/address.service');
+        // Get user's addresses using service (includes phone numbers)
         logger.debug(`[ProfileRoutes] Fetching addresses for user ${userId}`);
         const addresses = await getUserAddresses(userId);
 
@@ -135,7 +137,7 @@ router.put('/', authenticateToken, async (req, res) => {
             }
 
             // Abstract API validation
-            const phoneValidator = require('../utils/phone-validator');
+            // Abstract API validation
             logger.info({ phone }, 'Calling phone validator service from profile route');
             const validationResult = await phoneValidator.validate(phone);
             if (!validationResult.isValid) {

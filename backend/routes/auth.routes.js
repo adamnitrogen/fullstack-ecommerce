@@ -7,6 +7,7 @@ const validate = require('../middleware/validate.middleware');
 const { loginSchema, registerSchema, changePasswordSchema } = require('../schemas/auth.schema');
 const AuthService = require('../services/auth.service');
 const { supabase, supabaseAdmin } = require('../lib/supabase'); // Consolidated Supabase client usage
+const { createClient } = require('@supabase/supabase-js');
 
 // NOTE: /auth/me endpoint REMOVED
 // Session initialization now uses supabase.auth.getSession() on frontend
@@ -324,7 +325,6 @@ router.post('/change-password', authenticateToken, validate(changePasswordSchema
         }
 
         // Use temporary client to validate password to avoid tainting global instance
-        const { createClient } = require('@supabase/supabase-js');
         const tempClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
             auth: {
                 persistSession: false,

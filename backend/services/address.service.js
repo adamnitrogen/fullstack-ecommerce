@@ -1,4 +1,6 @@
 const supabase = require('../config/supabase');
+const phoneValidator = require('../utils/phone-validator');
+const crypto = require('crypto');
 const logger = require('../utils/logger');
 
 /**
@@ -61,7 +63,6 @@ const createAddress = async (userId, addressData) => {
     const normalizedPhone = addressData.phone?.replace(/\s+/g, '').trim();
 
     // Phone validation using Abstract API
-    const phoneValidator = require('../utils/phone-validator');
     logger.info({ phone: normalizedPhone }, 'Calling phone validator from createAddress');
     const validationResult = await phoneValidator.validate(normalizedPhone);
     if (!validationResult.isValid) {
@@ -163,7 +164,6 @@ const updateAddress = async (id, userId, updates) => {
         // Normalize phone for consistency
         const normalizedPhone = phone?.replace(/\s+/g, '').trim();
 
-        const phoneValidator = require('../utils/phone-validator');
         logger.info({ phone: normalizedPhone }, 'Calling phone validator from updateAddress');
         const validationResult = await phoneValidator.validate(normalizedPhone);
         if (!validationResult.isValid) {
@@ -240,7 +240,7 @@ const setPrimaryAddress = async (id, userId, type, correlationId = null) => {
         p_address_id: id,
         p_user_id: userId,
         p_address_type: type,
-        p_correlation_id: correlationId || require('crypto').randomUUID()
+        p_correlation_id: correlationId || crypto.randomUUID()
     });
 
     if (error) {

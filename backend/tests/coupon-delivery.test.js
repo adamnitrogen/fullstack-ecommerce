@@ -12,7 +12,7 @@ const {
     calculateCouponDiscount,
     getCouponPriority,
     validateCoupon
-} = require('../services/coupon.service');
+} = CouponService;
 const CartService = require('../services/cart.service');
 
 describe('Coupon & Delivery Logic', () => {

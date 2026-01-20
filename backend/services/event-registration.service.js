@@ -4,7 +4,7 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const emailService = require('../services/email');
 const { createInvoice } = require('../services/razorpay-invoice.service');
-const { capturePayment, voidAuthorization } = require('../utils/razorpay-helper');
+const { capturePayment, voidAuthorization, refundPayment } = require('../utils/razorpay-helper');
 
 // Initialize Razorpay
 const razorpay = new Razorpay({
@@ -340,7 +340,6 @@ class EventRegistrationService {
 
             try {
                 // Refund the full amount
-                const { refundPayment } = require('../utils/razorpay-helper');
                 await refundPayment(razorpay_payment_id, null, {
                     reason: `Registration update failed: ${systemError.message}`
                 });

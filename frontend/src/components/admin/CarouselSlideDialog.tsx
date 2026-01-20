@@ -21,6 +21,7 @@ import {
   updateCarouselSlide,
 } from "@/lib/services/carousel.service";
 import { toast } from "sonner";
+import { uploadService } from "@/services/upload.service";
 
 interface CarouselSlideDialogProps {
   open: boolean;
@@ -80,7 +81,6 @@ export function CarouselSlideDialog({
 
       let imageUrl = formData.image;
       if (formData.imageFile) {
-        const { uploadService } = await import("@/services/upload.service");
         const response = await uploadService.uploadImage(formData.imageFile, 'carousel');
         imageUrl = response.url;
       }

@@ -1,7 +1,8 @@
 const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
-const { validateCoupon, calculateCouponDiscount } = require('./coupon.service');
+const { validateCoupon, calculateCouponDiscount, getCachedCoupon } = require('./coupon.service');
 const settingsService = require('./settings.service');
+const { DeliveryChargeService } = require('./delivery-charge.service');
 
 
 /**
@@ -426,7 +427,6 @@ async function calculateCartTotals(userId, guestId, existingCart = null, { skipV
             if (skipValidation) {
                 // OPTIMIZATION: Skip full validation, just fetch coupon and recalculate discount
                 // Use the coupon cache from coupon.service.js (already has 60s TTL)
-                const { getCachedCoupon } = require('./coupon.service');
                 coupon = await getCachedCoupon(cart.applied_coupon_code);
 
                 if (coupon && coupon.is_active) {
@@ -460,7 +460,6 @@ async function calculateCartTotals(userId, guestId, existingCart = null, { skipV
 
         // NEW DYNAMIC DELIVERY LOGIC
         // Calculate delivery charges using DeliveryChargeService
-        const { DeliveryChargeService } = require('./delivery-charge.service');
 
         let totalDeliveryCharge = 0;
         let totalDeliveryGST = 0;

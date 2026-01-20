@@ -7,6 +7,7 @@ const { FinancialEventLogger } = require('./financial-event-logger.service');
 const { DeliveryChargeService } = require('./delivery-charge.service');
 const emailService = require('./email');
 const { createModuleLogger } = require('../utils/logging-standards');
+const orderService = require('./order.service');
 
 const log = createModuleLogger('ReturnService');
 const { logStatusHistory } = require('./history.service');
@@ -264,7 +265,6 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
         .eq('id', orderId);
 
     // 6. Log History
-    const orderService = require('./order.service');
     await orderService.logStatusHistory(orderId, 'return_requested', userId, `Return requested. Refund Est: ₹${estimatedRefund}`, 'USER');
 
     // 7. Log Financial Event
@@ -337,7 +337,6 @@ const processReturnApproval = async (returnId, adminId) => {
         .eq('id', returnRequest.order_id);
 
     // 4. Log History
-    const orderService = require('./order.service');
     await orderService.logStatusHistory(returnRequest.order_id, 'return_approved', adminId, 'Return approved! We will now proceed with picking up the items.', 'ADMIN');
 
     // 5. Send RETURN_APPROVED Email (using order_number for clarity)
@@ -394,7 +393,6 @@ const processReturnRejection = async (returnId, adminId, reason) => {
             .update({ status: 'return_rejected' })
             .eq('id', returnRequest.order_id);
 
-        const orderService = require('./order.service');
         await orderService.logStatusHistory(returnRequest.order_id, 'return_rejected', adminId, `Return rejected. Reason: ${reason}`, 'ADMIN');
 
         // Log Financial Event
@@ -449,7 +447,6 @@ const cancelReturnRequest = async (returnId, userId) => {
     if (updateError) throw updateError;
 
     // 4. Log History
-    const orderService = require('./order.service');
     await orderService.logStatusHistory(returnRequest.order_id, 'return_cancelled', userId, `Return request cancelled by you.`, 'USER');
 
     return { success: true };
@@ -484,7 +481,6 @@ const updateReturnStatus = async (returnId, status, adminId, notes = '') => {
     if (updateError) throw updateError;
 
     // 4. Log Status History
-    const orderService = require('./order.service');
     await orderService.logStatusHistory(returnRequest.order_id, `return_${status}`, adminId, `Return request status updated to ${status}. ${notes}`, 'ADMIN');
 
     // 5. If marking as picked_up, update all items too if they are still 'approved'
@@ -719,7 +715,6 @@ const aggregateOrderState = async (orderId) => {
 
         await supabaseAdmin.from('orders').update(updateData).eq('id', orderId);
 
-        const orderService = require('./order.service');
         if (updates.status) {
             const statusLabel = updates.status.replace('_', ' ');
             const message = updates.status === 'returned'

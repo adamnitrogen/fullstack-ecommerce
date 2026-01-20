@@ -9,6 +9,7 @@ import { analyticsService, DashboardStats } from '@/services/analytics.service';
 import { format } from 'date-fns';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/lib/supabase';
+import { orderService } from '@/services/order.service';
 import { toast } from 'sonner';
 import { DashboardAlerts } from '@/components/admin/DashboardAlerts';
 import {
@@ -42,7 +43,6 @@ export default function AdminDashboard() {
   const { data: ordersData, isLoading: isOrdersLoading, isFetching: isOrdersFetching } = useQuery({
     queryKey: ['admin-dashboard-recent-orders', ordersPage],
     queryFn: async () => {
-      const { orderService } = await import("@/services/order.service");
       return orderService.getAll({
         page: ordersPage,
         limit: ordersLimit,

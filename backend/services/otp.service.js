@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const logger = require('../utils/logger');
-// bcrypt removed for performance (using sha256 for OTPs)
 const { supabaseAdmin: supabase } = require('../lib/supabase');
+const emailService = require('./email');
 
 // Configuration
 const OTP_LENGTH = 6;
@@ -98,7 +98,6 @@ async function deleteOTP(identifier) {
  * Send OTP via Email using Resend
  */
 async function sendEmailOTP(email, otp, metadata = null) {
-    const emailService = require('./email');
 
     try {
         let result;

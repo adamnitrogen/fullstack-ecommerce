@@ -7,6 +7,7 @@ import { BackButton } from "@/components/ui/BackButton";
 import { ProductReviews } from "@/components/ProductReviews";
 import { ProductDetailView } from "@/components/ProductDetailView";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { productService } from "@/services/product.service";
 
 const ProductDetail = () => {
   const { productId } = useParams<{ productId: string }>();
@@ -14,7 +15,6 @@ const ProductDetail = () => {
   const { data: product, isLoading } = useQuery({
     queryKey: ["product", productId],
     queryFn: async () => {
-      const { productService } = await import("@/services/product.service");
       return productService.getById(productId!);
     },
     enabled: !!productId,

@@ -3,6 +3,8 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth.middleware');
 const AccountDeletionService = require('../services/account-deletion.service');
+const { DeletionJobProcessor } = require('../services/deletion-job-processor');
+const supabase = require('../config/supabase');
 
 /**
  * Account Deletion Routes
@@ -229,13 +231,11 @@ router.post('/admin/process-pending', authenticateToken, async (req, res) => {
 
         if (!jobId) {
             // Process all pending jobs
-            const { DeletionJobProcessor } = require('../services/deletion-job-processor');
             const result = await DeletionJobProcessor.processScheduledDeletions();
             return res.json({ success: true, message: 'Scheduled jobs processing triggered', ...result });
         }
 
         // Process specific job
-        const supabase = require('../config/supabase');
         const { data: job, error: fetchError } = await supabase
             .from('account_deletion_jobs')
             .select('*')
@@ -250,7 +250,6 @@ router.post('/admin/process-pending', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: `Job status is ${job.status}, not PENDING. Update status first.` });
         }
 
-        const { DeletionJobProcessor } = require('../services/deletion-job-processor');
 
         // Trigger async processing
         setImmediate(async () => {

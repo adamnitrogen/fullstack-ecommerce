@@ -1,9 +1,14 @@
-const { supabaseAdmin } = require('../lib/supabase');
+const { supabase, supabaseAdmin } = require('../lib/supabase');
 const logger = require('../utils/logger');
 const { cleanupOrphanedUser } = require('../utils/cleanup');
 const { sendOTP, verifyOTP } = require('./otp.service');
 const CartService = require('./cart.service');
 const crypto = require('crypto');
+const { createClient } = require('@supabase/supabase-js');
+const phoneValidator = require('../utils/phone-validator');
+const emailService = require('./email');
+const { invalidateAuthCache } = require('../middleware/auth.middleware');
+
 
 // Encryption Keys (should be in env, but generating for now or using secret)
 const ENCRYPTION_KEY = process.env.JWT_SECRET || 'fallback_secret_must_be_32_bytes_long_!!'; // Ensure 32 bytes
@@ -281,7 +286,6 @@ class AuthService {
                 return;
             }
 
-            const emailService = require('./email');
             const finalName = name || profile?.name || user.user_metadata?.full_name || user.user_metadata?.name || 'User';
 
             logger.info({ userId: user.id, email: user.email, name: finalName, source }, '[AuthService] Triggering welcome email');
@@ -308,7 +312,6 @@ class AuthService {
      */
     static async validateCredentials(email, password, guestId) {
         // Create a temporary client to validate credentials without tainting the global instance
-        const { createClient } = require('@supabase/supabase-js');
         const tempClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
             auth: {
                 persistSession: false,
@@ -459,7 +462,6 @@ class AuthService {
 
         // Validate phone number if provided
         if (phone) {
-            const phoneValidator = require('../utils/phone-validator');
             logger.info({ phone }, 'Calling phone validator service from registration');
             const validationResult = await phoneValidator.validate(phone);
             if (!validationResult.isValid) {
@@ -512,7 +514,6 @@ class AuthService {
         }
 
         // 4. Verification Token
-        const crypto = require('crypto');
         const verificationToken = crypto.randomBytes(32).toString('hex');
         const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
@@ -525,7 +526,6 @@ class AuthService {
             .eq('id', authData.user.id);
 
         // 5. Send Email
-        const emailService = require('./email');
         const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${verificationToken}`;
 
         // Don't await email to speed up response
@@ -649,7 +649,6 @@ class AuthService {
      * Logout
      */
     static async logout(accessToken, refreshToken) {
-        const { invalidateAuthCache } = require('../middleware/auth.middleware');
 
         if (accessToken) {
             // Invalidate local cache
@@ -718,7 +717,6 @@ class AuthService {
         }
 
         // Send reset email
-        const emailService = require('./email');
         const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
 
         // Don't await - send async
@@ -888,7 +886,6 @@ class AuthService {
         }
 
         // Send verification email
-        const emailService = require('./email');
         const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${verificationToken}`;
 
         await emailService.sendEmailConfirmation(profile.email, {

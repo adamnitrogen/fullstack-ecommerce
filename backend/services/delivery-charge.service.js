@@ -10,6 +10,7 @@
 const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
 const { createModuleLogger } = require('../utils/logging-standards');
+const settingsService = require('./settings.service');
 
 const log = createModuleLogger('DeliveryChargeService');
 
@@ -86,7 +87,6 @@ class DeliveryChargeService {
             }
 
             // No config found, use global defaults from Settings Service
-            const settingsService = require('./settings.service');
             const globalSettings = await settingsService.getDeliverySettings();
 
             log.debug('DELIVERY_CONFIG', 'Using global settings', { productId, settings: globalSettings });
@@ -241,7 +241,6 @@ class DeliveryChargeService {
 
         try {
             // Fetch global settings for threshold
-            const settingsService = require('./settings.service');
             const globalSettings = await settingsService.getDeliverySettings();
             const threshold = globalSettings.delivery_threshold || 0;
 

@@ -10,8 +10,12 @@ const {
     getCheckoutSummary,
     createRazorpayInvoice,
     createPaymentRecord,
-    processPaymentAndOrder
+    processPaymentAndOrder,
+    getBuyNowSummary,
+    processBuyNowOrder
 } = require('../services/checkout.service');
+const cartService = require('../services/cart.service');
+const supabase = require('../config/supabase');
 
 /**
  * Checkout Routes
@@ -56,8 +60,6 @@ router.get('/validate-stock', async (req, res) => {
             return res.status(401).json({ error: 'Authentication required' });
         }
 
-        const cartService = require('../services/cart.service');
-        const supabase = require('../config/supabase');
         const cart = await cartService.getUserCart(userId);
 
         if (!cart || !cart.cart_items || cart.cart_items.length === 0) {
@@ -131,7 +133,7 @@ router.post('/create-payment-order', validate(createPaymentOrderSchema), request
 
         // 1. Get User Profile (Needed for Invoice)
         // We need name/email/phone for the Invoice Customer
-        const { data: profile } = await require('../config/supabase')
+        const { data: profile } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', userId)
@@ -142,7 +144,6 @@ router.post('/create-payment-order', validate(createPaymentOrderSchema), request
         }
 
         // 2. Get Cart & Totals
-        const cartService = require('../services/cart.service');
         const cart = await cartService.getUserCart(userId);
         if (!cart || !cart.cart_items || cart.cart_items.length === 0) {
             return res.status(400).json({ error: 'Cart is empty' });
@@ -152,7 +153,6 @@ router.post('/create-payment-order', validate(createPaymentOrderSchema), request
         const amount = totals.finalAmount;
 
         // PHASE 2B OPTIMIZATION: Inline stock validation (eliminates separate API call)
-        const supabase = require('../config/supabase');
         const stockIssues = [];
 
         for (const item of cart.cart_items) {
@@ -316,7 +316,6 @@ router.post('/buy-now/summary', async (req, res) => {
             return res.status(400).json({ error: 'Please select a valid quantity (1-100).' });
         }
 
-        const { getBuyNowSummary } = require('../services/checkout.service');
         const summary = await getBuyNowSummary(userId, { productId, variantId, quantity }, addressId);
 
         // PHASE 2B OPTIMIZATION: Include Razorpay key in summary
@@ -345,7 +344,6 @@ router.post('/buy-now/validate-stock', async (req, res) => {
             return res.status(400).json({ error: 'Please select a valid quantity.' });
         }
 
-        const supabase = require('../config/supabase');
 
         let availableStock = 0;
         let productTitle = 'Product';
@@ -425,7 +423,6 @@ router.post('/buy-now/create-payment-order', requestLock('create-payment-order')
             return res.status(400).json({ error: 'Please select a valid quantity (1-100).' });
         }
 
-        const supabase = require('../config/supabase');
 
         // PHASE 2 OPTIMIZATION: Inline stock validation (eliminates separate API call)
         let availableStock = 0;
@@ -476,7 +473,6 @@ router.post('/buy-now/create-payment-order', requestLock('create-payment-order')
             });
         }
 
-        const { getBuyNowSummary, createRazorpayInvoice, createPaymentRecord } = require('../services/checkout.service');
         const summary = await getBuyNowSummary(userId, { productId, variantId, quantity });
         const amount = summary.totals.finalAmount;
 
@@ -563,7 +559,6 @@ router.post('/buy-now/verify-payment', requestLock('verify-payment'), idempotenc
             return res.status(400).json({ error: 'Invalid checkout session. Please try again from the product page.' });
         }
 
-        const { processBuyNowOrder } = require('../services/checkout.service');
         const result = await processBuyNowOrder(userId, paymentData, buyNowData);
 
         res.json(result);

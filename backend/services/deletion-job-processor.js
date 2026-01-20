@@ -1,6 +1,8 @@
 const { supabaseAdmin: supabase } = require('../lib/supabase');
 const logger = require('../utils/logger');
 const crypto = require('crypto');
+const emailService = require('./email');
+const AccountDeletionService = require('./account-deletion.service');
 
 /**
  * Deletion Job Processor
@@ -129,7 +131,6 @@ class DeletionJobProcessor {
             // 5. Send final confirmation email for SCHEDULED deletions
             // (IMMEDIATE deletions send it in the service before anonymization)
             if (job.mode === 'SCHEDULED' && profile.email) {
-                const emailService = require('./email');
                 await emailService.sendAccountDeletedEmail(profile.email, { name: profile.name }).catch(err =>
                     logger.error({ err, userId }, '[DeletionJob] Failed to send final deletion email')
                 );
@@ -650,7 +651,6 @@ class DeletionJobProcessor {
             for (const job of dueJobs || []) {
                 try {
                     // Re-check eligibility
-                    const AccountDeletionService = require('./account-deletion.service');
                     const eligibility = await AccountDeletionService.checkEligibility(job.user_id);
 
                     if (!eligibility.eligible) {

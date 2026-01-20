@@ -42,6 +42,7 @@ const mapToDb = (blog) => {
 };
 
 const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { deletePhotoByUrl } = require('../services/photo.service');
 
 // Get all blogs (with optional pagination and search)
 router.get('/', async (req, res) => {
@@ -170,7 +171,6 @@ router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async 
 
         // 3. Clean up blog image from storage and photos table
         if (blog && blog.image) {
-            const { deletePhotoByUrl } = require('../services/photo.service');
             // Don't await - let cleanup happen asynchronously
             deletePhotoByUrl(blog.image).catch(err =>
                 logger.error('Error cleaning up blog image:', err)

@@ -2,6 +2,9 @@ const { supabase, supabaseAdmin } = require('../config/supabase');
 const logger = require('../utils/logger');
 const { updatePaymentRecord } = require('./checkout.service');
 const emailService = require('./email');
+const crypto = require('crypto');
+const orderService = require('./order.service');
+const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
 
 /**
  * Webhook Service
@@ -117,7 +120,7 @@ async function handleSubscriptionWebhook(event, payment, payload) {
         }
 
         const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-        const unique = require('crypto').randomBytes(4).toString('hex').toUpperCase();
+        const unique = crypto.randomBytes(4).toString('hex').toUpperCase();
         const newRef = `DON-SUB-${dateStr}-${unique}`;
 
         const { data: newDonation, error: insertError } = await supabase
@@ -287,7 +290,7 @@ async function handleOrderWebhook(event, payload, payment) {
                     .single();
 
                 // Log Timeline: PAYMENT_SUCCESS
-                await require('./order.service').logStatusHistory(
+                await orderService.logStatusHistory(
                     dbPayment.order_id,
                     'PAYMENT_SUCCESS',
                     'SYSTEM',
@@ -302,7 +305,6 @@ async function handleOrderWebhook(event, payload, payment) {
                         const hasRazorpayReceipt = (updatedOrder.invoices || []).some(inv => inv.type === 'RAZORPAY');
                         if (!hasRazorpayReceipt) {
                             try {
-                                const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
                                 logger.info({ orderId: updatedOrder.id }, 'Generating missing Razorpay receipt via webhook');
                                 const result = await InvoiceOrchestrator.generateRazorpayInvoice({
                                     ...updatedOrder,
@@ -349,7 +351,7 @@ async function handleOrderWebhook(event, payload, payment) {
             });
 
             if (dbPayment.order_id) {
-                await require('./order.service').logStatusHistory(
+                await orderService.logStatusHistory(
                     dbPayment.order_id,
                     'PAYMENT_FAILED',
                     'SYSTEM',
@@ -454,7 +456,7 @@ async function handleOrderWebhook(event, payload, payment) {
 
             // Log Timeline match
             const eventType = isFullRefund ? 'REFUND_COMPLETED' : 'REFUND_PARTIAL';
-            await require('./order.service').logStatusHistory(
+            await orderService.logStatusHistory(
                 dbPayment.order_id,
                 orderStatus,
                 'SYSTEM',

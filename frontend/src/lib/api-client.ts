@@ -1,8 +1,8 @@
-import { logger } from "@/lib/logger";
+import { logger, logAPICall, logPageAction } from "@/lib/logger";
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
-import { logAPICall, logPageAction } from '@/lib/logger';
 import { ApiErrorResponse } from "@/types";
 import { supabase } from "@/lib/supabase";
+import { getGuestId } from '@/lib/guestId';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
@@ -49,9 +49,8 @@ export const apiClient = axios.create({
     timeout: 30000,
 });
 
-import { getGuestId } from '@/lib/guestId';
 
-// ... (existing imports)
+// ... (existing configuration)
 
 apiClient.interceptors.request.use(
     (config) => {

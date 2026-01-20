@@ -12,6 +12,7 @@ import { toast } from "@/hooks/use-toast";
 import { User, Mail, Phone, Edit, Trash2 } from "lucide-react";
 import { AddressBook } from "./AddressBook";
 import { DeleteAccountDialog } from "./DeleteAccountDialog";
+import { profileService } from "@/services/profile.service";
 
 export function ProfileSettings() {
   const { t } = useTranslation();
@@ -33,7 +34,6 @@ export function ProfileSettings() {
 
   const handleSavePersonalInfo = async () => {
     try {
-      const { profileService } = await import("@/services/profile.service");
       await profileService.updateProfile({
         firstName: personalInfo.firstName,
         lastName: personalInfo.lastName,
@@ -88,8 +88,6 @@ export function ProfileSettings() {
 
   const handleDeleteAccount = async () => {
     try {
-      const { profileService } = await import("@/services/profile.service");
-
       if (user) {
         // Mark account as deleted and deactivate
         await profileService.deleteAccount();

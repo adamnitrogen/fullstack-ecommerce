@@ -28,6 +28,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { categoryService } from "@/services/category.service";
 
 interface CouponDialogProps {
     open: boolean;
@@ -65,7 +66,6 @@ export function CouponDialog({
         const fetchCategories = async () => {
             try {
                 setLoadingCategories(true);
-                const { categoryService } = await import("@/services/category.service");
                 const data = await categoryService.getAll("product");
                 // Extract unique category names
                 const uniqueCategories = [...new Set(data.map((c) => c.name))];

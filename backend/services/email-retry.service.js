@@ -76,15 +76,9 @@ class EmailRetryService {
                     // Strategy: mark current record as 'RETRIED_LEGACY' and let new one be the active one?
                     // Or finding the new record and linking?
 
-                    // Let's implement specific retry logic:
                     // 1. Increment retry_count
                     // 2. Try sending using provider
                     // 3. Update status ('SENT' or 'FAILED')
-
-                    const { getProvider } = require('./index'); // access internal if possible or expose it
-                    // Since specific provider logic isn't easily accessible without bypass, 
-                    // we will RE-TRIGGER standard send, and mark this record as 'ARCHIVED/RETRIED' 
-                    // to prevent re-selection.
 
                     await emailService.send(
                         emailRecord.event_type,

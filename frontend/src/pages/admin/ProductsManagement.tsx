@@ -27,6 +27,9 @@ import { toast } from "@/hooks/use-toast";
 import { getErrorMessage, getErrorDetails } from "@/lib/errorUtils";
 import { downloadCSV, flattenObject } from "@/lib/exportUtils";
 import type { Product, VariantFormData, DeliveryConfig } from "@/types";
+import { productService } from "@/services/product.service";
+import { uploadService } from "@/services/upload.service";
+import { deliveryConfigService } from "@/services/delivery-config.service";
 
 // ... (skipping some lines)
 
@@ -42,7 +45,6 @@ export default function ProductsManagement() {
   const { data, isLoading } = useQuery({
     queryKey: ["admin-products", searchQuery, page],
     queryFn: async () => {
-      const { productService } = await import("@/services/product.service");
       return productService.getAll({ page, limit: 15, search: searchQuery });
     },
   });
@@ -50,9 +52,6 @@ export default function ProductsManagement() {
   const productMutation = useMutation({
     mutationFn: async (productData: Omit<Partial<Product>, "variants" | "delivery_config"> & { id?: string, imageFiles?: (File | string)[], variants?: VariantFormData[], delivery_config?: Partial<DeliveryConfig> }) => {
       logger.debug("ProductMutation - Received data:", productData);
-      const { productService } = await import("@/services/product.service");
-      const { uploadService } = await import("@/services/upload.service");
-      const { deliveryConfigService } = await import("@/services/delivery-config.service");
 
       const { variants, imageFiles, delivery_config, ...finalProductData } = productData;
       // Defensive ID check: check productData.id OR selectedProduct.id if editing
@@ -229,7 +228,6 @@ export default function ProductsManagement() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { productService } = await import("@/services/product.service");
 
       // Get the product to access its images
       const product = data?.products?.find(p => p.id === id);
@@ -238,7 +236,6 @@ export default function ProductsManagement() {
       // Delete images from Supabase Storage if they exist
       if (product && product.images && product.images.length > 0) {
         logger.debug("Found images to delete:", product.images);
-        const { uploadService } = await import("@/services/upload.service");
 
         for (const imageUrl of product.images) {
           try {
@@ -257,7 +254,6 @@ export default function ProductsManagement() {
       // Delete VARIANT images if they exist
       if (product && product.variants && product.variants.length > 0) {
         logger.debug("Checking for variant images to delete...");
-        const { uploadService } = await import("@/services/upload.service");
 
         for (const variant of product.variants) {
           if (variant.variant_image_url) {

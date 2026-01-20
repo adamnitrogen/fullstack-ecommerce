@@ -1,4 +1,4 @@
-import { useEffect, useRef, lazy, Suspense } from "react";
+import { useEffect, useRef } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,61 +17,60 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ForceChangePasswordDialog } from "@/components/auth/ForceChangePasswordDialog";
 import { ReactivationModal } from "@/components/auth/ReactivationModal";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { couponService } from "@/services/coupon.service";
 
-// Lazy load pages for code splitting
-const Index = lazy(() => import("./pages/Index"));
-const Shop = lazy(() => import("./pages/Shop"));
-const ProductDetail = lazy(() => import("./pages/ProductDetail"));
-const Cart = lazy(() => import("./pages/Cart"));
-const Checkout = lazy(() => import("./pages/Checkout"));
-const OrderSummary = lazy(() => import("./pages/OrderSummary"));
-const OrderConfirmation = lazy(() => import("./pages/OrderConfirmation"));
-const Profile = lazy(() => import("./pages/Profile"));
-const Gallery = lazy(() => import("./pages/Gallery"));
-const Donate = lazy(() => import("./pages/Donate"));
-const Events = lazy(() => import("./pages/Events"));
-const EventDetail = lazy(() => import("./pages/EventDetail"));
-const EventRegistration = lazy(() => import("./pages/EventRegistration"));
-const Contact = lazy(() => import("./pages/Contact"));
-const About = lazy(() => import("./pages/About"));
-const Blog = lazy(() => import("./pages/Blog"));
-const BlogPost = lazy(() => import("./pages/BlogPost"));
-const Privacy = lazy(() => import("./pages/Privacy"));
-const Terms = lazy(() => import("./pages/Terms"));
-const ShippingAndRefund = lazy(() => import("./pages/ShippingAndRefund"));
-const FAQ = lazy(() => import("./pages/FAQ"));
-const AuthCallback = lazy(() => import("./pages/AuthCallback"));
-const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
-const ResetPassword = lazy(() => import("./pages/ResetPassword"));
-const MyOrders = lazy(() => import("./pages/user/MyOrders"));
-const UserOrderDetail = lazy(() => import("./pages/user/UserOrderDetail"));
-const AccountDeletion = lazy(() => import("./pages/AccountDeletion"));
-const NotFound = lazy(() => import("./pages/NotFound"));
+import Index from "./pages/Index";
+import Shop from "./pages/Shop";
+import ProductDetail from "./pages/ProductDetail";
+import Cart from "./pages/Cart";
+import Checkout from "./pages/Checkout";
+import OrderSummary from "./pages/OrderSummary";
+import OrderConfirmation from "./pages/OrderConfirmation";
+import Profile from "./pages/Profile";
+import Gallery from "./pages/Gallery";
+import Donate from "./pages/Donate";
+import Events from "./pages/Events";
+import EventDetail from "./pages/EventDetail";
+import EventRegistration from "./pages/EventRegistration";
+import Contact from "./pages/Contact";
+import About from "./pages/About";
+import Blog from "./pages/Blog";
+import BlogPost from "./pages/BlogPost";
+import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
+import ShippingAndRefund from "./pages/ShippingAndRefund";
+import FAQ from "./pages/FAQ";
+import AuthCallback from "./pages/AuthCallback";
+import VerifyEmail from "./pages/VerifyEmail";
+import ResetPassword from "./pages/ResetPassword";
+import MyOrders from "./pages/user/MyOrders";
+import UserOrderDetail from "./pages/user/UserOrderDetail";
+import AccountDeletion from "./pages/AccountDeletion";
+import NotFound from "./pages/NotFound";
 
 // Admin Pages
-const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
-const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
-const ProductsManagement = lazy(() => import("./pages/admin/ProductsManagement"));
-const AllCategoriesManagement = lazy(() => import("./pages/admin/AllCategoriesManagement"));
-const EventsManagement = lazy(() => import("./pages/admin/EventsManagement"));
-const BlogsManagement = lazy(() => import("./pages/admin/BlogsManagement"));
-const GalleryManagement = lazy(() => import("./pages/admin/GalleryManagement"));
-const CarouselManagement = lazy(() => import("./pages/admin/CarouselManagement"));
-const UsersManagement = lazy(() => import("./pages/admin/UsersManagement"));
-const ManagerManagement = lazy(() => import("./pages/admin/ManagerManagement"));
-const ReviewsManagement = lazy(() => import("./pages/admin/ReviewsManagement"));
-const FlaggedCommentsManagement = lazy(() => import("./pages/admin/FlaggedCommentsManagement"));
-const FAQsManagement = lazy(() => import("./pages/admin/FAQsManagement"));
-const ContactManagement = lazy(() => import("./pages/admin/ContactManagement"));
-const ContactMessages = lazy(() => import("./pages/admin/ContactMessages"));
-const ContactMessageDetail = lazy(() => import("./pages/admin/ContactMessageDetail"));
-const AboutUsManagement = lazy(() => import("./pages/admin/AboutUsManagement"));
-const PolicyManagement = lazy(() => import("./pages/admin/PolicyManagement"));
-const JobsManagement = lazy(() => import("./pages/admin/JobsManagement"));
-
-const OrdersManagement = lazy(() => import("./pages/admin/OrdersManagement"));
-const OrderDetail = lazy(() => import("./pages/admin/OrderDetail"));
-const SettingsManagement = lazy(() => import("./pages/admin/SettingsManagement"));
+import AdminLayout from "./pages/admin/AdminLayout";
+import AdminDashboard from "./pages/admin/Dashboard";
+import ProductsManagement from "./pages/admin/ProductsManagement";
+import AllCategoriesManagement from "./pages/admin/AllCategoriesManagement";
+import EventsManagement from "./pages/admin/EventsManagement";
+import BlogsManagement from "./pages/admin/BlogsManagement";
+import GalleryManagement from "./pages/admin/GalleryManagement";
+import CarouselManagement from "./pages/admin/CarouselManagement";
+import UsersManagement from "./pages/admin/UsersManagement";
+import ManagerManagement from "./pages/admin/ManagerManagement";
+import ReviewsManagement from "./pages/admin/ReviewsManagement";
+import FlaggedCommentsManagement from "./pages/admin/FlaggedCommentsManagement";
+import FAQsManagement from "./pages/admin/FAQsManagement";
+import ContactManagement from "./pages/admin/ContactManagement";
+import ContactMessages from "./pages/admin/ContactMessages";
+import ContactMessageDetail from "./pages/admin/ContactMessageDetail";
+import AboutUsManagement from "./pages/admin/AboutUsManagement";
+import PolicyManagement from "./pages/admin/PolicyManagement";
+import JobsManagement from "./pages/admin/JobsManagement";
+import OrdersManagement from "./pages/admin/OrdersManagement";
+import OrderDetail from "./pages/admin/OrderDetail";
+import SettingsManagement from "./pages/admin/SettingsManagement";
 
 const queryClient = new QueryClient();
 
@@ -108,7 +107,6 @@ const App = () => {
     // Coupon Management: Fetch active coupons and cache in session storage
     const fetchCoupons = async () => {
       try {
-        const { couponService } = await import("@/services/coupon.service");
         // Only fetch if not already cached to avoid redundant calls on page refresh
         // But the requirement says "fetch the coupon for every session starts", which mount effectively is.
         // We will fetch regardless to ensure fresh data on app load.
@@ -148,177 +146,175 @@ const App = () => {
             <CookieConsent />
             <ForceChangePasswordDialog />
             <ReactivationModal />
-            <Suspense fallback={<LoadingOverlay isLoading={true} message="Just a moment..." />}>
-              <Routes>
-                <Route element={<MainLayout />}>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/shop" element={<Shop />} />
-                  <Route path="/product/:productId" element={<ProductDetail />} />
-                  <Route path="/cart" element={<Cart />} />
-                  <Route
-                    path="/checkout"
-                    element={
-                      <ProtectedRoute requireAuth>
-                        <Checkout />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/order-summary"
-                    element={
-                      <ProtectedRoute requireAuth>
-                        <OrderSummary />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/order-confirmation/:id"
-                    element={
-                      <ProtectedRoute requireAuth>
-                        <OrderConfirmation />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/profile"
-                    element={
-                      <ProtectedRoute requireAuth>
-                        <Profile />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route path="/gallery" element={<Gallery />} />
-                  <Route path="/donate" element={<Donate />} />
-                  <Route path="/events" element={<Events />} />
-                  <Route path="/event/:eventId" element={<EventDetail />} />
-                  <Route
-                    path="/event/register/:eventId"
-                    element={
-                      <ProtectedRoute requireAuth>
-                        <EventRegistration />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route path="/contact" element={<Contact />} />
-                  <Route path="/about" element={<About />} />
-                  <Route path="/blog" element={<Blog />} />
-                  <Route path="/blog/:postId" element={<BlogPost />} />
-                  <Route path="/privacy-policy" element={<Privacy />} />
-                  <Route path="/terms-and-conditions" element={<Terms />} />
-                  <Route path="/shipping-and-refund-policy" element={<ShippingAndRefund />} />
-                  <Route path="/faq" element={<FAQ />} />
-                  <Route path="/auth/callback" element={<AuthCallback />} />
-                  <Route path="/verify-email" element={<VerifyEmail />} />
-                  <Route path="/reset-password" element={<ResetPassword />} />
-                  <Route
-                    path="/my-orders"
-                    element={
-                      <ProtectedRoute requireAuth>
-                        <MyOrders />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/my-orders/:id"
-                    element={
-                      <ProtectedRoute requireAuth>
-                        <UserOrderDetail />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/account/delete"
-                    element={
-                      <ProtectedRoute requireAuth>
-                        <AccountDeletion />
-                      </ProtectedRoute>
-                    }
-                  />
-                </Route>
-
-                {/* Admin Routes - Strictly for Admin */}
+            <Routes>
+              <Route element={<MainLayout />}>
+                <Route path="/" element={<Index />} />
+                <Route path="/shop" element={<Shop />} />
+                <Route path="/product/:productId" element={<ProductDetail />} />
+                <Route path="/cart" element={<Cart />} />
                 <Route
-                  path="/admin"
+                  path="/checkout"
                   element={
-                    <ProtectedRoute allowedRoles={["admin"]}>
-                      <AdminLayout />
+                    <ProtectedRoute requireAuth>
+                      <Checkout />
                     </ProtectedRoute>
                   }
-                >
-                  <Route index element={<AdminDashboard />} />
-                  <Route path="products" element={<ProductsManagement />} />
-                  <Route
-                    path="categories"
-                    element={<AllCategoriesManagement />}
-                  />
-                  <Route path="orders" element={<OrdersManagement />} />
-                  <Route path="orders/:id" element={<OrderDetail />} />
-                  <Route path="events" element={<EventsManagement />} />
-                  <Route path="blogs" element={<BlogsManagement />} />
-                  <Route path="gallery" element={<GalleryManagement />} />
-                  <Route path="carousel" element={<CarouselManagement />} />
-                  <Route path="users" element={<UsersManagement />} />
-                  <Route path="managers" element={<ManagerManagement />} />
-                  <Route path="reviews" element={<ReviewsManagement />} />
-                  <Route path="comments" element={<FlaggedCommentsManagement />} />
-                  <Route path="faqs" element={<FAQsManagement />} />
-                  <Route
-                    path="contact-management"
-                    element={<ContactManagement />}
-                  />
-                  <Route path="contact-messages" element={<ContactMessages />} />
-                  <Route path="contact-messages/:id" element={<ContactMessageDetail />} />
-                  <Route path="about-us" element={<AboutUsManagement />} />
-                  <Route path="policies" element={<PolicyManagement />} />
-                  <Route path="jobs" element={<JobsManagement />} />
-
-                  <Route path="settings" element={<SettingsManagement />} />
-                </Route>
-
-                {/* Manager Routes - For Managers (and Admins if they visit) */}
+                />
                 <Route
-                  path="/manager"
+                  path="/order-summary"
                   element={
-                    <ProtectedRoute allowedRoles={["manager", "admin"]}>
-                      <AdminLayout />
+                    <ProtectedRoute requireAuth>
+                      <OrderSummary />
                     </ProtectedRoute>
                   }
-                >
-                  {/* Reuse same components but accessed via /manager/... */}
-                  <Route index element={<AdminDashboard />} />
-                  <Route path="products" element={<ProductsManagement />} />
-                  <Route
-                    path="categories"
-                    element={<AllCategoriesManagement />}
-                  />
-                  <Route path="orders" element={<OrdersManagement />} />
-                  <Route path="orders/:id" element={<OrderDetail />} />
-                  <Route path="events" element={<EventsManagement />} />
-                  <Route path="blogs" element={<BlogsManagement />} />
-                  <Route path="gallery" element={<GalleryManagement />} />
-                  <Route path="carousel" element={<CarouselManagement />} />
-                  {/* Managers don't manage users/managers usually, but let RBAC handle inside components if needed */}
-                  {/* UsersManagement removed from Manager routes to prevent Admin Management access */}
-                  {/* ManagerManagement likely SHOULD BE HIDDEN for managers - will handle in Sidebar/Layout */}
-                  <Route path="reviews" element={<ReviewsManagement />} />
-                  <Route path="comments" element={<FlaggedCommentsManagement />} />
-                  <Route path="faqs" element={<FAQsManagement />} />
-                  <Route
-                    path="contact-management"
-                    element={<ContactManagement />}
-                  />
-                  <Route path="contact-messages" element={<ContactMessages />} />
-                  <Route path="contact-messages/:id" element={<ContactMessageDetail />} />
-                  <Route path="about-us" element={<AboutUsManagement />} />
-                  <Route path="policies" element={<PolicyManagement />} />
+                />
+                <Route
+                  path="/order-confirmation/:id"
+                  element={
+                    <ProtectedRoute requireAuth>
+                      <OrderConfirmation />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/profile"
+                  element={
+                    <ProtectedRoute requireAuth>
+                      <Profile />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="/gallery" element={<Gallery />} />
+                <Route path="/donate" element={<Donate />} />
+                <Route path="/events" element={<Events />} />
+                <Route path="/event/:eventId" element={<EventDetail />} />
+                <Route
+                  path="/event/register/:eventId"
+                  element={
+                    <ProtectedRoute requireAuth>
+                      <EventRegistration />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="/contact" element={<Contact />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/blog" element={<Blog />} />
+                <Route path="/blog/:postId" element={<BlogPost />} />
+                <Route path="/privacy-policy" element={<Privacy />} />
+                <Route path="/terms-and-conditions" element={<Terms />} />
+                <Route path="/shipping-and-refund-policy" element={<ShippingAndRefund />} />
+                <Route path="/faq" element={<FAQ />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route
+                  path="/my-orders"
+                  element={
+                    <ProtectedRoute requireAuth>
+                      <MyOrders />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/my-orders/:id"
+                  element={
+                    <ProtectedRoute requireAuth>
+                      <UserOrderDetail />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/account/delete"
+                  element={
+                    <ProtectedRoute requireAuth>
+                      <AccountDeletion />
+                    </ProtectedRoute>
+                  }
+                />
+              </Route>
 
-                  {/* Managers likely don't access creating managers or system settings */}
-                </Route>
+              {/* Admin Routes - Strictly for Admin */}
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<AdminDashboard />} />
+                <Route path="products" element={<ProductsManagement />} />
+                <Route
+                  path="categories"
+                  element={<AllCategoriesManagement />}
+                />
+                <Route path="orders" element={<OrdersManagement />} />
+                <Route path="orders/:id" element={<OrderDetail />} />
+                <Route path="events" element={<EventsManagement />} />
+                <Route path="blogs" element={<BlogsManagement />} />
+                <Route path="gallery" element={<GalleryManagement />} />
+                <Route path="carousel" element={<CarouselManagement />} />
+                <Route path="users" element={<UsersManagement />} />
+                <Route path="managers" element={<ManagerManagement />} />
+                <Route path="reviews" element={<ReviewsManagement />} />
+                <Route path="comments" element={<FlaggedCommentsManagement />} />
+                <Route path="faqs" element={<FAQsManagement />} />
+                <Route
+                  path="contact-management"
+                  element={<ContactManagement />}
+                />
+                <Route path="contact-messages" element={<ContactMessages />} />
+                <Route path="contact-messages/:id" element={<ContactMessageDetail />} />
+                <Route path="about-us" element={<AboutUsManagement />} />
+                <Route path="policies" element={<PolicyManagement />} />
+                <Route path="jobs" element={<JobsManagement />} />
 
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
+                <Route path="settings" element={<SettingsManagement />} />
+              </Route>
+
+              {/* Manager Routes - For Managers (and Admins if they visit) */}
+              <Route
+                path="/manager"
+                element={
+                  <ProtectedRoute allowedRoles={["manager", "admin"]}>
+                    <AdminLayout />
+                  </ProtectedRoute>
+                }
+              >
+                {/* Reuse same components but accessed via /manager/... */}
+                <Route index element={<AdminDashboard />} />
+                <Route path="products" element={<ProductsManagement />} />
+                <Route
+                  path="categories"
+                  element={<AllCategoriesManagement />}
+                />
+                <Route path="orders" element={<OrdersManagement />} />
+                <Route path="orders/:id" element={<OrderDetail />} />
+                <Route path="events" element={<EventsManagement />} />
+                <Route path="blogs" element={<BlogsManagement />} />
+                <Route path="gallery" element={<GalleryManagement />} />
+                <Route path="carousel" element={<CarouselManagement />} />
+                {/* Managers don't manage users/managers usually, but let RBAC handle inside components if needed */}
+                {/* UsersManagement removed from Manager routes to prevent Admin Management access */}
+                {/* ManagerManagement likely SHOULD BE HIDDEN for managers - will handle in Sidebar/Layout */}
+                <Route path="reviews" element={<ReviewsManagement />} />
+                <Route path="comments" element={<FlaggedCommentsManagement />} />
+                <Route path="faqs" element={<FAQsManagement />} />
+                <Route
+                  path="contact-management"
+                  element={<ContactManagement />}
+                />
+                <Route path="contact-messages" element={<ContactMessages />} />
+                <Route path="contact-messages/:id" element={<ContactMessageDetail />} />
+                <Route path="about-us" element={<AboutUsManagement />} />
+                <Route path="policies" element={<PolicyManagement />} />
+
+                {/* Managers likely don't access creating managers or system settings */}
+              </Route>
+
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
           </BrowserRouter>
         </TooltipProvider>
       </I18nextProvider>

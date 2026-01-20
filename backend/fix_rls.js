@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
+const fs = require('fs');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -47,7 +48,7 @@ async function fixRLS() {
 
     console.log('\n\n=== MANUAL SQL (if RPC failed) ===');
     console.log('Run this in Supabase SQL Editor:\n');
-    console.log(require('fs').readFileSync('migrations/fix_rls_service_role_bypass.sql', 'utf8'));
+    console.log(fs.readFileSync('migrations/fix_rls_service_role_bypass.sql', 'utf8'));
 }
 
 fixRLS().then(() => {

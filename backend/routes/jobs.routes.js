@@ -3,6 +3,9 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth.middleware');
 const supabase = require('../config/supabase');
+const crypto = require('crypto');
+const { DeletionJobProcessor } = require('../services/deletion-job-processor');
+const EventCancellationService = require('../services/event-cancellation.service');
 
 /**
  * Admin Jobs Management Routes
@@ -288,7 +291,7 @@ router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
 router.post('/:id/retry', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { id } = req.params;
-        const correlationId = req.correlationId || require('crypto').randomUUID();
+        const correlationId = req.correlationId || crypto.randomUUID();
 
         // Check account deletion jobs first
         let { data: deletionJob } = await supabase
@@ -327,7 +330,6 @@ router.post('/:id/retry', authenticateToken, requireAdmin, async (req, res) => {
                 .update({ deletion_status: 'DELETION_IN_PROGRESS' })
                 .eq('id', deletionJob.user_id);
 
-            const { DeletionJobProcessor } = require('../services/deletion-job-processor');
             setImmediate(async () => {
                 try {
                     await DeletionJobProcessor.processJob(id);
@@ -406,7 +408,6 @@ router.post('/:id/retry', authenticateToken, requireAdmin, async (req, res) => {
             if (resetError) throw resetError;
 
             // Trigger background processing
-            const EventCancellationService = require('../services/event-cancellation.service');
             setImmediate(async () => {
                 try {
                     await EventCancellationService.processJob(id);
@@ -440,7 +441,7 @@ router.post('/:id/retry', authenticateToken, requireAdmin, async (req, res) => {
 router.post('/:id/process', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { id } = req.params;
-        const correlationId = req.correlationId || require('crypto').randomUUID();
+        const correlationId = req.correlationId || crypto.randomUUID();
 
         // Check account deletion jobs first
         let { data: deletionJob } = await supabase
@@ -461,7 +462,6 @@ router.post('/:id/process', authenticateToken, requireAdmin, async (req, res) =>
                 .update({ deletion_status: 'DELETION_IN_PROGRESS' })
                 .eq('id', deletionJob.user_id);
 
-            const { DeletionJobProcessor } = require('../services/deletion-job-processor');
             setImmediate(async () => {
                 try {
                     await DeletionJobProcessor.processJob(id);
@@ -494,7 +494,6 @@ router.post('/:id/process', authenticateToken, requireAdmin, async (req, res) =>
                 });
             }
 
-            const EventCancellationService = require('../services/event-cancellation.service');
             setImmediate(async () => {
                 try {
                     await EventCancellationService.processJob(id);

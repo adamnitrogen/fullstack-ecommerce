@@ -1,7 +1,10 @@
 const pino = require('pino');
+const { stdSerializers } = pino;
 const path = require('path');
 const fs = require('fs');
 const { getContext } = require('./async-context');
+const newrelicPinoEnricher = require('@newrelic/pino-enricher');
+const pinoPretty = require('pino-pretty');
 
 const isProduction = process.env.NODE_ENV === 'production';
 const LOG_LEVEL = process.env.LOG_LEVEL || (isProduction ? 'info' : 'debug');
@@ -12,7 +15,7 @@ if (!isProduction && !fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir, { recursive: true });
 }
 
-const { stdSerializers } = require('pino');
+// Core serializers
 
 // Custom Serializers for strict sanitization
 const reqSerializer = (req) => {
@@ -125,7 +128,6 @@ const restructureLog = (inputArgs) => {
 
 if (isProduction) {
     // PRODUCTION: Use New Relic enricher for log correlation
-    const newrelicPinoEnricher = require('@newrelic/pino-enricher');
     const nrEnricher = newrelicPinoEnricher();
 
     logger = pino(Object.assign({}, nrEnricher, {
@@ -163,7 +165,7 @@ if (isProduction) {
     const logFilePath = path.join(logsDir, 'app.log');
 
     // Stream 1: Pretty Console
-    const prettyStream = require('pino-pretty')({
+    const prettyStream = pinoPretty({
         colorize: true,
         translateTime: 'SYS:standard',
         ignore: 'pid,hostname,layer,environment,module,operation'

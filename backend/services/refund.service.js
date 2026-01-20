@@ -1,6 +1,7 @@
 const Razorpay = require('razorpay');
 const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
+const { logStatusHistory } = require('./history.service');
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
@@ -218,7 +219,6 @@ class RefundService {
 
                 // Log Timeline
                 try {
-                    const { logStatusHistory } = require('./history.service');
                     await logStatusHistory(
                         order.id,
                         'refund_initiated',

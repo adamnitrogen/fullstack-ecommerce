@@ -18,6 +18,7 @@ import { Tag } from "@/components/ui/Tag";
 import { X, Plus } from "lucide-react";
 import type { Blog } from "@/types";
 import { ImageUpload } from "./ImageUpload";
+import { uploadService } from "@/services/upload.service";
 
 interface BlogDialogProps {
   open: boolean;
@@ -93,7 +94,6 @@ export function BlogDialog({
     if (originalImage && formData.imageFile instanceof File) {
       logger.debug("Deleting replaced blog image:", originalImage);
       try {
-        const { uploadService } = await import("@/services/upload.service");
         await uploadService.deleteImageByUrl(originalImage);
         logger.debug("Successfully deleted old blog image:", originalImage);
       } catch (error) {

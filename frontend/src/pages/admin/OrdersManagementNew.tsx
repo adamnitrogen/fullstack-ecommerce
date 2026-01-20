@@ -46,6 +46,7 @@ import { format } from "date-fns";
 import type { OrderStatus } from "@/types";
 import { downloadCSV, flattenObject } from "@/lib/exportUtils";
 import { getErrorMessage } from "@/lib/errorUtils";
+import { apiClient } from "@/lib/api-client";
 
 interface ReturnItem {
   id: string;
@@ -72,7 +73,7 @@ export default function OrdersManagementNew() {
     queryFn: async () => {
       // Fetch real orders from API
       // We pass all=true to get all orders as admin
-      const response = await import("@/lib/api-client").then(m => m.apiClient.get("/orders?all=true"));
+      const response = await apiClient.get("/orders?all=true");
       return response.data;
     },
     // Refresh interval to catch webhook updates
@@ -161,9 +162,7 @@ export default function OrdersManagementNew() {
       orderId: string;
       status: OrderStatus;
     }) => {
-      await import("@/lib/api-client").then(m =>
-        m.apiClient.put(`/orders/${orderId}/status`, { status })
-      );
+      await apiClient.put(`/orders/${orderId}/status`, { status });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
@@ -184,7 +183,6 @@ export default function OrdersManagementNew() {
         activeReturnRequest
       ) {
         try {
-          const apiClient = await import("@/lib/api-client").then(m => m.apiClient);
           if (newStatus === 'return_approved') {
             await apiClient.post(`/returns/${activeReturnRequest.id}/approve`, {});
             toast.success("Return approved and refund processed");
@@ -213,7 +211,6 @@ export default function OrdersManagementNew() {
   const fetchReturnDetails = async (orderId: string) => {
     setReturnDetailsLoading(true);
     try {
-      const apiClient = await import("@/lib/api-client").then(m => m.apiClient);
       const response = await apiClient.get(`/returns/orders/${orderId}/active`);
       setActiveReturnRequest(response.data);
     } catch (error) {

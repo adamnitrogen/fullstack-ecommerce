@@ -33,6 +33,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { ImageUpload } from "./ImageUpload";
 import type { Event } from "@/types";
+import { categoryService } from "@/services/category.service";
+import { uploadService } from "@/services/upload.service";
 
 interface EventDialogProps {
   open: boolean;
@@ -65,7 +67,6 @@ export function EventDialog({
   const { data: eventCategories = [] } = useQuery({
     queryKey: ["event-categories"],
     queryFn: async () => {
-      const { categoryService } = await import("@/services/category.service");
       return categoryService.getAll("event");
     },
   });
@@ -167,7 +168,6 @@ export function EventDialog({
     if (originalImage && formData.imageFile instanceof File) {
       logger.debug("Deleting replaced image:", originalImage);
       try {
-        const { uploadService } = await import("@/services/upload.service");
         await uploadService.deleteImageByUrl(originalImage);
         logger.debug("Successfully deleted old image:", originalImage);
       } catch (error) {

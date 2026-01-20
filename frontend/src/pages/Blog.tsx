@@ -31,6 +31,7 @@ import {
   CarouselPrevious,
 } from "@/components/ui/carousel";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { blogService } from "@/services/blog.service";
 
 const POSTS_PER_PAGE = 6;
 
@@ -44,7 +45,6 @@ export default function Blog() {
   const { data: allBlogs = [], isLoading } = useQuery({
     queryKey: ["blogs"],
     queryFn: async () => {
-      const { blogService } = await import("@/services/blog.service");
       return blogService.getAll();
     },
   });

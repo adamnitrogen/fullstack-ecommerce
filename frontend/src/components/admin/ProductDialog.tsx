@@ -36,6 +36,9 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { categoryService } from "@/services/category.service";
+import { productService } from "@/services/product.service";
+import { uploadService } from "@/services/upload.service";
 
 interface ProductDialogProps {
   open: boolean;
@@ -67,7 +70,6 @@ export function ProductDialog({
   const { data: categories = EMPTY_CATEGORIES } = useQuery({
     queryKey: ["categories", "product"],
     queryFn: async () => {
-      const { categoryService } = await import("@/services/category.service");
       return categoryService.getAll("product");
     },
   });
@@ -114,7 +116,6 @@ export function ProductDialog({
     queryKey: ["product", product?.id],
     queryFn: async () => {
       if (!product?.id) return null;
-      const { productService } = await import("@/services/product.service");
       return productService.getById(product.id);
     },
     enabled: !!product?.id && open,
@@ -313,7 +314,6 @@ export function ProductDialog({
     // Delete removed images from Supabase Storage
     if (removedImages.length > 0) {
       logger.debug("Deleting removed images:", removedImages);
-      const { uploadService } = await import("@/services/upload.service");
 
       for (const imageUrl of removedImages) {
         try {
@@ -329,7 +329,6 @@ export function ProductDialog({
     // Delete removed VARIANT images from Supabase Storage
     if (removedVariantImages.length > 0) {
       logger.debug("Deleting removed variant images:", removedVariantImages);
-      const { uploadService } = await import("@/services/upload.service");
 
       for (const imageUrl of removedVariantImages) {
         try {

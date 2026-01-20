@@ -1,6 +1,4 @@
-if (process.env.NEW_RELIC_ENABLED !== 'false') {
-    require('newrelic');
-}
+const newrelic = process.env.NEW_RELIC_ENABLED !== 'false' ? require('newrelic') : null;
 const express = require('express');
 // Trigger restart for bootstrap verification
 const cors = require('cors');
@@ -8,6 +6,68 @@ const cookieParser = require('cookie-parser');
 require('dotenv').config();
 const logger = require('./utils/logger');
 const pinoHttp = require('pino-http');
+const crypto = require('crypto');
+const pino = require('pino');
+
+// Routes
+const authRoutes = require('./routes/auth.routes');
+const productRoutes = require('./routes/product.routes');
+const orderRoutes = require('./routes/order.routes');
+const categoryRoutes = require('./routes/category.routes');
+const uploadRoutes = require('./routes/upload.routes');
+const eventRoutes = require('./routes/event.routes');
+const blogRoutes = require('./routes/blog.routes');
+const testimonialRoutes = require('./routes/testimonial.routes');
+const galleryFolderRoutes = require('./routes/gallery-folder.routes');
+const galleryRoutes = require('./routes/gallery-item.routes');
+const galleryVideoRoutes = require('./routes/gallery-video.routes');
+const carouselRoutes = require('./routes/carousel.routes');
+const faqRoutes = require('./routes/faq.routes');
+const socialMediaRoutes = require('./routes/social-media.routes');
+const contactInfoRoutes = require('./routes/contact-info.routes');
+const bankDetailsRoutes = require('./routes/bank-details.routes');
+const newsletterRoutes = require('./routes/newsletter.routes');
+const managerRoutes = require('./routes/manager.routes');
+const contactRoutes = require('./routes/contact.routes');
+const adminEventRoutes = require('./routes/admin-event.routes');
+const adminAlertRoutes = require('./routes/admin-alert.routes');
+const reviewRoutes = require('./routes/review.routes');
+const commentRoutes = require('./routes/comments.routes');
+const blogCommentRoutes = require('./routes/blog-comment.routes');
+const userRoutes = require('./routes/user.routes');
+const profileRoutes = require('./routes/profile.routes');
+const addressRoutes = require('./routes/address.routes');
+const aboutRoutes = require('./routes/about.routes');
+const couponRoutes = require('./routes/coupon.routes');
+const cartRoutes = require('./routes/cart.routes');
+const checkoutRoutes = require('./routes/checkout.routes');
+const adminNotificationRoutes = require('./routes/admin-notification.routes');
+const geoRoutes = require('./routes/geo.routes');
+const razorpayRoutes = require('./routes/razorpay.routes');
+const eventRegistrationRoutes = require('./routes/event-registration.routes');
+const donationRoutes = require('./routes/donation.routes');
+const analyticsRoutes = require('./routes/analytics.routes');
+const returnRoutes = require('./routes/return.routes');
+const emailRoutes = require('./routes/email.routes');
+const settingsRoutes = require('./routes/settings.routes');
+const policyRoutes = require('./routes/policy.routes');
+const accountDeletionRoutes = require('./routes/account-deletion.routes');
+const jobsRoutes = require('./routes/jobs.routes');
+const productVariantRoutes = require('./routes/product-variant.routes');
+const webhookRoutes = require('./routes/webhook.routes');
+const invoiceRoutes = require('./routes/invoice.routes');
+const cronRoutes = require('./routes/cron.routes');
+const deliveryConfigsRoutes = require('./routes/delivery-configs.routes');
+const customInvoiceRoutes = require('./routes/custom-invoice.routes');
+
+// Middleware
+const { tracingMiddleware } = require('./middleware/tracing.middleware');
+const errorMiddleware = require('./middleware/error.middleware');
+
+// Libraries & Services
+const { bootstrapAdmin } = require('./lib/bootstrap');
+const { SupabaseLogger } = require('./services/supabase-logger');
+const { initScheduler, stopScheduler } = require('./lib/scheduler');
 
 const app = express();
 const PORT = parseInt(process.env.PORT, 10) || 5001;
@@ -55,7 +115,7 @@ app.use(pinoHttp({
     // Automatically capture from headers or generate if missing.
     // This ID attaches to every log in the request scope.
     genReqId: function (req) {
-        return req.headers['x-correlation-id'] || req.headers['x-request-id'] || require('crypto').randomUUID();
+        return req.headers['x-correlation-id'] || req.headers['x-request-id'] || crypto.randomUUID();
     },
 
     // Constraint: Conciseness
@@ -77,7 +137,7 @@ app.use(pinoHttp({
             statusCode: res.statusCode
             // Duration is added automatically by pino-http
         }),
-        err: require('pino').stdSerializers.err // Standard error serializer
+        err: pino.stdSerializers.err // Standard error serializer
     },
 
     // Quiet down health checks and static assets if needed
@@ -102,9 +162,6 @@ app.use(pinoHttp({
     }
 }));
 
-// Context Middleware: Propagate Trace Context to deep services
-const { tracingMiddleware } = require('./middleware/tracing.middleware');
-const newrelic = require('newrelic');
 
 // Apply tracing middleware - generates/extracts traceId, spanId, correlationId
 app.use(tracingMiddleware);
@@ -132,24 +189,6 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'Server is running' });
 });
 
-const authRoutes = require('./routes/auth.routes');
-const productRoutes = require('./routes/product.routes');
-const orderRoutes = require('./routes/order.routes');
-const categoryRoutes = require('./routes/category.routes');
-const uploadRoutes = require('./routes/upload.routes');
-const eventRoutes = require('./routes/event.routes');
-const blogRoutes = require('./routes/blog.routes');
-const testimonialRoutes = require('./routes/testimonial.routes');
-const galleryFolderRoutes = require('./routes/gallery-folder.routes');
-const galleryRoutes = require('./routes/gallery-item.routes'); // Renamed from galleryItemRoutes
-const galleryVideoRoutes = require('./routes/gallery-video.routes');
-const carouselRoutes = require('./routes/carousel.routes'); // Added
-const faqRoutes = require('./routes/faq.routes');
-const socialMediaRoutes = require('./routes/social-media.routes');
-const contactInfoRoutes = require('./routes/contact-info.routes');
-const bankDetailsRoutes = require('./routes/bank-details.routes');
-const newsletterRoutes = require('./routes/newsletter.routes');
-const managerRoutes = require('./routes/manager.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
@@ -159,54 +198,51 @@ app.use('/api/events', eventRoutes);
 app.use('/api/blogs', blogRoutes);
 app.use('/api/testimonials', testimonialRoutes);
 app.use('/api/upload', uploadRoutes);
-app.use('/api/gallery-items', galleryRoutes); // Updated path and variable name
-app.use('/api/gallery-folders', galleryFolderRoutes); // Updated path
-app.use('/api/gallery-videos', galleryVideoRoutes); // Updated path
-app.use('/api/carousel-slides', carouselRoutes); // Added
+app.use('/api/gallery-items', galleryRoutes);
+app.use('/api/gallery-folders', galleryFolderRoutes);
+app.use('/api/gallery-videos', galleryVideoRoutes);
+app.use('/api/carousel-slides', carouselRoutes);
 app.use('/api/faqs', faqRoutes);
 app.use('/api/social-media', socialMediaRoutes);
 app.use('/api/contact-info', contactInfoRoutes);
 app.use('/api/bank-details', bankDetailsRoutes);
 app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/managers', managerRoutes);
-app.use('/api/contact', require('./routes/contact.routes'));
-app.use('/api/admin/events', require('./routes/admin-event.routes'));
-app.use('/api/admin/alerts', require('./routes/admin-alert.routes'));
-app.use('/api/reviews', require('./routes/review.routes'));
-app.use('/api/comments', require('./routes/comments.routes'));
-app.use('/api/blog-comments', require('./routes/blog-comment.routes'));
-app.use('/api/users', require('./routes/user.routes'));
-app.use('/api/profile', require('./routes/profile.routes'));
-app.use('/api/addresses', require('./routes/address.routes'));
-app.use('/api/about', require('./routes/about.routes'));
-app.use('/api/coupons', require('./routes/coupon.routes'));
-app.use('/api/cart', require('./routes/cart.routes'));
-app.use('/api/checkout', require('./routes/checkout.routes'));
-app.use('/api/admin/notifications', require('./routes/admin-notification.routes'));
-app.use('/api/geo', require('./routes/geo.routes'));  // Proxy for geographical APIs
-app.use('/api/razorpay', require('./routes/razorpay.routes'));
-app.use('/api/event-registrations', require('./routes/event-registration.routes'));
-app.use('/api/donations', require('./routes/donation.routes')); // Added Donation Routes
-app.use('/api/analytics', require('./routes/analytics.routes'));
-app.use('/api/returns', require('./routes/return.routes'));
-app.use('/api/email', require('./routes/email.routes'));
-app.use('/api/settings', require('./routes/settings.routes'));
-app.use('/api/policies', require('./routes/policy.routes'));
-app.use('/api/account/delete', require('./routes/account-deletion.routes'));
-app.use('/api/admin/jobs', require('./routes/jobs.routes'));
-app.use('/api', require('./routes/product-variant.routes')); // Product variants (admin + public)
-app.use('/api/webhooks', require('./routes/webhook.routes')); // Payment webhooks
-app.use('/api/invoices', require('./routes/invoice.routes')); // Invoice management
-app.use('/api/cron', require('./routes/cron.routes')); // Background job triggers
-app.use('/api/admin/delivery-configs', require('./routes/delivery-configs.routes')); // Delivery config management
-app.use('/api/custom-invoices', require('./routes/custom-invoice.routes')); // Manual invoice generation
+app.use('/api/contact', contactRoutes);
+app.use('/api/admin/events', adminEventRoutes);
+app.use('/api/admin/alerts', adminAlertRoutes);
+app.use('/api/reviews', reviewRoutes);
+app.use('/api/comments', commentRoutes);
+app.use('/api/blog-comments', blogCommentRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/profile', profileRoutes);
+app.use('/api/addresses', addressRoutes);
+app.use('/api/about', aboutRoutes);
+app.use('/api/coupons', couponRoutes);
+app.use('/api/cart', cartRoutes);
+app.use('/api/checkout', checkoutRoutes);
+app.use('/api/admin/notifications', adminNotificationRoutes);
+app.use('/api/geo', geoRoutes);
+app.use('/api/razorpay', razorpayRoutes);
+app.use('/api/event-registrations', eventRegistrationRoutes);
+app.use('/api/donations', donationRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/returns', returnRoutes);
+app.use('/api/email', emailRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/policies', policyRoutes);
+app.use('/api/account/delete', accountDeletionRoutes);
+app.use('/api/admin/jobs', jobsRoutes);
+app.use('/api', productVariantRoutes);
+app.use('/api/webhooks', webhookRoutes);
+app.use('/api/invoices', invoiceRoutes);
+app.use('/api/cron', cronRoutes);
+app.use('/api/admin/delivery-configs', deliveryConfigsRoutes);
+app.use('/api/custom-invoices', customInvoiceRoutes);
 
 // Global Error Handler (Must be last)
-app.use(require('./middleware/error.middleware'));
+app.use(errorMiddleware);
 
-const { bootstrapAdmin } = require('./lib/bootstrap');
-const { SupabaseLogger } = require('./services/supabase-logger');
-const { initScheduler, stopScheduler } = require('./lib/scheduler');
 
 let server;
 

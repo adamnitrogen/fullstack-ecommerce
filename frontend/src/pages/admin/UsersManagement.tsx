@@ -17,6 +17,7 @@ import { downloadCSV, flattenObject } from "@/lib/exportUtils";
 import { toast } from "@/hooks/use-toast";
 import { User } from "@/types";
 import { useAuthStore } from "@/store/authStore";
+import { userService } from "@/services/user.service";
 
 export default function UsersManagement() {
   const [search, setSearch] = useState("");
@@ -26,8 +27,6 @@ export default function UsersManagement() {
   const { data: users = [], isLoading } = useQuery<User[]>({
     queryKey: ["users"],
     queryFn: async () => {
-      const { userService } = await import("@/services/user.service");
-
       // Get current logged-in admin from Zustand store
       const currentUser = useAuthStore.getState().user;
       const currentAdminId = currentUser?.id;
