@@ -1,7 +1,7 @@
 import { logger } from "@/lib/logger";
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { Order, Product, ReturnRequest } from "@/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -70,6 +70,7 @@ interface ReturnItem {
 }
 
 export default function OrdersManagement() {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -140,16 +141,18 @@ export default function OrdersManagement() {
   const deliverableOrders = allOrders
     .filter((order: Order) => {
       const deliverableStatuses: OrderStatus[] = [
-        "processing",
+        "pending",
         "confirmed",
+        "processing",
+        "packed",
         "shipped",
-        "outfordelivery",
+        "out_for_delivery",
         "delivered",
       ];
       return deliverableStatuses.includes(order.status);
     })
     .filter((order: Order) =>
-      order.id.toLowerCase().includes(searchQuery.toLowerCase())
+      (order.order_number || order.id).toLowerCase().includes(searchQuery.toLowerCase())
     )
     .sort(
       (a: Order, b: Order) =>
@@ -159,27 +162,15 @@ export default function OrdersManagement() {
   const returnOrders = allOrders
     .filter((order: Order) => {
       const returnStatuses: OrderStatus[] = [
-        "returnrequested",
         "return_requested",
-        "returnpending",
-        "returnapproved",
         "return_approved",
-        "returnrejected",
         "return_rejected",
-        "pickupscheduled",
-        "pickupattempted",
-        "pickupcompleted",
-        "intransittowarehouse",
-        "qcinprogress",
-        "qcpassed",
-        "qcfailed",
-        "returncompleted",
-        "returnclosed",
+        "returned",
       ];
       return returnStatuses.includes(order.status);
     })
     .filter((order: Order) =>
-      order.id.toLowerCase().includes(searchQuery.toLowerCase())
+      (order.order_number || order.id).toLowerCase().includes(searchQuery.toLowerCase())
     )
     .sort(
       (a: Order, b: Order) =>
@@ -190,24 +181,18 @@ export default function OrdersManagement() {
   const cancelOrders = allOrders
     .filter((order: Order) => {
       const cancelStatuses: OrderStatus[] = [
-        "cancellationrequested",
-        "cancellationpending",
-        "cancellationapproved",
-        "cancellationrejected",
-        "refundinitiated",
-        "refundinprogress",
-        "refundcompleted",
         "cancelled",
+        "refunded",
       ];
       return cancelStatuses.includes(order.status);
     })
     .filter((order: Order) =>
-      order.id.toLowerCase().includes(searchQuery.toLowerCase())
+      (order.order_number || order.id).toLowerCase().includes(searchQuery.toLowerCase())
     )
     .sort(
       (a: Order, b: Order) =>
-        new Date(b.cancelRequestedAt || b.cancel_requested_at || b.createdAt || b.created_at).getTime() -
-        new Date(a.cancelRequestedAt || a.cancel_requested_at || a.createdAt || a.created_at).getTime()
+        new Date(b.createdAt || b.created_at).getTime() -
+        new Date(a.createdAt || a.created_at).getTime()
     );
 
   const updateStatusMutation = useMutation({
@@ -312,152 +297,67 @@ export default function OrdersManagement() {
         variant: "outline",
         className: "bg-gray-100 text-gray-800",
       },
-      processing: {
-        label: "Processing",
-        variant: "secondary",
-        className: "bg-gray-500 text-white",
-      },
       confirmed: {
         label: "Confirmed",
         variant: "default",
         className: "bg-yellow-500 text-white",
       },
-      shipped: {
-        label: "Shipped",
+      processing: {
+        label: "Processing",
+        variant: "secondary",
+        className: "bg-blue-400 text-white",
+      },
+      packed: {
+        label: "Packed",
         variant: "default",
         className: "bg-blue-500 text-white",
       },
-      outfordelivery: {
-        label: "Out for Delivery",
+      shipped: {
+        label: "Shipped",
         variant: "default",
         className: "bg-blue-600 text-white",
+      },
+      out_for_delivery: {
+        label: "Out for Delivery",
+        variant: "default",
+        className: "bg-indigo-500 text-white",
       },
       delivered: {
         label: "Delivered",
         variant: "default",
         className: "bg-green-500 text-white",
       },
-      // Cancellation Flow
-      cancellationrequested: {
-        label: "Cancel Requested",
-        variant: "default",
-        className: "bg-amber-400 text-black",
-      },
-      cancellationpending: {
-        label: "Cancel Pending",
-        variant: "default",
-        className: "bg-amber-500 text-white",
-      },
-      cancellationapproved: {
-        label: "Cancel Approved",
-        variant: "default",
-        className: "bg-yellow-500 text-white",
-      },
-      cancellationrejected: {
-        label: "Cancel Rejected",
-        variant: "destructive",
-        className: "bg-red-400 text-white",
-      },
-      refundinitiated: {
-        label: "Refund Initiated",
-        variant: "default",
-        className: "bg-blue-400 text-white",
-      },
-      refundinprogress: {
-        label: "Refund In Progress",
-        variant: "default",
-        className: "bg-blue-500 text-white",
-      },
-      refundcompleted: {
-        label: "Refund Completed",
-        variant: "default",
-        className: "bg-green-400 text-white",
-      },
+      // Cancellation & Refund
       cancelled: {
         label: "Cancelled",
         variant: "destructive",
         className: "bg-red-500 text-white",
       },
-      // Return Flow
-      returnrequested: {
-        label: "Return Requested",
+      refunded: {
+        label: "Refunded",
         variant: "default",
-        className: "bg-purple-400 text-white",
+        className: "bg-green-400 text-white",
       },
+      // Return Flow
       return_requested: {
         label: "Return Requested",
         variant: "default",
         className: "bg-purple-400 text-white",
-      },
-      returnpending: {
-        label: "Return Pending",
-        variant: "default",
-        className: "bg-purple-500 text-white",
-      },
-      returnapproved: {
-        label: "Return Approved",
-        variant: "default",
-        className: "bg-purple-600 text-white",
       },
       return_approved: {
         label: "Return Approved",
         variant: "default",
         className: "bg-purple-600 text-white",
       },
-      returnrejected: {
-        label: "Return Rejected",
-        variant: "destructive",
-        className: "bg-red-400 text-white",
-      },
       return_rejected: {
         label: "Return Rejected",
         variant: "destructive",
         className: "bg-red-400 text-white",
       },
-      pickupscheduled: {
-        label: "Pickup Scheduled",
+      returned: {
+        label: "Returned",
         variant: "default",
-        className: "bg-indigo-400 text-white",
-      },
-      pickupattempted: {
-        label: "Pickup Attempted",
-        variant: "default",
-        className: "bg-indigo-500 text-white",
-      },
-      pickupcompleted: {
-        label: "Pickup Completed",
-        variant: "default",
-        className: "bg-indigo-600 text-white",
-      },
-      intransittowarehouse: {
-        label: "In Transit",
-        variant: "default",
-        className: "bg-blue-600 text-white",
-      },
-      qcinprogress: {
-        label: "QC In Progress",
-        variant: "default",
-        className: "bg-yellow-400 text-black",
-      },
-      qcpassed: {
-        label: "QC Passed",
-        variant: "default",
-        className: "bg-green-400 text-white",
-      },
-      qcfailed: {
-        label: "QC Failed",
-        variant: "destructive",
-        className: "bg-red-500 text-white",
-      },
-      returncompleted: {
-        label: "Return Completed",
-        variant: "default",
-        className: "bg-green-500 text-white",
-      },
-      returnclosed: {
-        label: "Return Closed",
-        variant: "default",
-        className: "bg-gray-600 text-white",
+        className: "bg-purple-700 text-white",
       },
     };
 
@@ -470,40 +370,24 @@ export default function OrdersManagement() {
   };
 
   const getNextStatuses = (currentStatus: OrderStatus): OrderStatus[] => {
+    // Based on history.service.js ALLOWED_TRANSITIONS
     const statusFlows: Record<OrderStatus, OrderStatus[]> = {
       // Normal Flow
-      pending: ["processing", "cancelled"],
-      processing: ["confirmed", "cancellationrequested"],
-      confirmed: ["shipped", "cancellationrequested"],
-      shipped: ["outfordelivery", "cancellationrequested"],
-      outfordelivery: ["delivered", "cancellationrequested"],
-      delivered: ["returnrequested"],
-      // Cancellation Flow
-      cancellationrequested: ["cancellationpending"],
-      cancellationpending: ["cancellationapproved", "cancellationrejected"],
-      cancellationapproved: ["refundinitiated"],
-      cancellationrejected: ["processing", "confirmed", "shipped"],
-      refundinitiated: ["refundinprogress"],
-      refundinprogress: ["refundcompleted"],
-      refundcompleted: ["cancelled"],
-      cancelled: [],
+      pending: ["confirmed", "cancelled"],
+      confirmed: ["processing", "cancelled"],
+      processing: ["packed", "cancelled"],
+      packed: ["shipped", "cancelled"],
+      shipped: ["out_for_delivery"],
+      out_for_delivery: ["delivered", "returned"],
+      delivered: ["return_requested"],
+      // Cancellation & Refund
+      cancelled: ["refunded"],
+      refunded: [],
       // Return Flow
-      returnrequested: ["returnpending"], // Legacy
       return_requested: ["return_approved", "return_rejected"],
-      returnpending: ["returnapproved", "returnrejected"],
-      returnapproved: ["pickupscheduled"],
-      return_approved: ["pickupscheduled", "pickupattempted"],
-      returnrejected: ["returnclosed"],
-      return_rejected: ["returnclosed"],
-      pickupscheduled: ["pickupattempted", "pickupcompleted"],
-      pickupattempted: ["pickupscheduled", "pickupcompleted"],
-      pickupcompleted: ["intransittowarehouse"],
-      intransittowarehouse: ["qcinprogress"],
-      qcinprogress: ["qcpassed", "qcfailed"],
-      qcpassed: ["refundinitiated"],
-      qcfailed: ["returnrejected"],
-      returncompleted: [],
-      returnclosed: [],
+      return_approved: ["returned"],
+      return_rejected: [],
+      returned: ["refunded"],
     };
 
     return statusFlows[currentStatus] || [];
@@ -533,7 +417,7 @@ export default function OrdersManagement() {
           <TableBody>
             {orders.map((order) => (
               <TableRow key={order.id}>
-                <TableCell className="font-medium font-mono text-xs">{order.id}</TableCell>
+                <TableCell className="font-medium font-mono text-xs">{order.order_number || order.id}</TableCell>
                 <TableCell>
                   {format(new Date(order.createdAt || order.created_at || Date.now()), "MMM d, yyyy")}
                 </TableCell>
@@ -559,33 +443,14 @@ export default function OrdersManagement() {
                     {(order.paymentStatus || order.payment_status || "pending").toUpperCase()}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right space-x-2">
+                <TableCell className="text-right">
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => {
-                      setSelectedOrder(order);
-                      setDetailsOpen(true);
-                    }}
+                    onClick={() => navigate(`/admin/orders/${order.id}`)}
+                    title="View full order details"
                   >
                     <Eye className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedOrder(order);
-                      setNewStatus(order.status);
-                      setStatusDialogOpen(true);
-                      // If it's a return related status, fetch return details
-                      if (['returnrequested', 'return_requested'].includes(order.status)) {
-                        fetchReturnDetails(order.id);
-                      } else {
-                        setActiveReturnRequest(null);
-                      }
-                    }}
-                  >
-                    Update Status
                   </Button>
                 </TableCell>
               </TableRow>
@@ -628,14 +493,21 @@ export default function OrdersManagement() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
+            {/* Normal Flow */}
             <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="confirmed">Confirmed</SelectItem>
             <SelectItem value="processing">Processing</SelectItem>
             <SelectItem value="packed">Packed</SelectItem>
             <SelectItem value="shipped">Shipped</SelectItem>
+            <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
             <SelectItem value="delivered">Delivered</SelectItem>
+            {/* Cancellation & Refund */}
             <SelectItem value="cancelled">Cancelled</SelectItem>
+            <SelectItem value="refunded">Refunded</SelectItem>
+            {/* Returns */}
             <SelectItem value="return_requested">Return Requested</SelectItem>
+            <SelectItem value="return_approved">Return Approved</SelectItem>
+            <SelectItem value="return_rejected">Return Rejected</SelectItem>
             <SelectItem value="returned">Returned</SelectItem>
           </SelectContent>
         </Select>
@@ -650,7 +522,10 @@ export default function OrdersManagement() {
             <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="paid">Paid</SelectItem>
             <SelectItem value="failed">Failed</SelectItem>
+            <SelectItem value="refund_initiated">Refund Initiated</SelectItem>
+            <SelectItem value="refund_in_progress">Refund In Progress</SelectItem>
             <SelectItem value="refunded">Refunded</SelectItem>
+            <SelectItem value="partially_refunded">Partially Refunded</SelectItem>
           </SelectContent>
         </Select>
 

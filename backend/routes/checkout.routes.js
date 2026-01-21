@@ -131,13 +131,19 @@ router.post('/create-payment-order', validate(createPaymentOrderSchema), request
             return res.status(401).json({ error: 'Authentication required' });
         }
 
-        // 1. Get User Profile (Needed for Invoice)
-        // We need name/email/phone for the Invoice Customer
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', userId)
-            .single();
+        const supabase = require('../config/supabase');
+
+        // PHASE 3A OPTIMIZATION: Use profile from request body if provided (from summary)
+        // Fallback to database fetch for backward compatibility
+        let profile = req.body.user_profile;
+        if (!profile) {
+            const { data: fetchedProfile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', userId)
+                .single();
+            profile = fetchedProfile;
+        }
 
         if (!profile) {
             return res.status(404).json({ error: 'User profile not found' });

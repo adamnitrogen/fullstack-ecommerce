@@ -249,7 +249,17 @@ export default function Checkout() {
         throw error;
       }
 
-      // 2. Initialize Razorpay Options
+      // 2. Ensure Razorpay SDK is loaded (verify preload or load now)
+      if (!window.Razorpay) {
+        const isLoaded = await loadRazorpay();
+        if (!isLoaded) {
+          toast.error("Failed to load payment gateway. Please check your connection.");
+          setProcessing(false);
+          return;
+        }
+      }
+
+      // 3. Initialize Razorpay Options
       const options = {
         key: summary.razorpay_key_id || orderData.key_id, // PHASE 2B: Use key from summary (fallback to orderData for compatibility)
         amount: orderData.amount,

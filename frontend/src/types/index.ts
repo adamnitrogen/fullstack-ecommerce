@@ -190,37 +190,21 @@ export interface CartItem {
 export type OrderStatus =
   // Normal Flow
   | "pending"
-  | "processing"
   | "confirmed"
+  | "processing"
+  | "packed"
   | "shipped"
-  | "outfordelivery"
+  | "out_for_delivery"
   | "delivered"
-  // Cancellation Flow
-  | "cancellationrequested"
-  | "cancellationpending"
-  | "cancellationapproved"
-  | "cancellationrejected"
-  | "refundinitiated"
-  | "refundinprogress"
-  | "refundcompleted"
+  // Cancellation & Refund
   | "cancelled"
+  | "refunded"
   // Return Flow
-  | "returnrequested"
   | "return_requested"
-  | "returnpending"
   | "return_approved"
-  | "returnapproved"
-  | "returnrejected"
   | "return_rejected"
-  | "pickupscheduled"
-  | "pickupattempted"
-  | "pickupcompleted"
-  | "intransittowarehouse"
-  | "qcinprogress"
-  | "qcpassed"
-  | "qcfailed"
-  | "returncompleted"
-  | "returnclosed";
+  | "returned";
+
 
 export interface OrderItem {
   id: string;

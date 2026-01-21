@@ -705,13 +705,17 @@ async function cancelOrder(id, userId, reason, userEmail, userName) {
         throw err;
     }
 
+
     // 2. Check Eligibility
-    const allowedStatuses = [ORDER_STATUS.PENDING, ORDER_STATUS.CONFIRMED];
+    // Allow cancellation for: pending, confirmed, processing, packed
+    // Once shipped, user must use return request instead
+    const allowedStatuses = [ORDER_STATUS.PENDING, ORDER_STATUS.CONFIRMED, ORDER_STATUS.PROCESSING, ORDER_STATUS.PACKED];
     if (!allowedStatuses.includes(order.status)) {
-        const err = new Error('Order cannot be cancelled at this stage');
+        const err = new Error('Order cannot be cancelled at this stage. Please request a return instead.');
         err.status = 400;
         throw err;
     }
+
 
     // 3. Update Status
     const note = reason ? `Cancelled by user: ${reason}` : 'Cancelled by user';

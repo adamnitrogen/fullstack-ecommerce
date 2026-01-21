@@ -126,7 +126,7 @@ export function TaxBreakdown({
                 <CardTitle className="flex items-center justify-between text-base">
                     <div className="flex items-center gap-2">
                         <FileText size={18} className={role === 'admin' ? "text-primary" : ""} />
-                        <span>{role === 'admin' ? 'Detailed Tax Summary & Audit' : 'Tax Summary'}</span>
+                        <span>{role === 'admin' ? 'Detailed Tax Summary & Audit' : 'Price Breakdown'}</span>
                     </div>
                 </CardTitle>
             </CardHeader>
@@ -135,11 +135,11 @@ export function TaxBreakdown({
                     {/* Primary Taxable & Tax Split */}
                     <div className="grid grid-cols-2 gap-4 bg-muted/30 p-3 rounded-lg border border-muted">
                         <div className="space-y-1">
-                            <span className="text-[10px] uppercase font-bold text-muted-foreground block">Total Taxable</span>
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground block">{role === 'admin' ? 'Total Taxable' : 'Subtotal (Before Tax)'}</span>
                             <span className="text-sm font-semibold">{formatAmount(effectiveTaxable)}</span>
                         </div>
                         <div className="space-y-1 text-right">
-                            <span className="text-[10px] uppercase font-bold text-muted-foreground block">Total GST</span>
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground block">{role === 'admin' ? 'Total GST' : 'Taxes (GST)'}</span>
                             <span className="text-sm font-semibold text-primary">{formatAmount(displayTotalTax)}</span>
                         </div>
                     </div>
@@ -147,12 +147,12 @@ export function TaxBreakdown({
                     {/* Detailed Breakdown */}
                     <div className="space-y-2 px-1">
                         <div className="flex justify-between text-xs">
-                            <span className="text-muted-foreground">Product(s) Net Taxable</span>
+                            <span className="text-muted-foreground">{role === 'admin' ? 'Product(s) Net Taxable' : 'Items Total'}</span>
                             <span>{formatAmount(productTaxableFromItems)}</span>
                         </div>
                         {deliveryCharge > 0 && (
                             <div className="flex justify-between text-xs">
-                                <span className="text-muted-foreground italic">Delivery Service Taxable</span>
+                                <span className="text-muted-foreground italic">{role === 'admin' ? 'Delivery Service Taxable' : 'Shipping Charges'}</span>
                                 <span>{formatAmount(deliveryCharge)}</span>
                             </div>
                         )}
@@ -160,17 +160,17 @@ export function TaxBreakdown({
 
                         {isInterState ? (
                             <div className="flex justify-between text-sm font-medium">
-                                <span className="text-muted-foreground">IGST (Integrated GST)</span>
+                                <span className="text-muted-foreground">{role === 'admin' ? 'IGST (Integrated GST)' : 'Tax (IGST)'}</span>
                                 <span className="text-primary">{formatAmount(displayIgst)}</span>
                             </div>
                         ) : (
                             <>
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">CGST (Central GST)</span>
+                                    <span className="text-muted-foreground">{role === 'admin' ? 'CGST (Central GST)' : 'Central Tax (CGST)'}</span>
                                     <span>{formatAmount(displayCgst)}</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">SGST (State GST)</span>
+                                    <span className="text-muted-foreground">{role === 'admin' ? 'SGST (State GST)' : 'State Tax (SGST)'}</span>
                                     <span>{formatAmount(displaySgst)}</span>
                                 </div>
                             </>
@@ -181,7 +181,7 @@ export function TaxBreakdown({
                     {items && items.length > 0 && (
                         <div className="border rounded-md overflow-hidden text-xs shadow-sm">
                             <div className="bg-muted/50 px-3 py-2 font-medium flex justify-between items-center border-b">
-                                <span>Itemized Breakdown</span>
+                                <span>{role === 'admin' ? 'Itemized Breakdown' : 'Product Details'}</span>
                                 {role === 'admin' && <span className="text-[9px] text-muted-foreground uppercase bg-white px-1 rounded border">Audit Log</span>}
                             </div>
                             <div className="divide-y max-h-[250px] overflow-y-auto bg-white">
@@ -244,10 +244,10 @@ export function TaxBreakdown({
                 <div className="border-t-2 border-primary/20 pt-4 mt-2">
                     <div className="flex justify-between items-end">
                         <div className="space-y-0.5">
-                            <span className="text-[10px] uppercase font-bold text-muted-foreground block">Final Amount Payable</span>
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground block">{role === 'admin' ? 'Final Amount Payable' : 'Grand Total'}</span>
                             <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                                 <Info size={10} />
-                                Taxable Value + Total GST
+                                {role === 'admin' ? 'Taxable Value + Total GST' : 'Includes all taxes'}
                             </span>
                         </div>
                         <div className="text-right">
