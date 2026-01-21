@@ -278,11 +278,12 @@ async function handleOrderWebhook(event, payload, payment) {
             });
 
             if (dbPayment.order_id) {
+                // User requested that orders NOT be auto-confirmed by system. Leaving status as 'pending'.
                 const { data: updatedOrder } = await supabaseAdmin
                     .from('orders')
                     .update({
                         payment_status: 'paid',
-                        status: 'confirmed',
+                        status: 'pending',
                         updated_at: new Date().toISOString()
                     })
                     .eq('id', dbPayment.order_id)
@@ -297,38 +298,37 @@ async function handleOrderWebhook(event, payload, payment) {
                     `Payment captured: ${payment.id} via ${payment.method}`
                 );
 
-                // Send Order Confirmation Email
+                // Send Order Placed Email (v2)
                 if (updatedOrder) {
                     try {
-                        // Check if Razorpay receipt already exists in invoices array
-                        const items = updatedOrder.order_items || [];
                         const hasRazorpayReceipt = (updatedOrder.invoices || []).some(inv => inv.type === 'RAZORPAY');
                         if (!hasRazorpayReceipt) {
                             try {
                                 logger.info({ orderId: updatedOrder.id }, 'Generating missing Razorpay receipt via webhook');
                                 const result = await InvoiceOrchestrator.generateRazorpayInvoice({
                                     ...updatedOrder,
-                                    items: items
+                                    items: updatedOrder.order_items
                                 });
                                 if (result.success && result.invoiceUrl) {
-                                    updatedOrder.invoiceUrl = result.invoiceUrl; // For email template
-                                    // NOTE: invoice_url is NOT set here - it's reserved for internal invoice at delivery
+                                    updatedOrder.invoiceUrl = result.invoiceUrl;
                                 }
                             } catch (invErr) {
                                 logger.warn({ err: invErr }, 'Failed to generate Razorpay receipt in webhook');
                             }
                         }
 
-                        await emailService.sendOrderConfirmationEmail(
+                        // Send "Order Placed" email (includes receipt link)
+                        await emailService.sendOrderPlacedEmail(
                             updatedOrder.customer_email,
                             {
                                 order: updatedOrder,
-                                customerName: updatedOrder.customer_name
+                                customerName: updatedOrder.customer_name,
+                                receiptUrl: updatedOrder.invoiceUrl
                             },
                             updatedOrder.user_id
                         );
                     } catch (emailErr) {
-                        logger.error({ err: emailErr }, 'Failed to send order confirmation email:');
+                        logger.error({ err: emailErr }, 'Failed to send order placed email via webhook:');
                     }
                 }
             }

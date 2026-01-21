@@ -18,11 +18,13 @@ const EmailEventTypes = {
     PASSWORD_RESET: 'PASSWORD_RESET',
 
     // Orders - ALLOWED EMAILS (6 states)
-    ORDER_PLACED: 'ORDER_CONFIRMATION',           // ✓ ALLOWED: Order placed by customer
-    ORDER_STATUS_UPDATE: 'ORDER_STATUS_UPDATE',   // ✓ ALLOWED: Used for confirmed, shipped, delivered
-    ORDER_SHIPPED: 'ORDER_SHIPPED',               // ✓ ALLOWED: Order shipped
-    ORDER_DELIVERED: 'ORDER_DELIVERED',           // ✓ ALLOWED: Order delivered
-    ORDER_CANCELLED: 'ORDER_CANCELLED',           // ✓ ALLOWED: Order cancelled
+    // POLICY: Each status MUST have a unique event type for template resolution
+    ORDER_PLACED: 'ORDER_PLACED',
+    ORDER_CONFIRMED: 'ORDER_CONFIRMED',
+    ORDER_SHIPPED: 'ORDER_SHIPPED',
+    ORDER_DELIVERED: 'ORDER_DELIVERED',
+    ORDER_CANCELLED: 'ORDER_CANCELLED',
+    ORDER_RETURNED: 'ORDER_RETURNED',
 
     // Payment & Invoice - DEPRECATED
     PAYMENT_CONFIRMED: 'PAYMENT_CONFIRMED',       // ✗ DEPRECATED: No longer sent
@@ -69,11 +71,11 @@ const EmailEventTypes = {
  */
 const ALLOWED_ORDER_EMAIL_STATES = {
     'pending': EmailEventTypes.ORDER_PLACED,
-    'confirmed': EmailEventTypes.ORDER_STATUS_UPDATE,
+    'confirmed': EmailEventTypes.ORDER_CONFIRMED,
     'shipped': EmailEventTypes.ORDER_SHIPPED,
     'delivered': EmailEventTypes.ORDER_DELIVERED,
     'cancelled': EmailEventTypes.ORDER_CANCELLED,
-    'returned': EmailEventTypes.ORDER_STATUS_UPDATE  // Final return completion
+    'returned': EmailEventTypes.ORDER_RETURNED
 };
 
 /**

@@ -841,16 +841,17 @@ const createOrder = async (userId, checkoutData, cart) => {
         log.warn({ err: histError, orderId: order.id }, '[Checkout] Failed to log payment status history');
     }
 
-    // Send Order Confirmation Email (non-transactional, OK to fail)
-    logger.info({ data: profile.email }, '[CheckoutService] Sending order confirmation email to:');
-    emailService.sendOrderConfirmationEmail(
+    // Send "Order Placed" Email (v2)
+    logger.info({ data: profile.email }, '[CheckoutService] Sending order placed email to:');
+    emailService.sendOrderPlacedEmail(
         profile.email,
         {
             order: order,
-            customerName: profile.name
+            customerName: profile.name,
+            receiptUrl: order.invoiceUrl // Injected from Razorpay Receipt flow
         },
         userId
-    ).catch(err => logger.error('Failed to send order confirmation email:', err));
+    ).catch(err => logger.error('Failed to send order placed email:', err));
 
     return order;
 };
@@ -1418,6 +1419,22 @@ async function processPaymentAndOrder(userId, {
 
     // --- DB TRANSACTION PHASE ---
     try {
+        // Extract pre-generated order number from payment receipt
+        let preGeneratedOrderNumber = null;
+        if (payment_id) {
+            try {
+                const { data: existingPayment } = await supabase
+                    .from('payments')
+                    .select('metadata')
+                    .eq('id', payment_id)
+                    .single();
+
+                preGeneratedOrderNumber = existingPayment?.metadata?.receipt || null;
+            } catch (e) {
+                logger.warn({ err: e, payment_id }, 'Failed to fetch payment receipt for order number');
+            }
+        }
+
         // Create order via atomic PostgreSQL transaction
         const order = await createOrder(
             userId,
@@ -1428,7 +1445,7 @@ async function processPaymentAndOrder(userId, {
                 notes,
                 payment_status: 'paid',
                 razorpay_payment_id,
-                orderNumber: notes?._receipt || null,
+                orderNumber: preGeneratedOrderNumber, // Use the pre-generated number from Razorpay receipt
                 invoice_id: (payment_id && !isMockPayment) ?
                     (await supabase.from('payments').select('invoice_id').eq('id', payment_id).single()).data?.invoice_id
                     : null
@@ -1489,25 +1506,38 @@ async function processPaymentAndOrder(userId, {
                 logger.info({
                     razorpay_payment_id,
                     razorpay_order_id
-                }, '[Checkout] Payment refunded successfully');
+                }, '[Checkout] Payment refunded successfully after order creation failure');
 
-                const userError = new Error(`Order creation failed (${systemError.message}) and payment has been refunded. Please try again.`);
+                const userError = new Error('Order creation failed but your payment has been refunded automatically. The amount will be credited to your account within 5-7 business days.');
                 userError.status = 500;
                 throw userError;
 
             } catch (refundError) {
-                // Check if this is our intentional re-throw
-                if (refundError.message.includes('Order creation failed')) {
+                // Check if this is our intentional re-throw (refund succeeded but we're throwing user-friendly message)
+                if (refundError.message.includes('Order creation failed') && refundError.message.includes('refunded')) {
                     throw refundError;
                 }
 
                 logger.error({
                     err: refundError,
                     razorpay_payment_id,
-                    razorpay_order_id
+                    razorpay_order_id,
+                    payment_id
                 }, '[Checkout] CRITICAL: Failed to refund payment after DB failure!');
 
-                const userError = new Error('Order creation failed. We encountered an issue refunding your payment. Please contact support immediately.');
+                // Update payment record to indicate refund failure
+                if (payment_id) {
+                    try {
+                        await updatePaymentRecord(payment_id, {
+                            status: 'refund_failed',
+                            error_description: `Order creation failed: ${systemError.message}. Refund failed: ${refundError.message}`
+                        });
+                    } catch (updateErr) {
+                        logger.error({ err: updateErr, payment_id }, 'Failed to update payment status after refund failure');
+                    }
+                }
+
+                const userError = new Error(`Order creation failed and automatic refund encountered an issue. Please contact support immediately with Payment ID: ${razorpay_payment_id}. Our team will process your refund manually.`);
                 userError.status = 500;
                 throw userError;
             }
@@ -1596,15 +1626,23 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
         virtualCart.id = null; // Explicitly set to null for createOrder to treat it as virtual (no DB updates)
 
         // 3. Reuse standard createOrder logic
-        // We need to fetch the invoice_id from the payment record if it exists
+        // We need to fetch the invoice_id and receipt (order number) from the payment record if it exists
         let invoice_id = null;
+        let orderNumber = null;
+        let notesWithRef = notes || 'Buy Now Order'; // Use new variable instead of reassigning const
+
         if (payment_id) {
             const { data: paymentRecord } = await supabase
                 .from('payments')
-                .select('invoice_id')
+                .select('invoice_id, metadata')
                 .eq('id', payment_id)
                 .single();
             invoice_id = paymentRecord?.invoice_id;
+            orderNumber = paymentRecord?.metadata?.receipt || null;
+
+            if (orderNumber && notes && typeof notes === 'string') {
+                notesWithRef = `${notes} (Ref: ${orderNumber})`;
+            }
         }
 
         const order = await createOrder(
@@ -1613,10 +1651,11 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
                 shipping_address_id,
                 billing_address_id,
                 payment_id,
-                notes: notes || 'Buy Now Order',
+                notes: notesWithRef,
                 payment_status: 'paid',
                 razorpay_payment_id,
-                invoice_id
+                invoice_id,
+                orderNumber: orderNumber // Use the pre-generated number from Razorpay receipt
             },
             virtualCart
         );
@@ -1645,10 +1684,13 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
         };
 
     } catch (error) {
-        log.operationError('BUY_NOW_ERROR', error);
+        log.operationError('BUY_NOW_ERROR', error, { productId, variantId });
 
         // TECHNICAL REFUND: If order creation fails after payment
         if (razorpay_payment_id) {
+            let refundSuccess = false;
+            let refundError = null;
+
             try {
                 if (payment_id) {
                     await RefundService.asyncProcessRefund(payment_id, REFUND_TYPES.TECHNICAL_REFUND, 'SYSTEM', `Buy Now order failed: ${error.message}`, true);
@@ -1657,8 +1699,39 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
                         reason: `Buy Now order failed: ${error.message}`
                     });
                 }
+                refundSuccess = true;
+                logger.info({ razorpay_payment_id, payment_id }, '[BuyNow] Technical refund initiated successfully after order failure');
             } catch (refundErr) {
-                log.error({ err: refundErr }, 'Double fault: Failed to process technical refund');
+                refundError = refundErr;
+                logger.error({
+                    err: refundErr,
+                    razorpay_payment_id,
+                    payment_id,
+                    originalError: error.message
+                }, 'CRITICAL: Technical refund failed after order creation failure!');
+
+                // Update payment record to indicate refund failure
+                if (payment_id) {
+                    try {
+                        await updatePaymentRecord(payment_id, {
+                            status: 'refund_failed',
+                            error_description: `Order failed: ${error.message}. Refund failed: ${refundErr.message}`
+                        });
+                    } catch (updateErr) {
+                        logger.error({ err: updateErr, payment_id }, 'Failed to update payment status after refund failure');
+                    }
+                }
+            }
+
+            // Throw user-friendly error based on refund status
+            if (refundSuccess) {
+                const userError = new Error('Order creation failed but your payment has been refunded automatically. The amount will be credited to your account within 5-7 business days.');
+                userError.status = 500;
+                throw userError;
+            } else {
+                const userError = new Error(`Order creation failed and automatic refund encountered an issue. Please contact support immediately with Payment ID: ${razorpay_payment_id}. Our team will process your refund manually.`);
+                userError.status = 500;
+                throw userError;
             }
         }
 

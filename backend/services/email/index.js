@@ -19,7 +19,7 @@ const SmtpProvider = require('./providers/smtp.provider');
 
 // Templates
 const { getRegistrationEmail, getEmailVerificationEmail, getEmailConfirmationEmail } = require('./templates/registration.template');
-const { getOrderConfirmationEmail, getOrderStatusUpdateEmail, getOrderCancellationEmail } = require('./templates/order.template');
+const { getOrderPlacedEmail, getOrderConfirmedEmail, getOrderShippedEmail, getOrderDeliveredEmail, getOrderCancellationEmail, getOrderReturnedEmail } = require('./templates/order.template');
 const { getEventRegistrationEmail, getEventCancellationEmail, getEventUpdateEmail } = require('./templates/event.template');
 const { getDonationReceiptEmail, getSubscriptionConfirmationEmail, getSubscriptionCancellationEmail } = require('./templates/donation.template');
 const { getContactFormEmail, getContactAutoReplyEmail } = require('./templates/contact.template');
@@ -78,12 +78,19 @@ class EmailService {
                 return getRegistrationEmail(data);
 
             case EmailEventTypes.ORDER_PLACED:
-                return getOrderConfirmationEmail(data);
+                return getOrderPlacedEmail(data);
 
-            case EmailEventTypes.ORDER_STATUS_UPDATE:
+            case EmailEventTypes.ORDER_CONFIRMED:
+                return getOrderConfirmedEmail(data);
+
             case EmailEventTypes.ORDER_SHIPPED:
+                return getOrderShippedEmail(data);
+
             case EmailEventTypes.ORDER_DELIVERED:
-                return getOrderStatusUpdateEmail(data);
+                return getOrderDeliveredEmail(data);
+
+            case EmailEventTypes.ORDER_RETURNED:
+                return getOrderReturnedEmail(data);
 
             case EmailEventTypes.ORDER_CANCELLED:
                 return getOrderCancellationEmail(data);
@@ -150,29 +157,46 @@ class EmailService {
      */
     async _createLog({ to, eventType, subject, html, userId, referenceId, metadata }) {
         try {
+            // Map unique internal types to existing DB enum values to avoid constraint errors
+            const dbTypeMap = {
+                'ORDER_PLACED': 'ORDER_CONFIRMATION',
+                'ORDER_CONFIRMED': 'ORDER_STATUS_UPDATE',
+                'ORDER_CANCELLED': 'ORDER_STATUS_UPDATE',
+                'ORDER_RETURNED': 'ORDER_STATUS_UPDATE'
+            };
+            const dbEventType = dbTypeMap[eventType] || eventType;
+
             // Try RPC first (bypasses RLS if configured)
             const { data: logId, error } = await supabase.rpc('log_email_notification', {
-                p_email_type: eventType,
+                p_email_type: dbEventType,
                 p_recipient_email: to,
                 p_subject: subject,
                 p_html_preview: html ? html.substring(0, 500) : '',
                 p_user_id: userId,
                 p_reference_id: referenceId,
-                p_metadata: metadata
+                p_metadata: { ...metadata, internal_type: eventType }
             });
 
             if (!error && logId) return logId;
 
             // Fallback to direct insert if RPC fails (e.g. not found)
             if (error && error.code === '42883') {
+                const dbTypeMap = {
+                    'ORDER_PLACED': 'ORDER_CONFIRMATION',
+                    'ORDER_CONFIRMED': 'ORDER_STATUS_UPDATE',
+                    'ORDER_CANCELLED': 'ORDER_STATUS_UPDATE',
+                    'ORDER_RETURNED': 'ORDER_STATUS_UPDATE'
+                };
+                const dbEventType = dbTypeMap[eventType] || eventType;
+
                 logger.warn('[EmailService] RPC log_email_notification not found, falling back to direct insert');
                 const { data } = await supabase.from('email_notifications').insert([{
                     user_id: userId,
-                    email_type: eventType,
+                    email_type: dbEventType,
                     recipient_email: to,
                     reference_id: referenceId,
                     status: 'PENDING',
-                    metadata: { ...metadata, subject, html_preview: html ? html.substring(0, 500) : '' }
+                    metadata: { ...metadata, subject, internal_type: eventType, html_preview: html ? html.substring(0, 500) : '' }
                 }]).select('id').single();
                 return data?.id;
             }
@@ -330,17 +354,38 @@ class EmailService {
     }
 
     /**
-     * Send order confirmation email
+     * Send order placed email (Pending)
      */
-    async sendOrderConfirmationEmail(to, { order, customerName }, userId = null) {
-        return this.send(EmailEventTypes.ORDER_PLACED, to, { order, customerName }, { userId, referenceId: order.id });
+    async sendOrderPlacedEmail(to, { order, customerName, receiptUrl }, userId = null) {
+        return this.send(EmailEventTypes.ORDER_PLACED, to, { order, customerName, receiptUrl }, { userId, referenceId: order.id });
     }
 
     /**
-     * Send order status update email
+     * Send order confirmed email
      */
-    async sendOrderStatusUpdateEmail(to, { order, customerName, newStatus }, userId = null) {
-        return this.send(EmailEventTypes.ORDER_STATUS_UPDATE, to, { order, customerName, newStatus }, { userId, referenceId: order.id });
+    async sendOrderConfirmedEmail(to, { order, customerName }, userId = null) {
+        return this.send(EmailEventTypes.ORDER_CONFIRMED, to, { order, customerName }, { userId, referenceId: order.id });
+    }
+
+    /**
+     * Send order shipped email
+     */
+    async sendOrderShippedEmail(to, { order, customerName }, userId = null) {
+        return this.send(EmailEventTypes.ORDER_SHIPPED, to, { order, customerName }, { userId, referenceId: order.id });
+    }
+
+    /**
+     * Send order delivered email
+     */
+    async sendOrderDeliveredEmail(to, { order, customerName, invoiceUrl }, userId = null) {
+        return this.send(EmailEventTypes.ORDER_DELIVERED, to, { order, customerName, invoiceUrl }, { userId, referenceId: order.id });
+    }
+
+    /**
+     * Send order returned email
+     */
+    async sendOrderReturnedEmail(to, { order, customerName }, userId = null) {
+        return this.send(EmailEventTypes.ORDER_RETURNED, to, { order, customerName }, { userId, referenceId: order.id });
     }
 
     /**

@@ -826,21 +826,35 @@ export default function OrderDetail() {
                                         </div>
 
                                         {/* Refund Metadata Display */}
-                                        {order.refunds && order.refunds.length > 0 && (
+                                        {(order.payment_status === 'refund_initiated' || order.payment_status === 'refunded' || order.payment_status === 'partially_refunded' || (order.refunds && order.refunds.length > 0)) && (
                                             <div className="mt-3 space-y-2">
-                                                <p className="text-[10px] text-red-600 uppercase tracking-widest font-semibold">Refunds Processed</p>
-                                                {order.refunds.map((ref, idx) => (
-                                                    <div key={idx} className="grid grid-cols-2 gap-4 bg-red-50/50 p-2 rounded border border-red-100/50">
-                                                        <div>
-                                                            <p className="text-muted-foreground text-[11px]">Refund ID ({ref.status})</p>
-                                                            <code className="bg-white px-1 rounded text-[10px] break-all text-red-700 border border-red-100">{ref.razorpay_refund_id || ref.id}</code>
+                                                <p className="text-[10px] text-red-600 uppercase tracking-widest font-semibold">Refunds Information</p>
+                                                {order.refunds && order.refunds.length > 0 ? (
+                                                    order.refunds.map((ref, idx) => (
+                                                        <div key={idx} className="grid grid-cols-2 gap-4 bg-red-50/50 p-2 rounded border border-red-100/50">
+                                                            <div>
+                                                                <p className="text-muted-foreground text-[11px]">Refund ID ({ref.status || 'Initiated'})</p>
+                                                                <code className="bg-white px-1 rounded text-[10px] break-all text-red-700 border border-red-100">{ref.razorpay_refund_id || ref.id}</code>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <p className="text-muted-foreground text-[11px]">Amount</p>
+                                                                <span className="text-xs font-medium text-red-700">₹{(ref.amount || 0).toFixed(2)}</span>
+                                                            </div>
+                                                            {ref.notes && (
+                                                                <div className="col-span-2">
+                                                                    <p className="text-[9px] text-muted-foreground italic">Note: {ref.notes}</p>
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                        <div className="text-right">
-                                                            <p className="text-muted-foreground text-[11px]">Amount</p>
-                                                            <span className="text-xs font-medium text-red-700">₹{(ref.amount || 0).toFixed(2)}</span>
-                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div className="bg-amber-50 p-2 rounded border border-amber-100 text-[11px] text-amber-800">
+                                                        <p className="font-medium flex items-center gap-1.5">
+                                                            <Clock className="h-3 w-3" /> Refund {order.payment_status === 'refund_initiated' ? 'Initiated' : 'Record Pending'}
+                                                        </p>
+                                                        <p className="mt-0.5 opacity-80">The system has triggered the refund request. Detailed records will appear once processed by the gateway.</p>
                                                     </div>
-                                                ))}
+                                                )}
                                             </div>
                                         )}
                                     </div>

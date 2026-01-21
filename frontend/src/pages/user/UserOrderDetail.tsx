@@ -99,6 +99,7 @@ interface OrderResponse {
         amount: number;
         status: string;
         created_at: string;
+        notes?: string;
     }>;
 }
 
@@ -1165,18 +1166,32 @@ export default function UserOrderDetail() {
                                         )}
                                     </div>
 
-                                    {/* Refund IDs */}
-                                    {order.refunds && order.refunds.length > 0 && (
+                                    {/* Refund Details */}
+                                    {(order.payment_status === 'refund_initiated' || order.payment_status === 'refunded' || order.payment_status === 'partially_refunded' || (order.refunds && order.refunds.length > 0)) && (
                                         <div className="pt-2 border-t mt-2">
-                                            <span className="text-muted-foreground text-xs block mb-1">Refund Reference(s):</span>
-                                            <div className="space-y-1">
-                                                {order.refunds.map((r, idx) => (
-                                                    <div key={idx} className="flex justify-between items-center text-xs bg-red-50 p-1 rounded border border-red-100">
-                                                        <span className="font-mono text-red-800">{r.razorpay_refund_id || r.id}</span>
-                                                        <span className="font-medium text-red-700">₹{r.amount}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
+                                            <span className="text-muted-foreground text-xs block mb-1">Refund Information:</span>
+                                            {order.refunds && order.refunds.length > 0 ? (
+                                                <div className="space-y-1">
+                                                    {order.refunds.map((r, idx) => (
+                                                        <div key={idx} className="bg-red-50 p-1.5 rounded border border-red-100">
+                                                            <div className="flex justify-between items-center text-xs">
+                                                                <span className="font-mono text-red-800">{r.razorpay_refund_id || r.id}</span>
+                                                                <span className="font-medium text-red-700">₹{r.amount}</span>
+                                                            </div>
+                                                            {r.notes && (
+                                                                <p className="text-[10px] text-red-600/70 mt-0.5 italic pl-1 border-l border-red-200 ml-0.5">
+                                                                    Note: {r.notes}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="bg-blue-50 p-2 rounded border border-blue-100 text-[10px] text-blue-700">
+                                                    <p className="font-medium">Refund Processing</p>
+                                                    <p className="opacity-80">Our team has initiated your refund. Details will be updated here shortly.</p>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>

@@ -111,9 +111,11 @@ class RefundService {
 
             // 1. Fetch Order and Payment Details
             if (isInternalPaymentId) {
+                // FIX: Specify relationship hint to avoid PGRST201 error
+                // Use payments_order_id_fkey (payments.order_id → orders.id)
                 const { data: paymentRecord, error: pError } = await supabase
                     .from('payments')
-                    .select('*, orders(*, order_items(*))')
+                    .select('*, orders!payments_order_id_fkey(*, order_items(*))')
                     .eq('id', identifier)
                     .maybeSingle();
 

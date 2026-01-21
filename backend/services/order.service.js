@@ -260,7 +260,50 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
                 .catch(err => logger.error(`[Order ${orderId}] Failed to log refund event:`, err.message));
         }
 
-        // 9. Log order status update for audit
+        // 9. Send Email Notifications (v2 Dedicated Flow)
+        const { ALLOWED_ORDER_EMAIL_STATES } = require('./email/types');
+        if (ALLOWED_ORDER_EMAIL_STATES[newStatus]) {
+            // Fetch full order for email (with items and addresses)
+            // IMPORTANT: We pass newStatus explicitly to avoid race conditions
+            getOrderById(orderId, { role: 'admin', id: 'system' })
+                .then(async (fullOrder) => {
+                    const to = fullOrder.customer_email;
+                    const customerName = fullOrder.customer_name;
+                    if (!to) return;
+
+                    // CRITICAL: Use newStatus parameter, NOT fullOrder.status
+                    // fullOrder might have stale status due to caching or timing
+                    switch (newStatus) {
+                        case ORDER_STATUS.CONFIRMED:
+                            await emailService.sendOrderConfirmedEmail(to, { order: fullOrder, customerName }, fullOrder.user_id);
+                            break;
+                        case ORDER_STATUS.SHIPPED:
+                            await emailService.sendOrderShippedEmail(to, { order: fullOrder, customerName }, fullOrder.user_id);
+                            break;
+                        case ORDER_STATUS.DELIVERED:
+                            // For delivered, we need to ensure the custom invoice is ready
+                            // We wait a bit or fetch it from the order
+                            let invoiceUrl = fullOrder.invoice_url;
+                            if (!invoiceUrl) {
+                                // Try to fetch from invoices table (type='INTERNAL')
+                                const { data: internalInv } = await supabase.from('invoices').select('public_url').eq('order_id', orderId).eq('type', 'INTERNAL').maybeSingle();
+                                if (internalInv) invoiceUrl = internalInv.public_url;
+                            }
+                            await emailService.sendOrderDeliveredEmail(to, { order: fullOrder, customerName, invoiceUrl }, fullOrder.user_id);
+                            break;
+                        case ORDER_STATUS.RETURNED:
+                            await emailService.sendOrderReturnedEmail(to, { order: fullOrder, customerName }, fullOrder.user_id);
+                            break;
+                        case ORDER_STATUS.CANCELLED:
+                            await emailService.sendOrderCancellationEmail(to, { order: fullOrder, customerName }, fullOrder.user_id);
+                            logger.info({ customerEmail: to, orderId: orderId }, 'Cancellation email sent successfully via updateOrderStatus');
+                            break;
+                    }
+                })
+                .catch(err => logger.error(`[Order ${orderId}] Email trigger failed:`, err.message));
+        }
+
+        // 10. Log order status update for audit
         FinancialEventLogger.logOrderUpdated(orderId, previousStatus, newStatus, isAdminOrManager ? userId : null)
             .catch(err => logger.warn(`[Order ${orderId}] Failed to log status update:`, err.message));
 
@@ -392,24 +435,24 @@ async function createOrder(userId, orderData, userEmail, userName) {
     // Log initial creation status
     await logStatusHistory(data.id, ORDER_STATUS.PENDING, userId, 'Order created');
 
-    // Send Confirmation Email
+    // Send "Order Placed" Email (v2)
     const customerEmail = orderData.customer_email || orderData.customerEmail || userEmail;
     const customerNameVal = orderData.customer_name || orderData.customerName || userName || 'Customer';
 
-    logger.info({ orderId: data.id, hasEmail: !!customerEmail, itemsCount: data.items?.length }, 'Sending order confirmation email');
-
     if (customerEmail) {
-        emailService.sendOrderConfirmationEmail(
+        emailService.sendOrderPlacedEmail(
             customerEmail,
             {
                 order: data,
-                customerName: customerNameVal
+                customerName: customerNameVal,
+                receiptUrl: data.invoiceUrl || orderData.invoiceUrl // Use linked receipt from checkout flow
             },
             userId
         )
-            .then(res => logger.info({ orderId: data.id }, 'Order confirmation email sent'))
-            .catch(err => logger.error({ err }, 'Failed to send order confirmation email'));
-    } else {
+            .then(res => logger.info({ orderId: data.id }, 'Order placed email sent'))
+            .catch(err => logger.error({ err }, 'Failed to send order placed email'));
+    }
+    else {
         logger.warn('No customer email found, skipping confirmation email');
     }
 
@@ -554,7 +597,9 @@ async function getOrderById(id, user) {
         if (res.type === 'billing') dbBillingAddress = res.data;
         if (res.type === 'refunds') {
             // Merge parallel fetched refunds (if any)
-            data.refunds = [...(data.refunds || []), ...res.data];
+            // Map 'reason' to 'notes' for frontend compatibility
+            const mappedRefunds = (res.data || []).map(r => ({ ...r, notes: r.reason || r.notes }));
+            data.refunds = [...(data.refunds || []), ...mappedRefunds];
         }
         if (res.type === 'invoices') invoices = res.data;
         if (res.type === 'payment_with_refunds' && res.data) {
@@ -563,7 +608,9 @@ async function getOrderById(id, user) {
             if (res.data.refunds && res.data.refunds.length > 0) {
                 // Avoid duplicates if we fetched same refunds via order_id
                 const existingIds = new Set((data.refunds || []).map(r => r.id));
-                const newRefunds = res.data.refunds.filter(r => !existingIds.has(r.id));
+                const newRefunds = res.data.refunds
+                    .filter(r => !existingIds.has(r.id))
+                    .map(r => ({ ...r, notes: r.reason || r.notes })); // Map 'reason' to 'notes'
                 data.refunds = [...(data.refunds || []), ...newRefunds];
             }
         }
@@ -651,7 +698,10 @@ async function getOrderById(id, user) {
         customer_email: profile.email || data.customer_email || 'N/A',
         customer_phone: profile.phone || data.customer_phone || shippingAddress?.phone,
         shipping_address: shippingAddress,
-        billing_address: billingAddress,
+        billing_address: {
+            ...billingAddress,
+            phone: billingAddress?.phone || shippingAddress?.phone || data.customer_phone || ''
+        },
         items: mappedItems,
         created_at: data.created_at,
         total_amount: data.total_amount || 0,
@@ -712,18 +762,8 @@ async function cancelOrder(id, userId, reason, userEmail, userName) {
         throw new Error(result.error);
     }
 
-    // Send Cancellation Email
-    const customerEmail = result.order.customerEmail || result.order.customer_email || userEmail;
-    if (customerEmail) {
-        emailService.sendOrderCancellationEmail(
-            customerEmail,
-            {
-                order: result.order,
-                customerName: result.order.customerName || result.order.customer_name || userName
-            },
-            userId
-        ).catch(err => logger.error({ err }, 'Failed to send cancellation email'));
-    }
+    // NOTE: Email is now sent automatically inside updateOrderStatus
+    // when it detects the status changed to CANCELLED.
 
     return {
         order: result.order,

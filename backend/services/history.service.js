@@ -129,7 +129,7 @@ async function logStatusHistory(orderId, statusOrEventType, updatedBy, notes = '
             // Handle FK violation (23503), Invalid UUID (22P02), OR RLS violation (42501)
             if (error.code === '23503' || error.code === '22P02' || error.code === '42501') {
                 logger.info(`Retrying log history for order ${orderId} as System (null user) due to error ${error.code}`);
-                await supabaseAdmin.from('order_status_history').insert({
+                const retryResult = await supabaseAdmin.from('order_status_history').insert({
                     order_id: orderId,
                     status: status,
                     event_type: finalEventType,
@@ -138,6 +138,12 @@ async function logStatusHistory(orderId, statusOrEventType, updatedBy, notes = '
                     notes: notes + (error.code === '42501' ? ' [RLS Bypass]' : error.code === '22P02' ? ' [Invalid UUID]' : ' [User ID invalid]'),
                     created_at: new Date().toISOString()
                 });
+
+                if (retryResult.error) {
+                    logger.error({ err: retryResult.error, orderId }, 'Retry also failed for history logging');
+                } else {
+                    logger.info({ orderId, status, actor: finalActor }, 'Successfully logged status history via retry');
+                }
             }
         } else {
             logger.info({ orderId, status, actor: finalActor }, 'Successfully logged status history');

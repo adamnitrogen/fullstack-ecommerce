@@ -229,8 +229,17 @@ router.post('/create-payment-order', validate(createPaymentOrderSchema), request
             });
         }
 
-        // 3. Receipt ID
-        const receipt = `order_${Date.now()}_${userId.substring(0, 8)}`;
+        // 3. Pre-generate Sequential Order Number
+        // This ensures Razorpay invoice receipt matches the final DB order number
+        const { data: orderNumberData, error: orderNumberError } = await supabase
+            .rpc('generate_next_order_number');
+
+        if (orderNumberError || !orderNumberData) {
+            logger.error({ err: orderNumberError }, 'Failed to generate order number');
+            return res.status(500).json({ error: 'Failed to generate order number. Please try again.' });
+        }
+
+        const receipt = orderNumberData; // e.g., ODR20260121000001
 
         // 4. Map Cart Items to Razorpay Line Items
         // FIX: Use `totals.itemBreakdown` to ensure line items use DISCOUNTED prices
@@ -522,8 +531,17 @@ router.post('/buy-now/create-payment-order', requestLock('create-payment-order')
             return res.status(404).json({ error: 'Please complete your profile to continue with the purchase.' });
         }
 
-        // Receipt ID
-        const receipt = `buynow_${Date.now()}_${userId.substring(0, 8)}`;
+        // 3. Pre-generate Sequential Order Number for Buy Now
+        // This ensures Razorpay invoice receipt matches the final DB order number
+        const { data: orderNumberData, error: orderNumberError } = await supabase
+            .rpc('generate_next_order_number');
+
+        if (orderNumberError || !orderNumberData) {
+            logger.error({ err: orderNumberError }, 'Failed to generate order number');
+            return res.status(500).json({ error: 'Failed to generate order number. Please try again.' });
+        }
+
+        const receipt = orderNumberData; // e.g., ODR20260121000001
 
         // Build line items for Razorpay Invoice
         const lineItems = summary.cart.cart_items.map((item, index) => {
@@ -564,8 +582,7 @@ router.post('/buy-now/create-payment-order', requestLock('create-payment-order')
             amount,
             currency: 'INR',
             status: 'created',
-            receipt: receipt, // Try adding top-level if column exists, else it's ignored or error
-            metadata: { receipt: receipt } // Add to metadata for sure
+            metadata: { receipt: receipt }
         });
 
         res.json({

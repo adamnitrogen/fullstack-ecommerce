@@ -1,9 +1,8 @@
--- Migration: Update create_order_transactional to accept optional p_order_number
+-- Migration: Update Order Number Format for High Volume
 -- Created: 2026-01-21
--- Description:
--- Updates the create_order_transactional function to accept an optional p_order_number parameter.
--- If provided, this number is used as the order_number.
--- If NULL, the function falls back to the auto-generation logic (ORDYYYYMMDDXXXX).
+-- Description: Changes order number format to support lakhs of orders per day
+-- Format: ODR{YYYYMMDD}{Sequential6Digits} e.g., ODR20260121000001
+-- Supports up to 999,999 orders per day
 
 CREATE OR REPLACE FUNCTION create_order_transactional(
     p_user_id UUID,
@@ -12,7 +11,7 @@ CREATE OR REPLACE FUNCTION create_order_transactional(
     p_payment_id UUID DEFAULT NULL,
     p_cart_id UUID DEFAULT NULL,
     p_coupon_code TEXT DEFAULT NULL,
-    p_order_number TEXT DEFAULT NULL -- NEW PARAMETER
+    p_order_number TEXT DEFAULT NULL
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -35,6 +34,7 @@ BEGIN
         v_order_number := p_order_number;
     ELSE
         -- Auto-generate order number (Format: ODRYYYYMMDD{6-digit-sequential})
+        -- Changed from ORD to ODR
         -- Changed from 4-digit to 6-digit sequential (supports 999,999 orders/day)
         SELECT 'ODR' || TO_CHAR(NOW(), 'YYYYMMDD') || 
                LPAD((COALESCE(
@@ -45,7 +45,7 @@ BEGIN
                     ORDER BY order_number DESC 
                     LIMIT 1), 
                    1
-               ))::TEXT, 6, '0')
+               ))::TEXT, 6, '0')  -- Changed from 4 to 6 digits
         INTO v_order_number;
     END IF;
 
@@ -54,7 +54,7 @@ BEGIN
     SELECT id INTO v_order_id FROM orders WHERE order_number = v_order_number;
     
     IF v_order_id IS NOT NULL THEN
-        -- UPDATE existing placeholder order (created by generate_next_order_number)
+        -- UPDATE existing placeholder order
         UPDATE orders SET
             user_id = p_user_id,
             payment_id = p_payment_id,
@@ -82,63 +82,63 @@ BEGIN
             updated_at = NOW()
         WHERE order_number = v_order_number;
     ELSE
-        -- INSERT new order (legacy flow)
-    INSERT INTO orders (
-        user_id,
-        order_number,
-        payment_id,
-        customer_name,
-        customer_email,
-        customer_phone,
-        shipping_address_id,
-        billing_address_id,
-        shipping_address,
-        items,
-        total_amount,
-        subtotal,
-        coupon_code,
-        coupon_discount,
-        delivery_charge,
-        status,
-        payment_status,
-        notes,
-        is_delivery_refundable,
-        delivery_tax_type,
-        total_taxable_amount,
-        total_cgst,
-        total_sgst,
-        total_igst,
-        created_at,
-        updated_at
-    )
-    SELECT
-        p_user_id,
-        v_order_number,
-        p_payment_id,
-        p_order_data->>'customer_name',
-        p_order_data->>'customer_email',
-        p_order_data->>'customer_phone',
-        (p_order_data->>'shipping_address_id')::UUID,
-        (p_order_data->>'billing_address_id')::UUID,
-        p_order_data->'shipping_address',
-        p_order_items,
-        (p_order_data->>'total_amount')::NUMERIC,
-        (p_order_data->>'subtotal')::NUMERIC,
-        p_order_data->>'coupon_code',
-        (p_order_data->>'coupon_discount')::NUMERIC,
-        (p_order_data->>'delivery_charge')::NUMERIC,
-        COALESCE(p_order_data->>'status', 'pending'),
-        COALESCE(p_order_data->>'payment_status', 'paid'),
-        p_order_data->>'notes',
-        COALESCE((p_order_data->>'is_delivery_refundable')::BOOLEAN, TRUE),
-        COALESCE(p_order_data->>'delivery_tax_type', 'GST'),
-        COALESCE((p_order_data->>'total_taxable_amount')::NUMERIC, 0),
-        COALESCE((p_order_data->>'total_cgst')::NUMERIC, 0),
-        COALESCE((p_order_data->>'total_sgst')::NUMERIC, 0),
-        COALESCE((p_order_data->>'total_igst')::NUMERIC, 0),
-        NOW(),
-        NOW()
-    RETURNING id INTO v_order_id;
+        -- INSERT new order (legacy flow or when no placeholder exists)
+        INSERT INTO orders (
+            user_id,
+            order_number,
+            payment_id,
+            customer_name,
+            customer_email,
+            customer_phone,
+            shipping_address_id,
+            billing_address_id,
+            shipping_address,
+            items,
+            total_amount,
+            subtotal,
+            coupon_code,
+            coupon_discount,
+            delivery_charge,
+            status,
+            payment_status,
+            notes,
+            is_delivery_refundable,
+            delivery_tax_type,
+            total_taxable_amount,
+            total_cgst,
+            total_sgst,
+            total_igst,
+            created_at,
+            updated_at
+        )
+        SELECT
+            p_user_id,
+            v_order_number,
+            p_payment_id,
+            p_order_data->>'customer_name',
+            p_order_data->>'customer_email',
+            p_order_data->>'customer_phone',
+            (p_order_data->>'shipping_address_id')::UUID,
+            (p_order_data->>'billing_address_id')::UUID,
+            p_order_data->'shipping_address',
+            p_order_items,
+            (p_order_data->>'total_amount')::NUMERIC,
+            (p_order_data->>'subtotal')::NUMERIC,
+            p_order_data->>'coupon_code',
+            (p_order_data->>'coupon_discount')::NUMERIC,
+            (p_order_data->>'delivery_charge')::NUMERIC,
+            COALESCE(p_order_data->>'status', 'pending'),
+            COALESCE(p_order_data->>'payment_status', 'paid'),
+            p_order_data->>'notes',
+            COALESCE((p_order_data->>'is_delivery_refundable')::BOOLEAN, TRUE),
+            COALESCE(p_order_data->>'delivery_tax_type', 'GST'),
+            COALESCE((p_order_data->>'total_taxable_amount')::NUMERIC, 0),
+            COALESCE((p_order_data->>'total_cgst')::NUMERIC, 0),
+            COALESCE((p_order_data->>'total_sgst')::NUMERIC, 0),
+            COALESCE((p_order_data->>'total_igst')::NUMERIC, 0),
+            NOW(),
+            NOW()
+        RETURNING id INTO v_order_id;
     END IF;
 
     -- 2. CREATE ORDER ITEMS (Comprehensive version with Tax/Delivery)
@@ -310,3 +310,22 @@ EXCEPTION
         RAISE EXCEPTION 'Order creation failed: %', SQLERRM;
 END;
 $$;
+
+-- Add index for efficient order number lookups
+CREATE INDEX IF NOT EXISTS idx_orders_number_date_desc ON orders(order_number DESC) 
+WHERE order_number LIKE 'ODR%';
+
+-- Add unique constraint to ensure no duplicate order numbers
+-- Note: ALTER TABLE doesn't support IF NOT EXISTS, so we use DO block
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'unique_order_number' AND conrelid = 'orders'::regclass
+    ) THEN
+        ALTER TABLE orders ADD CONSTRAINT unique_order_number UNIQUE (order_number);
+    END IF;
+END $$;
+
+COMMENT ON FUNCTION create_order_transactional(UUID, JSONB, JSONB, UUID, UUID, TEXT, TEXT) IS 
+'Creates order with format ODR{YYYYMMDD}{6-digit-sequential}. Supports up to 999,999 orders per day.';

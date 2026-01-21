@@ -159,7 +159,7 @@ class InternalInvoiceService {
         const deliveryItems = [];
 
         if (!order.items || !Array.isArray(order.items) || order.items.length === 0) {
-            log.warn('ORDER_ITEMS_EMPTY', 'No items found in order object for invoice generation', { orderId: order.id });
+            log.warn('ORDER_ITEMS_EMPTY', 'No items found in order object for invoice generation. Invoice will be empty.', { orderId: order.id });
         }
 
         (order.items || []).forEach((item) => {
@@ -193,7 +193,7 @@ class InternalInvoiceService {
         let totalRefundableDeliveryGst = 0;
         let deliveryGstRate = 0;
 
-        order.items.forEach(item => {
+        (order.items || []).forEach(item => {
             const snapshot = item.delivery_calculation_snapshot || {};
             // Include both REFUNDABLE and PARTIAL policies
             if (snapshot.delivery_refund_policy === 'REFUNDABLE' || snapshot.delivery_refund_policy === 'PARTIAL') {
@@ -284,8 +284,15 @@ class InternalInvoiceService {
     }
 
     static async _generatePdf(data) {
-        const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox'] });
+        let browser;
         try {
+            log.info('Launching Puppeteer for invoice generation...');
+            browser = await puppeteer.launch({
+                headless: 'new',
+                args: ['--no-sandbox', '--disable-setuid-sandbox']
+            });
+            log.info('Puppeteer launched successfully');
+
             const page = await browser.newPage();
 
             const renderInvoiceHtml = (invoice) => `
@@ -454,9 +461,16 @@ class InternalInvoiceService {
             await page.setContent(fullHtml, { waitUntil: 'networkidle0' });
             const pdf = await page.pdf({ format: 'A4', printBackground: true });
 
+            log.info('PDF generated successfully');
             return pdf;
+        } catch (error) {
+            log.error('Puppeteer/PDF generation failed:', error);
+            throw error;
         } finally {
-            await browser.close();
+            if (browser) {
+                await browser.close();
+                log.info('Puppeteer browser closed');
+            }
         }
     }
 
