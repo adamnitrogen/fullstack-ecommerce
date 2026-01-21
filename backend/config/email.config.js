@@ -2,7 +2,26 @@
  * Email Configuration Module
  * Centralized configuration for all email providers with validation
  * 
- * Supports:
+ * EMAIL NOTIFICATION POLICY:
+ * ===========================
+ * Customer-facing order emails are STRICTLY LIMITED to 6 definitive states:
+ * 1. ORDER_PLACED (pending) - Customer completes payment
+ * 2. ORDER_CONFIRMED (confirmed) - Admin confirms order
+ * 3. ORDER_SHIPPED (shipped) - Order is shipped
+ * 4. ORDER_DELIVERED (delivered) - Order is delivered
+ * 5. ORDER_CANCELLED (cancelled) - Order is cancelled
+ * 6. ORDER_RETURNED (returned) - Return is completed
+ * 
+ * DEPRECATED EMAIL TYPES (No longer sent):
+ * - PAYMENT_CONFIRMED - Redundant with ORDER_PLACED
+ * - GST_INVOICE_GENERATED - Available via download on order details page
+ * - RETURN_REQUESTED - Customer can check status on order details page
+ * - RETURN_APPROVED - Customer can check status on order details page
+ * - RETURN_REJECTED - Customer can check status on order details page
+ * - REFUND_INITIATED - Customer can check status on order details page
+ * - REFUND_COMPLETED - Customer can check status on order details page
+ * 
+ * Supported Providers:
  * - MailerSend API
  * - SMTP (Gmail, Outlook, Custom)
  * - Console (development fallback)

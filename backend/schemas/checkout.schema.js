@@ -1,7 +1,9 @@
 const { z } = require('zod');
 
 const createPaymentOrderSchema = z.object({
-    amount: z.number().positive('Amount must be positive').optional() // Optional: Backend calculates this securely
+    amount: z.number().positive('Amount must be positive').optional(), // Optional: Backend calculates this securely
+    address_id: z.string().uuid('Invalid address ID').optional(),
+    user_profile: z.any().optional() // Allow profile pass-through
 });
 
 const verifyPaymentSchema = z.object({

@@ -193,32 +193,16 @@ class InvoiceOrchestrator {
     }
 
     static async _sendInvoiceEmail(order, invoiceResult) {
-        if (!order.customer_email) return;
+        // NO EMAIL: GST invoice email is deprecated per email policy
+        // Invoice is available for download on order details page
+        log.info('INVOICE_GENERATED', 'GST invoice generated - email notification disabled per policy', {
+            orderId: order.id,
+            invoiceId: invoiceResult.invoiceId,
+            customerEmail: order.customer_email
+        });
 
-        // Use the new GST template email logic
-        // We need to fetch/construct the breakdown for the email template
-        // Or just send a simple "Here is your invoice" with attachment?
-        // Existing `gst-invoice.template.js` logic expects tax breakdown object.
-        // We can reuse it if we calculate breakdown again or pass it from InternalInvoiceService.
-
-        // For now, simpliest valid email:
-        // We will just invoke the email service with the download link.
-
-        // Using existing email service method which likely internally calls the template
-        // We need to ensure we pass the right data structure expected by `gst-invoice.template.js`
-        // See: Step 19. It expects { taxBreakdown, invoiceUrl ... }
-
-        // Let's rely on the user manually downloading it for MVP or implement proper breakdown pass-through later.
-        // Or better: Assume the user clicks the link in the email.
-
-        const downloadUrl = `${process.env.FRONTEND_URL}/orders/${order.id}`; // Point to Order Details page where button is
-
-        emailService.send('GST_INVOICE_GENERATED', order.customer_email, {
-            customerName: order.customer_name,
-            order: order,
-            invoiceUrl: downloadUrl // User goes to portal to download
-            // taxBreakdown: ... // Optional: skip for now or implement calculation
-        }, order.user_id, order.id);
+        // Invoice download link is available at: ${process.env.FRONTEND_URL}/orders/${order.id}
+        // Customer can access it from their order details page
     }
 
     /**

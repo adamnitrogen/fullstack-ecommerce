@@ -19,6 +19,7 @@ const { logStatusHistory, ORDER_STATUS } = require('./history.service');
 const { validateCoupon } = require('./coupon.service');
 const { RazorpayInvoiceService } = require('./razorpay-invoice.service');
 const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
+const { wrapRazorpayWithTimeout } = require('../utils/razorpay-timeout');
 
 // Create module-specific logger
 const log = createModuleLogger('CheckoutService');
@@ -36,10 +37,13 @@ if (!key_secret) {
     logger.error('RAZORPAY_KEY_SECRET is missing in environment variables. Payment verification will fail.');
 }
 
-const razorpay = new Razorpay({
+const razorpayRaw = new Razorpay({
     key_id: key_id,
     key_secret: key_secret
 });
+
+// Wrap Razorpay with timeout protection (30s default, configurable via RAZORPAY_API_TIMEOUT)
+const razorpay = wrapRazorpayWithTimeout(razorpayRaw);
 
 
 /**
@@ -76,16 +80,30 @@ const createBuyNowVirtualCart = async (userId, guestId, buyNowData) => {
         }
     }
 
-    // 2. Use exact Buy Now quantity - do not merge with cart
+    // 2. CRITICAL: Check stock availability before proceeding
+    const stockCheck = await checkStockAvailability([{
+        product_id: productId,
+        variant_id: variantId,
+        quantity: quantity
+    }]);
+
+    if (!stockCheck.available) {
+        const error = new Error(stockCheck.message || 'Product is out of stock');
+        error.status = 400;
+        error.stockInfo = stockCheck;
+        throw error;
+    }
+
+    // 3. Use exact Buy Now quantity - do not merge with cart
     // Buy Now intent is "purchase THIS item NOW", not "purchase this + cart items"
     const finalQuantity = quantity;
 
-    // 3. Construct Virtual Cart
+    // 4. Construct Virtual Cart
     return {
         id: 'buy-now-virtual', // Use null when creating order to prevent DB updates
         user_id: userId,
         guest_id: guestId,
-        applied_coupon_code: null,
+        applied_coupon_code: buyNowData.couponCode || null, // Support coupon codes in Buy Now
         cart_items: [
             {
                 product_id: productId,
@@ -101,101 +119,90 @@ const createBuyNowVirtualCart = async (userId, guestId, buyNowData) => {
 
 // Get checkout summary (cart + addresses + totals + tax + profile)
 // PHASE 3A: Now includes user_profile to eliminate duplicate fetch in payment creation
-const getCheckoutSummary = async (userId, addressId = null) => {
-    // Get cart with totals
-    const cart = await getUserCart(userId);
-    // PERFORMANCE: Pass existing cart to avoid refetching in calculateCartTotals
-    const totals = await calculateCartTotals(userId, null, cart);
+const getCheckoutSummary = async (userId, guestId, addressId = null) => {
+    // 1. Fetch Cart First
+    const cart = await getUserCart(userId, guestId);
+    if (!cart || !cart.cart_items || cart.cart_items.length === 0) {
+        return { cart: null, totals: null, shipping_address: null, billing_address: null };
+    }
 
-    // PHASE 3A OPTIMIZATION: Fetch user profile once (eliminates duplicate fetch in payment endpoint)
-    const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+    // 2. Fetch dependencies in parallel
+    const [profileResult, allAddresses] = await Promise.all([
+        userId ? supabase.from('profiles').select('*').eq('id', userId).single() : Promise.resolve({ data: null }),
+        userId ? getUserAddresses(userId) : Promise.resolve([])
+    ]);
+    const profile = profileResult.data;
 
-    // OPTIMIZATION: Fetch all addresses once instead of multiple queries (reduces 6 queries to 1)
-    const allAddresses = await getUserAddresses(userId);
-
-    // Helper function to find address by type
+    // 3. Resolve Addresses
     const findAddressByType = (addresses, type) => {
-        // First try primary of that type
         const primary = addresses.find(a => a.is_primary && (a.type === type || a.type === 'both'));
         if (primary) return primary;
-
-        // Then try latest of that type
         return addresses.find(a => a.type === type || a.type === 'both');
     };
 
-    // Get shipping address
     let shippingAddress = null;
     if (addressId) {
-        // If specific address requested, find it in the fetched list
         shippingAddress = allAddresses.find(a => a.id === addressId);
-        if (!shippingAddress) {
-            logger.warn({ addressId }, 'Requested address not found, using default');
-        }
     }
 
     if (!shippingAddress) {
-        // Try primary shipping, then latest shipping, then any primary, then first address
-        shippingAddress = findAddressByType(allAddresses, 'shipping') ||
+        // Fallback sequence: Primary Shipping -> Any Shipping -> Any Primary -> First Available
+        shippingAddress = allAddresses.find(a => a.is_primary && (a.type === 'shipping' || a.type === 'both')) ||
+            findAddressByType(allAddresses, 'shipping') ||
             allAddresses.find(a => a.is_primary) ||
             allAddresses[0];
     }
 
-    // Get billing address: try primary billing, then latest billing, then use shipping
-    let billingAddress = findAddressByType(allAddresses, 'billing') ||
-        allAddresses.find(a => a.is_primary) ||
-        allAddresses[0];
-
-    // Calculate taxes if shipping address is available
-    let taxResult = null;
-    if (shippingAddress && cart.cart_items?.length > 0) {
-        try {
-            taxResult = TaxEngine.calculateOrderTax(cart.cart_items, shippingAddress);
-
-            // AGGREGATE DELIVERY GST INTO SUMMARY
-            // totals has deliveryGST which is the SUM of global and product delivery GSTs
-            const deliveryGstTotal = totals.deliveryGST || 0;
-            if (deliveryGstTotal > 0) {
-                taxResult.summary.total_tax += deliveryGstTotal;
-                taxResult.summary.total_amount += deliveryGstTotal; // Note: total_amount in TaxEngine is taxable+tax
-
-                if (taxResult.summary.tax_type === 'INTER') {
-                    taxResult.summary.total_igst += deliveryGstTotal;
-                } else {
-                    const cgst = Math.round((deliveryGstTotal / 2) * 100) / 100;
-                    const sgst = deliveryGstTotal - cgst;
-                    taxResult.summary.total_cgst += cgst;
-                    taxResult.summary.total_sgst += sgst;
-                }
-            }
-
-            log.debug('CHECKOUT_TAX', 'Tax calculated inclusive of delivery', {
-                tax_type: taxResult.summary.tax_type,
-                total_tax: taxResult.summary.total_tax
-            });
-        } catch (err) {
-            log.warn('CHECKOUT_TAX_ERROR', 'Failed to calculate taxes', { error: err.message });
+    // Validate completeness
+    if (shippingAddress) {
+        const requiredFields = ['name', 'street', 'city', 'state', 'zip_code', 'phone'];
+        const isIncomplete = requiredFields.some(field => !shippingAddress[field]);
+        if (isIncomplete) {
+            log.warn('SUMMARY_INCOMPLETE_ADDR', 'Shipping address incomplete, unsetting', { addressId: shippingAddress.id });
+            shippingAddress = null;
         }
     }
 
-    return {
+    const billingAddress = findAddressByType(allAddresses, 'billing') ||
+        allAddresses.find(a => a.is_primary) ||
+        allAddresses[0] ||
+        shippingAddress;
+
+    // 4. Calculate Totals once using the RESOLVED address
+    // This ensures consistency between the displayed totals and the active address
+    const totals = await calculateCartTotals(userId, guestId, cart, {
+        addressId: shippingAddress?.id || null
+    });
+
+    // 5. Construct Response
+    // We map the totals.tax and itemBreakdown to the interface expected by the Frontend
+    const response = {
         cart,
         totals,
         shipping_address: shippingAddress,
         billing_address: billingAddress,
-        user_profile: profile, // PHASE 3A: Include profile in summary
-        tax: taxResult ? {
-            ...taxResult.summary,
-            items: taxResult.items.map(item => ({
+        user_profile: profile,
+        tax: totals.tax ? {
+            total_tax: totals.tax.amount,
+            total_taxable_amount: totals.itemsCount > 0 ? totals.totalPrice - totals.tax.amount : 0,
+            total_cgst: totals.tax.cgst || 0,
+            total_sgst: totals.tax.sgst || 0,
+            total_igst: totals.tax.igst || 0,
+            tax_type: totals.tax.type,
+            items: (totals.itemBreakdown || []).map(item => ({
                 product_id: item.product_id,
                 variant_id: item.variant_id,
-                ...item.taxBreakdown
+                taxable_amount: item.tax_breakdown?.taxable_amount || 0,
+                cgst: item.tax_breakdown?.cgst || 0,
+                sgst: item.tax_breakdown?.sgst || 0,
+                igst: item.tax_breakdown?.igst || 0,
+                total_tax: item.tax_breakdown?.total_tax || 0,
+                gst_rate: item.tax_breakdown?.gst_rate || 0
             }))
         } : null
     };
+
+    return response;
 };
 
 // Create Razorpay INVOICE (replaces simple Order)
@@ -251,7 +258,92 @@ const createRazorpayInvoice = async (amount, receipt, customer, lineItems, total
         // Final Line Items
         const cleanLineItems = [...productItems];
 
-        // Add delivery items
+
+
+        // Apply Coupon Discount using PRECISE breakdown from Pricing Engine calculator
+        // This ensures Product vs Variant vs Cart coupons are applied exactly as per business logic
+        const discountVal = (totals?.couponDiscount || 0);
+        const itemBreakdown = totals?.itemBreakdown || [];
+
+        if (discountVal > 0 && cleanLineItems.length > 0) {
+
+            // Strategy: Use precise discount from itemBreakdown if available (Preferred)
+            // Fallback: Proportional distribution (Legacy/Safety)
+
+            let preciseDiscountApplied = 0;
+            let appliedPreciseLogic = false;
+
+            if (itemBreakdown.length > 0) {
+                cleanLineItems.forEach(item => {
+                    // Find matching item in breakdown using ID
+                    // We check variantId first (most specific), then productId
+                    const breakdownItem = itemBreakdown.find(bi => {
+                        if (item.variantId && bi.variant_id) {
+                            return bi.variant_id === item.variantId;
+                        }
+                        return bi.product_id === item.productId && !bi.variant_id; // Match product-only items
+                    });
+
+                    if (breakdownItem && breakdownItem.coupon_discount > 0) {
+                        const originalAmount = item.amount; // In Paise
+                        const discountInPaise = Math.round(breakdownItem.coupon_discount * 100);
+
+                        // Ensure we don't discount more than the item price
+                        const finalDiscount = Math.min(discountInPaise, originalAmount);
+
+                        item.amount = originalAmount - finalDiscount;
+                        preciseDiscountApplied += finalDiscount;
+                        appliedPreciseLogic = true;
+                    }
+                });
+            }
+
+            if (appliedPreciseLogic) {
+                logger.info({
+                    receipt,
+                    discountVal,
+                    preciseDiscountApplied: preciseDiscountApplied / 100
+                }, '[Checkout] Applied PRECISE coupon discounts from PricingEngine');
+            } else {
+                // FALLBACK: Proportional Logic (for old carts or missing breakdown)
+                // Calculate total before discount (PRODUCTS ONLY)
+                const totalBeforeDiscount = cleanLineItems.reduce((sum, item) => sum + item.amount, 0); // Paise
+                const discountInPaise = Math.round(discountVal * 100);
+
+                // Safety: Constraint discount to product total
+                const effectiveDiscountInPaise = Math.min(discountInPaise, totalBeforeDiscount);
+                const targetTotal = totalBeforeDiscount - effectiveDiscountInPaise;
+                const discountFactor = effectiveDiscountInPaise / totalBeforeDiscount;
+
+                let runningTotal = 0;
+
+                cleanLineItems.forEach((item, index) => {
+                    const originalAmount = item.amount;
+                    if (index === cleanLineItems.length - 1) {
+                        const newAmount = Math.max(0, targetTotal - runningTotal);
+                        item.amount = newAmount;
+                    } else {
+                        const itemDiscount = Math.round(originalAmount * discountFactor);
+                        item.amount = originalAmount - itemDiscount;
+                        runningTotal += item.amount;
+                    }
+                });
+
+                logger.info({
+                    receipt,
+                    totalBeforeDiscount,
+                    effectiveDiscountInPaise
+                }, '[Checkout] Applied PROPORTIONAL (Fallback) coupon discounts');
+            }
+        }
+
+        // Sanitize Line Items (Remove internal IDs before sending to Razorpay)
+        cleanLineItems.forEach(item => {
+            delete item.productId;
+            delete item.variantId;
+        });
+
+        // NOW Add Aggregated Delivery Charges (Un-discounted)
         Object.entries(deliveryAggregator).forEach(([name, amount]) => {
             cleanLineItems.push({
                 name: name,
@@ -264,7 +356,7 @@ const createRazorpayInvoice = async (amount, receipt, customer, lineItems, total
         // Construct Invoice Payload
         const payload = {
             type: 'invoice',
-            description: `Order ${receipt}`,
+            description: `Order #${receipt} - Payment Status: PAID`, // Add status to description since Amount Paid might be 0 for separate invoices
             date: Math.floor(Date.now() / 1000), // Unix timestamp
             customer: {
                 name: customer.name,
@@ -273,18 +365,18 @@ const createRazorpayInvoice = async (amount, receipt, customer, lineItems, total
             },
             line_items: cleanLineItems,
             receipt: receipt,
-            sms_notify: 0,
-            email_notify: 0
+            sms_notify: process.env.RAZORPAY_SMS_NOTIFY === 'true' ? 1 : 0,
+            email_notify: process.env.RAZORPAY_EMAIL_NOTIFY === 'true' ? 1 : 0
         };
 
-        // Add Coupon Discount (Reliable via discount_amount)
-        const discountVal = (totals?.couponDiscount || 0);
-        if (discountVal > 0) {
-            payload.discount_amount = Math.round(discountVal * 100);
-        }
+        logger.info({
+            receipt,
+            itemCount: payload.line_items.length,
+            hasDiscount: discountVal > 0,
+            sms_notify: payload.sms_notify,
+            email_notify: payload.email_notify
+        }, '[Checkout] Creating Razorpay invoice');
 
-        // Ensure proper contact format if possible, otherwise Razorpay might complain.
-        // Assuming database phone is clean.
 
         // Wait! Razorpay Items + Invoice API flow is slightly different from Standard Checkout.
         // Standard Checkout needs `order_id` generated via `orders.create`.
@@ -324,11 +416,23 @@ const createRazorpayInvoice = async (amount, receipt, customer, lineItems, total
         };
     } catch (error) {
         log.operationError('CREATE_RAZORPAY_INVOICE', error, { amount, receipt });
-        // Fallback: If Invoice creation fails (e.g. invalid customer data), 
-        // should we fail hard or fallback to generic Order?
-        // User requested "Invoice Integration", implying if it fails, we should fix it.
-        // Failing hard is better than silent generic orders if the goal is GST compliance.
-        throw new Error(`Failed to create Razorpay invoice: ${error.message}`);
+
+        // Extract error message from Razorpay error object
+        // Razorpay errors can have: error.error.description, error.message, or error.description
+        const errorMessage = error.error?.description ||
+            error.description ||
+            error.message ||
+            JSON.stringify(error);
+
+        logger.error({
+            err: error,
+            errorMessage,
+            amount,
+            receipt,
+            customer
+        }, '[Checkout] Razorpay invoice creation failed');
+
+        throw new Error(`Failed to create Razorpay invoice: ${errorMessage}`);
     }
 };
 
@@ -345,6 +449,7 @@ const verifyRazorpayPayment = (orderId, paymentId, signature) => {
 
 // Create payment record
 const createPaymentRecord = async (paymentData) => {
+    // Note: receipt/orderNumber should be passed in valid columns (e.g. metadata)
     const { data, error } = await supabase
         .from('payments')
         .insert([paymentData])
@@ -379,7 +484,8 @@ const createOrder = async (userId, checkoutData, cart) => {
         billing_address_id,
         payment_id,
         razorpay_payment_id, // Destructure here
-        notes
+        notes,
+        orderNumber // NEW: Receipt ID passed from payment record
     } = checkoutData;
 
 
@@ -617,7 +723,8 @@ const createOrder = async (userId, checkoutData, cart) => {
             p_order_items: orderItems,
             p_payment_id: payment_id || null,
             p_cart_id: cart.id,
-            p_coupon_code: totals.coupon?.code || null
+            p_coupon_code: totals.coupon?.code || null,
+            p_order_number: checkoutData.orderNumber || null // NEW: Pass custom Order Number if provided
         });
 
     if (rpcError) {
@@ -666,65 +773,59 @@ const createOrder = async (userId, checkoutData, cart) => {
         .catch(err => log.warn('AUDIT_LOG_ERROR', 'Failed to log order creation', { error: err.message }));
 
     // Generate Invoice immediately for paid orders (if verified)
-    // This allows including the invoice link in the confirmation email
+    // CRITICAL: Invoice generation is MANDATORY for paid orders (GST compliance)
     if (order.status === 'confirmed' || checkoutData.payment_status === 'paid') {
-        try {
-            // OPTIMIZATION: If we already have an invoice ID from the checkout flow (Invoice A),
-            // reuse it instead of creating a new one (Invoice B) which would be unpaid.
-            if (checkoutData.invoice_id) {
-                logger.info({ orderId: order.id, invoiceId: checkoutData.invoice_id }, '[Checkout] Linking existing Razorpay Invoice (Receipt)');
+        // OPTIMIZATION: If we already have an invoice ID from the checkout flow (Invoice A),
+        // reuse it instead of creating a new one (Invoice B) which would be unpaid.
+        if (checkoutData.invoice_id) {
+            logger.info({ orderId: order.id, invoiceId: checkoutData.invoice_id }, '[Checkout] Linking existing Razorpay Invoice (Receipt)');
 
-                // Fetch the existing invoice to get the URL
-                // Actually, checkout.service.js doesn't import RazorpayInvoiceService directly yet, but InvoiceOrchestrator uses it.
-                // Or we can just use the razorpay instance directly since we are in checkout service.
-                let inv = await razorpay.invoices.fetch(checkoutData.invoice_id);
+            // Fetch the existing invoice to get the URL
+            let inv = await razorpay.invoices.fetch(checkoutData.invoice_id);
 
-                // FIX: Ensure invoice is issued to get the short_url if it's still in draft
-                if (inv && inv.status === 'draft') {
-                    logger.info({ invoiceId: inv.id }, '[Checkout] Issuing draft invoice to generate URL');
-                    inv = await razorpay.invoices.issue(inv.id);
-                }
-
-                if (inv && inv.short_url) {
-                    order.invoiceUrl = inv.short_url;
-                    order.invoice_id = checkoutData.invoice_id; // Set internally for response
-
-                    // Update Order - NOTE: We do NOT set invoice_url here.
-                    // invoice_url is reserved for Internal GST Invoice (generated at delivery).
-                    // Razorpay receipts are accessed via invoices array (type='RAZORPAY').
-                    await supabase.from('orders').update({
-                        invoice_status: 'receipt_generated'
-                    }).eq('id', order.id);
-
-                    // Also ensure we insert into 'invoices' table to keep Orchestrator happy/consistent?
-                    // InvoiceOrchestrator.generateRazorpayInvoice inserts into 'invoices'.
-                    // We should probably do the same for consistency.
-                    await supabase.from('invoices').insert({
-                        order_id: order.id,
-                        type: 'RAZORPAY',
-                        invoice_number: inv.invoice_number,
-                        provider_id: inv.id,
-                        public_url: inv.short_url,
-                        status: inv.status
-                    });
-                }
-            } else {
-                // Fallback: Create new invoice if one doesn't exist (e.g. Buy Now might not have created one? Or legacy flow?)
-                // Actually Buy Now uses createRazorpayInvoice too, so it should have one.
-                logger.info({ orderId: order.id }, '[Checkout] Generating immediate Razorpay Payment Receipt');
-                // This is now purely for Payment Receipt, not the legal Tax Invoice
-                const result = await InvoiceOrchestrator.generateRazorpayInvoice(order);
-
-                if (result.success && result.invoiceUrl) {
-                    order.invoiceUrl = result.invoiceUrl;
-                    // Also update the local order object to reflect invoice status if we were returning it
-                    order.invoice_id = result.invoiceId;
-                    order.invoice_status = 'generated';
-                }
+            // FIX: Ensure invoice is issued to get the short_url if it's still in draft
+            if (inv && inv.status === 'draft') {
+                logger.info({ invoiceId: inv.id }, '[Checkout] Issuing draft invoice to generate URL');
+                inv = await razorpay.invoices.issue(inv.id);
             }
-        } catch (invError) {
-            logger.warn({ err: invError, orderId: order.id }, '[Checkout] Failed to link/generate immediate invoice');
-            // Continue - do not block the order response
+
+            if (inv && inv.short_url) {
+                order.invoiceUrl = inv.short_url;
+                order.invoice_id = checkoutData.invoice_id;
+
+                // Update Order
+                await supabase.from('orders').update({
+                    invoice_status: 'receipt_generated'
+                }).eq('id', order.id);
+
+                // Insert into invoices table for consistency
+                await supabase.from('invoices').insert({
+                    order_id: order.id,
+                    type: 'RAZORPAY',
+                    invoice_number: inv.invoice_number,
+                    provider_id: inv.id,
+                    public_url: inv.short_url,
+                    status: inv.status
+                });
+            } else {
+                // CRITICAL: Invoice fetch/issue failed - this is a blocking error
+                throw new Error('Failed to fetch/issue Razorpay invoice - order cannot proceed without invoice');
+            }
+        } else {
+            // Fallback: Create new invoice if one doesn't exist
+            logger.info({ orderId: order.id }, '[Checkout] Generating immediate Razorpay Payment Receipt');
+            const result = await InvoiceOrchestrator.generateRazorpayInvoice(order);
+
+            if (!result.success) {
+                // CRITICAL: Invoice generation failed - this is a blocking error for paid orders
+                throw new Error(`Invoice generation failed: ${result.error || 'Unknown error'} - order cannot proceed without invoice`);
+            }
+
+            if (result.invoiceUrl) {
+                order.invoiceUrl = result.invoiceUrl;
+                order.invoice_id = result.invoiceId;
+                order.invoice_status = 'generated';
+            }
         }
     }
 
@@ -806,6 +907,44 @@ const handleWebhookEvent = async (payload) => {
     const order = data.order?.entity;
 
     logger.info(`Processing Webhook Event: ${event} for Order: ${payment?.order_id}`);
+
+    // CRITICAL: Idempotency check - prevent duplicate event processing
+    const eventId = payload.id || `${event}_${payment?.id || order?.id}_${Date.now()}`;
+
+    try {
+        // Check if event already processed
+        const { data: existingEvent } = await supabase
+            .from('webhook_events')
+            .select('id')
+            .eq('event_id', eventId)
+            .maybeSingle();
+
+        if (existingEvent) {
+            logger.info({
+                eventId,
+                event
+            }, 'Webhook event already processed - skipping duplicate');
+            return { success: true, duplicate: true };
+        }
+
+        // Record event as being processed
+        await supabase
+            .from('webhook_events')
+            .insert({
+                event_id: eventId,
+                event_type: event,
+                payload: payload
+            });
+
+        logger.info({ eventId, event }, 'Webhook event recorded for processing');
+
+    } catch (idempotencyError) {
+        logger.error({
+            err: idempotencyError,
+            eventId
+        }, 'Idempotency check failed - proceeding with caution');
+        // Continue processing but log the error
+    }
 
     try {
         if (event === 'payment.captured' && payment) {
@@ -1107,23 +1246,67 @@ async function processPaymentAndOrder(userId, {
                 // Attempt Auto-Refund if payment was captured
                 try {
                     const payment = await razorpay.payments.fetch(razorpay_payment_id);
-                    if (payment.status === 'captured' || payment.status === 'authorized') {
-                        logger.info('Auto-Refunding failed/mismatched payment...');
+
+                    // CRITICAL: Additional validation before auto-refund
+                    const shouldRefund = (
+                        (payment.status === 'captured' || payment.status === 'authorized') &&
+                        (payment.order_id !== razorpay_order_id || s2sError.message.includes('mismatch'))
+                    );
+
+                    if (shouldRefund) {
+                        // Validate amount matches expected (prevent refunding wrong amount)
+                        const paymentAmount = payment.amount / 100; // Convert from paise
+                        const expectedAmount = captureAmount;
+
+                        if (Math.abs(paymentAmount - expectedAmount) > 1) {
+                            logger.error({
+                                paymentAmount,
+                                expectedAmount,
+                                difference: Math.abs(paymentAmount - expectedAmount)
+                            }, 'CRITICAL: Payment amount mismatch - manual review required');
+
+                            throw new Error('Payment amount mismatch detected. Please contact support.');
+                        }
+
+                        logger.warn({
+                            razorpay_payment_id,
+                            razorpay_order_id,
+                            payment_order_id: payment.order_id,
+                            reason: s2sError.message
+                        }, 'Auto-Refunding failed/mismatched payment after validation');
+
                         await razorpay.payments.refund(razorpay_payment_id, {
                             reason: `Validation/Verification Failed: ${s2sError.message}`
                         });
 
                         if (payment_id) {
-                            await updatePaymentRecord(payment_id, { status: 'refunded', error_description: s2sError.message });
+                            await updatePaymentRecord(payment_id, {
+                                status: 'refunded',
+                                error_description: s2sError.message
+                            });
                         }
 
                         const refundError = new Error('Payment verification failed and your amount has been refunded. Please try again.');
                         refundError.status = 400;
                         throw refundError;
+                    } else {
+                        logger.warn({
+                            payment_status: payment.status,
+                            payment_order_id: payment.order_id,
+                            expected_order_id: razorpay_order_id
+                        }, 'Payment not eligible for auto-refund - manual review may be required');
                     }
                 } catch (refundErr) {
                     // Start of refund error handling (if refund fails, or if it was thrown above)
-                    if (refundErr.message.includes('has been refunded')) throw refundErr;
+                    if (refundErr.message.includes('has been refunded') ||
+                        refundErr.message.includes('amount mismatch')) {
+                        throw refundErr;
+                    }
+
+                    logger.error({
+                        err: refundErr,
+                        razorpay_payment_id
+                    }, 'Auto-refund attempt failed');
                 }
 
                 // Update payment as failed
@@ -1156,18 +1339,9 @@ async function processPaymentAndOrder(userId, {
             amount: captureAmount
         }, '[Checkout] Payment signature verified (Auto-captured), proceeding with order creation');
 
-        // Send Payment Confirmation Email (async, don't await)
-        // Fetch user email if not available in scope (we have userId)
-        const { data: userProfile } = await supabase.from('profiles').select('email, name').eq('id', userId).single();
-        if (userProfile?.email) {
-            emailService.send('PAYMENT_CONFIRMED', userProfile.email, {
-                customerName: userProfile.name,
-                order: { id: razorpay_order_id, order_number: razorpay_order_id },
-                paymentId: razorpay_payment_id,
-                amount: captureAmount,
-                method: 'razorpay'
-            }, userId).catch(err => logger.error({ err }, 'Failed to send payment confirmation email'));
-        }
+        // NO EMAIL: Payment confirmed email is deprecated per email policy
+        // Order confirmation email will be sent after order creation
+        logger.info({ userId, razorpay_payment_id }, '[Checkout] Payment confirmed - email notification disabled per policy');
 
     } else {
         logger.info('Processing mock payment for testing...');
@@ -1191,17 +1365,54 @@ async function processPaymentAndOrder(userId, {
         try {
             const { data: existingPayment } = await supabase
                 .from('payments')
-                .select('id')
+                .select('id, status, metadata') // Fetch metadata too
                 .eq('razorpay_order_id', razorpay_order_id)
                 .single();
 
             if (existingPayment) {
-                payment_id = existingPayment.id;
-                logger.info({ recovered_payment_id: payment_id }, 'Recovered missing payment_id via razorpay_order_id');
+                // CRITICAL: Validate payment status before recovery
+                if (existingPayment.status === 'captured' || existingPayment.status === 'paid') {
+                    payment_id = existingPayment.id;
+                    // Check for persisted receipt ID
+                    if (existingPayment.metadata?.receipt) {
+                        // Pass this to createOrder
+                        notes = { ...notes, _receipt: existingPayment.metadata.receipt };
+                    }
+                    logger.info({
+                        recovered_payment_id: payment_id,
+                        status: existingPayment.status
+                    }, 'Recovered missing payment_id via razorpay_order_id');
+                } else {
+                    logger.error({
+                        payment_id: existingPayment.id,
+                        status: existingPayment.status,
+                        razorpay_order_id
+                    }, 'Payment recovery failed: invalid payment status');
+                    throw new Error(`Payment recovery failed: payment status is ${existingPayment.status}, not captured`);
+                }
             }
         } catch (e) {
+            // If it's our validation error, re-throw it
+            if (e.message.includes('Payment recovery failed')) {
+                throw e;
+            }
             // Log warning but proceed - this is a recovery attempt, not critical path
             logger.warn({ err: e, razorpay_order_id }, 'Failed to recover payment_id via razorpay_order_id');
+        }
+    } else if (payment_id) {
+        // If payment_id IS provided, fetch metadata to get the Receipt ID
+        try {
+            const { data: existingPayment } = await supabase
+                .from('payments')
+                .select('metadata')
+                .eq('id', payment_id)
+                .single();
+
+            if (existingPayment?.metadata?.receipt) {
+                notes = { ...notes, _receipt: existingPayment.metadata.receipt };
+            }
+        } catch (e) {
+            logger.warn({ err: e, payment_id }, 'Failed to fetch payment metadata for receipt ID');
         }
     }
 
@@ -1216,8 +1427,8 @@ async function processPaymentAndOrder(userId, {
                 payment_id,
                 notes,
                 payment_status: 'paid',
-                razorpay_payment_id, // Pass to createOrder for logging
-                // Pass invoice_id if available on payment record to prevent duplicate invoices
+                razorpay_payment_id,
+                orderNumber: notes?._receipt || null,
                 invoice_id: (payment_id && !isMockPayment) ?
                     (await supabase.from('payments').select('invoice_id').eq('id', payment_id).single()).data?.invoice_id
                     : null

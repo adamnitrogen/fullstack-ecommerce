@@ -87,8 +87,9 @@ export default function Checkout() {
 
       setSummary(data);
 
-      // Pre-select addresses if available
-      if (data.shipping_address) {
+      // Pre-select addresses if available, but DON'T overwrite if we specifically requested an address (user selection)
+      // This prevents race conditions where backend fallback logic reverts the user's selection
+      if (data.shipping_address && !addressId) {
         const newShipping = data.shipping_address;
         setShippingAddress(prev => {
           // Only update if current is null or ID differs
@@ -210,9 +211,11 @@ export default function Checkout() {
           orderData = await checkoutService.createPaymentOrderForBuyNow(buyNowData);
         } else {
           // PHASE 3A: Pass profile from summary to avoid duplicate fetch
+          // Pass shippingAddress.id to ensure backend calculates delivery/tax correctly for THIS address
           orderData = await checkoutService.createPaymentOrder(
             summary.totals.finalAmount,
-            summary.user_profile
+            summary.user_profile,
+            shippingAddress?.id
           );
         }
       } catch (error: any) {

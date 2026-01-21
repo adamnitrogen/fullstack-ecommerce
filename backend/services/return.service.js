@@ -271,26 +271,13 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
     FinancialEventLogger.logReturnRequested(orderId, returnRequest.id, returnItems, userId)
         .catch(err => log.warn('AUDIT_LOG_ERROR', 'Failed to log return request', { error: err.message }));
 
-    // 8. Get user email and send RETURN_REQUESTED email
-    const { data: order } = await supabase
-        .from('orders')
-        .select('user_id, profiles(email, name)')
-        .eq('id', orderId)
-        .single();
-
-    if (order?.profiles?.email) {
-        emailService.send('RETURN_REQUESTED', order.profiles.email, {
-            customerName: order.profiles.name,
-            order: { id: orderId, order_number: orderId.slice(0, 8).toUpperCase() },
-            returnItems: returnItems.map((ri, i) => ({
-                title: availableItems.find(a => a.id === ri.orderItemId)?.title || 'Product',
-                quantity: ri.quantity,
-                variantLabel: availableItems.find(a => a.id === ri.orderItemId)?.variant_snapshot?.size_label,
-                reason: ri.reason
-            })),
-            reason: reason || 'See item details'
-        }, userId, returnRequest.id).catch(err => log.warn('EMAIL_ERROR', 'Failed to send return requested email', { error: err.message }));
-    }
+    // NO EMAIL: Return requested email is deprecated per email policy
+    // Customer can check return status on order details page
+    log.info('RETURN_REQUESTED', 'Return request created - email notification disabled per policy', {
+        orderId,
+        returnId: returnRequest.id,
+        estimatedRefund
+    });
 
     return returnRequest;
 };
@@ -339,20 +326,12 @@ const processReturnApproval = async (returnId, adminId) => {
     // 4. Log History
     await orderService.logStatusHistory(returnRequest.order_id, 'return_approved', adminId, 'Return approved! We will now proceed with picking up the items.', 'ADMIN');
 
-    // 5. Send RETURN_APPROVED Email (using order_number for clarity)
-    const userEmail = returnRequest.orders?.profiles?.email;
-    const userName = returnRequest.orders?.profiles?.name;
-    const orderNumber = returnRequest.orders?.order_number || returnRequest.order_id.slice(0, 8).toUpperCase();
-
-    if (userEmail) {
-        emailService.send('RETURN_APPROVED', userEmail, {
-            customerName: userName,
-            order: { id: returnRequest.order_id, order_number: orderNumber },
-            order_id: returnRequest.order_id,
-            order_number: orderNumber
-        }, returnRequest.user_id, returnId)
-            .catch(err => log.warn('EMAIL_ERROR', 'Failed to send return approved email', { error: err.message }));
-    }
+    // NO EMAIL: Return approved email is deprecated per email policy
+    // Customer can check return status on order details page
+    log.info('RETURN_APPROVED', 'Return approved - email notification disabled per policy', {
+        orderId: returnRequest.order_id,
+        returnId
+    });
 
     return { success: true };
 };
@@ -399,19 +378,13 @@ const processReturnRejection = async (returnId, adminId, reason) => {
         FinancialEventLogger.logReturnRejected(returnId, returnRequest.order_id, adminId, reason)
             .catch(err => log.warn('AUDIT_LOG_ERROR', 'Failed to log return rejection', { error: err.message }));
 
-        // Send RETURN_REJECTED Email
-        const userEmail = returnRequest.orders?.profiles?.email;
-        const userName = returnRequest.orders?.profiles?.name;
-        const orderNumber = returnRequest.orders?.order_number || returnRequest.order_id.slice(0, 8).toUpperCase();
-
-        if (userEmail) {
-            emailService.send('RETURN_REJECTED', userEmail, {
-                customerName: userName,
-                order: { id: returnRequest.order_id, order_number: orderNumber },
-                reason
-            }, returnRequest.orders?.user_id, returnId)
-                .catch(err => log.warn('EMAIL_ERROR', 'Failed to send return rejected email', { error: err.message }));
-        }
+        // NO EMAIL: Return rejected email is deprecated per email policy
+        // Customer can check return status on order details page
+        log.info('RETURN_REJECTED', 'Return rejected - email notification disabled per policy', {
+            orderId: returnRequest.order_id,
+            returnId,
+            reason
+        });
     }
 
     return { success: true };

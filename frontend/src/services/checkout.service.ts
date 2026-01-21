@@ -45,10 +45,11 @@ export const checkoutService = {
 
     // Create Razorpay payment order
     // PHASE 3A: Now accepts user_profile to avoid duplicate fetch
-    createPaymentOrder: async (amount: number, userProfile?: any): Promise<RazorpayOrderResponse> => {
+    createPaymentOrder: async (amount: number, userProfile: any, addressId?: string): Promise<RazorpayOrderResponse> => {
         const response = await apiClient.post('/checkout/create-payment-order', {
             amount,
-            user_profile: userProfile // Pass profile from summary
+            user_profile: userProfile,
+            address_id: addressId
         });
         return response.data;
     },

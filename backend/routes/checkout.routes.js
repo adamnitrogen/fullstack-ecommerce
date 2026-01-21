@@ -14,7 +14,7 @@ const {
     getBuyNowSummary,
     processBuyNowOrder
 } = require('../services/checkout.service');
-const cartService = require('../services/cart.service');
+const { getUserCart, calculateCartTotals } = require('../services/cart.service');
 const supabase = require('../config/supabase');
 
 /**
@@ -25,21 +25,28 @@ const supabase = require('../config/supabase');
 // Apply authentication to all checkout routes
 router.use(authenticateToken);
 
-// Helper to get user ID
-const getUserId = (req) => {
-    return req.user?.id;
+// Helper to get User ID or Guest ID
+const getContextIds = (req) => {
+    const userId = req.user?.id;
+    // Guest ID from header (x-guest-id) or cookie (guest_id)
+    const guestId = req.headers['x-guest-id'] || req.cookies?.guest_id;
+    return { userId, guestId };
 };
+
+// Helper to get User ID
+const getUserId = (req) => req.user?.id;
 
 // Get checkout summary (cart + addresses + totals)
 router.get('/summary', async (req, res) => {
     try {
-        const userId = getUserId(req);
-        if (!userId) {
+        const { userId, guestId } = getContextIds(req);
+        const { addressId } = req.query;
+
+        if (!userId && !guestId) {
             return res.status(401).json({ error: 'Authentication required' });
         }
 
-        const { addressId } = req.query;
-        const summary = await getCheckoutSummary(userId, addressId);
+        const summary = await getCheckoutSummary(userId, guestId, addressId);
 
         // PHASE 2B OPTIMIZATION: Include Razorpay key in summary (one less data point in payment order response)
         summary.razorpay_key_id = process.env.RAZORPAY_KEY_ID;
@@ -55,12 +62,15 @@ router.get('/summary', async (req, res) => {
 // Returns list of items with insufficient stock
 router.get('/validate-stock', async (req, res) => {
     try {
-        const userId = getUserId(req);
-        if (!userId) {
+        const { userId, guestId } = getContextIds(req);
+        const { addressId } = req.query; // Extract selected address if any
+
+        if (!userId && !guestId) {
             return res.status(401).json({ error: 'Authentication required' });
         }
 
-        const cart = await cartService.getUserCart(userId);
+        const summary = await getCheckoutSummary(userId, guestId, addressId);
+        const cart = summary.cart; // Extract cart from the summary
 
         if (!cart || !cart.cart_items || cart.cart_items.length === 0) {
             return res.json({ valid: true, items: [] });
@@ -126,7 +136,7 @@ router.get('/validate-stock', async (req, res) => {
 // NOW INCLUDES INLINE STOCK VALIDATION (Phase 2B Optimization)
 router.post('/create-payment-order', validate(createPaymentOrderSchema), requestLock('create-payment-order'), idempotency(), async (req, res) => {
     try {
-        const userId = getUserId(req);
+        const userId = req.user?.id;
         if (!userId) {
             return res.status(401).json({ error: 'Authentication required' });
         }
@@ -149,13 +159,20 @@ router.post('/create-payment-order', validate(createPaymentOrderSchema), request
             return res.status(404).json({ error: 'User profile not found' });
         }
 
-        // 2. Get Cart & Totals
-        const cart = await cartService.getUserCart(userId);
+        // 2. Get Cart
+        const cart = await getUserCart(userId);
         if (!cart || !cart.cart_items || cart.cart_items.length === 0) {
             return res.status(400).json({ error: 'Cart is empty' });
         }
 
-        const totals = await cartService.calculateCartTotals(userId, cart);
+        // Get address_id from request (optional) - Ensures accurate delivery/tax calc
+        const { address_id } = req.body;
+
+        // Calculate Totals using Address Context
+        // Passing 'null' for guestId, 'cart' for existingCart
+        const totals = await calculateCartTotals(userId, null, cart, {
+            addressId: address_id || null
+        });
         const amount = totals.finalAmount;
 
         // PHASE 2B OPTIMIZATION: Inline stock validation (eliminates separate API call)
@@ -216,29 +233,45 @@ router.post('/create-payment-order', validate(createPaymentOrderSchema), request
         const receipt = `order_${Date.now()}_${userId.substring(0, 8)}`;
 
         // 4. Map Cart Items to Razorpay Line Items
-        // This is where "Phase 20" logic shines: Using synced Item IDs
-        const lineItems = cart.cart_items.map((item, index) => {
-            const variant = item.product_variants;
-            const product = item.products;
+        // FIX: Use `totals.itemBreakdown` to ensure line items use DISCOUNTED prices
+        const lineItems = totals.itemBreakdown.map((breakdownItem, index) => {
+            const cartItem = cart.cart_items.find(i =>
+                (i.variant_id && i.variant_id === breakdownItem.variant_id) ||
+                (!i.variant_id && i.product_id === breakdownItem.product_id)
+            );
+
+            const variant = cartItem?.product_variants;
+            const product = cartItem?.products;
+
+            // Safety fallback if mapping fails (though unlikely)
+            const title = product?.title || 'Product';
+            const variantLabel = variant?.size_label || 'Default';
+            const syncedId = variant?.razorpay_item_id;
 
             let razorpayItem;
-            if (variant && variant.razorpay_item_id) {
-                // Synced Item: Use ID
+
+            if (syncedId) {
+                // Synced Item
                 razorpayItem = {
-                    item_id: variant.razorpay_item_id,
-                    name: `${product.title} - ${variant?.size_label || 'Default'}`,
-                    amount: Math.round((variant?.selling_price || product.price) * 100),
+                    item_id: syncedId,
+                    productId: breakdownItem.product_id,
+                    variantId: breakdownItem.variant_id,
+                    name: `${title} - ${variantLabel}`,
+                    // USE DISCOUNTED PRICE FROM BREAKDOWN
+                    amount: Math.round(breakdownItem.price * 100),
                     currency: 'INR',
-                    quantity: item.quantity
+                    quantity: breakdownItem.quantity
                 };
             } else {
-                // Unsynced / Old Item: Fallback to manual details
-                // (This ensures checkout doesn't break for old products)
+                // Unsynced
                 razorpayItem = {
-                    name: `${product.title} - ${variant?.size_label || 'Default'}`,
-                    amount: Math.round((variant?.selling_price || product.price) * 100),
+                    productId: breakdownItem.product_id,
+                    variantId: breakdownItem.variant_id,
+                    name: `${title} - ${variantLabel}`,
+                    // USE DISCOUNTED PRICE FROM BREAKDOWN
+                    amount: Math.round(breakdownItem.price * 100),
                     currency: 'INR',
-                    quantity: item.quantity
+                    quantity: breakdownItem.quantity
                 };
             }
 
@@ -499,6 +532,11 @@ router.post('/buy-now/create-payment-order', requestLock('create-payment-order')
 
             let razorpayItem = {
                 item_id: variant?.razorpay_item_id || null,
+
+                // Add internal IDs for precise discount mapping in service
+                productId: product.id,
+                variantId: variant ? variant.id : null,
+
                 name: `${product.title}${variant ? ` - ${variant.size_label}` : ''}`,
                 amount: Math.round((variant?.selling_price || product.price) * 100),
                 currency: 'INR',
@@ -525,7 +563,9 @@ router.post('/buy-now/create-payment-order', requestLock('create-payment-order')
             invoice_id: razorpayResponse.invoice_id,
             amount,
             currency: 'INR',
-            status: 'created'
+            status: 'created',
+            receipt: receipt, // Try adding top-level if column exists, else it's ignored or error
+            metadata: { receipt: receipt } // Add to metadata for sure
         });
 
         res.json({

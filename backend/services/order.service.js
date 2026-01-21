@@ -242,35 +242,22 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
                 .catch(err => logger.error(`[Order ${orderId}] Invoice generation error:`, err.message));
         }
 
-        // 8. Send Refund Email notifications
+        // 8. Send Refund Email notifications - DISABLED PER EMAIL POLICY
         if (newStatus === ORDER_STATUS.RETURNED && refundInitiated) {
-            // Get user info and send REFUND_INITIATED email
-            const { data: orderWithUser } = await supabase
-                .from('orders')
-                .select('user_id, profiles:user_id(email, name), total_taxable_amount, total_cgst, total_sgst, total_igst')
-                .eq('id', orderId)
-                .single();
+            // NO EMAIL: Refund initiated email is deprecated per email policy
+            // Customer can check refund status on order details page
+            logger.info({ orderId }, '[Order] Refund initiated - email notification disabled per policy');
 
-            if (orderWithUser?.profiles?.email) {
-                // Get return info for refund breakdown
-                const { data: returnReq } = await supabase
-                    .from('returns')
-                    .select('refund_amount, refund_breakdown')
-                    .eq('order_id', orderId)
-                    .eq('status', 'approved')
-                    .maybeSingle();
+            // Log financial event (audit trail only)
+            const { data: returnReq } = await supabase
+                .from('returns')
+                .select('refund_amount, refund_breakdown')
+                .eq('order_id', orderId)
+                .eq('status', 'approved')
+                .maybeSingle();
 
-                emailService.send('REFUND_INITIATED', orderWithUser.profiles.email, {
-                    customerName: orderWithUser.profiles.name,
-                    order: { id: orderId, order_number: finalOrder.order_number },
-                    refundBreakdown: returnReq?.refund_breakdown || { totalRefund: returnReq?.refund_amount || 0 }
-                }, orderWithUser.user_id, orderId)
-                    .catch(err => logger.error(`[Order ${orderId}] Failed to send refund email:`, err.message));
-
-                // Log financial event
-                FinancialEventLogger.logRefundInitiated(orderId, returnReq?.refund_breakdown || { totalRefund: returnReq?.refund_amount })
-                    .catch(err => logger.error(`[Order ${orderId}] Failed to log refund event:`, err.message));
-            }
+            FinancialEventLogger.logRefundInitiated(orderId, returnReq?.refund_breakdown || { totalRefund: returnReq?.refund_amount })
+                .catch(err => logger.error(`[Order ${orderId}] Failed to log refund event:`, err.message));
         }
 
         // 9. Log order status update for audit

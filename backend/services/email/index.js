@@ -8,7 +8,7 @@
  */
 
 const supabase = require('../../config/supabase');
-const { EmailEventTypes } = require('./types');
+const { EmailEventTypes, DEPRECATED_EMAIL_TYPES } = require('./types');
 const logger = require('../../utils/logger');
 const emailConfig = require('../../config/email.config');
 
@@ -26,10 +26,10 @@ const { getContactFormEmail, getContactAutoReplyEmail } = require('./templates/c
 const { getAccountDeletedEmail, getAccountDeletionScheduledEmail, getAccountDeletionOTPEmail } = require('./templates/account.template');
 const { getOTPEmail, getPasswordResetEmail } = require('./templates/auth.template');
 const { getManagerWelcomeEmail } = require('./templates/manager.template');
-// New GST/Refund/Return Templates
-const { getGSTInvoiceEmail } = require('./templates/gst-invoice.template');
-const { getRefundInitiatedEmail, getRefundCompletedEmail } = require('./templates/refund-status.template');
-const { getReturnRequestedEmail, getReturnApprovedEmail, getReturnRejectedEmail } = require('./templates/return-status.template');
+// DEPRECATED Templates - Kept for backward compatibility but will not send emails
+// const { getGSTInvoiceEmail } = require('./templates/gst-invoice.template');
+// const { getRefundInitiatedEmail, getRefundCompletedEmail } = require('./templates/refund-status.template');
+// const { getReturnRequestedEmail, getReturnApprovedEmail, getReturnRejectedEmail } = require('./templates/return-status.template');
 
 class EmailService {
     constructor() {
@@ -130,23 +130,15 @@ class EmailService {
             case EmailEventTypes.MANAGER_WELCOME:
                 return getManagerWelcomeEmail(data);
 
-            // GST Invoice
+            // DEPRECATED - These email types are no longer sent
             case EmailEventTypes.GST_INVOICE_GENERATED:
-                return getGSTInvoiceEmail(data);
-
-            // Refund emails
             case EmailEventTypes.REFUND_INITIATED:
-                return getRefundInitiatedEmail(data);
             case EmailEventTypes.REFUND_COMPLETED:
-                return getRefundCompletedEmail(data);
-
-            // Return emails
             case EmailEventTypes.RETURN_REQUESTED:
-                return getReturnRequestedEmail(data);
             case EmailEventTypes.RETURN_APPROVED:
-                return getReturnApprovedEmail(data);
             case EmailEventTypes.RETURN_REJECTED:
-                return getReturnRejectedEmail(data);
+            case EmailEventTypes.PAYMENT_CONFIRMED:
+                throw new Error(`Email type ${eventType} is deprecated and will not be sent. Invoices and status updates are available via the order details page.`);
 
             default:
                 throw new Error(`Unknown email event type: ${eventType}`);
@@ -221,6 +213,22 @@ class EmailService {
     async send(eventType, to, data, options = {}) {
         const { userId = null, referenceId = null } = options;
         let logId = null;
+
+        // POLICY ENFORCEMENT: Block deprecated email types
+        if (DEPRECATED_EMAIL_TYPES.includes(eventType)) {
+            logger.warn({
+                eventType,
+                to,
+                userId,
+                referenceId
+            }, '[EmailService] BLOCKED: Deprecated email type will not be sent');
+
+            return {
+                success: false,
+                error: `Email type ${eventType} is deprecated and will not be sent. Information is available via the order details page.`,
+                blocked: true
+            };
+        }
 
         logger.info({ eventType, to, userId, hasData: !!data }, '[EmailService] Internal send triggered');
 

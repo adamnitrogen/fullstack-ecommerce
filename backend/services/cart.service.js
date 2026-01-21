@@ -390,7 +390,7 @@ const { PricingCalculator } = require('./pricing-calculator.service');
  * @param {object} options - Optimization options
  * @param {boolean} options.skipValidation - If true, skip full coupon validation (pass through to Calculator if we add that flag later)
  */
-async function calculateCartTotals(userId, guestId, existingCart = null, { skipValidation = false } = {}) {
+async function calculateCartTotals(userId, guestId, existingCart = null, { skipValidation = false, addressId = null } = {}) {
     try {
         const cart = existingCart || await getUserCart(userId, guestId);
 
@@ -405,11 +405,22 @@ async function calculateCartTotals(userId, guestId, existingCart = null, { skipV
             variant: item.product_variants
         }));
 
+        // Fetch Shipping Address if addressId is provided
+        let shippingAddress = null;
+        if (addressId) {
+            const { data: address } = await supabase
+                .from('addresses')
+                .select('*, phone_numbers(phone_number)')
+                .eq('id', addressId)
+                .single();
+            shippingAddress = address;
+        }
+
         // Use the centralized PricingCalculator
         // This handles: MRP discounts, Coupons (Product, Cart, Free Delivery), Taxes, Delivery Charges
         const calculatorResult = await PricingCalculator.calculateCheckoutTotals(
             normalizedItems,
-            null, // shippingAddress - Cart page doesn't usually have this yet
+            shippingAddress, // Pass resolved shippingAddress (or null)
             cart.applied_coupon_code, // couponCode from cart
             userId // userId for validation
         );
