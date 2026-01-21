@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api-client";
+import CacheHelper from "@/utils/cacheHelper";
 import type { CheckoutAddress, CreateAddressDto } from "@/types";
 
 
@@ -69,6 +70,27 @@ export const addressService = {
     getAddresses: async (): Promise<CheckoutAddress[]> => {
         const response = await apiClient.get('/addresses');
         return (response.data || []).map(transformToCheckoutAddress);
+    },
+
+    /**
+     * Get all addresses with 1-hour cache
+     */
+    getAddressesCached: async (): Promise<CheckoutAddress[]> => {
+        return CacheHelper.getOrFetch(
+            'user_addresses',
+            async () => {
+                const response = await apiClient.get('/addresses');
+                return (response.data || []).map(transformToCheckoutAddress);
+            },
+            { ttl: 60 * 60 * 1000 } // 1 hour
+        );
+    },
+
+    /**
+     * Invalidate addresses cache
+     */
+    invalidateCache: () => {
+        CacheHelper.remove('user_addresses');
     },
 
     /**

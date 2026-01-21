@@ -98,21 +98,21 @@ router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req,
         } = req.body;
 
         // Validation
-        if (!code || !type || !discount_percentage || !valid_until) {
+        if (!code || !type || (type !== 'free_delivery' && !discount_percentage) || !valid_until) {
             return res.status(400).json({
-                error: 'Missing required fields: code, type, discount_percentage, valid_until'
+                error: 'Missing required fields: code, type, discount_percentage (except for free_delivery), valid_until'
             });
         }
 
-        if (discount_percentage < 1 || discount_percentage > 100) {
+        if (type !== 'free_delivery' && (discount_percentage < 1 || discount_percentage > 100)) {
             return res.status(400).json({
                 error: 'Discount percentage must be between 1 and 100'
             });
         }
 
-        if (!['product', 'category', 'cart', 'variant'].includes(type)) {
+        if (!['product', 'category', 'cart', 'variant', 'free_delivery'].includes(type)) {
             return res.status(400).json({
-                error: 'Type must be one of: product, category, cart, variant'
+                error: 'Type must be one of: product, category, cart, variant, free_delivery'
             });
         }
 
@@ -135,7 +135,7 @@ router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req,
             .insert([{
                 code: upperCode,
                 type,
-                discount_percentage,
+                discount_percentage: type === 'free_delivery' ? (discount_percentage || 1) : discount_percentage,
                 target_id,
                 min_purchase_amount: min_purchase_amount || 0,
                 max_discount_amount,
@@ -148,6 +148,9 @@ router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req,
             .single();
 
         if (error) throw error;
+
+        // Invalidate cache immediately so new coupons show up in cart offers/banners
+        invalidateCouponCache();
 
         res.status(201).json(data);
     } catch (error) {
@@ -177,7 +180,7 @@ router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (re
         if (code !== undefined) updates.code = code.toUpperCase();
         if (type !== undefined) updates.type = type;
         if (discount_percentage !== undefined) {
-            if (discount_percentage < 1 || discount_percentage > 100) {
+            if (type !== 'free_delivery' && (discount_percentage < 1 || discount_percentage > 100)) {
                 return res.status(400).json({
                     error: 'Discount percentage must be between 1 and 100'
                 });

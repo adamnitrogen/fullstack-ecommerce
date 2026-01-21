@@ -40,17 +40,18 @@ const Cart = () => {
     }
   }, [isAuthenticated, fetchCart]);
 
-  // Fetch available coupons
+  // Fetch available coupons - refetch when totals change to pick up new coupons immediately
   useEffect(() => {
     const fetchCoupons = async () => {
       try {
         const coupons = await couponService.getActive();
         setAvailableCoupons(coupons);
       } catch (error) {
+        // Silently fail - coupons are optional
       }
     };
     fetchCoupons();
-  }, []);
+  }, [totals]); // Refetch when totals change (after cart operations)
 
   const handlePlaceOrder = () => {
     if (!isAuthenticated) {
@@ -122,6 +123,21 @@ const Cart = () => {
     );
   }
 
+  const enrichedItems = items.map((item) => {
+    const itemDetail = totals?.itemBreakdown?.find((id: any) =>
+      (id.variant_id && id.variant_id === item.variantId) ||
+      (!id.variant_id && id.product_id === item.productId)
+    );
+    return {
+      ...item,
+      delivery_charge: itemDetail?.delivery_charge || 0,
+      delivery_gst: itemDetail?.delivery_gst || 0,
+      delivery_meta: itemDetail?.delivery_meta,
+      coupon_discount: itemDetail?.coupon_discount || 0,
+      coupon_code: itemDetail?.coupon_code || ''
+    };
+  });
+
   return (
     <div className="min-h-screen bg-background py-8 sm:py-16 animate-in fade-in duration-700">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -140,31 +156,17 @@ const Cart = () => {
           {/* Cart Items List */}
           <div className="lg:col-span-2 space-y-6 sm:space-y-8">
             <div className="space-y-6">
-              {items.map((item) => {
-                const itemDetail = totals?.itemBreakdown?.find((id: any) =>
-                  (id.variant_id && id.variant_id === item.variantId) ||
-                  (!id.variant_id && id.product_id === item.productId)
-                );
-
-                return (
-                  <CartItem
-                    key={`${item.productId}-${item.variantId || 'base'}`}
-                    item={{
-                      ...item,
-                      delivery_charge: itemDetail?.delivery_charge || 0,
-                      delivery_gst: itemDetail?.delivery_gst || 0,
-                      delivery_meta: itemDetail?.delivery_meta,
-                      coupon_discount: itemDetail?.coupon_discount || 0,
-                      coupon_code: itemDetail?.coupon_code || ''
-                    }}
-                    updateQuantity={updateQuantity}
-                    removeItem={removeItem}
-                    isLoading={isLoading}
-                    isCalculating={isCalculating}
-                    isFreeDelivery={totals?.deliveryCharge === 0}
-                  />
-                );
-              })}
+              {enrichedItems.map((item) => (
+                <CartItem
+                  key={`${item.productId}-${item.variantId || 'base'}`}
+                  item={item}
+                  updateQuantity={updateQuantity}
+                  removeItem={removeItem}
+                  isLoading={isLoading}
+                  isCalculating={isCalculating}
+                  isFreeDelivery={totals?.deliveryCharge === 0}
+                />
+              ))}
             </div>
 
             <div className="mt-12 pt-8 border-t border-dashed border-border/60 flex items-center justify-between">
@@ -193,7 +195,7 @@ const Cart = () => {
               availableCoupons={availableCoupons}
               deliverySettings={deliverySettings}
               isCalculating={isCalculating}
-              items={items}
+              items={enrichedItems}
             />
           </div>
         </div>

@@ -172,28 +172,48 @@ export function CouponDialog({
     }, [coupon]);
 
     const handleChange = (field: keyof CreateCouponDto, value: string | number | boolean | undefined) => {
-        setFormData((prev) => ({ ...prev, [field]: value }));
+        setFormData((prev) => {
+            const newData = { ...prev, [field]: value };
+            // If type changed to free_delivery, set discount to 1 to satisfy DB constraint
+            if (field === 'type' && value === 'free_delivery') {
+                newData.discount_percentage = 1;
+            } else if (field === 'type' && prev.type === 'free_delivery' && value !== 'free_delivery') {
+                // If changing back from free_delivery, set a default discount
+                newData.discount_percentage = 10;
+            }
+            return newData;
+        });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
+        // Prepare data for submission
+        const dataToSave = { ...formData };
+
+        // For free delivery, clear amount constraints as requested
+        if (dataToSave.type === 'free_delivery') {
+            dataToSave.min_purchase_amount = undefined;
+            dataToSave.max_discount_amount = undefined;
+            dataToSave.discount_percentage = 1; // Set to 1 to satisfy DB check constraint (>0)
+        }
+
         // Validation
-        if (!formData.code || !formData.valid_until) {
+        if (!dataToSave.code || !dataToSave.valid_until) {
             toast.error("Please fill in all required fields");
             return;
         }
 
-        if (formData.discount_percentage < 1 || formData.discount_percentage > 100) {
+        if (dataToSave.type !== "free_delivery" && (dataToSave.discount_percentage < 1 || dataToSave.discount_percentage > 100)) {
             toast.error("Discount percentage must be between 1 and 100");
             return;
         }
 
         if (
-            (formData.type === "product" || formData.type === "category") &&
-            !formData.target_id
+            (dataToSave.type === "product" || dataToSave.type === "category") &&
+            !dataToSave.target_id
         ) {
-            toast.error(`Please specify a ${formData.type} for this coupon`);
+            toast.error(`Please specify a ${dataToSave.type} for this coupon`);
             return;
         }
 
@@ -202,11 +222,11 @@ export function CouponDialog({
 
             if (coupon) {
                 // Update existing coupon
-                await couponService.update(coupon.id, formData);
+                await couponService.update(coupon.id, dataToSave);
                 toast.success("Coupon updated successfully");
             } else {
                 // Create new coupon
-                await couponService.create(formData);
+                await couponService.create(dataToSave);
                 toast.success("Coupon created successfully");
             }
 
@@ -257,7 +277,7 @@ export function CouponDialog({
                         </Label>
                         <Select
                             value={formData.type}
-                            onValueChange={(value: "cart" | "category" | "product" | "variant") => {
+                            onValueChange={(value: "cart" | "category" | "product" | "variant" | "free_delivery") => {
                                 handleChange("type", value);
                                 // Clear target_id when switching types
                                 handleChange("target_id", undefined);
@@ -272,6 +292,7 @@ export function CouponDialog({
                                 <SelectItem value="category">Category-Level (Apply to a category)</SelectItem>
                                 <SelectItem value="product">Product-Level (Apply to specific product)</SelectItem>
                                 <SelectItem value="variant">Variant-Level (Apply to specific variant)</SelectItem>
+                                <SelectItem value="free_delivery">Free Delivery (Waive shipping charges)</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -414,64 +435,68 @@ export function CouponDialog({
                         </div>
                     )}
 
-                    {/* Discount Percentage */}
-                    <div className="grid gap-2">
-                        <Label htmlFor="discount">
-                            Discount Percentage <span className="text-destructive">*</span>
-                        </Label>
-                        <Input
-                            id="discount"
-                            type="number"
-                            min="1"
-                            max="100"
-                            value={formData.discount_percentage}
-                            onChange={(e) =>
-                                handleChange("discount_percentage", parseInt(e.target.value))
-                            }
-                            disabled={loading}
-                            required
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        {/* Min Purchase Amount */}
+                    {/* Discount Percentage - Hidden for Free Delivery */}
+                    {formData.type !== 'free_delivery' && (
                         <div className="grid gap-2">
-                            <Label htmlFor="min_purchase">Minimum Purchase (₹)</Label>
+                            <Label htmlFor="discount">
+                                Discount Percentage <span className="text-destructive">*</span>
+                            </Label>
                             <Input
-                                id="min_purchase"
+                                id="discount"
                                 type="number"
-                                min="0"
-                                value={formData.min_purchase_amount || ""}
+                                min="1"
+                                max="100"
+                                value={formData.discount_percentage}
                                 onChange={(e) =>
-                                    handleChange(
-                                        "min_purchase_amount",
-                                        e.target.value ? parseFloat(e.target.value) : undefined
-                                    )
+                                    handleChange("discount_percentage", parseInt(e.target.value))
                                 }
-                                placeholder="No minimum"
                                 disabled={loading}
+                                required
                             />
                         </div>
+                    )}
 
-                        {/* Max Discount Amount */}
-                        <div className="grid gap-2">
-                            <Label htmlFor="max_discount">Max Discount Cap (₹)</Label>
-                            <Input
-                                id="max_discount"
-                                type="number"
-                                min="0"
-                                value={formData.max_discount_amount || ""}
-                                onChange={(e) =>
-                                    handleChange(
-                                        "max_discount_amount",
-                                        e.target.value ? parseFloat(e.target.value) : undefined
-                                    )
-                                }
-                                placeholder="No cap"
-                                disabled={loading}
-                            />
+                    {formData.type !== 'free_delivery' && (
+                        <div className="grid grid-cols-2 gap-4">
+                            {/* Min Purchase Amount */}
+                            <div className="grid gap-2">
+                                <Label htmlFor="min_purchase">Minimum Purchase (₹)</Label>
+                                <Input
+                                    id="min_purchase"
+                                    type="number"
+                                    min="0"
+                                    value={formData.min_purchase_amount || ""}
+                                    onChange={(e) =>
+                                        handleChange(
+                                            "min_purchase_amount",
+                                            e.target.value ? parseFloat(e.target.value) : undefined
+                                        )
+                                    }
+                                    placeholder="No minimum"
+                                    disabled={loading}
+                                />
+                            </div>
+
+                            {/* Max Discount Amount */}
+                            <div className="grid gap-2">
+                                <Label htmlFor="max_discount">Max Discount Cap (₹)</Label>
+                                <Input
+                                    id="max_discount"
+                                    type="number"
+                                    min="0"
+                                    value={formData.max_discount_amount || ""}
+                                    onChange={(e) =>
+                                        handleChange(
+                                            "max_discount_amount",
+                                            e.target.value ? parseFloat(e.target.value) : undefined
+                                        )
+                                    }
+                                    placeholder="No cap"
+                                    disabled={loading}
+                                />
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-4">
                         {/* Valid From */}

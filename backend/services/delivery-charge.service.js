@@ -233,10 +233,12 @@ class DeliveryChargeService {
      * 
      * @param {Array} cartItems - Cart items with product/variant data
      * @param {number} cartSubtotal - Total price of items (for threshold check)
+     * @param {object} options - Calculation options
+     * @param {boolean} options.forceFreeStandard - If true, waives standard delivery regardless of threshold
      * @returns {Promise<object>} { totalDeliveryCharge, totalDeliveryGST, totalDelivery, items }
      */
-    static async calculateCartDelivery(cartItems, cartSubtotal = 0) {
-        log.operationStart('CALCULATE_CART_DELIVERY', { itemCount: cartItems.length, cartSubtotal });
+    static async calculateCartDelivery(cartItems, cartSubtotal = 0, { forceFreeStandard = false } = {}) {
+        log.operationStart('CALCULATE_CART_DELIVERY', { itemCount: cartItems.length, cartSubtotal, forceFreeStandard });
         const startTime = Date.now();
 
         try {
@@ -244,8 +246,8 @@ class DeliveryChargeService {
             const globalSettings = await settingsService.getDeliverySettings();
             const threshold = globalSettings.delivery_threshold || 0;
 
-            // Determine if free delivery applies
-            const isFreeDelivery = cartSubtotal >= threshold;
+            // Determine if free delivery applies (either via threshold or coupon force)
+            const isFreeDelivery = forceFreeStandard || (cartSubtotal >= threshold);
 
             let totalDeliveryCharge = 0;
             let totalDeliveryGST = 0;

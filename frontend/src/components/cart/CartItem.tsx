@@ -30,9 +30,15 @@ export const CartItem = ({ item, updateQuantity, removeItem, isLoading, isCalcul
     const isLowStock = itemStock > 0 && itemStock <= 5;
     const isOutOfStock = itemStock === 0;
 
-    // Tax logic: Priority to variant, then product defaults
     const isTaxApplicable = variant?.tax_applicable ?? product.default_tax_applicable ?? false;
     const priceIncludesTax = variant?.price_includes_tax ?? product.default_price_includes_tax ?? false;
+
+    // Calculate item-level tax for transparency
+    const gstRate = variant?.gst_rate ?? product.default_gst_rate ?? 0;
+    const itemTotal = itemPrice * quantity;
+    const itemTaxAmount = priceIncludesTax
+        ? (itemTotal - (itemTotal / (1 + (gstRate / 100))))
+        : (itemTotal * (gstRate / 100));
 
     return (
         <div className={cn(
@@ -75,12 +81,12 @@ export const CartItem = ({ item, updateQuantity, removeItem, isLoading, isCalcul
             <div className="flex flex-1 flex-col min-w-0">
                 <div className="flex justify-between items-start gap-4">
                     <div className="space-y-1.5 flex-1 min-w-0 pt-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-[10px] uppercase tracking-widest font-black text-primary/80 bg-primary/10 px-2.5 py-1 rounded-full border border-primary/10">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                            <span className="text-[10px] uppercase tracking-widest font-black text-[#A16207] bg-[#FEF9C3] px-2.5 py-1 rounded-md">
                                 {product.category}
                             </span>
                             {(sizeLabel || variant?.size_label) && (
-                                <span className="text-[10px] uppercase tracking-widest font-black text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-100">
+                                <span className="text-[10px] uppercase tracking-widest font-black text-[#A16207] bg-[#FFEDD5] px-2.5 py-1 rounded-md">
                                     {sizeLabel || variant?.size_label}
                                 </span>
                             )}
@@ -90,8 +96,8 @@ export const CartItem = ({ item, updateQuantity, removeItem, isLoading, isCalcul
                                     Out of Stock
                                 </span>
                             ) : (
-                                <span className="text-[9px] font-black uppercase text-emerald-600 flex items-center gap-1.5 ml-1">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                <span className="text-[9px] font-black uppercase text-[#059669] flex items-center gap-1.5 ml-1 bg-[#ECFDF5] px-2 py-1 rounded-md">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
                                     In Stock
                                 </span>
                             )}
@@ -99,7 +105,7 @@ export const CartItem = ({ item, updateQuantity, removeItem, isLoading, isCalcul
 
                         <Link
                             to={`/product/${item.productId}`}
-                            className="block font-bold text-lg sm:text-xl hover:text-primary transition-all duration-300 line-clamp-1 leading-tight tracking-tight mt-1"
+                            className="block font-bold text-lg sm:text-xl hover:text-primary transition-all duration-300 line-clamp-1 leading-tight tracking-tight mb-2"
                         >
                             {product.title}
                         </Link>
@@ -118,23 +124,23 @@ export const CartItem = ({ item, updateQuantity, removeItem, isLoading, isCalcul
                             )}
 
                             {(item.delivery_charge ?? 0) > 0 && item.delivery_meta?.source !== 'global' ? (
-                                <div className="flex flex-col items-start gap-0.5 w-full">
-                                    <div className="flex items-center gap-1.5 font-bold text-[11px] text-orange-600/90 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-100">
+                                <div className="flex flex-col items-start gap-1 w-full">
+                                    <div className="flex items-center gap-1.5 font-black text-[10px] uppercase tracking-wider text-[#9A3412] bg-[#FFF7ED] px-2.5 py-1 rounded-full border border-[#FDBA74]">
                                         <Truck className="w-3 h-3" />
                                         <span>
                                             +₹{((item.delivery_charge ?? 0) + (item.delivery_gst ?? 0)).toFixed(2)} Surcharge
                                         </span>
                                     </div>
                                     {item.delivery_meta && (
-                                        <div className="flex flex-col pl-1">
-                                            <span className="text-[10px] text-muted-foreground font-medium tracking-wide italic leading-tight">
+                                        <div className="flex flex-col pl-1 space-y-0.5">
+                                            <span className="text-[10px] text-muted-foreground/70 font-bold italic leading-tight">
                                                 {item.delivery_meta.calculation_type === 'PER_ITEM' && `(₹${item.delivery_meta.base_charge} / item)`}
                                                 {item.delivery_meta.calculation_type === 'PER_PACKAGE' && `(₹${item.delivery_meta.base_charge} / package)`}
                                                 {item.delivery_meta.calculation_type === 'WEIGHT_BASED' && `(Heavy Item Surcharge)`}
                                                 {item.delivery_meta.calculation_type === 'FLAT_PER_ORDER' && `(Flat Product Charge)`}
                                             </span>
                                             {(item.delivery_gst ?? 0) > 0 && (
-                                                <span className="text-[9px] text-muted-foreground/60 font-medium">
+                                                <span className="text-[9px] text-muted-foreground/50 font-medium">
                                                     (Includes ₹{(item.delivery_gst ?? 0).toFixed(2)} GST)
                                                 </span>
                                             )}
@@ -175,18 +181,25 @@ export const CartItem = ({ item, updateQuantity, removeItem, isLoading, isCalcul
                             )}
                         </div>
                         {isTaxApplicable && (
-                            <span className="text-[10px] text-muted-foreground/60 font-medium">
-                                {priceIncludesTax ? "Inclusive of all taxes" : "Exclusive of taxes"}
-                            </span>
+                            <div className="flex flex-col">
+                                <span className="text-[10px] text-muted-foreground/60 font-medium">
+                                    {priceIncludesTax ? "Inclusive of all taxes" : "Exclusive of taxes"}
+                                </span>
+                                {gstRate > 0 && (
+                                    <span className="text-[9px] text-muted-foreground/40 font-bold italic">
+                                        ({priceIncludesTax ? "Includes" : "+"} ₹{itemTaxAmount.toFixed(2)} {gstRate}% GST)
+                                    </span>
+                                )}
+                            </div>
                         )}
                     </div>
 
-                    <div className="flex items-center gap-1 bg-muted/30 p-1 rounded-lg border border-border/10 shadow-sm self-end">
+                    <div className="flex items-center gap-1 bg-muted/40 p-1.5 rounded-xl border border-border/10 shadow-sm self-end">
                         <Button
                             variant="ghost"
                             size="icon"
                             className={cn(
-                                "h-7 w-7 rounded-md transition-all duration-300",
+                                "h-8 w-8 rounded-lg transition-all duration-300",
                                 quantity === 1 ? "hover:bg-destructive/10 hover:text-destructive" : "hover:bg-background hover:shadow-sm"
                             )}
                             onClick={() => {
@@ -195,19 +208,19 @@ export const CartItem = ({ item, updateQuantity, removeItem, isLoading, isCalcul
                             }}
                             disabled={isLoading}
                         >
-                            {quantity === 1 ? <Trash2 className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                            {quantity === 1 ? <Trash2 className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />}
                         </Button>
-                        <div className="w-6 text-center font-bold text-sm tabular-nums text-foreground/80">
+                        <div className="w-8 text-center font-bold text-sm tabular-nums text-foreground/80">
                             {quantity}
                         </div>
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 rounded-md hover:bg-background hover:shadow-sm transition-all duration-300"
+                            className="h-8 w-8 rounded-lg hover:bg-background hover:shadow-sm transition-all duration-300"
                             onClick={() => updateQuantity(item.productId, quantity + 1, variantId)}
                             disabled={isLoading || quantity >= itemStock}
                         >
-                            <Plus className="w-3 h-3" />
+                            <Plus className="w-3.5 h-3.5" />
                         </Button>
                     </div>
                 </div>

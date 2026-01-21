@@ -453,7 +453,7 @@ export interface AboutUsContent {
 export interface Coupon {
   id: string;
   code: string;
-  type: 'product' | 'category' | 'cart' | 'variant';
+  type: 'product' | 'category' | 'cart' | 'variant' | 'free_delivery';
   discount_percentage: number;
   target_id?: string;
   min_purchase_amount?: number;
@@ -469,7 +469,7 @@ export interface Coupon {
 
 export interface CreateCouponDto {
   code: string;
-  type: 'product' | 'category' | 'cart' | 'variant';
+  type: 'product' | 'category' | 'cart' | 'variant' | 'free_delivery';
   discount_percentage: number;
   target_id?: string;
   min_purchase_amount?: number;
@@ -512,6 +512,11 @@ export interface CartTotals {
   globalDeliveryCharge?: number;
   productDeliveryGST?: number;
   globalDeliveryGST?: number;
+  // Backend snake_case fields
+  global_delivery_charge?: number;
+  global_delivery_gst?: number;
+  product_delivery_charges?: number;
+  product_delivery_gst?: number;
   itemBreakdown?: Array<{
     product_id: string;
     variant_id?: string;

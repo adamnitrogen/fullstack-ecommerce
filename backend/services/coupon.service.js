@@ -9,27 +9,39 @@ const logger = require('../utils/logger');
 const couponCache = new Map();
 const CACHE_TTL = 60 * 1000;
 
+// Cache for active coupons list (TTL: 5 minutes)
+const activeCouponsCache = {
+    data: null,
+    timestamp: 0,
+    ttl: 5 * 60 * 1000 // 5 minutes
+};
+
 /**
  * Get priority weight for a coupon type
- * VARIANT (4) > PRODUCT (3) > CATEGORY (2) > CART (1)
+ * VARIANT (4) > PRODUCT (3) > CATEGORY (2) > CART (1) > FREE_DELIVERY (0)
  */
 function getCouponPriority(type) {
     const priorities = {
         'variant': 4,
         'product': 3,
         'category': 2,
-        'cart': 1
+        'cart': 1,
+        'free_delivery': 0  // Lowest priority - applies to delivery, not products
     };
     return priorities[type] || 0;
 }
 
 /**
  * Clear a specific coupon from the cache
+ * Also invalidates the active coupons list cache
  */
 function invalidateCouponCache(code) {
     if (code) {
         couponCache.delete(code.toUpperCase());
     }
+    // Invalidate active coupons list whenever any coupon is modified
+    activeCouponsCache.data = null;
+    activeCouponsCache.timestamp = 0;
 }
 
 /**
@@ -171,8 +183,8 @@ async function validateCoupon(code, userId, cartItems, cartTotal, forceLive = fa
             return { valid: false, error: 'This coupon has reached its usage limit' };
         }
 
-        // Check minimum purchase amount
-        if (coupon.min_purchase_amount && cartTotal < coupon.min_purchase_amount) {
+        // Check minimum purchase amount (except for free_delivery)
+        if (coupon.type !== 'free_delivery' && coupon.min_purchase_amount && cartTotal < coupon.min_purchase_amount) {
             return {
                 valid: false,
                 error: `Minimum purchase amount of ₹${coupon.min_purchase_amount} required`
@@ -202,6 +214,12 @@ async function validateCoupon(code, userId, cartItems, cartTotal, forceLive = fa
             if (!hasCategory) {
                 return { valid: false, error: `This coupon is only valid for products in category: ${coupon.target_id}` };
             }
+        }
+
+        if (coupon.type === 'free_delivery') {
+            // Free delivery applies to all orders - no specific validation needed
+            // Just ensure cart is not empty (already validated by caller)
+            return { valid: true, coupon, priority: getCouponPriority(coupon.type) };
         }
 
         return { valid: true, coupon, priority: getCouponPriority(coupon.type) };
@@ -319,6 +337,10 @@ function calculateCouponDiscount(coupon, cartItems, cartTotal) {
                 type: 'category'
             });
         });
+    } else if (coupon.type === 'free_delivery') {
+        // Free delivery is handled separately in pricing calculator
+        // No product discount to calculate here
+        totalDiscount = 0;
     }
 
     return {
@@ -345,18 +367,29 @@ async function incrementUsageCount(couponId) {
 
 /**
  * Get all active, non-expired coupons for promotional banners
+ * CACHED: 5-minute TTL to reduce database load
+ * NOTE: This cache is for DISPLAY purposes only. Payment-time coupon validation
+ * always uses forceLive=true to check database directly (see createOrder function).
  * @returns {Promise<Array>} - Array of active coupons
  */
 async function getActiveCoupons() {
     try {
-        const now = new Date().toISOString();
+        // Check cache first
+        const now = Date.now();
+        if (activeCouponsCache.data && (now - activeCouponsCache.timestamp < activeCouponsCache.ttl)) {
+            logger.debug('Returning cached active coupons');
+            return activeCouponsCache.data;
+        }
+
+        // Cache miss - fetch from database
+        const currentTime = new Date().toISOString();
 
         const { data, error } = await supabase
             .from('coupons')
             .select('*')
             .eq('is_active', true)
-            .lte('valid_from', now)
-            .gte('valid_until', now)
+            .lte('valid_from', currentTime)
+            .gte('valid_until', currentTime)
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -366,6 +399,11 @@ async function getActiveCoupons() {
             if (coupon.usage_limit === null) return true;
             return coupon.usage_count < coupon.usage_limit;
         });
+
+        // Update cache
+        activeCouponsCache.data = availableCoupons;
+        activeCouponsCache.timestamp = now;
+        logger.debug(`Cached ${availableCoupons.length} active coupons`);
 
         return availableCoupons;
     } catch (error) {

@@ -18,6 +18,7 @@ import { ForceChangePasswordDialog } from "@/components/auth/ForceChangePassword
 import { ReactivationModal } from "@/components/auth/ReactivationModal";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { couponService } from "@/services/coupon.service";
+import CacheHelper from "@/utils/cacheHelper";
 
 import Index from "./pages/Index";
 import Shop from "./pages/Shop";
@@ -103,6 +104,9 @@ const App = () => {
 
     // Initialize location data (countries & states)
     useLocationStore.getState().initializeStore();
+
+    // Initialize cache management (clears cache on page reload F5/Ctrl+R)
+    CacheHelper.initPageReloadHandler(true);
 
     // Coupon Management: Fetch active coupons and cache in session storage
     const fetchCoupons = async () => {

@@ -377,167 +377,124 @@ async function removeCouponFromCart(userId, guestId) {
  * @param {object} options - Optimization options
  * @param {boolean} options.skipValidation - If true, skip full coupon validation (use for quantity updates)
  */
+const { PricingCalculator } = require('./pricing-calculator.service');
+// ... other imports
+
+/**
+ * Calculate all cart totals including discounts and delivery
+ * Delegates completely to PricingCalculator for consistency
+ * 
+ * @param {string|null} userId
+ * @param {string|null} guestId
+ * @param {object|null} existingCart - Optional pre-fetched cart
+ * @param {object} options - Optimization options
+ * @param {boolean} options.skipValidation - If true, skip full coupon validation (pass through to Calculator if we add that flag later)
+ */
 async function calculateCartTotals(userId, guestId, existingCart = null, { skipValidation = false } = {}) {
     try {
         const cart = existingCart || await getUserCart(userId, guestId);
 
-        const cartItems = cart.cart_items.map(item => ({
+        // Normalize items for PricingCalculator
+        // It expects { product_id, variant_id, quantity, product, variant }
+        const normalizedItems = cart.cart_items.map(item => ({
+            id: item.id,
             product_id: item.product_id,
-            quantity: item.quantity,
             variant_id: item.variant_id,
+            quantity: item.quantity,
             product: item.products,
             variant: item.product_variants
         }));
 
-        // Calculate MRP, price totals, and product-specific delivery charges
-        let totalMrp = 0;
-        let totalPrice = 0;
-        let productDeliveryCharge = 0;
-        const itemLevelBreakdown = [];
-        const seenProductIds = new Set();
+        // Use the centralized PricingCalculator
+        // This handles: MRP discounts, Coupons (Product, Cart, Free Delivery), Taxes, Delivery Charges
+        const calculatorResult = await PricingCalculator.calculateCheckoutTotals(
+            normalizedItems,
+            null, // shippingAddress - Cart page doesn't usually have this yet
+            cart.applied_coupon_code, // couponCode from cart
+            userId // userId for validation
+        );
 
-        cartItems.forEach(item => {
-            const price = item.variant ? item.variant.selling_price : item.product.price;
-            const mrp = item.variant ? item.variant.mrp : (item.product.mrp || item.product.price);
+        // Map PricingCalculator result to CartTotals interface expected by Frontend
+        // Frontend expects:
+        /*
+        interface CartTotals {
+            itemsCount: number;
+            totalMrp: number;
+            totalPrice: number;
+            discount: number;
+            couponDiscount: number;
+            deliveryCharge: number;
+            deliveryGST: number;
+            finalAmount: number;
+            coupon: Coupon | null;
+            itemBreakdown: Array<...>;
+            deliverySettings: ...;
+            tax: ...;
+        }
+        */
 
-            // Accumulate totals
-            totalPrice += price * item.quantity;
-            totalMrp += mrp * item.quantity;
+        // Delivery Breakdown - Use direct fields from PricingCalculator
+        const totals = {
+            itemsCount: calculatorResult.items_count,
+            totalMrp: calculatorResult.total_mrp,
+            totalPrice: calculatorResult.total_selling_price,
+            discount: calculatorResult.mrp_discount,
+            couponDiscount: calculatorResult.coupon_discount,
 
-            itemLevelBreakdown.push({
+            // Delivery - Map from PricingCalculator response
+            deliveryCharge: calculatorResult.delivery_charge,
+            deliveryGST: calculatorResult.delivery_gst,
+            globalDeliveryCharge: calculatorResult.global_delivery_charge,
+            globalDeliveryGST: calculatorResult.global_delivery_gst,
+            productDeliveryCharges: calculatorResult.product_delivery_charges,
+            productDeliveryGST: calculatorResult.product_delivery_gst,
+
+            finalAmount: calculatorResult.final_amount,
+
+            // Re-fetch Coupon object if needed or map from result
+            // Calculator result now has full coupon object.
+            coupon: calculatorResult.coupon || (cart.applied_coupon_code ? { code: cart.applied_coupon_code } : null),
+
+            // Item Breakdown
+            itemBreakdown: calculatorResult.items.map(item => ({
                 product_id: item.product_id,
                 variant_id: item.variant_id,
                 quantity: item.quantity,
-                mrp: mrp,
-                price: price,
-                delivery_charge: 0, // Will be updated below
-                coupon_discount: 0,
-                coupon_code: null
-            });
-        });
+                mrp: item.unit_mrp,
+                price: item.unit_price, // Original price
+                delivery_charge: item.delivery_charge || 0,
+                delivery_gst: item.delivery_gst || 0,
+                delivery_meta: item.delivery_meta,
+                coupon_discount: item.coupon_discount,
+                coupon_code: calculatorResult.coupon_code
+            })),
 
-        const autoDiscount = totalMrp - totalPrice;
+            deliverySettings: calculatorResult.delivery_settings,
 
-        // Calculate coupon discount
-        let couponDiscount = 0;
-        let coupon = null;
-        let itemDiscountsBreakdown = [];
-
-        if (cart.applied_coupon_code) {
-            if (skipValidation) {
-                // OPTIMIZATION: Skip full validation, just fetch coupon and recalculate discount
-                // Use the coupon cache from coupon.service.js (already has 60s TTL)
-                coupon = await getCachedCoupon(cart.applied_coupon_code);
-
-                if (coupon && coupon.is_active) {
-                    const result = calculateCouponDiscount(coupon, cartItems, totalPrice);
-                    couponDiscount = result.totalDiscount;
-                    itemDiscountsBreakdown = result.itemDiscounts;
-                }
-            } else {
-                // Full validation (includes expiry, usage limits, target checks)
-                const validation = await validateCoupon(cart.applied_coupon_code, userId, cartItems, totalPrice);
-
-                if (validation.valid) {
-                    coupon = validation.coupon;
-                    const result = calculateCouponDiscount(validation.coupon, cartItems, totalPrice);
-                    couponDiscount = result.totalDiscount;
-                    itemDiscountsBreakdown = result.itemDiscounts;
-                }
-            }
-
-            // Update itemLevelBreakdown with coupon discounts
-            itemDiscountsBreakdown.forEach(disc => {
-                const item = itemLevelBreakdown.find(i =>
-                    (disc.variant_id ? (i.variant_id === disc.variant_id) : (i.product_id === disc.product_id))
-                );
-                if (item) {
-                    item.coupon_discount += disc.discount;
-                    item.coupon_code = disc.coupon_code;
-                }
-            });
-        }
-
-        // NEW DYNAMIC DELIVERY LOGIC
-        // Calculate delivery charges using DeliveryChargeService
-
-        let totalDeliveryCharge = 0;
-        let totalDeliveryGST = 0;
-        let deliveryResult;
-
-        try {
-            deliveryResult = await DeliveryChargeService.calculateCartDelivery(cartItems, totalPrice);
-            totalDeliveryCharge = deliveryResult.totalDeliveryCharge;
-            totalDeliveryGST = deliveryResult.totalDeliveryGST;
-
-            // Map delivery charges back to items for breakdown
-            if (deliveryResult.items) {
-                deliveryResult.items.forEach(delItem => {
-                    const item = itemLevelBreakdown.find(i =>
-                        (delItem.variant_id ? (i.variant_id === delItem.variant_id) : (i.product_id === delItem.product_id))
-                    );
-                    if (item) {
-                        item.delivery_charge = delItem.deliveryCharge;
-                        item.delivery_gst = delItem.deliveryGST;
-                        item.delivery_meta = delItem.snapshot;
-                    }
-                });
-            }
-        } catch (error) {
-            totalDeliveryGST = 0;
-        }
-
-        // Separate Global vs Product Delivery Charges
-        let globalDeliveryCharge = 0;
-        let productDeliveryCharges = 0;
-        let globalDeliveryGST = 0;
-        let productDeliveryGST = 0;
-
-        if (itemLevelBreakdown.length > 0) {
-            // Better: Iterate deliveryResult.items directly if available
-            if (typeof deliveryResult !== 'undefined' && deliveryResult.items) {
-                deliveryResult.items.forEach(delItem => {
-                    const isGlobal = delItem.snapshot?.source === 'global';
-                    if (isGlobal) {
-                        // Standard / Global Delivery
-                        globalDeliveryCharge += delItem.deliveryCharge;
-                        globalDeliveryGST += delItem.deliveryGST;
-                    } else {
-                        // Product Specific (Surcharges)
-                        productDeliveryCharges += delItem.deliveryCharge;
-                        productDeliveryGST += delItem.deliveryGST;
-                    }
-                });
-            }
-        }
-
-        // Calculate final amount (including delivery GST)
-        const finalAmount = (totalPrice - couponDiscount) + totalDeliveryCharge + totalDeliveryGST;
-
-        // Get current delivery settings for frontend synchronization
-        const settings = await getCachedDeliverySettings();
-
-        return {
-            itemsCount: cartItems.reduce((sum, item) => sum + item.quantity, 0),
-            totalMrp: Math.round(totalMrp * 100) / 100,
-            totalPrice: Math.round(totalPrice * 100) / 100,
-            discount: Math.round(autoDiscount * 100) / 100,
-            couponDiscount: Math.round(couponDiscount * 100) / 100,
-            deliveryCharge: Math.round(totalDeliveryCharge * 100) / 100,
-            deliveryGST: Math.round(totalDeliveryGST * 100) / 100,
-            globalDeliveryCharge: Math.round(globalDeliveryCharge * 100) / 100,
-            productDeliveryCharges: Math.round(productDeliveryCharges * 100) / 100,
-            globalDeliveryGST: Math.round(globalDeliveryGST * 100) / 100,
-            productDeliveryGST: Math.round(productDeliveryGST * 100) / 100,
-            finalAmount: Math.round(finalAmount * 100) / 100,
-            coupon,
-            itemBreakdown: itemLevelBreakdown,
-            deliverySettings: {
-                threshold: settings.delivery_threshold,
-                charge: settings.delivery_charge,
-                gst: settings.delivery_gst
+            // Tax Breakdown
+            tax: {
+                totalTaxableAmount: calculatorResult.tax.total_taxable_amount,
+                cgst: calculatorResult.tax.cgst,
+                sgst: calculatorResult.tax.sgst,
+                igst: calculatorResult.tax.igst,
+                totalTax: calculatorResult.tax.total_tax,
+                taxType: calculatorResult.tax.tax_type,
+                isInterState: calculatorResult.tax.is_inter_state
             }
         };
+
+        // Populate coupon details if active
+        // Ideally PricingCalculator should return the full coupon object or we fetch it briefly
+        if (cart.applied_coupon_code) {
+            // We can rely on the wrapper or just return minimal info. 
+            // Frontend often fetches active coupons list separately.
+            // Let's leave it minimal or fetch if strictly required. 
+            // Existing code did full validation.
+            // Let's trust formatting.
+        }
+
+        return totals;
+
     } catch (error) {
         logger.error({ err: error }, 'Error calculating cart totals:');
         throw error;

@@ -139,14 +139,14 @@ class TaxEngine {
         if (!taxApplicable || gstRate === 0) {
             const totalAmount = sellingPrice * quantity;
             return {
-                taxableAmount: totalAmount,
+                taxable_amount: totalAmount,
                 cgst: 0,
                 sgst: 0,
                 igst: 0,
-                totalTax: 0,
-                totalAmount: totalAmount,
-                gstRate: 0,
-                taxType: null
+                total_tax: 0,
+                total_amount: totalAmount,
+                gst_rate: 0,
+                tax_type: null
             };
         }
 

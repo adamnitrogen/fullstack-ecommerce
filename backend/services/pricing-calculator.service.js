@@ -6,6 +6,7 @@
 const { TaxEngine, TAX_TYPE } = require('./tax-engine.service');
 const settingsService = require('./settings.service');
 const { validateCoupon, calculateCouponDiscount } = require('./coupon.service');
+const { DeliveryChargeService } = require('./delivery-charge.service');
 const logger = require('../utils/logger');
 const { createModuleLogger } = require('../utils/logging-standards');
 
@@ -58,47 +59,174 @@ class PricingCalculator {
             // 2. Calculate MRP discount (before coupon)
             const mrpDiscount = totalMrp - totalSellingPrice;
 
-            // 3. Validate and calculate coupon discount (applied to pre-tax price)
-            let couponDiscount = 0;
+            // 3. Validate and calculate coupon discount
+            let productCouponDiscount = 0;
+            let deliveryCouponDiscount = 0;
             let validatedCoupon = null;
+            let itemDiscountBreakdown = [];
 
             if (couponCode && userId) {
                 const validation = await validateCoupon(couponCode, userId, normalizedItems, totalSellingPrice);
                 if (validation.valid) {
                     validatedCoupon = validation.coupon;
-                    couponDiscount = calculateCouponDiscount(validatedCoupon, normalizedItems, totalSellingPrice);
+
+                    // Only apply product-level discounts if not free_delivery
+                    if (validatedCoupon.type !== 'free_delivery') {
+                        const discountResult = calculateCouponDiscount(validatedCoupon, normalizedItems, totalSellingPrice);
+                        productCouponDiscount = discountResult.totalDiscount;
+                        itemDiscountBreakdown = discountResult.itemDiscounts;
+
+                        // Apply discounts to item prices BEFORE tax calculation
+                        // This ensures tax is calculated on the discounted amount
+                        if (itemDiscountBreakdown.length > 0) {
+                            normalizedItems.forEach(item => {
+                                const itemDiscount = itemDiscountBreakdown.find(d =>
+                                    (d.variant_id && d.variant_id === item.variant_id) ||
+                                    (!d.variant_id && d.product_id === item.product_id)
+                                );
+                                if (itemDiscount) {
+                                    // Subtract discount from the price used by TaxEngine
+                                    const discountPerUnit = itemDiscount.discount / item.quantity;
+
+                                    // We create deep copies to avoid polluting original objects if they are cached
+                                    if (item.variant) {
+                                        item.variant = { ...item.variant, selling_price: item.variant.selling_price - discountPerUnit };
+                                    } else if (item.product) {
+                                        item.product = { ...item.product, price: item.product.price - discountPerUnit };
+                                    }
+
+                                    // Also update the unitPrice helper in normalizedItems
+                                    item.unitPrice = item.unitPrice - discountPerUnit;
+                                }
+                            });
+                        }
+                    }
                 } else {
                     log.warn('COUPON_INVALID', validation.error, { couponCode });
                 }
             }
 
-            // 4. Calculate subtotal after coupons (this is what we apply tax to)
-            const subtotalAfterCoupons = totalSellingPrice - couponDiscount;
-
-            // 5. Calculate taxes using TaxEngine
+            // 4. Calculate taxes using TaxEngine (on discounted prices)
             const taxResult = TaxEngine.calculateOrderTax(normalizedItems, shippingAddress);
 
-            // 6. Get delivery settings
-            const settings = await settingsService.getDeliverySettings();
-            const deliveryCharge = totalSellingPrice >= settings.delivery_threshold ? 0 : settings.delivery_charge;
+            // 5. Calculate Delivery Charges (Standard + Surcharges)
+            // Check if free delivery coupon is active
+            const isFreeDeliveryCoupon = validatedCoupon && validatedCoupon.type === 'free_delivery';
+
+            // Calculate delivery using the unified service
+            // This handles global thresholds, surcharges, and inclusive GST logic
+            const deliveryResult = await DeliveryChargeService.calculateCartDelivery(
+                normalizedItems,
+                totalSellingPrice,
+                { forceFreeStandard: isFreeDeliveryCoupon }
+            );
+
+            let deliveryCharge = deliveryResult.totalDeliveryCharge;
+            let deliveryGst = deliveryResult.totalDeliveryGST;
+            // deliveryTotal from service is inclusive total
+            let deliveryTotal = deliveryResult.totalDelivery;
+
+            // Separate Global vs Product Delivery Charges for reporting
+            let globalDeliveryCharge = 0;
+            let productDeliveryCharges = 0;
+            let globalDeliveryGST = 0;
+            let productDeliveryGST = 0;
+
+            if (deliveryResult.items) {
+                deliveryResult.items.forEach(delItem => {
+                    const isGlobal = delItem.snapshot?.source === 'global';
+                    if (isGlobal) {
+                        globalDeliveryCharge += delItem.deliveryCharge;
+                        globalDeliveryGST += delItem.deliveryGST;
+                    } else {
+                        productDeliveryCharges += delItem.deliveryCharge;
+                        productDeliveryGST += delItem.deliveryGST;
+                    }
+
+                    // Map delivery charges back to normalizedItems for result construction
+                    const item = normalizedItems.find(i =>
+                        (delItem.variant_id && i.variant_id === delItem.variant_id) ||
+                        (!delItem.variant_id && i.product_id === delItem.product_id)
+                    );
+                    if (item) {
+                        item.delivery_charge = delItem.deliveryCharge;
+                        item.delivery_gst = delItem.deliveryGST;
+                        item.delivery_meta = delItem.snapshot;
+                    }
+                });
+            }
+
+            // 6. Calculate Coupon Discount for display
+            // If it's a free_delivery coupon, we show the saved amount.
+            // Logic: The "Discount" is the amount the user WOULD have paid for standard delivery.
+            if (isFreeDeliveryCoupon) {
+                const settings = await settingsService.getDeliverySettings();
+                // Only show discount if they simply didn't meet the threshold
+                if (totalSellingPrice < settings.delivery_threshold) {
+                    // The saving is the standard delivery charge (inclusive)
+                    // Note: DeliveryChargeService has already waived this in the actual totals above
+                    deliveryCouponDiscount = settings.delivery_charge;
+
+                    // Note: We deliberately do NOT set deliveryCouponDiscount to a value that would mess up math.
+                    // But if we want to show it in the UI, we might need to. 
+                    // However, we established that "Delivery = 0" and "Coupon = 0" is the cleanest math.
+                    // Let's set it to 0 for calculation but maybe the UI computes the savings visually?
+                    // Reverting to 0 to be safe for now, consistent with logic.
+                    // Actually, let's stick to 0. The UI "Free Delivery" badge implies the saving.
+                    deliveryCouponDiscount = 0;
+                }
+            }
+
+            // Total coupon discount (applies to items only basically, or purely informational if logic separates them)
+            const totalCouponDiscount = productCouponDiscount + deliveryCouponDiscount;
 
             // 7. Calculate final amount
-            // Note: Tax is calculated on selling price, coupon reduces the amount you pay
-            // Final = (taxable + tax) - couponDiscount + delivery
-            const finalAmount = taxResult.summary.total_amount - couponDiscount + deliveryCharge;
+            // Formula: Final = (Item_Taxable + Item_Tax) - productCouponDiscount + (Delivery + DeliveryGst)
+            // Note: productCouponDiscount was already deducted from Item Prices?
+            // "Apply discounts to item prices BEFORE tax calculation" -> Yes.
+            // So `taxResult.summary.total_amount` is ALREADY the discounted price.
+            // So we DO NOT subtract `productCouponDiscount` again.
+
+            const finalAmount = taxResult.summary.total_amount + deliveryCharge + deliveryGst;
+
+            // Fetch settings for result metadata
+            const currentSettings = await settingsService.getDeliverySettings();
 
             const result = {
                 // Item details
                 items_count: normalizedItems.reduce((sum, item) => sum + item.quantity, 0),
-                items: taxResult.items.map(item => ({
-                    product_id: item.product_id,
-                    variant_id: item.variant_id,
-                    quantity: item.quantity,
-                    unit_price: item.unitPrice,
-                    unit_mrp: item.unitMrp,
-                    line_total: item.unitPrice * item.quantity,
-                    tax_breakdown: item.taxBreakdown
-                })),
+                items: taxResult.items.map(item => {
+                    // Find the original item in normalizedItems to get delivery info
+                    // We must match by reference or ID since normalizedItems was mutated with delivery info
+                    const originalItem = normalizedItems.find(i =>
+                        (i.variant_id && i.variant_id === item.variant_id) ||
+                        (!i.variant_id && i.product_id === item.product_id)
+                    );
+
+                    // Extract the item-level coupon discount for this specific item
+                    const itemDiscount = itemDiscountBreakdown.find(d =>
+                        (d.variant_id && d.variant_id === item.variant_id) ||
+                        (!d.variant_id && d.product_id === item.product_id)
+                    );
+
+                    return {
+                        product_id: item.product_id,
+                        variant_id: item.variant_id,
+                        quantity: item.quantity,
+                        unit_price: (originalItem?.unitPrice || item.unitPrice) + (itemDiscount ? (itemDiscount.discount / item.quantity) : 0), // Original price
+                        discounted_unit_price: originalItem?.unitPrice || item.unitPrice, // Price used for tax
+                        unit_mrp: originalItem?.unitMrp || item.unitMrp,
+                        line_total: (originalItem?.unitPrice || item.unitPrice) * item.quantity,
+                        coupon_discount: itemDiscount ? itemDiscount.discount : 0,
+
+                        // Delivery Breakdown (Added)
+                        delivery_charge: originalItem?.delivery_charge || 0,
+                        delivery_gst: originalItem?.delivery_gst || 0,
+                        delivery_meta: originalItem?.delivery_meta || null,
+
+                        tax_breakdown: item.taxBreakdown
+                    };
+                }),
 
                 // Price breakdown
                 total_mrp: Math.round(totalMrp * 100) / 100,
@@ -106,11 +234,12 @@ class PricingCalculator {
                 mrp_discount: Math.round(mrpDiscount * 100) / 100,
 
                 // Coupon
+                coupon: validatedCoupon || null,
                 coupon_code: validatedCoupon?.code || null,
-                coupon_discount: Math.round(couponDiscount * 100) / 100,
+                coupon_discount: Math.round(totalCouponDiscount * 100) / 100,
 
-                // Subtotal (after MRP discount and coupon, before tax)
-                subtotal_before_tax: Math.round((totalSellingPrice - couponDiscount) * 100) / 100,
+                // Subtotal (after MRP discount and PRODUCT coupon, before tax)
+                subtotal_before_tax: Math.round((totalSellingPrice - productCouponDiscount) * 100) / 100,
 
                 // Tax breakdown
                 tax: {
@@ -125,11 +254,20 @@ class PricingCalculator {
 
                 // Delivery
                 delivery_charge: Math.round(deliveryCharge * 100) / 100,
-                free_delivery_threshold: settings.delivery_threshold,
+                delivery_gst: Math.round(deliveryGst * 100) / 100,
+                delivery_total: Math.round((deliveryCharge + deliveryGst) * 100) / 100,
+
+                // Detailed Breakdown (Added for UI)
+                global_delivery_charge: Math.round(globalDeliveryCharge * 100) / 100,
+                global_delivery_gst: Math.round(globalDeliveryGST * 100) / 100,
+                product_delivery_charges: Math.round(productDeliveryCharges * 100) / 100,
+                product_delivery_gst: Math.round(productDeliveryGST * 100) / 100,
+
+                free_delivery_threshold: currentSettings.delivery_threshold,
                 delivery_settings: {
-                    threshold: settings.delivery_threshold,
-                    charge: settings.delivery_charge,
-                    gst: settings.delivery_gst
+                    threshold: currentSettings.delivery_threshold,
+                    charge: currentSettings.delivery_charge,
+                    gst: currentSettings.delivery_gst
                 },
 
                 // Final
@@ -144,9 +282,9 @@ class PricingCalculator {
             };
 
             log.operationSuccess('CALCULATE_CHECKOUT_TOTALS', {
-                finalAmount: result.finalAmount,
-                taxAmount: result.tax.totalTax,
-                taxType: result.tax.taxType
+                finalAmount: result.final_amount,
+                taxAmount: result.tax.total_tax,
+                taxType: result.tax.tax_type
             }, Date.now() - startTime);
 
             return result;
@@ -244,18 +382,18 @@ class PricingCalculator {
             const lineItem = {
                 name: `${product.title || 'Product'} - ${variant.size_label || 'Standard'}`,
                 description: variant.description || product.description || '',
-                amount: Math.round(tax.taxableAmount * 100), // Amount in paisa
+                amount: Math.round(tax.taxable_amount / (item.quantity || 1) * 100), // Base amount per unit in paisa
                 currency: 'INR',
                 quantity: item.quantity || 1
             };
 
             // Add GST fields only if tax is applicable
-            if (tax.gstRate && tax.gstRate > 0) {
+            if (tax.gst_rate && tax.gst_rate > 0) {
                 lineItem.hsn_code = tax.hsnCode || undefined;
-                lineItem.tax_rate = tax.gstRate;
+                lineItem.tax_rate = tax.gst_rate;
 
                 // Razorpay expects tax amounts in paisa
-                if (tax.taxType === TAX_TYPE.INTER_STATE) {
+                if (tax.tax_type === TAX_TYPE.INTER_STATE) {
                     lineItem.igst = Math.round(tax.igst * 100);
                 } else {
                     lineItem.cgst = Math.round(tax.cgst * 100);

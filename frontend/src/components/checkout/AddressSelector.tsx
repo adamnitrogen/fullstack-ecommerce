@@ -159,8 +159,8 @@ export function AddressSelector({ type, selectedAddressId, onSelect, forceEditId
                             className={`
                                 relative p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 group
                                 ${selectedAddressId === address.id
-                                    ? "border-primary bg-primary/5 shadow-sm"
-                                    : "border-border/40 hover:border-primary/50 hover:bg-muted/30"
+                                    ? "border-[#2C1810] bg-[#2C1810]/5 shadow-sm"
+                                    : "border-border/40 hover:border-[#2C1810]/30 hover:bg-muted/30"
                                 }
                             `}
                         >
@@ -173,11 +173,11 @@ export function AddressSelector({ type, selectedAddressId, onSelect, forceEditId
                                 <div className="flex-1 space-y-1">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
-                                            <span className="font-bold text-base text-foreground">{address.full_name}</span>
+                                            <span className="font-bold text-base text-[#2C1810]">{address.full_name}</span>
                                             {address.is_primary && (
-                                                <Badge variant="default" className="h-5 px-1.5 text-[10px] bg-primary/80 hover:bg-primary">Primary</Badge>
+                                                <Badge variant="default" className="h-5 px-1.5 text-[10px] bg-[#2C1810] hover:bg-[#2C1810]/90">Primary</Badge>
                                             )}
-                                            <Badge variant="outline" className="h-5 px-1.5 text-[10px] capitalize border-primary/20 text-primary">{address.type}</Badge>
+                                            <Badge variant="outline" className="h-5 px-1.5 text-[10px] capitalize border-[#2C1810]/20 text-[#2C1810]"> {address.type}</Badge>
                                         </div>
                                     </div>
 

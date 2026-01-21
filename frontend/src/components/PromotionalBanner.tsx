@@ -11,7 +11,7 @@ export function PromotionalBanner() {
 
     useEffect(() => {
         checkAndFetchCoupons();
-        const validityInterval = setInterval(checkAndFetchCoupons, 60000);
+        const validityInterval = setInterval(checkAndFetchCoupons, 30000); // Poll every 30 seconds
 
         const handleVisibilityChange = () => {
             if (document.visibilityState === "visible") {
@@ -43,16 +43,18 @@ export function PromotionalBanner() {
 
     const checkAndFetchCoupons = async () => {
         const cacheKey = "promo_coupons_cache";
-        const cacheDuration = 60 * 60 * 1000;
+        const cacheVersion = "v2"; // Increment to force cache invalidation
+        const cacheDuration = 60 * 1000; // 1 minute cache for faster updates
 
         try {
             const cachedData = localStorage.getItem(cacheKey);
 
             if (cachedData) {
-                const { coupons: cachedCoupons, timestamp } = JSON.parse(cachedData);
+                const { coupons: cachedCoupons, timestamp, version } = JSON.parse(cachedData);
                 const isExpired = Date.now() - timestamp > cacheDuration;
+                const isOldVersion = version !== cacheVersion;
 
-                if (!isExpired && cachedCoupons.length > 0) {
+                if (!isExpired && !isOldVersion && cachedCoupons.length > 0) {
                     setCoupons(cachedCoupons);
                     setLoading(false);
                     return;
@@ -72,7 +74,8 @@ export function PromotionalBanner() {
 
             localStorage.setItem("promo_coupons_cache", JSON.stringify({
                 coupons: data,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                version: "v2" // Store version with cache
             }));
         } catch (error) {
             logger.error("Error fetching active coupons:", error);
@@ -138,7 +141,7 @@ export function PromotionalBanner() {
                                         {coupon.code}
                                     </Badge>
                                     <span className="font-black text-xs text-[#B85C3C]">
-                                        {coupon.discount_percentage}% OFF
+                                        {coupon.type === 'free_delivery' ? 'FREE SHIPPING' : (coupon.discount_percentage ? `${coupon.discount_percentage}% OFF` : 'SPECIAL OFFER')}
                                     </span>
                                 </div>
                                 {coupon.min_purchase_amount && coupon.min_purchase_amount > 0 && (

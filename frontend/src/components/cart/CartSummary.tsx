@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Tag as TagIcon, X, ShieldCheck, Truck, RotateCcw, Loader2, Gift, Sparkles } from "lucide-react";
+import { Loader2, X, Truck, RotateCcw, ShieldCheck, Sparkles, Tag, CheckCircle2, Gift } from "lucide-react";
 import { CartTotals, Coupon } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -88,20 +88,38 @@ export const CartSummary = ({
                                 <button
                                     key={coupon.id}
                                     onClick={() => handleApplyCoupon(coupon.code)}
-                                    className="p-3 bg-primary/5 hover:bg-primary/10 border border-primary/20 rounded-xl flex-shrink-0 w-48 transition-all hover:scale-[1.02] active:scale-95 text-left group snap-center"
+                                    className="relative p-4 bg-gradient-to-br from-white to-primary/5 hover:from-primary/5 hover:to-primary/10 border-2 border-primary/20 hover:border-primary/40 rounded-2xl flex-shrink-0 w-48 transition-all hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] text-left group snap-center overflow-hidden"
                                 >
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <div className="bg-primary text-white text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-tighter">
-                                            {coupon.code}
+                                    {/* Decorative gradient overlay */}
+                                    <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-primary/10 to-transparent rounded-bl-full opacity-50 group-hover:opacity-70 transition-opacity" />
+
+                                    <div className="relative z-10 space-y-2.5">
+                                        <div className="flex items-center justify-between">
+                                            <div className="bg-gradient-to-r from-primary to-primary/80 text-white text-[10px] font-black px-2.5 py-1 rounded-lg shadow-md uppercase tracking-tight">
+                                                {coupon.code}
+                                            </div>
+                                            <Gift className="w-4 h-4 text-primary opacity-60 group-hover:opacity-100 group-hover:scale-110 transition-all" />
                                         </div>
-                                        <Gift className="w-3.5 h-3.5 text-primary opacity-50 group-hover:opacity-100 transition-opacity" />
+
+                                        <div className="space-y-1">
+                                            <p className="text-sm font-black text-foreground uppercase tracking-tight leading-tight">
+                                                {coupon.type === 'free_delivery'
+                                                    ? '🚚 FREE SHIPPING'
+                                                    : `💰 ${coupon.discount_percentage || 0}% OFF`}
+                                            </p>
+                                            <p className="text-[10px] text-muted-foreground font-semibold">
+                                                {coupon.min_purchase_amount
+                                                    ? `Min. ₹${coupon.min_purchase_amount}`
+                                                    : 'No minimum purchase'}
+                                            </p>
+                                        </div>
+
+                                        <div className="pt-1 border-t border-border/40">
+                                            <p className="text-[9px] text-primary font-bold uppercase tracking-wider">
+                                                Tap to apply →
+                                            </p>
+                                        </div>
                                     </div>
-                                    <p className="text-[11px] font-bold text-foreground mb-0.5 truncate uppercase">
-                                        {coupon.discount_percentage}% OFF
-                                    </p>
-                                    <p className="text-[10px] text-muted-foreground line-clamp-1 italic">
-                                        {coupon.min_purchase_amount ? `Min. ₹${coupon.min_purchase_amount}` : 'No min. purchase'}
-                                    </p>
                                 </button>
                             ))}
                         </div>
@@ -122,7 +140,7 @@ export const CartSummary = ({
                         {totals && totals.discount > 0 && (
                             <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold">
                                 <span className="flex items-center gap-1.5">
-                                    <TagIcon className="w-3.5 h-3.5" />
+                                    <Tag className="w-3.5 h-3.5" />
                                     Product Discounts
                                 </span>
                                 <span>-₹{totals.discount.toFixed(2)}</span>
@@ -137,23 +155,49 @@ export const CartSummary = ({
                                     Delivery & Handling
                                 </div>
 
-                                {/* Standard Delivery */}
-                                {(totals?.globalDeliveryCharge ?? 0) > 0 && (
-                                    <div className="flex justify-between items-center group/del">
-                                        <span className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium">
-                                            Standard Delivery
-                                            <span className="text-[9px] opacity-40 font-normal">(Non-Ref)</span>
-                                            {(totals?.globalDeliveryGST ?? 0) > 0 && (
-                                                <span className="text-[8px] uppercase tracking-wider text-emerald-600 bg-emerald-50/50 border border-emerald-100/50 px-1 py-0 rounded-sm font-bold">
-                                                    Incl. Tax
+                                {/* Standard Delivery - Always show, mark as FREE if coupon applied */}
+                                {(() => {
+                                    const globalCharge = totals?.globalDeliveryCharge ?? totals?.global_delivery_charge ?? 0;
+                                    const globalGST = totals?.globalDeliveryGST ?? totals?.global_delivery_gst ?? 0;
+                                    const globalTotal = globalCharge + globalGST;
+                                    const isFreeDelivery = totals?.coupon?.type === 'free_delivery';
+
+                                    // Show if there's a charge OR if free delivery is applied
+                                    if (globalTotal > 0 || isFreeDelivery) {
+                                        return (
+                                            <div className="flex justify-between items-center group/del">
+                                                <span className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium">
+                                                    Standard Delivery
+                                                    {!isFreeDelivery && (
+                                                        <>
+                                                            <span className="text-[9px] opacity-40 font-normal">(Non-Ref)</span>
+                                                            {globalGST > 0 && (
+                                                                <span className="text-[8px] uppercase tracking-wider text-emerald-600 bg-emerald-50/50 border border-emerald-100/50 px-1 py-0 rounded-sm font-bold">
+                                                                    Incl. Tax
+                                                                </span>
+                                                            )}
+                                                        </>
+                                                    )}
                                                 </span>
-                                            )}
-                                        </span>
-                                        <span className="font-bold text-foreground text-xs">
-                                            ₹{((totals?.globalDeliveryCharge ?? 0) + (totals?.globalDeliveryGST ?? 0)).toFixed(2)}
-                                        </span>
-                                    </div>
-                                )}
+                                                <span className="font-bold text-xs flex items-center gap-2">
+                                                    {isFreeDelivery ? (
+                                                        <>
+                                                            <span className="text-muted-foreground/40 line-through">
+                                                                ₹{globalTotal.toFixed(2)}
+                                                            </span>
+                                                            <span className="text-emerald-600 font-black">FREE</span>
+                                                        </>
+                                                    ) : (
+                                                        <span className="text-foreground">
+                                                            ₹{globalTotal.toFixed(2)}
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                })()}
 
                                 {/* Surcharges IIFE */}
                                 {(() => {
@@ -186,7 +230,7 @@ export const CartSummary = ({
                                             {refundableTotal > 0 && (
                                                 <div className="flex justify-between items-center pl-1 group/sur">
                                                     <span className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-blue-400/60" />
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-[#3B82F6]" />
                                                         Refundable Surcharge
                                                         {refundableGst > 0 && (
                                                             <span className="text-[8px] uppercase tracking-wider text-blue-600 bg-blue-50/50 border border-blue-100/50 px-1 py-0 rounded-sm font-bold">
@@ -202,7 +246,7 @@ export const CartSummary = ({
                                             {nonRefundableTotal > 0 && (
                                                 <div className="flex justify-between items-center pl-1 group/sur">
                                                     <span className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-orange-400/60" />
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-[#F97316]" />
                                                         Addt. Processing
                                                         <span className="text-[9px] opacity-40 font-normal">(Non-Ref)</span>
                                                         {nonRefundableGst > 0 && (
@@ -222,23 +266,47 @@ export const CartSummary = ({
                             </div>
                         )}
 
-                        {/* Tax Details Section */}
-                        {totals && (totals.tax?.totalTax ?? 0) > 0 && (
-                            <div className="pt-2 border-t border-dashed border-border/40">
-                                <div className="flex justify-between items-center px-1">
-                                    <span className="text-[10px] text-muted-foreground/50 italic leading-tight font-medium">
+                        {/* Detailed Tax Breakdown */}
+                        {totals && (totals.tax?.totalTax ?? 0) > 0 && totals.tax && (
+                            <div className="pt-3 border-t border-dashed border-border/40 space-y-2">
+                                <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] font-bold uppercase tracking-wider mb-1">
+                                    <Sparkles className="w-3 h-3 text-primary/70" />
+                                    Tax Breakdown (GST)
+                                </div>
+
+                                {totals.tax.isInterState ? (
+                                    <div className="flex justify-between items-center pl-1">
+                                        <span className="text-muted-foreground text-xs font-medium">IGST (Inter-state Tax)</span>
+                                        <span className="font-bold text-xs text-foreground">₹{totals.tax.igst.toFixed(2)}</span>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="flex justify-between items-center pl-1">
+                                            <span className="text-muted-foreground text-xs font-medium">CGST (Central Tax)</span>
+                                            <span className="font-bold text-xs text-foreground">₹{totals.tax.cgst.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center pl-1">
+                                            <span className="text-muted-foreground text-xs font-medium">SGST (State Tax)</span>
+                                            <span className="font-bold text-xs text-foreground">₹{totals.tax.sgst.toFixed(2)}</span>
+                                        </div>
+                                    </>
+                                )}
+
+                                <div className="flex justify-between items-center px-1 pt-1 border-t border-border/5">
+                                    <span className="text-[10px] text-muted-foreground font-medium italic">
                                         Total Tax (Included)
                                     </span>
-                                    <span className="text-[10px] text-muted-foreground/50 italic font-medium">
+                                    <span className="text-[10px] text-muted-foreground/80 font-bold">
                                         ₹{totals.tax.totalTax.toFixed(2)}
                                     </span>
                                 </div>
 
                                 <details className="group mt-1 px-1">
-                                    <summary className="text-[9px] text-primary cursor-pointer hover:underline mb-1 list-none flex items-center gap-1 font-medium opacity-80 hover:opacity-100">
-                                        <span>View Tax Breakdown</span>
+                                    <summary className="text-[9px] text-primary cursor-pointer hover:opacity-80 transition-opacity mb-1 list-none flex items-center gap-1 font-bold uppercase tracking-wider">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-primary/30 group-open:bg-primary transition-colors animate-pulse" />
+                                        <span>View Product-wise Tax</span>
                                     </summary>
-                                    <div className="bg-muted/30 rounded p-2 space-y-1.5 mt-1 max-h-[120px] overflow-y-auto custom-scrollbar">
+                                    <div className="bg-muted/30 rounded-xl p-3 space-y-2.5 mt-2 max-h-[160px] overflow-y-auto custom-scrollbar border border-border/10 shadow-inner">
                                         {/* Product Tax */}
                                         {(items || []).map((item, idx) => {
                                             const taxRate = item.variant?.gst_rate ?? item.product?.default_gst_rate ?? 0;
@@ -248,12 +316,16 @@ export const CartSummary = ({
                                             const itemTax = itemTotal - (itemTotal / (1 + (taxRate / 100)));
 
                                             return (
-                                                <div key={`tax-${idx}`} className="flex flex-col text-[8px] text-muted-foreground border-b border-dashed border-border/40 last:border-0 pb-1 last:pb-0">
-                                                    <div className="flex justify-between font-medium text-foreground/70">
-                                                        <span className="truncate max-w-[120px]">{item.product?.title}</span>
-                                                        <span>{taxRate}% GST</span>
+                                                <div key={`tax-${idx}`} className="flex flex-col text-[10px] text-muted-foreground border-b border-dashed border-border/40 last:border-0 pb-2 last:pb-0">
+                                                    <div className="flex justify-between font-bold text-foreground/80 mb-0.5">
+                                                        <span className="truncate max-w-[140px]">{item.product?.title || 'Product'}</span>
+                                                        <span className="text-[9px] bg-primary/5 px-1.5 py-0.5 rounded text-primary">{taxRate}% GST</span>
                                                     </div>
-                                                    <div className="flex justify-between pl-1 opacity-70">
+                                                    <div className="flex justify-between pl-1 opacity-80">
+                                                        <span>Taxable Amount</span>
+                                                        <span>₹{(itemTotal - itemTax).toFixed(2)}</span>
+                                                    </div>
+                                                    <div className="flex justify-between pl-1 font-bold text-foreground/60">
                                                         <span>Tax Amount</span>
                                                         <span>₹{itemTax.toFixed(2)}</span>
                                                     </div>
@@ -264,22 +336,23 @@ export const CartSummary = ({
                                         {/* Delivery Tax */}
                                         {(() => {
                                             const delTaxLines = [];
-                                            if ((totals?.globalDeliveryGST ?? 0) > 0) {
-                                                delTaxLines.push({ label: "Standard Delivery GST", amount: totals.globalDeliveryGST || 0 });
+                                            const globalDeliveryGST = totals?.globalDeliveryGST ?? totals?.global_delivery_gst ?? 0;
+                                            if (globalDeliveryGST > 0) {
+                                                delTaxLines.push({ label: "Standard Delivery GST", amount: globalDeliveryGST });
                                             }
                                             let surchargeGST = 0;
                                             (items || []).forEach(it => { if (it.delivery_meta?.source !== 'global') surchargeGST += (it.delivery_gst || 0); });
                                             if (surchargeGST > 0) {
-                                                delTaxLines.push({ label: "Sur-Charge GST", amount: surchargeGST });
+                                                delTaxLines.push({ label: "Surcharge GST", amount: surchargeGST });
                                             }
 
                                             return delTaxLines.map((line, lidx) => (
-                                                <div key={`del-tax-${lidx}`} className="flex flex-col text-[8px] text-muted-foreground border-b border-dashed border-border/40 last:border-0 pb-1 last:pb-0">
-                                                    <div className="flex justify-between font-medium text-foreground/70">
+                                                <div key={`del-tax-${lidx}`} className="flex flex-col text-[10px] text-muted-foreground border-b border-dashed border-border/40 last:border-0 pb-2 last:pb-0">
+                                                    <div className="flex justify-between font-bold text-foreground/80 mb-0.5">
                                                         <span>{line.label}</span>
-                                                        <span>18% GST</span>
+                                                        <span className="text-[9px] bg-primary/5 px-1.5 py-0.5 rounded text-primary">18% GST</span>
                                                     </div>
-                                                    <div className="flex justify-between pl-1 opacity-70">
+                                                    <div className="flex justify-between pl-1 font-bold text-foreground/60">
                                                         <span>Tax Amount</span>
                                                         <span>₹{line.amount.toFixed(2)}</span>
                                                     </div>
@@ -317,61 +390,111 @@ export const CartSummary = ({
                     </div>
                 )}
 
-                {totals?.coupon && totals.couponDiscount > 0 && (
-                    <div className="flex justify-between text-emerald-600 font-black pt-1 border-t border-dashed border-emerald-100/50">
+                {totals?.coupon && (totals.couponDiscount > 0 || totals.coupon.type === 'free_delivery') && (
+                    <div className="flex justify-between text-[#0D9488] font-bold pt-1 border-t border-dashed border-[#CCFBF1]">
                         <span className="flex items-center gap-1.5">
                             <Sparkles className="w-3.5 h-3.5" />
                             Coupon ({totals.coupon.code})
                         </span>
-                        <span>-₹{totals.couponDiscount.toFixed(2)}</span>
+                        <span>
+                            {totals.coupon.type === 'free_delivery' && (totals.couponDiscount || 0) === 0
+                                ? 'Applied'
+                                : `-₹${(totals.couponDiscount || 0).toFixed(2)}`}
+                        </span>
                     </div>
                 )}
 
                 <Separator className="opacity-50" />
 
-                {/* Promotional Section */}
-                <div className="space-y-4">
-                    <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-muted-foreground">
-                        <TagIcon className="w-3.5 h-3.5" />
+                {/* Apply Promotion Section */}
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground/80">
+                        <Tag className="w-3.5 h-3.5 text-primary" />
                         Apply Promotion
                     </div>
 
                     {totals?.coupon ? (
-                        <div className="flex items-center justify-between p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl animate-in zoom-in-95">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center">
-                                    <Gift className="w-4 h-4" />
-                                </div>
-                                <div>
-                                    <div className="text-[10px] font-black text-emerald-600 uppercase tracking-tighter">Applied</div>
-                                    <div className="text-sm font-black text-emerald-700 tracking-tight">{totals.coupon.code}</div>
+                        <div className="relative group">
+                            <div className="p-4 bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-2xl animate-in zoom-in-95 duration-300">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex-1 space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className="bg-emerald-600 text-white text-xs font-black px-2.5 py-1 rounded-lg shadow-sm uppercase tracking-tight">
+                                                {totals.coupon.code}
+                                            </div>
+                                            <div className="flex items-center gap-1 text-emerald-700 text-xs font-bold">
+                                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                                Applied
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-sm font-bold text-emerald-900">
+                                                {totals.coupon.type === 'free_delivery'
+                                                    ? '🎉 Free Delivery Unlocked!'
+                                                    : `💰 ${totals.coupon.discount_percentage}% Discount Applied`}
+                                            </p>
+                                            {totals.couponDiscount > 0 && (
+                                                <p className="text-xs text-emerald-700 font-semibold">
+                                                    You saved ₹{totals.couponDiscount.toFixed(2)}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={onRemoveCoupon}
+                                        disabled={isLoading}
+                                        className="p-2 hover:bg-emerald-100 rounded-lg transition-colors group-hover:opacity-100 opacity-60"
+                                        title="Remove coupon"
+                                    >
+                                        <X className="w-4 h-4 text-emerald-700" />
+                                    </button>
                                 </div>
                             </div>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={onRemoveCoupon}
-                                className="h-8 w-8 p-0 rounded-full hover:bg-destructive/10 hover:text-destructive"
-                            >
-                                <X className="w-4 h-4" />
-                            </Button>
+                            <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-2xl opacity-20 blur-sm -z-10 group-hover:opacity-30 transition-opacity" />
                         </div>
                     ) : (
-                        <div className="flex gap-2">
-                            <Input
-                                placeholder="PROMO CODE"
-                                value={couponCode}
-                                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                                className="uppercase font-bold h-10 rounded-xl"
-                                onKeyDown={(e) => e.key === "Enter" && handleApplyCoupon()}
-                            />
-                            <Button
-                                onClick={() => handleApplyCoupon()}
-                                disabled={!couponCode || isLoading || isApplyingCoupon}
-                                className="h-10 px-4 rounded-xl font-black uppercase tracking-widest text-[10px]"
-                            >
-                                {isApplyingCoupon ? <Loader2 className="w-4 h-4 animate-spin" /> : "Apply"}
-                            </Button>
+                        <div className="relative">
+                            <div className="flex gap-2">
+                                <div className="relative flex-1">
+                                    <Input
+                                        placeholder="Enter coupon code"
+                                        value={couponCode}
+                                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && couponCode.trim()) {
+                                                handleApplyCoupon();
+                                            }
+                                        }}
+                                        disabled={isLoading || isApplyingCoupon}
+                                        className="h-12 px-4 pr-10 rounded-xl border-2 border-border/60 focus:border-primary/50 font-mono text-sm font-bold uppercase tracking-wider placeholder:normal-case placeholder:tracking-normal placeholder:font-normal transition-all"
+                                    />
+                                    {couponCode && (
+                                        <button
+                                            onClick={() => setCouponCode('')}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-muted rounded-full transition-colors"
+                                        >
+                                            <X className="w-4 h-4 text-muted-foreground" />
+                                        </button>
+                                    )}
+                                </div>
+                                <Button
+                                    onClick={() => handleApplyCoupon()}
+                                    disabled={!couponCode || isLoading || isApplyingCoupon}
+                                    className="h-12 px-6 rounded-xl font-black uppercase tracking-widest text-xs bg-primary hover:bg-primary/90 shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
+                                >
+                                    {isApplyingCoupon ? (
+                                        <div className="flex items-center gap-2">
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            <span className="hidden sm:inline">Applying...</span>
+                                        </div>
+                                    ) : (
+                                        'Apply'
+                                    )}
+                                </Button>
+                            </div>
+                            {isApplyingCoupon && (
+                                <div className="absolute inset-0 bg-background/50 backdrop-blur-[2px] rounded-xl animate-in fade-in duration-200" />
+                            )}
                         </div>
                     )}
                 </div>
@@ -381,26 +504,31 @@ export const CartSummary = ({
                 {/* Final Total */}
                 <div className="space-y-4">
                     <div className="flex justify-between items-end">
-                        <span className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Total Pay</span>
+                        <span className="text-sm font-black text-muted-foreground/60 uppercase tracking-[0.1em]">Total Pay</span>
                         <div className="text-right">
-                            <span className="text-3xl font-black text-primary block leading-none tracking-tighter">
+                            <span className="text-4xl font-black text-primary block leading-none tracking-tighter font-playfair">
                                 ₹{totals?.finalAmount?.toFixed(2) || '0.00'}
                             </span>
-                            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest">
+                            <span className="text-[10px] text-muted-foreground/40 font-bold uppercase tracking-widest mt-1 block">
                                 Including GST & Fees
                             </span>
                         </div>
                     </div>
 
-                    {totals && (totals.discount + totals.couponDiscount) > 0 && (
-                        <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 text-[11px] p-2.5 rounded-xl text-center font-bold">
-                            Congrats! You are saving ₹{(totals.discount + totals.couponDiscount).toFixed(2)}
-                        </div>
-                    )}
+                    {(() => {
+                        const freeDeliverySavings = totals?.coupon?.type === 'free_delivery' ? (totals?.deliverySettings?.charge || 0) : 0;
+                        const totalSavings = (totals?.discount || 0) + (totals?.couponDiscount || 0) + freeDeliverySavings;
+
+                        return totals && totalSavings > 0 ? (
+                            <div className="bg-[#F0FDFA] border border-[#CCFBF1] text-[#0D9488] text-[11px] p-3 rounded-xl text-center font-bold animate-in zoom-in-95">
+                                Congrats! You are saving ₹{totalSavings.toFixed(2)}
+                            </div>
+                        ) : null;
+                    })()}
 
                     <Button
                         size="lg"
-                        className="w-full h-14 text-lg font-black uppercase tracking-widest shadow-xl rounded-2xl"
+                        className="w-full h-14 text-xl font-black uppercase tracking-[0.15em] shadow-xl rounded-2xl bg-[#BA5C3C] hover:bg-[#A54B2D] transition-all duration-300"
                         onClick={onCheckout}
                         disabled={isLoading || itemsCount === 0}
                     >

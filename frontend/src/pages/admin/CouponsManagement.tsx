@@ -160,6 +160,8 @@ const CouponsManagement = () => {
                                     <SelectItem value="cart">Cart-Level</SelectItem>
                                     <SelectItem value="category">Category-Level</SelectItem>
                                     <SelectItem value="product">Product-Level</SelectItem>
+                                    <SelectItem value="variant">Variant-Level</SelectItem>
+                                    <SelectItem value="free_delivery">Free Delivery</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -230,7 +232,9 @@ const CouponsManagement = () => {
                                                     {coupon.type}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell>{coupon.discount_percentage}%</TableCell>
+                                            <TableCell>
+                                                {coupon.type === 'free_delivery' ? 'Free Shipping' : `${coupon.discount_percentage}%`}
+                                            </TableCell>
                                             <TableCell>
                                                 <span
                                                     className={

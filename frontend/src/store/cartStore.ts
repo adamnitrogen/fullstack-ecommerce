@@ -2,6 +2,7 @@ import { logger } from "@/lib/logger";
 import { create } from "zustand";
 import { CartItem, Product, CartTotals } from "@/types";
 import { cartService } from "@/services/cart.service";
+import { couponService } from "@/services/coupon.service";
 import { toast } from "sonner";
 import { CartDTO } from "@/lib/dto/cart.dto";
 import axios from "axios";

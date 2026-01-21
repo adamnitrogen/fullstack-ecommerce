@@ -114,37 +114,40 @@ const getCheckoutSummary = async (userId, addressId = null) => {
         .eq('id', userId)
         .single();
 
+    // OPTIMIZATION: Fetch all addresses once instead of multiple queries (reduces 6 queries to 1)
+    const allAddresses = await getUserAddresses(userId);
+
+    // Helper function to find address by type
+    const findAddressByType = (addresses, type) => {
+        // First try primary of that type
+        const primary = addresses.find(a => a.is_primary && (a.type === type || a.type === 'both'));
+        if (primary) return primary;
+
+        // Then try latest of that type
+        return addresses.find(a => a.type === type || a.type === 'both');
+    };
+
     // Get shipping address
     let shippingAddress = null;
     if (addressId) {
-        // If specific address requested (e.g. user changed selection), fetch it
-        try {
-            shippingAddress = await getAddressById(addressId, userId);
-        } catch (error) {
-            logger.warn({ error, addressId }, 'Failed to fetch requested address, falling back to default');
+        // If specific address requested, find it in the fetched list
+        shippingAddress = allAddresses.find(a => a.id === addressId);
+        if (!shippingAddress) {
+            logger.warn({ addressId }, 'Requested address not found, using default');
         }
     }
 
     if (!shippingAddress) {
-        // Default logic
-        shippingAddress = await getPrimaryAddress(userId, 'shipping');
+        // Try primary shipping, then latest shipping, then any primary, then first address
+        shippingAddress = findAddressByType(allAddresses, 'shipping') ||
+            allAddresses.find(a => a.is_primary) ||
+            allAddresses[0];
     }
 
-    if (!shippingAddress) {
-        shippingAddress = await getLatestAddress(userId, 'shipping');
-    }
-    if (!shippingAddress) {
-        shippingAddress = await getLatestAddress(userId); // Fallback to any address
-    }
-
-    // Get primary billing address -> latest billing -> latest any
-    let billingAddress = await getPrimaryAddress(userId, 'billing');
-    if (!billingAddress) {
-        billingAddress = await getLatestAddress(userId, 'billing');
-    }
-    if (!billingAddress) {
-        billingAddress = await getLatestAddress(userId); // Fallback to any address
-    }
+    // Get billing address: try primary billing, then latest billing, then use shipping
+    let billingAddress = findAddressByType(allAddresses, 'billing') ||
+        allAddresses.find(a => a.is_primary) ||
+        allAddresses[0];
 
     // Calculate taxes if shipping address is available
     let taxResult = null;
