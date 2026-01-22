@@ -234,10 +234,17 @@ router.post('/create-payment-order', validate(createPaymentOrderSchema), request
         if (cart.applied_coupon_code) {
             const { validateCoupon } = require('../services/coupon.service');
 
+            // Normalize items for validation (Service expects 'product' and 'variant' keys)
+            const normalizedItems = cart.cart_items.map(item => ({
+                ...item,
+                product: item.products,
+                variant: item.product_variants
+            }));
+
             const validation = await validateCoupon(
                 cart.applied_coupon_code,
                 userId,
-                cart.cart_items,
+                normalizedItems,
                 totals.totalPrice,
                 true // Force live check for critical operation
             );

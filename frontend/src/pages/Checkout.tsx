@@ -405,6 +405,24 @@ export default function Checkout() {
 
   if (!summary) return null;
 
+  // Prepare cart items with delivery details embedded
+  const cartItems = summary.cart.cart_items.map((item) => {
+    const itemDetail = summary.totals.itemBreakdown?.find((id: any) =>
+      (id.variant_id && id.variant_id === item.variant_id) ||
+      (!id.variant_id && id.product_id === item.product_id)
+    );
+
+    return {
+      ...item,
+      productId: item.product_id,
+      product: item.products,
+      variant: item.product_variants,
+      delivery_charge: itemDetail?.delivery_charge || 0,
+      delivery_gst: itemDetail?.delivery_gst || 0,
+      delivery_meta: itemDetail?.delivery_meta
+    };
+  });
+
   return (
     <div className="min-h-screen bg-background pb-20">
       <LoadingOverlay
@@ -435,159 +453,146 @@ export default function Checkout() {
       </section>
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
-          {/* Left Column - Addresses */}
-          <div className="lg:col-span-8 space-y-8">
-            {/* Shipping Address */}
-            <Card className="border-none shadow-sm overflow-hidden">
-              <CardHeader className="bg-muted/30 pb-4">
-                <CardTitle className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm shadow-md">
-                    1
-                  </div>
-                  Shipping Address
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <AddressSelector
-                  type="shipping"
-                  selectedAddressId={shippingAddress?.id}
-                  onSelect={(address) => {
-                    // Only refetch if address actually changed
-                    if (shippingAddress?.id !== address.id) {
-                      setShippingAddress(address);
-                      fetchCheckoutSummary(address.id);
-                    }
-                  }}
-                  forceEditId={addressIdToEdit}
-                  onEditOpened={() => setAddressIdToEdit(null)}
-                />
-              </CardContent>
-            </Card>
+        <div className="space-y-8">
+          {/* Top Section: Order Items */}
+          <Card className="border-none shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <CardHeader className="bg-muted/30 pb-4">
+              <CardTitle className="flex items-center gap-3">
+                <ShoppingBag className="w-5 h-5 text-primary" />
+                Items in your Order
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <OrderSummary items={cartItems} />
+            </CardContent>
+          </Card>
 
-            {/* Billing Address */}
-            <Card className="border-none shadow-sm overflow-hidden">
-              <CardHeader className="bg-muted/30 pb-4">
-                <CardTitle className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm shadow-md">
-                    2
-                  </div>
-                  Billing Address
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6 space-y-6">
-                <div className="flex items-center space-x-3 bg-muted/20 p-4 rounded-lg border border-border/50">
-                  <Checkbox
-                    id="billing-same"
-                    checked={billingSameAsShipping}
-                    onCheckedChange={(checked) => setBillingSameAsShipping(checked as boolean)}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+            {/* Left Column - Addresses */}
+            <div className="lg:col-span-8 space-y-8">
+              {/* Shipping Address */}
+              <Card className="border-none shadow-sm overflow-hidden">
+                <CardHeader className="bg-muted/30 pb-4">
+                  <CardTitle className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm shadow-md">
+                      1
+                    </div>
+                    Shipping Address
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <AddressSelector
+                    type="shipping"
+                    selectedAddressId={shippingAddress?.id}
+                    onSelect={(address) => {
+                      // Only refetch if address actually changed
+                      if (shippingAddress?.id !== address.id) {
+                        setShippingAddress(address);
+                        fetchCheckoutSummary(address.id);
+                      }
+                    }}
+                    forceEditId={addressIdToEdit}
+                    onEditOpened={() => setAddressIdToEdit(null)}
                   />
-                  <Label htmlFor="billing-same" className="cursor-pointer font-medium">
-                    Same as shipping address
-                  </Label>
-                </div>
+                </CardContent>
+              </Card>
 
-                {!billingSameAsShipping && (
-                  <div className="animate-in fade-in slide-in-from-top-2 pt-2">
-                    <AddressSelector
-                      type="billing"
-                      selectedAddressId={billingAddress?.id}
-                      onSelect={setBillingAddress}
+              {/* Billing Address */}
+              <Card className="border-none shadow-sm overflow-hidden">
+                <CardHeader className="bg-muted/30 pb-4">
+                  <CardTitle className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm shadow-md">
+                      2
+                    </div>
+                    Billing Address
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-6">
+                  <div className="flex items-center space-x-3 bg-muted/20 p-4 rounded-lg border border-border/50">
+                    <Checkbox
+                      id="billing-same"
+                      checked={billingSameAsShipping}
+                      onCheckedChange={(checked) => setBillingSameAsShipping(checked as boolean)}
                     />
+                    <Label htmlFor="billing-same" className="cursor-pointer font-medium">
+                      Same as shipping address
+                    </Label>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
 
-          {/* Right Column - Order Summary */}
-          <div className="lg:col-span-4 space-y-6">
-            <div className="sticky top-24 space-y-6">
-              <Card className="border-none shadow-elevated overflow-hidden">
-                <CardContent className="p-6 space-y-2">
-                  {/* Define mapped items to reuse */}
-                  {(() => {
-                    const cartItems = summary.cart.cart_items.map((item) => {
-                      const itemDetail = summary.totals.itemBreakdown?.find((id: any) =>
-                        (id.variant_id && id.variant_id === item.variant_id) ||
-                        (!id.variant_id && id.product_id === item.product_id)
-                      );
-
-                      return {
-                        ...item,
-                        productId: item.product_id,
-                        product: item.products,
-                        variant: item.product_variants,
-                        delivery_charge: itemDetail?.delivery_charge || 0,
-                        delivery_gst: itemDetail?.delivery_gst || 0,
-                        delivery_meta: itemDetail?.delivery_meta
-                      };
-                    });
-
-                    return (
-                      <>
-                        <OrderSummary items={cartItems} />
-
-                        <Separator className="bg-border/60 my-2" />
-
-                        <PriceBreakdown totals={summary.totals} items={cartItems} />
-                      </>
-                    );
-                  })()}
-
-                  <Button
-                    className="w-full h-14 text-lg font-bold shadow-lg hover:shadow-xl transition-all"
-                    onClick={handlePayment}
-                    disabled={processing}
-                  >
-                    {processing ? (
-                      <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <Lock className="mr-2 h-4 w-4" />
-                        Pay ₹{summary.totals.finalAmount.toFixed(2)}
-                      </>
-                    )}
-                  </Button>
-
-                  <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground bg-muted/30 py-2 rounded-full">
-                    <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                    <span>Secure Payment via Razorpay</span>
-                  </div>
+                  {!billingSameAsShipping && (
+                    <div className="animate-in fade-in slide-in-from-top-2 pt-2">
+                      <AddressSelector
+                        type="billing"
+                        selectedAddressId={billingAddress?.id}
+                        onSelect={setBillingAddress}
+                      />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
+
+            {/* Right Column - Order Summary */}
+            <div className="lg:col-span-4 space-y-6">
+              <div className="sticky top-24 space-y-6">
+                <Card className="border-none shadow-elevated overflow-hidden">
+                  <CardContent className="p-6 space-y-2">
+                    <PriceBreakdown totals={summary.totals} items={cartItems} />
+
+                    <Button
+                      className="w-full h-14 text-lg font-bold shadow-lg hover:shadow-xl transition-all"
+                      onClick={handlePayment}
+                      disabled={processing}
+                    >
+                      {processing ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="mr-2 h-4 w-4" />
+                          Pay ₹{summary.totals.finalAmount.toFixed(2)}
+                        </>
+                      )}
+                    </Button>
+
+                    <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground bg-muted/30 py-2 rounded-full">
+                      <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                      <span>Secure Payment via Razorpay</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </div>
         </div>
+
+        <AlertDialog open={showPhoneWarning} onOpenChange={setShowPhoneWarning}>
+          <AlertDialogContent className="rounded-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="font-playfair text-2xl text-destructive">Phone Number Required</AlertDialogTitle>
+              <AlertDialogDescription className="text-base">
+                To ensure smooth delivery, we need a valid phone number. Please update your shipping address to include a contact number.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogAction onClick={() => {
+                if (shippingAddress) setAddressIdToEdit(shippingAddress.id);
+                setShowPhoneWarning(false);
+              }} className="rounded-full px-6">
+                OK, I'll add it
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <OutOfStockModal
+          open={showStockModal}
+          onClose={() => setShowStockModal(false)}
+          items={stockIssues}
+        />
       </div>
-
-      <AlertDialog open={showPhoneWarning} onOpenChange={setShowPhoneWarning}>
-        <AlertDialogContent className="rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="font-playfair text-2xl text-destructive">Phone Number Required</AlertDialogTitle>
-            <AlertDialogDescription className="text-base">
-              To ensure smooth delivery, we need a valid phone number. Please update your shipping address to include a contact number.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => {
-              if (shippingAddress) setAddressIdToEdit(shippingAddress.id);
-              setShowPhoneWarning(false);
-            }} className="rounded-full px-6">
-              OK, I'll add it
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <OutOfStockModal
-        open={showStockModal}
-        onClose={() => setShowStockModal(false)}
-        items={stockIssues}
-      />
     </div>
   );
 }

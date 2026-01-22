@@ -23,11 +23,11 @@ export function OrderSummary({ items }: OrderSummaryProps) {
 
             <Separator className="bg-border/60" />
 
-            <ScrollArea className="max-h-[320px] pr-4 -mr-4">
-                <div className="space-y-3 pt-2">
+            <ScrollArea className="max-h-[60vh] pr-4 -mr-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pt-2">
                     {items.map((item) => (
-                        <div key={item.id} className="flex gap-3 items-start group">
-                            <div className="w-12 h-12 flex-shrink-0 rounded-md overflow-hidden border border-border/50 bg-muted/20 relative">
+                        <div key={item.id} className="flex gap-3 items-start group bg-muted/20 p-3 rounded-lg border border-border/50 hover:bg-muted/40 transition-colors">
+                            <div className="w-16 h-16 flex-shrink-0 rounded-md overflow-hidden border border-border/50 bg-white relative">
                                 <AspectRatio ratio={1}>
                                     <img
                                         src={item.product.images[0] || "/placeholder.png"}
@@ -36,8 +36,8 @@ export function OrderSummary({ items }: OrderSummaryProps) {
                                     />
                                 </AspectRatio>
                             </div>
-                            <div className="flex-1 min-w-0 space-y-0.5">
-                                <h4 className="text-sm font-semibold line-clamp-1 text-foreground group-hover:text-primary transition-colors">
+                            <div className="flex-1 min-w-0 space-y-1">
+                                <h4 className="text-sm font-semibold line-clamp-2 text-foreground group-hover:text-primary transition-colors leading-tight">
                                     {item.product.title}
                                 </h4>
                                 {item.sizeLabel && (
@@ -45,9 +45,9 @@ export function OrderSummary({ items }: OrderSummaryProps) {
                                         {item.sizeLabel}
                                     </p>
                                 )}
-                                <div className="flex justify-between items-center text-xs">
+                                <div className="flex justify-between items-center text-xs mt-1">
                                     <p className="text-muted-foreground font-medium">
-                                        Qty: <span className="text-foreground">{item.quantity}</span>
+                                        Qty: <span className="text-foreground font-bold">{item.quantity}</span>
                                     </p>
                                     <div className="text-right">
                                         <p className="font-bold tabular-nums">
