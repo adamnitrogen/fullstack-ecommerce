@@ -477,11 +477,25 @@ const createRazorpayInvoice = async (amount, receipt, customer, lineItems, total
 
 // Verify Razorpay payment signature
 const verifyRazorpayPayment = (orderId, paymentId, signature) => {
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    if (!keySecret) {
+        throw new Error('RAZORPAY_KEY_SECRET is not defined in environment variables');
+    }
+
     const body = orderId + '|' + paymentId;
     const expectedSignature = crypto
-        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || 'your_secret_key')
+        .createHmac('sha256', keySecret)
         .update(body)
         .digest('hex');
+
+    if (expectedSignature !== signature) {
+        // Log mismatch details (masked) for debugging
+        const maskedSecret = keySecret.substring(0, 4) + '***';
+        // Do NOT log the full signatures in production, but for now we need to know why.
+        // Actually, never log the secret.
+        // We can log the inputs.
+        // logger.debug({ orderId, paymentId, signatureLength: signature.length }, 'Signature verification inputs');
+    }
 
     return expectedSignature === signature;
 };
@@ -542,8 +556,15 @@ const createOrder = async (userId, checkoutData, cart) => {
     // PRIMARY validation happens in /create-payment-order BEFORE payment capture
     // This is a SECONDARY check to catch race conditions (e.g., coupon disabled between payment steps)
     if (cart.applied_coupon_code) {
+        // Normalize items for validation (Service expects 'product' and 'variant' keys)
+        const normalizedItems = cart.cart_items.map(item => ({
+            ...item,
+            product: item.products,
+            variant: item.product_variants
+        }));
+
         // Force live check for critical operation
-        const validation = await validateCoupon(cart.applied_coupon_code, userId, cart.cart_items, totals.totalPrice, true);
+        const validation = await validateCoupon(cart.applied_coupon_code, userId, normalizedItems, totals.totalPrice, true);
 
         if (!validation.valid) {
             log.warn('STALE_COUPON_REJECTED_POST_PAYMENT', 'Coupon invalid after payment (race condition caught by safety guard)', {
@@ -758,16 +779,19 @@ const createOrder = async (userId, checkoutData, cart) => {
     // ATOMIC TRANSACTION: All operations execute together or none do
     // Creates: order, order_items, payment link, admin notifications, 
     // inventory decrease, cart clear - all in one transaction
-    const { data: rpcResult, error: rpcError } = await supabase
-        .rpc('create_order_transactional', {
-            p_user_id: userId,
-            p_order_data: orderData,
-            p_order_items: orderItems,
-            p_payment_id: payment_id || null,
-            p_cart_id: cart.id,
-            p_coupon_code: totals.coupon?.code || null,
-            p_order_number: checkoutData.orderNumber || null // NEW: Pass custom Order Number if provided
-        });
+
+    // Prepare RPC parameters - ALWAYS pass all 7 params to disambiguate function overloads
+    const rpcParams = {
+        p_user_id: userId,
+        p_order_data: orderData,
+        p_order_items: orderItems,
+        p_payment_id: payment_id || null,
+        p_cart_id: cart.id,
+        p_coupon_code: totals.coupon?.code || null,
+        p_order_number: checkoutData.orderNumber || null
+    };
+
+    const { data: rpcResult, error: rpcError } = await supabase.rpc('create_order_transactional', rpcParams);
 
     if (rpcError) {
         logger.error({ err: rpcError }, '[Checkout] Transactional order creation failed:');
@@ -859,8 +883,11 @@ const createOrder = async (userId, checkoutData, cart) => {
             const result = await InvoiceOrchestrator.generateRazorpayInvoice(order);
 
             if (!result.success) {
-                // CRITICAL: Invoice generation failed - this is a blocking error for paid orders
-                throw new Error(`Invoice generation failed: ${result.error || 'Unknown error'} - order cannot proceed without invoice`);
+                // CHANGED: Degrade gracefully instead of blocking the order.
+                // Invoice generation is important but shouldn't fail the entire order if the payment is captured.
+                logger.error({ err: result.error }, 'Invoice generation failed (non-fatal), proceeding with order');
+                order.invoice_status = 'pending_generation';
+                // We do NOT throw here anymore. Support can regenerate it.
             }
 
             if (result.invoiceUrl) {
@@ -1550,7 +1577,7 @@ async function processPaymentAndOrder(userId, {
                     razorpay_order_id
                 }, '[Checkout] Payment refunded successfully after order creation failure');
 
-                const userError = new Error('Order creation failed but your payment has been refunded automatically. The amount will be credited to your account within 5-7 business days.');
+                const userError = new Error(`Order creation failed [${systemError.message}] but your payment has been refunded automatically. The amount will be credited to your account within 5-7 business days.`);
                 userError.status = 500;
                 throw userError;
 
@@ -1579,7 +1606,7 @@ async function processPaymentAndOrder(userId, {
                     }
                 }
 
-                const userError = new Error(`Order creation failed and automatic refund encountered an issue. Please contact support immediately with Payment ID: ${razorpay_payment_id}. Our team will process your refund manually.`);
+                const userError = new Error(`Order creation failed [${systemError.message}] and automatic refund encountered an issue. Please contact support immediately with Payment ID: ${razorpay_payment_id}. Our team will process your refund manually.`);
                 userError.status = 500;
                 throw userError;
             }

@@ -346,7 +346,8 @@ router.post('/create-payment-order', validate(createPaymentOrderSchema), request
             invoice_id: razorpayResponse.invoice_id, // Store Invoice ID for reference
             amount: amount,
             currency: 'INR',
-            status: 'created'
+            status: 'created',
+            metadata: { receipt: receipt }
         });
 
         res.json({

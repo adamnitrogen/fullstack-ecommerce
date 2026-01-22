@@ -511,7 +511,7 @@ export default function UserOrderDetail() {
                                         <RotateCcw className="mr-2 h-4 w-4" /> Request Return
                                     </Button>
                                 </DialogTrigger>
-                                <DialogContent className="sm:max-w-lg">
+                                <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col">
                                     <DialogHeader>
                                         <DialogTitle className="flex items-center gap-2 text-xl">
                                             <RotateCcw className="h-5 w-5 text-orange-500" />
@@ -521,14 +521,14 @@ export default function UserOrderDetail() {
                                             Select the items you wish to return. Our team will review your request within 24-48 hours.
                                         </DialogDescription>
                                     </DialogHeader>
-                                    <div className="space-y-5 py-4">
+                                    <div className="flex-1 overflow-y-auto pr-2 -mr-2 py-4 space-y-5">
                                         {/* Item Selection */}
                                         <div className="space-y-3">
                                             <Label className="text-sm font-semibold flex items-center gap-2">
                                                 <Package className="h-4 w-4 text-muted-foreground" />
                                                 Select Items to Return
                                             </Label>
-                                            <div className="rounded-lg border bg-muted/30 p-1 max-h-64 overflow-y-auto space-y-2">
+                                            <div className="rounded-lg border bg-muted/30 p-1 space-y-2">
                                                 {returnableItems.length === 0 ? (
                                                     <div className="text-center py-8 text-muted-foreground">
                                                         <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -707,7 +707,7 @@ export default function UserOrderDetail() {
                                             />
                                         </div>
                                     </div>
-                                    <DialogFooter className="gap-2 sm:gap-0">
+                                    <DialogFooter className="gap-2 sm:gap-0 pt-4 border-t">
                                         <Button variant="ghost" onClick={() => setReturnOpen(false)}>
                                             Cancel
                                         </Button>

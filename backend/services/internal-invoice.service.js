@@ -402,13 +402,15 @@ class InternalInvoiceService {
               </div>
 
             <div class="footer">
-                <div class="policy-section" style="margin-bottom: 15px; font-size: 10px; color: #555; border-top: 1px solid #eee; padding-top: 12px;">
+                <div class="policy-section" style="margin-bottom: 15px; font-size: 10px; color: #555; border-top: 1px solid #eee; padding-top: 12px; page-break-inside: avoid;">
                     <p><strong>Returns Policy:</strong> At Meri Gau Mata we try to deliver perfectly each and every time. But in the off-chance that you need to return the item, please do so with the original Brand box/price tag, original packing and invoice without which it will be really difficult for us to act on your request. Please help us in helping you. Terms and conditions apply.</p>
                     <p style="margin-top: 5px;">The goods sold as are intended for end user consumption and not for re-sale.</p>
                 </div>
-                <p>Regd. office: ${invoice.seller.name}, ${invoice.seller.address.line1}, ${invoice.seller.address.city}, ${invoice.seller.address.state} - ${invoice.seller.address.zip}</p>
-                <p>Contact: ${invoice.seller.email} | ${invoice.seller.website}</p>
-                <div class="eoe">E. & O.E.</div>
+                <div style="position: relative;">
+                    <p>Regd. office: ${invoice.seller.name}, ${invoice.seller.address.line1}, ${invoice.seller.address.city}, ${invoice.seller.address.state} - ${invoice.seller.address.zip}</p>
+                    <p>Contact: ${invoice.seller.email} | ${invoice.seller.website}</p>
+                    <div class="eoe">E. & O.E.</div>
+                </div>
             </div>
             </div>`;
 
@@ -418,7 +420,7 @@ class InternalInvoiceService {
             <head>
             <style>
               body { font-family: 'Helvetica', sans-serif; margin: 0; padding: 0; color: #333; line-height: 1.4; }
-              .invoice-page { padding: 40px; min-height: 1000px; position: relative; page-break-after: always; }
+              .invoice-page { padding: 40px; display: flex; flex-direction: column; min-height: 277mm; page-break-after: always; box-sizing: border-box; }
               .header { display: flex; justify-content: space-between; border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 20px; }
               .header-left { display: flex; align-items: flex-start; gap: 20px; }
               .logo { width: 60px; height: 60px; object-fit: contain; }
@@ -438,15 +440,15 @@ class InternalInvoiceService {
               td { padding: 15px 10px; border-bottom: 1px solid #f9f9f9; font-size: 12px; vertical-align: top; overflow-wrap: break-word; }
               .total-row td { font-weight: bold; border-top: 2px solid #eee; border-bottom: none; background: #fafafa; padding: 12px 10px; }
 
-              .grand-total-section { display: flex; justify-content: flex-end; align-items: center; gap: 40px; margin-top: 20px; padding: 0 10px; }
+              .grand-total-section { display: flex; justify-content: flex-end; align-items: center; gap: 40px; margin-top: 20px; padding: 0 10px; page-break-inside: avoid; }
               .grand-total-label { font-size: 18px; color: #666; }
               .grand-total-value { font-size: 24px; font-weight: bold; }
-
-              .signature-section { margin-top: 30px; text-align: right; padding-right: 10px; }
+              
+              .signature-section { margin-top: 30px; text-align: right; padding-right: 10px; page-break-inside: avoid; }
               .signature-box { height: 60px; display: flex; align-items: center; justify-content: flex-end; }
               .signature-section p { margin: 5px 0; font-size: 12px; }
-
-              .footer { position: absolute; bottom: 40px; left: 40px; right: 40px; font-size: 10px; color: #777; padding-top: 10px; }
+              
+              .footer { margin-top: auto; font-size: 10px; color: #777; padding-top: 20px; }
               .footer p { margin: 2px 0; }
               .eoe { position: absolute; right: 0; bottom: 0; font-weight: bold; font-size: 10px;}
             </style>
