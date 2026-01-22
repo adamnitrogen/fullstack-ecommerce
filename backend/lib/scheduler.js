@@ -5,7 +5,7 @@
  */
 
 const cron = require('node-cron');
-const { EmailRetryService } = require('../services/email-retry.service');
+const EmailRetryService = require('../services/email-retry.service');
 const { InvoiceOrchestrator } = require('../services/invoice-orchestrator.service');
 const { createModuleLogger } = require('../utils/logging-standards');
 
@@ -14,11 +14,11 @@ const log = createModuleLogger('Scheduler');
 // Schedule configuration
 const SCHEDULES = {
     // Email retry: Every 5 minutes
-    EMAIL_RETRY: '*/5 * * * *',
+    EMAIL_RETRY: process.env.EMAIL_RETRY_SCHEDULE || '*/5 * * * *',
     // Invoice retry: Every 15 minutes
-    INVOICE_RETRY: '*/15 * * * *',
+    INVOICE_RETRY: process.env.INVOICE_RETRY_SCHEDULE || '*/15 * * * *',
     // Cleanup old logs: Daily at 3 AM
-    CLEANUP: '0 3 * * *'
+    CLEANUP: process.env.CLEANUP_SCHEDULE || '0 3 * * *'
 };
 
 let scheduledJobs = [];

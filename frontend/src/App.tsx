@@ -68,7 +68,7 @@ import ContactMessages from "./pages/admin/ContactMessages";
 import ContactMessageDetail from "./pages/admin/ContactMessageDetail";
 import AboutUsManagement from "./pages/admin/AboutUsManagement";
 import PolicyManagement from "./pages/admin/PolicyManagement";
-import JobsManagement from "./pages/admin/JobsManagement";
+import BackgroundJobs from "./pages/admin/BackgroundJobs";
 import OrdersManagement from "./pages/admin/OrdersManagementNew";
 import OrderDetail from "./pages/admin/OrderDetail";
 import SettingsManagement from "./pages/admin/SettingsManagement";
@@ -271,7 +271,7 @@ const App = () => {
                 <Route path="contact-messages/:id" element={<ContactMessageDetail />} />
                 <Route path="about-us" element={<AboutUsManagement />} />
                 <Route path="policies" element={<PolicyManagement />} />
-                <Route path="jobs" element={<JobsManagement />} />
+                <Route path="jobs" element={<BackgroundJobs />} />
 
                 <Route path="settings" element={<SettingsManagement />} />
               </Route>

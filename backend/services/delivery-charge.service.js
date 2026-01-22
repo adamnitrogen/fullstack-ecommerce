@@ -144,13 +144,13 @@ class DeliveryChargeService {
      * @param {boolean} isFreeDelivery - Whether free delivery applies (for standard/flat rate)
      * @returns {Promise<object>} { deliveryCharge, deliveryGST, totalDelivery, snapshot }
      */
-    static async calculateDeliveryCharge(productId, variantId, quantity, isFreeDelivery = false) {
-        log.operationStart('CALCULATE_DELIVERY', { productId, variantId, quantity, isFreeDelivery });
+    static async calculateDeliveryCharge(productId, variantId, quantity, isFreeDelivery = false, prefetchedConfig = null) {
+        log.operationStart('CALCULATE_DELIVERY', { productId, variantId, quantity, isFreeDelivery, hasPrefetched: !!prefetchedConfig });
         const startTime = Date.now();
 
         try {
-            // Get delivery config
-            const config = await this.getDeliveryConfig(productId, variantId);
+            // Get delivery config - Use prefetched or fetch from DB
+            const config = prefetchedConfig || await this.getDeliveryConfig(productId, variantId);
 
             let deliveryCharge = 0;
             let calculationDetails = {
@@ -301,7 +301,7 @@ class DeliveryChargeService {
                 if (isGlobal) {
                     // Global Standard Delivery: Apply only once per order
                     if (!globalChargeApplied) {
-                        const result = await this.calculateDeliveryCharge(productId, variantId, quantity, isFreeDelivery);
+                        const result = await this.calculateDeliveryCharge(productId, variantId, quantity, isFreeDelivery, config);
                         totalDeliveryCharge += result.deliveryCharge;
                         totalDeliveryGST += result.deliveryGST;
                         globalChargeApplied = true;
@@ -343,7 +343,8 @@ class DeliveryChargeService {
                         // effectively attributing the base charge to this item for accounting.
 
                         // Fetch global defaults essentially by calling with nulls
-                        const globalResult = await this.calculateDeliveryCharge(null, null, 1, isFreeDelivery);
+                        // Use the current config if it happens to be global, otherwise it will fetch
+                        const globalResult = await this.calculateDeliveryCharge(null, null, 1, isFreeDelivery, isGlobal ? config : null);
                         totalDeliveryCharge += globalResult.deliveryCharge;
                         totalDeliveryGST += globalResult.deliveryGST;
                         globalChargeApplied = true;
@@ -365,7 +366,7 @@ class DeliveryChargeService {
                     // Product Specific Charge (The Surcharge itself)
                     // Note: Surcharges shouldn't be free just because order > threshold? 
                     // Assuming surcharge is always paid unless specific logic exists.
-                    const result = await this.calculateDeliveryCharge(productId, variantId, quantity, false);
+                    const result = await this.calculateDeliveryCharge(productId, variantId, quantity, false, config);
 
                     totalDeliveryCharge += result.deliveryCharge;
                     totalDeliveryGST += result.deliveryGST;

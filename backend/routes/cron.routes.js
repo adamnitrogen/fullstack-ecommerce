@@ -5,8 +5,9 @@
 
 const express = require('express');
 const router = express.Router();
-const { EmailRetryService } = require('../services/email-retry.service');
+const EmailRetryService = require('../services/email-retry.service');
 const { InvoiceOrchestrator } = require('../services/invoice-orchestrator.service');
+const { getSchedulerStatus } = require('../lib/scheduler');
 const { createModuleLogger } = require('../utils/logging-standards');
 
 const log = createModuleLogger('CronRoutes');
@@ -93,6 +94,40 @@ router.get('/email-stats', cronAuth, async (req, res) => {
         res.status(200).json({
             success: true,
             stats
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * @route GET /api/cron/invoice-stats
+ * @description Get invoice generation statistics
+ * @access Cron Secret
+ */
+router.get('/invoice-stats', cronAuth, async (req, res) => {
+    try {
+        const stats = await InvoiceOrchestrator.getInvoiceStats();
+        res.status(200).json({
+            success: true,
+            stats
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * @route GET /api/cron/scheduler-status
+ * @description Get background job scheduler status
+ * @access Cron Secret
+ */
+router.get('/scheduler-status', cronAuth, async (req, res) => {
+    try {
+        const status = getSchedulerStatus();
+        res.status(200).json({
+            success: true,
+            ...status
         });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });

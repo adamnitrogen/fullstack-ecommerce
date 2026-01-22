@@ -123,6 +123,87 @@ class InvoiceOrchestrator {
         }
     }
 
+    /**
+     * Retry failed invoice generation for orders
+     * Typically called by background job
+     */
+    static async retryFailedInvoices(limit = 10) {
+        log.operationStart('RETRY_FAILED_INVOICES', { limit });
+        try {
+            // Find orders where invoice status is 'failed'
+            const { data: failedOrders, error } = await supabase
+                .from('orders')
+                .select('id, order_number, invoice_status')
+                .eq('invoice_status', 'failed')
+                .limit(limit);
+
+            if (error) throw error;
+
+            if (!failedOrders || failedOrders.length === 0) {
+                return { processed: 0, successful: 0 };
+            }
+
+            log.info(`Found ${failedOrders.length} failed invoices to retry`);
+
+            let successful = 0;
+            for (const order of failedOrders) {
+                // Determine which type was the one that failed or if we should just retry both
+                // For now, retry Internal GST Invoice as it's the most common failure point after delivery
+                const result = await this.generateInternalInvoice(order.id);
+                if (result.success) successful++;
+            }
+
+            return { processed: failedOrders.length, successful };
+        } catch (error) {
+            log.operationError('RETRY_FAILED_INVOICES', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get statistics about invoice generation
+     */
+    static async getInvoiceStats() {
+        try {
+            // Count by invoice_status in orders table (Legacy/Overall tracking)
+            const { data: orderStats, error: orderErr } = await supabase
+                .from('orders')
+                .select('invoice_status');
+
+            if (orderErr) throw orderErr;
+
+            const stats = {
+                orders: (orderStats || []).reduce((acc, curr) => {
+                    const status = curr.invoice_status || 'pending';
+                    acc[status] = (acc[status] || 0) + 1;
+                    return acc;
+                }, {}),
+                detailed: {
+                    RAZORPAY: { GENERATED: 0, FAILED: 0 },
+                    INTERNAL: { GENERATED: 0, FAILED: 0 }
+                }
+            };
+
+            // Count by type/status in invoices table (Detailed tracking)
+            const { data: invData, error: invErr } = await supabase
+                .from('invoices')
+                .select('type, status');
+
+            if (invErr) throw invErr;
+
+            (invData || []).forEach(inv => {
+                if (stats.detailed[inv.type]) {
+                    stats.detailed[inv.type][inv.status] = (stats.detailed[inv.type][inv.status] || 0) + 1;
+                }
+            });
+
+            return stats;
+        } catch (error) {
+            logger.error({ err: error }, 'Error fetching invoice stats');
+            return {};
+        }
+    }
+
     // --- Helpers ---
 
     static _prepareRazorpayData(order) {

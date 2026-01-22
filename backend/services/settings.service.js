@@ -7,14 +7,23 @@ const logger = require('../utils/logger');
  */
 
 // Cache for settings to avoid redundant DB calls on every cart calculation
+let settingsCache = null;
+let lastCacheUpdate = 0;
+const CACHE_TTL = 5000; // 5 seconds cache is enough for a single request flow
 
 function clearSettingsCache() {
-    // No-op: Cache removed
+    settingsCache = null;
+    lastCacheUpdate = 0;
 }
 
 async function getDeliverySettings() {
-    try {
+    // Check cache
+    const now = Date.now();
+    if (settingsCache && (now - lastCacheUpdate < CACHE_TTL)) {
+        return settingsCache;
+    }
 
+    try {
         const { data, error } = await supabase
             .from('store_settings')
             .select('key, value')
@@ -34,6 +43,9 @@ async function getDeliverySettings() {
             delivery_gst: settings.delivery_gst ?? 18 // Default to 18% GST if not set, matching system defaults
         };
 
+        // Update cache
+        settingsCache = result;
+        lastCacheUpdate = now;
 
         return result;
     } catch (error) {

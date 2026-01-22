@@ -128,6 +128,36 @@ class EmailRetryService {
         }
     }
 
+    /**
+     * Alias for processFailedEmails to match scheduler expectation
+     */
+    static async processRetryQueue(batchSize = 20) {
+        return this.processFailedEmails(batchSize);
+    }
+
+    /**
+     * Get statistics about email notifications and retry counts
+     */
+    static async getRetryStats() {
+        try {
+            const { data, error } = await supabase
+                .from('email_notifications')
+                .select('status, id', { count: 'exact' });
+
+            if (error) throw error;
+
+            const stats = data.reduce((acc, curr) => {
+                acc[curr.status] = (acc[curr.status] || 0) + 1;
+                return acc;
+            }, {});
+
+            return stats;
+        } catch (error) {
+            logger.error({ err: error }, 'Error fetching email retry stats');
+            return {};
+        }
+    }
+
     static async _markAsPermanentFail(id, reason) {
         await supabase
             .from('email_notifications')

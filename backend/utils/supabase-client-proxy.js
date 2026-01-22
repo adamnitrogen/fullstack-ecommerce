@@ -123,7 +123,7 @@ const createQueryProxy = (builder, context) => {
             // we need to wrap its result again in a proxy to keep capturing the chain.
             if (typeof value === 'function') {
                 return function (...args) {
-                    const nextBuilder = value.apply(this, args);
+                    const nextBuilder = value.apply(target, args);
 
                     // Update context if possible (e.g. if method is 'select', 'insert', etc.)
                     // postgrest-js methods return new builder instances.
