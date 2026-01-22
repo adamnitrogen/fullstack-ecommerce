@@ -15,7 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { Loader2, Lock, ShieldCheck, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
-import { loadRazorpay } from "@/lib/razorpay";
+import { loadRazorpay, prefetchRazorpay } from "@/lib/razorpay";
 import type { CheckoutSummary, CheckoutAddress, Product } from "@/types";
 import { getErrorMessage, isNetworkError } from "@/lib/errorUtils";
 import {
@@ -161,6 +161,9 @@ export default function Checkout() {
             const newBilling = data.billing_address;
             setBillingAddress(prev => prev?.id === newBilling.id ? prev : newBilling);
           }
+
+          // Prefetch Razorpay SDK in background (non-blocking)
+          prefetchRazorpay();
         } catch (error) {
           logger.error("Buy Now checkout error", error);
           const errorMsg = getErrorMessage(error) || "Unable to load checkout. Please try again.";
@@ -178,6 +181,13 @@ export default function Checkout() {
 
     initCheckout();
   }, [isAuthenticated, navigate, fetchCheckoutSummary, location]);
+
+  // Prefetch Razorpay SDK after summary loads (non-blocking)
+  useEffect(() => {
+    if (summary && !loading) {
+      prefetchRazorpay();
+    }
+  }, [summary, loading]);
 
   const handlePayment = async () => {
     if (!shippingAddress) {

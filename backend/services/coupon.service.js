@@ -251,13 +251,15 @@ function calculateCouponDiscount(coupon, cartItems, cartTotal) {
 
         // Distribute the cart discount proportionally across all items
         cartItems.forEach(item => {
-            const price = item.variant ? item.variant.selling_price : item.product.price;
-            const itemSubtotal = price * item.quantity;
+            // Defensive: ensure price is never undefined
+            const price = (item.variant?.selling_price ?? item.product?.price ?? 0);
+            const quantity = item.quantity || 1;
+            const itemSubtotal = price * quantity;
             const itemProportion = cartTotal > 0 ? (itemSubtotal / cartTotal) : 0;
             const itemDiscount = Math.round((totalDiscount * itemProportion) * 100) / 100;
 
             itemDiscounts.push({
-                variant_id: item.variant_id,
+                variant_id: item.variant_id || null,
                 product_id: item.product_id,
                 discount: itemDiscount,
                 coupon_code: coupon.code,
@@ -272,8 +274,10 @@ function calculateCouponDiscount(coupon, cartItems, cartTotal) {
                 (coupon.type === 'product' && item.product_id === coupon.target_id);
 
             if (matches) {
-                const price = item.variant ? item.variant.selling_price : item.product.price;
-                const itemSubtotal = price * item.quantity;
+                // Defensive: ensure price is never undefined
+                const price = (item.variant?.selling_price ?? item.product?.price ?? 0);
+                const quantity = item.quantity || 1;
+                const itemSubtotal = price * quantity;
                 let discount = (itemSubtotal * coupon.discount_percentage) / 100;
 
                 if (coupon.max_discount_amount && discount > coupon.max_discount_amount) {
@@ -284,7 +288,7 @@ function calculateCouponDiscount(coupon, cartItems, cartTotal) {
                 totalDiscount += roundedDiscount;
 
                 itemDiscounts.push({
-                    variant_id: item.variant_id,
+                    variant_id: item.variant_id || null,
                     product_id: item.product_id,
                     discount: roundedDiscount,
                     coupon_code: coupon.code,
@@ -310,8 +314,10 @@ function calculateCouponDiscount(coupon, cartItems, cartTotal) {
 
         const eligibleItems = cartItems.filter(item => item.product && item.product.category === coupon.target_id);
         const eligibleTotal = eligibleItems.reduce((sum, item) => {
-            const price = item.variant ? item.variant.selling_price : item.product.price;
-            return sum + (price * item.quantity);
+            // Defensive: ensure price is never undefined
+            const price = (item.variant?.selling_price ?? item.product?.price ?? 0);
+            const quantity = item.quantity || 1;
+            return sum + (price * quantity);
         }, 0);
 
         let categoryTotalDiscount = (eligibleTotal * coupon.discount_percentage) / 100;
@@ -323,13 +329,15 @@ function calculateCouponDiscount(coupon, cartItems, cartTotal) {
 
         // Distribute the category discount proportionally across eligible items
         eligibleItems.forEach(item => {
-            const price = item.variant ? item.variant.selling_price : item.product.price;
-            const itemSubtotal = price * item.quantity;
+            // Defensive: ensure price is never undefined
+            const price = (item.variant?.selling_price ?? item.product?.price ?? 0);
+            const quantity = item.quantity || 1;
+            const itemSubtotal = price * quantity;
             const itemProportion = eligibleTotal > 0 ? (itemSubtotal / eligibleTotal) : 0;
             const itemDiscount = Math.round((totalDiscount * itemProportion) * 100) / 100;
 
             itemDiscounts.push({
-                variant_id: item.variant_id,
+                variant_id: item.variant_id || null,
                 product_id: item.product_id,
                 discount: itemDiscount,
                 coupon_code: coupon.code,

@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/react-query";
 import { apiClient } from "@/lib/api-client";
 import { syncSession } from "@/lib/services/auth.service";
+import { AuthCache, getTokenExpiry } from "@/lib/auth-cache";
 
 // Helper to check if session cookies exist (avoids 401 on first visit)
 const hasSessionCookies = (): boolean => {
@@ -47,19 +48,31 @@ interface AuthState {
 let authListenerUnsubscribe: (() => void) | null = null;
 let sessionExpiredHandler: (() => void) | null = null;
 
-export const useAuthStore = create<AuthState>((set, get) => ({
-  user: null,
-  isAuthenticated: false,
-  isInitializing: false,
-  isInitialized: false,
-  isReactivationRequired: false,
+// Initialize store with cached auth state for instant restoration
+const cachedAuth = AuthCache.get();
 
-  setUser: (user) =>
+export const useAuthStore = create<AuthState>((set, get) => ({
+  // Restore from cache immediately (if valid)
+  user: cachedAuth?.user || null,
+  isAuthenticated: cachedAuth?.isAuthenticated || false,
+  isInitializing: false,
+  isInitialized: false, // Still needs background verification
+  isReactivationRequired: cachedAuth?.user?.deletionStatus === 'PENDING_DELETION' || false,
+
+  setUser: (user) => {
     set({
       user,
       isAuthenticated: !!user,
       isReactivationRequired: user?.deletionStatus === 'PENDING_DELETION',
-    }),
+    });
+
+    // Cache auth state when user is set (with 24 hour expiry)
+    if (user) {
+      AuthCache.set(user, Date.now() + (24 * 60 * 60 * 1000));
+    } else {
+      AuthCache.clear();
+    }
+  },
 
   setReactivationRequired: (required) =>
     set({ isReactivationRequired: required }),
@@ -70,11 +83,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isAuthenticated: true,
       isInitialized: true,
     });
+
+    // Cache auth state with 24 hour expiry (will be updated on token refresh)
+    AuthCache.set(user, Date.now() + (24 * 60 * 60 * 1000));
   },
 
   logout: async () => {
     try {
-      // Clear local state first
+      // Clear auth cache first
+      AuthCache.clear();
+
+      // Clear local state
       set({
         user: null,
         isAuthenticated: false,
@@ -131,9 +150,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       };
       window.addEventListener('auth:session-expired', sessionExpiredHandler);
 
-      // 4. Check session via Supabase SDK (uses internal state)
+      // 4. OPTIMIZED: Run Supabase and backend checks in parallel (saves 300-500ms)
       try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        const [sessionResult, backendResult] = await Promise.allSettled([
+          supabase.auth.getSession(),
+          // Only call backend if we have session cookies (optimization)
+          hasSessionCookies()
+            ? apiClient.post('/auth/refresh', {}, { silent: true } as any)
+            : Promise.resolve(null)
+        ]);
+
+        // Process Supabase session result
+        if (sessionResult.status === 'rejected') {
+          logger.warn('[AuthStore] Supabase session check failed:', sessionResult.reason);
+          set({ user: null, isAuthenticated: false, isInitialized: true });
+          return;
+        }
+
+        const { data: { session }, error: sessionError } = sessionResult.value;
 
         if (sessionError) {
           logger.warn('[AuthStore] Supabase getSession error:', sessionError.message);
@@ -145,6 +179,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
           if (isRefreshError) {
             logger.warn('[AuthStore] Detected invalid refresh token, forcing logout cleanup');
+            AuthCache.clear();
             await get().logout();
             set({ isInitializing: false, isInitialized: true });
             return;
@@ -192,10 +227,43 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                   isInitialized: true,
                   isReactivationRequired: userData.deletionStatus === 'PENDING_DELETION',
                 });
+
+                // Cache the synced auth state
+                const expiry = getTokenExpiry(session.access_token);
+                if (expiry) {
+                  AuthCache.set(user, expiry);
+                }
+
                 logger.debug('[AuthStore] Session sync successful (no prior cookies)');
                 return;
               }
-            } catch (syncError) {
+            } catch (syncError: any) {
+              // CRITICAL FIX: Handle JWT claim validation errors
+              const errorMessage = syncError?.message || syncError?.error?.message || '';
+
+              if (errorMessage.includes('jwt_claim_invalid') ||
+                errorMessage.includes('Invalid claim') ||
+                errorMessage.includes('not allowed in JWT')) {
+                logger.warn('[AuthStore] JWT claim validation failed, clearing invalid session:', errorMessage);
+
+                // Clear the invalid session from Supabase
+                try {
+                  await supabase.auth.signOut();
+                } catch {
+                  // Silent fail
+                }
+
+                // Clear any cached auth
+                AuthCache.clear();
+
+                set({
+                  user: null,
+                  isAuthenticated: false,
+                  isInitialized: true,
+                });
+                return;
+              }
+
               logger.debug('[AuthStore] Session sync failed (silent):', syncError);
               // Fall through to guest state
             }
@@ -208,35 +276,50 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             return;
           }
 
-          try {
-            // Call backend to refresh/verify and get full profile
-            const response = await apiClient.post('/auth/refresh', {}, { silent: true } as any);
-            const data = response.data;
+          // Process parallel backend result (if it was attempted)
+          if (backendResult.status === 'fulfilled' && backendResult.value) {
+            try {
+              const data = backendResult.value.data;
 
-            if (data.user) {
-              const user: User = {
-                id: data.user.id,
-                email: data.user.email || '',
-                name: data.user.name || '',
-                phone: data.user.phone || undefined,
-                role: data.user.role || 'customer',
-                emailVerified: data.user.emailVerified,
-                phoneVerified: data.user.phoneVerified || false,
-                mustChangePassword: data.user.mustChangePassword || false,
-                deletionStatus: data.user.deletionStatus,
-                scheduledDeletionAt: data.user.scheduledDeletionAt,
-                addresses: [],
-              };
+              if (data.user) {
+                const user: User = {
+                  id: data.user.id,
+                  email: data.user.email || '',
+                  name: data.user.name || '',
+                  phone: data.user.phone || undefined,
+                  role: data.user.role || 'customer',
+                  emailVerified: data.user.emailVerified,
+                  phoneVerified: data.user.phoneVerified || false,
+                  mustChangePassword: data.user.mustChangePassword || false,
+                  deletionStatus: data.user.deletionStatus,
+                  scheduledDeletionAt: data.user.scheduledDeletionAt,
+                  addresses: [],
+                };
 
-              set({
-                user,
-                isAuthenticated: true,
-                isInitialized: true,
-                isReactivationRequired: data.user.deletionStatus === 'PENDING_DELETION',
-              });
-              logger.debug(`[AuthStore] User initialized and verified with backend (Status: ${data.user.deletionStatus || 'ACTIVE'})`);
+                set({
+                  user,
+                  isAuthenticated: true,
+                  isInitialized: true,
+                  isReactivationRequired: data.user.deletionStatus === 'PENDING_DELETION',
+                });
+
+                // Cache the verified state with token expiry
+                const expiry = getTokenExpiry(session?.access_token);
+                if (expiry) {
+                  AuthCache.set(user, expiry);
+                }
+
+                logger.debug(`[AuthStore] User initialized and verified with backend (Status: ${data.user.deletionStatus || 'ACTIVE'})`);
+                return; // Success, exit early
+              }
+            } catch (parseError) {
+              // Fall through to error handling
             }
-          } catch (verifyError: any) {
+          }
+
+          // Backend verification failed - try fallback sync
+          const verifyError: any = backendResult.status === 'rejected' ? backendResult.reason : null;
+          if (verifyError) {
             // FALLBACK: If refresh fails with 401 (e.g. cookies missing) but we HAVE a session,
             // try to sync the session instead of giving up.
             if (verifyError.response?.status === 401 && session.access_token) {
@@ -264,10 +347,42 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                     isInitialized: true,
                     isReactivationRequired: userData.deletionStatus === 'PENDING_DELETION',
                   });
+
+                  // Cache the re-synced state
+                  const expiry = getTokenExpiry(session.access_token);
+                  if (expiry) {
+                    AuthCache.set(user, expiry);
+                  }
+
                   logger.debug('[AuthStore] Session re-sync successful');
                   return; // Exit successful
                 }
-              } catch (syncError) {
+              } catch (syncError: any) {
+                // CRITICAL FIX: Handle JWT claim validation errors in fallback sync too
+                const errorMessage = syncError?.message || syncError?.error?.message || '';
+
+                if (errorMessage.includes('jwt_claim_invalid') ||
+                  errorMessage.includes('Invalid claim') ||
+                  errorMessage.includes('not allowed in JWT')) {
+                  logger.warn('[AuthStore] JWT claim validation failed in fallback sync, clearing invalid session:', errorMessage);
+
+                  // Clear the invalid session
+                  try {
+                    await supabase.auth.signOut();
+                  } catch {
+                    // Silent fail
+                  }
+
+                  AuthCache.clear();
+
+                  set({
+                    user: null,
+                    isAuthenticated: false,
+                    isInitialized: true,
+                  });
+                  return;
+                }
+
                 logger.debug('[AuthStore] Session re-sync fallback failed (silent):', syncError);
               }
             }

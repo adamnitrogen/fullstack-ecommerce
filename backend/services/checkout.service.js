@@ -230,17 +230,56 @@ const createRazorpayInvoice = async (amount, receipt, customer, lineItems, total
                 const label = 'Standard Delivery (Non-Ref)';
                 const totalGlobal = totals.globalDeliveryCharge + (totals.globalDeliveryGST || 0);
                 deliveryAggregator[label] = (deliveryAggregator[label] || 0) + totalGlobal;
+
+                // Debug logging
+                logger.info({
+                    receipt,
+                    globalDeliveryCharge: totals.globalDeliveryCharge,
+                    globalDeliveryGST: totals.globalDeliveryGST,
+                    totalGlobal
+                }, '[Checkout] Added Standard Delivery to invoice');
             }
 
             if (totals.productDeliveryCharges > 0) {
+                let refundableSurcharge = 0;
+                let nonRefundableSurcharge = 0;
+
                 (totals.itemBreakdown || []).forEach(item => {
                     const total = (item.delivery_charge || 0) + (item.delivery_gst || 0);
                     if (total > 0 && item.delivery_meta?.source !== 'global') {
                         const isRefundable = (item.delivery_meta?.delivery_refund_policy === 'REFUNDABLE');
                         const label = isRefundable ? 'Refundable Surcharge' : 'Addt. Processing (Non-Ref)';
                         deliveryAggregator[label] = (deliveryAggregator[label] || 0) + total;
+
+                        // Track for logging
+                        if (isRefundable) {
+                            refundableSurcharge += total;
+                        } else {
+                            nonRefundableSurcharge += total;
+                        }
                     }
                 });
+
+                // Debug logging
+                if (refundableSurcharge > 0 || nonRefundableSurcharge > 0) {
+                    logger.info({
+                        receipt,
+                        refundableSurcharge,
+                        nonRefundableSurcharge,
+                        totalProductSurcharges: totals.productDeliveryCharges,
+                        itemBreakdownCount: (totals.itemBreakdown || []).length
+                    }, '[Checkout] Added Product Surcharges to invoice');
+                }
+            }
+
+            // Log final delivery aggregation
+            const deliveryLineCount = Object.keys(deliveryAggregator).length;
+            if (deliveryLineCount > 0) {
+                logger.info({
+                    receipt,
+                    deliveryLines: deliveryAggregator,
+                    lineCount: deliveryLineCount
+                }, '[Checkout] Final delivery aggregation for Razorpay invoice');
             }
         } else {
             // Fallback: Legacy extraction from metadata (Buy Now or older callers)

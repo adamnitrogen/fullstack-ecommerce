@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { ShieldCheck, Truck, RotateCcw, Headphones } from "lucide-react";
@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { BackButton } from "@/components/ui/BackButton";
 import { couponService } from "@/services/coupon.service";
 import { Coupon } from "@/types";
+import { prefetchRazorpay } from "@/lib/razorpay";
 
 const Cart = () => {
   const { t } = useTranslation();
@@ -32,16 +33,51 @@ const Cart = () => {
   const { isAuthenticated } = useAuthStore();
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [availableCoupons, setAvailableCoupons] = useState<Coupon[]>([]);
+  const [couponsLoading, setCouponsLoading] = useState(false);
 
-  // Fetch cart on mount
+  // Track if initial fetch has happened to prevent double-fetch in React strict mode
+  const hasFetchedRef = useRef(false);
+
+  // OPTIMIZED: Fetch cart and coupons immediately on mount
+  // The cart service already handles guest vs authenticated via cookies
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchCart();
+    // Prevent double-fetch in React strict mode
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
+
+    const fetchCartAndCoupons = async () => {
+      // Run both fetches in parallel
+      await Promise.all([
+        fetchCart(), // Works for both guests and authenticated users
+        (async () => {
+          setCouponsLoading(true);
+          try {
+            const coupons = await couponService.getActive();
+            setAvailableCoupons(coupons);
+          } catch (error) {
+            // Silently fail - coupons are optional
+          } finally {
+            setCouponsLoading(false);
+          }
+        })()
+      ]);
+    };
+
+    fetchCartAndCoupons();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps intentional - fetchCart is stable from zustand, ref prevents double-fetch
+
+  // Prefetch Razorpay SDK when cart has items (non-blocking)
+  useEffect(() => {
+    if (initialized && items.length > 0) {
+      prefetchRazorpay();
     }
-  }, [isAuthenticated, fetchCart]);
+  }, [initialized, items.length]);
 
-  // Fetch available coupons - refetch when totals change to pick up new coupons immediately
+  // Refetch coupons when totals change (after cart operations) - but not on mount
   useEffect(() => {
+    if (!initialized) return; // Skip on mount
+
     const fetchCoupons = async () => {
       try {
         const coupons = await couponService.getActive();
@@ -51,7 +87,7 @@ const Cart = () => {
       }
     };
     fetchCoupons();
-  }, [totals]); // Refetch when totals change (after cart operations)
+  }, [totals, initialized]); // Refetch when totals change (after cart operations)
 
   const handlePlaceOrder = () => {
     if (!isAuthenticated) {
@@ -123,20 +159,49 @@ const Cart = () => {
     );
   }
 
-  const enrichedItems = items.map((item) => {
-    const itemDetail = totals?.itemBreakdown?.find((id: any) =>
-      (id.variant_id && id.variant_id === item.variantId) ||
-      (!id.variant_id && id.product_id === item.productId)
-    );
-    return {
-      ...item,
-      delivery_charge: itemDetail?.delivery_charge || 0,
-      delivery_gst: itemDetail?.delivery_gst || 0,
-      delivery_meta: itemDetail?.delivery_meta,
-      coupon_discount: itemDetail?.coupon_discount || 0,
-      coupon_code: itemDetail?.coupon_code || ''
-    };
-  });
+  // Memoize enriched items to prevent unnecessary recalculations
+  // This ensures surcharge data is properly mapped even during loading states
+  const enrichedItems = useMemo(() => {
+    if (!items || !totals?.itemBreakdown) {
+      // Return items without enrichment if breakdown not available yet
+      return items?.map(item => ({
+        ...item,
+        delivery_charge: 0,
+        delivery_gst: 0,
+        delivery_meta: undefined,
+        coupon_discount: 0,
+        coupon_code: ''
+      })) || [];
+    }
+
+    const enriched = items.map((item) => {
+      const itemDetail = totals.itemBreakdown!.find((id: any) =>
+        (id.variant_id && id.variant_id === item.variantId) ||
+        (!id.variant_id && id.product_id === item.productId)
+      );
+
+      return {
+        ...item,
+        delivery_charge: itemDetail?.delivery_charge || 0,
+        delivery_gst: itemDetail?.delivery_gst || 0,
+        delivery_meta: itemDetail?.delivery_meta,
+        coupon_discount: itemDetail?.coupon_discount || 0,
+        coupon_code: itemDetail?.coupon_code || ''
+      };
+    });
+
+    // Debug logging to track surcharge data (remove in production)
+    if (process.env.NODE_ENV === 'development') {
+      const surchargeItems = enriched.filter(item =>
+        item.delivery_meta?.source !== 'global' && (item.delivery_charge > 0 || item.delivery_gst > 0)
+      );
+      if (surchargeItems.length > 0) {
+        console.log('[Cart] Surcharge items detected:', surchargeItems.length);
+      }
+    }
+
+    return enriched;
+  }, [items, totals?.itemBreakdown]);
 
   return (
     <div className="min-h-screen bg-background py-8 sm:py-16 animate-in fade-in duration-700">

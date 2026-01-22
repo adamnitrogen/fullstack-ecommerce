@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Link } from "react-router-dom";
 import { Minus, Plus, Trash2, RotateCcw, Package, Star, Heart, Truck, Tag } from "lucide-react";
 import { CartItem as CartItemType } from "@/types";
@@ -13,7 +14,7 @@ interface CartItemProps {
     isFreeDelivery?: boolean;
 }
 
-export const CartItem = ({ item, updateQuantity, removeItem, isLoading, isCalculating, isFreeDelivery }: CartItemProps) => {
+const CartItemComponent = ({ item, updateQuantity, removeItem, isLoading, isCalculating, isFreeDelivery }: CartItemProps) => {
     const { product, quantity, variant, sizeLabel, variantId } = item;
 
     // Use variant pricing if available, otherwise fall back to product pricing
@@ -228,3 +229,21 @@ export const CartItem = ({ item, updateQuantity, removeItem, isLoading, isCalcul
         </div>
     );
 };
+
+// Memoize CartItem to prevent re-renders when other items in the cart change
+// Only re-render when this specific item's data or loading state changes
+export const CartItem = memo(CartItemComponent, (prevProps, nextProps) => {
+    return (
+        prevProps.item.productId === nextProps.item.productId &&
+        prevProps.item.variantId === nextProps.item.variantId &&
+        prevProps.item.quantity === nextProps.item.quantity &&
+        prevProps.item.delivery_charge === nextProps.item.delivery_charge &&
+        prevProps.item.delivery_gst === nextProps.item.delivery_gst &&
+        prevProps.item.coupon_discount === nextProps.item.coupon_discount &&
+        prevProps.isLoading === nextProps.isLoading &&
+        prevProps.isCalculating === nextProps.isCalculating &&
+        prevProps.isFreeDelivery === nextProps.isFreeDelivery
+    );
+});
+
+CartItem.displayName = 'CartItem';

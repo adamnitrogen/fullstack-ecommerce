@@ -217,7 +217,7 @@ class PricingCalculator {
                         discounted_unit_price: originalItem?.unitPrice || item.unitPrice, // Price used for tax
                         unit_mrp: originalItem?.unitMrp || item.unitMrp,
                         line_total: (originalItem?.unitPrice || item.unitPrice) * item.quantity,
-                        coupon_discount: itemDiscount ? itemDiscount.discount : 0,
+                        coupon_discount: itemDiscount?.discount || 0, // Defensive: ensure never undefined
 
                         // Delivery Breakdown (Added)
                         delivery_charge: originalItem?.delivery_charge || 0,
@@ -233,10 +233,10 @@ class PricingCalculator {
                 total_selling_price: Math.round(totalSellingPrice * 100) / 100,
                 mrp_discount: Math.round(mrpDiscount * 100) / 100,
 
-                // Coupon
+                // Coupon (Defensive: ensure never undefined)
                 coupon: validatedCoupon || null,
                 coupon_code: validatedCoupon?.code || null,
-                coupon_discount: Math.round(totalCouponDiscount * 100) / 100,
+                coupon_discount: Math.round((totalCouponDiscount || 0) * 100) / 100,
 
                 // Subtotal (after MRP discount and PRODUCT coupon, before tax)
                 subtotal_before_tax: Math.round((totalSellingPrice - productCouponDiscount) * 100) / 100,
