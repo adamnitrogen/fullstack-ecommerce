@@ -87,6 +87,10 @@ export default function Checkout() {
 
       setSummary(data);
 
+      // Sync global cart store to ensure Navbar count is accurate
+      // This handles cases where user navigates directly to checkout or hard refreshes
+      fetchCart();
+
       // Pre-select addresses if available, but DON'T overwrite if we specifically requested an address (user selection)
       // This prevents race conditions where backend fallback logic reverts the user's selection
       if (data.shipping_address && !addressId) {

@@ -538,16 +538,19 @@ const createOrder = async (userId, checkoutData, cart) => {
         throw new Error(`Insufficient stock for: ${itemNames}`);
     }
 
-    // --- COUPON SAFETY GUARD ---
+    // --- COUPON SAFETY GUARD (Defense-in-Depth) ---
+    // PRIMARY validation happens in /create-payment-order BEFORE payment capture
+    // This is a SECONDARY check to catch race conditions (e.g., coupon disabled between payment steps)
     if (cart.applied_coupon_code) {
         // Force live check for critical operation
         const validation = await validateCoupon(cart.applied_coupon_code, userId, cart.cart_items, totals.totalPrice, true);
 
         if (!validation.valid) {
-            log.warn('STALE_COUPON_REJECTED', 'Coupon became invalid during checkout session', {
+            log.warn('STALE_COUPON_REJECTED_POST_PAYMENT', 'Coupon invalid after payment (race condition caught by safety guard)', {
                 coupon: cart.applied_coupon_code,
                 error: validation.error
             });
+            // This should RARELY happen now - only if coupon changed BETWEEN create-payment-order and verify-payment
             throw new Error(`Coupon "${cart.applied_coupon_code}" is no longer valid: ${validation.error}. Please remove or change the coupon to proceed.`);
         }
     }

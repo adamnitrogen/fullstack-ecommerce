@@ -64,8 +64,9 @@ const Cart = () => {
     };
 
     fetchCartAndCoupons();
+    // Refetch when authentication state changes to ensure guest cart merge is reflected
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty deps intentional - fetchCart is stable from zustand, ref prevents double-fetch
+  }, [isAuthenticated]); // Added isAuthenticated dependency
 
   // Prefetch Razorpay SDK when cart has items (non-blocking)
   useEffect(() => {
@@ -120,47 +121,8 @@ const Cart = () => {
     }
   ];
 
-  // Loading state
-  if (isLoading && !initialized) {
-    return (
-      <div className="min-h-screen bg-background py-16">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex gap-4 p-4 border rounded-xl">
-                  <Skeleton className="h-24 w-24 rounded-lg" />
-                  <div className="flex-1 space-y-2">
-                    <Skeleton className="h-4 w-2/3" />
-                    <Skeleton className="h-4 w-1/3" />
-                    <Skeleton className="h-8 w-1/4 mt-2" />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="lg:col-span-1">
-              <Skeleton className="h-96 w-full rounded-xl" />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Loaded but empty
-  if (items.length === 0) {
-    return (
-      <div className="min-h-screen bg-background py-8">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <BackButton to="/shop" label={t("cart.continue")} />
-          <EmptyCart />
-        </div>
-      </div>
-    );
-  }
-
-  // Memoize enriched items to prevent unnecessary recalculations
-  // This ensures surcharge data is properly mapped even during loading states
+  // CRITICAL: Memoize enriched items BEFORE any early returns
+  // This ensures hooks are called in the same order on every render (React Rules of Hooks)
   const enrichedItems = useMemo(() => {
     if (!items || !totals?.itemBreakdown) {
       // Return items without enrichment if breakdown not available yet
@@ -202,6 +164,45 @@ const Cart = () => {
 
     return enriched;
   }, [items, totals?.itemBreakdown]);
+
+  // Loading state - now AFTER all hooks
+  if (isLoading && !initialized) {
+    return (
+      <div className="min-h-screen bg-background py-16">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex gap-4 p-4 border rounded-xl">
+                  <Skeleton className="h-24 w-24 rounded-lg" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="h-4 w-1/3" />
+                    <Skeleton className="h-8 w-1/4 mt-2" />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="lg:col-span-1">
+              <Skeleton className="h-96 w-full rounded-xl" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Loaded but empty
+  if (items.length === 0) {
+    return (
+      <div className="min-h-screen bg-background py-8">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <BackButton to="/shop" label={t("cart.continue")} />
+          <EmptyCart />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background py-8 sm:py-16 animate-in fade-in duration-700">

@@ -49,14 +49,15 @@ let authListenerUnsubscribe: (() => void) | null = null;
 let sessionExpiredHandler: (() => void) | null = null;
 
 // Initialize store with cached auth state for instant restoration
+// Auth cache provides instant auth state on page load (~0ms vs ~500ms verification)
 const cachedAuth = AuthCache.get();
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   // Restore from cache immediately (if valid)
   user: cachedAuth?.user || null,
   isAuthenticated: cachedAuth?.isAuthenticated || false,
-  isInitializing: false,
-  isInitialized: false, // Still needs background verification
+  isInitializing: false, // Let initializeAuth() set this when it starts
+  isInitialized: false, // Not initialized until background verification completes
   isReactivationRequired: cachedAuth?.user?.deletionStatus === 'PENDING_DELETION' || false,
 
   setUser: (user) => {

@@ -35,6 +35,89 @@ const DEFAULT_CONFIG = {
 
 class DeliveryChargeService {
     /**
+     * Get delivery configurations for multiple items in batch
+     * Optimized to reduce DB roundtrips (N+1 problem fix)
+     * 
+     * @param {Array} items - Array of {productId, variantId}
+     * @returns {Promise<Map>} Map of key `${productId}-${variantId}` -> config
+     */
+    static async getDeliveryConfigsBatch(items) {
+        try {
+            if (!items || items.length === 0) return new Map();
+
+            const productIds = [...new Set(items.map(i => i.productId).filter(id => id))];
+            const variantIds = [...new Set(items.map(i => i.variantId).filter(id => id))];
+
+            // Parallel fetch for Products and Variants configs
+            const [variantConfigsResult, productConfigsResult, globalSettings] = await Promise.all([
+                variantIds.length > 0 ? supabase
+                    .from('delivery_configs')
+                    .select('*')
+                    .eq('scope', 'VARIANT')
+                    .in('variant_id', variantIds)
+                    .eq('is_active', true)
+                    : Promise.resolve({ data: [] }),
+                productIds.length > 0 ? supabase
+                    .from('delivery_configs')
+                    .select('*')
+                    .eq('scope', 'PRODUCT')
+                    .in('product_id', productIds)
+                    .eq('is_active', true)
+                    : Promise.resolve({ data: [] }),
+                settingsService.getDeliverySettings()
+            ]);
+
+            const variantConfigs = variantConfigsResult.data || [];
+            const productConfigs = productConfigsResult.data || [];
+
+            // Build Global Default Config
+            const globalConfig = {
+                ...DEFAULT_CONFIG,
+                base_delivery_charge: globalSettings.delivery_charge,
+                gst_percentage: globalSettings.delivery_gst,
+                is_taxable: (globalSettings.delivery_gst > 0),
+                source: 'global',
+                delivery_refund_policy: 'NON_REFUNDABLE'
+            };
+
+            const configMap = new Map();
+
+            // Map configs to items
+            items.forEach(item => {
+                const key = `${item.productId}-${item.variantId || 'null'}`;
+
+                // 1. Variant Level (Highest Priority)
+                if (item.variantId) {
+                    const vConfig = variantConfigs.find(c => c.variant_id === item.variantId);
+                    if (vConfig) {
+                        configMap.set(key, { ...vConfig, source: 'variant', delivery_refund_policy: vConfig.delivery_refund_policy || 'REFUNDABLE' });
+                        return;
+                    }
+                }
+
+                // 2. Product Level
+                if (item.productId) {
+                    const pConfig = productConfigs.find(c => c.product_id === item.productId);
+                    if (pConfig) {
+                        configMap.set(key, { ...pConfig, source: 'product', delivery_refund_policy: pConfig.delivery_refund_policy || 'REFUNDABLE' });
+                        return;
+                    }
+                }
+
+                // 3. Global Level (Default)
+                configMap.set(key, globalConfig);
+            });
+
+            return configMap;
+
+        } catch (error) {
+            log.error('BATCH_CONFIG_ERROR', error);
+            // Fallback: Return empty map, caller should handle defaults or retry
+            return new Map();
+        }
+    }
+
+    /**
      * Get delivery configuration for a product/variant
      * Variant config overrides product config if present
      * 
@@ -43,72 +126,13 @@ class DeliveryChargeService {
      * @returns {Promise<object>} Delivery configuration
      */
     static async getDeliveryConfig(productId, variantId = null) {
-        try {
-            // First, try to get variant-level config if variantId provided
-            if (variantId && variantId !== 'null' && variantId !== 'undefined') {
-                const { data: variantConfigs, error: variantError } = await supabase
-                    .from('delivery_configs')
-                    .select('*')
-                    .eq('scope', 'VARIANT')
-                    .eq('variant_id', variantId)
-                    .limit(1);
-
-                const variantConfig = variantConfigs?.[0];
-
-                if (!variantError && variantConfig && variantConfig.is_active !== false) {
-                    log.debug('DELIVERY_CONFIG', 'Using variant-level config', { variantId });
-                    return {
-                        ...variantConfig,
-                        source: 'variant',
-                        delivery_refund_policy: variantConfig.delivery_refund_policy || 'REFUNDABLE'
-                    };
-                }
-            }
-
-            // Fall back to product-level config
-            if (productId && productId !== 'null' && productId !== 'undefined') {
-                const { data: productConfigs, error: productError } = await supabase
-                    .from('delivery_configs')
-                    .select('*')
-                    .eq('scope', 'PRODUCT')
-                    .eq('product_id', productId)
-                    .limit(1);
-
-                const productConfig = productConfigs?.[0];
-
-                if (!productError && productConfig && productConfig.is_active !== false) {
-                    log.debug('DELIVERY_CONFIG', 'Using product-level config', { productId });
-                    return {
-                        ...productConfig,
-                        source: 'product',
-                        delivery_refund_policy: productConfig.delivery_refund_policy || 'REFUNDABLE'
-                    };
-                }
-            }
-
-            // No config found, use global defaults from Settings Service
-            const globalSettings = await settingsService.getDeliverySettings();
-
-            log.debug('DELIVERY_CONFIG', 'Using global settings', { productId, settings: globalSettings });
-
-            return {
-                ...DEFAULT_CONFIG,
-                base_delivery_charge: globalSettings.delivery_charge,
-                gst_percentage: globalSettings.delivery_gst,
-                is_taxable: (globalSettings.delivery_gst > 0),
-                source: 'global',
-                delivery_refund_policy: 'NON_REFUNDABLE'
-                // We don't store threshold here, it's applied at cart level
-            };
-
-        } catch (error) {
-            log.warn('DELIVERY_CONFIG_ERROR', 'Error fetching delivery config, using default', {
-                error: error.message,
-                productId,
-                variantId
-            });
-            return { ...DEFAULT_CONFIG, source: 'default' };
-        }
+        // Reuse batch logic for single item for consistency
+        const map = await this.getDeliveryConfigsBatch([{ productId, variantId }]);
+        const key = `${productId}-${variantId || 'null'}`;
+        // If map fails or empty, use fallback within getDeliveryConfigsBatch logic or re-implement simple fetch?
+        // Actually the batch function handles the global fallback logic internally.
+        // It returns a Map with the config.
+        return map.get(key) || { ...DEFAULT_CONFIG, source: 'default' };
     }
 
     /**
@@ -255,14 +279,23 @@ class DeliveryChargeService {
 
             let globalChargeApplied = false;
 
+            // BATCH FETCH OPTIMIZATION
+            const batchItems = cartItems.map(item => ({
+                productId: item.product_id || item.product?.id,
+                variantId: item.variant_id || item.variant?.id
+            }));
+            const configMap = await this.getDeliveryConfigsBatch(batchItems);
+
             // Calculate delivery for each item
             for (const item of cartItems) {
                 const productId = item.product_id || item.product?.id;
                 const variantId = item.variant_id || item.variant?.id;
                 const quantity = item.quantity || 1;
 
-                // We need to know the source before deciding to add to totals
-                const config = await this.getDeliveryConfig(productId, variantId);
+                const key = `${productId}-${variantId || 'null'}`;
+                // Fallback to default if not in map (defensive)
+                const config = configMap.get(key) || { ...DEFAULT_CONFIG, source: 'global' };
+
                 const isGlobal = config.source === 'global';
 
                 if (isGlobal) {

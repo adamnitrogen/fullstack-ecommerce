@@ -237,8 +237,13 @@ class AuthService {
 
             // Merge Guest Cart if present
             if (guestId) {
-                CartService.mergeGuestCart(user.id, guestId)
-                    .catch(err => logger.error({ err }, 'Background cart merge failed during sync'));
+                try {
+                    await CartService.mergeGuestCart(user.id, guestId);
+                    logger.info({ userId: user.id }, '[AuthService] Guest cart merged during syncSession');
+                } catch (err) {
+                    logger.error({ err }, 'Cart merge failed during syncSession');
+                    // Continue anyway, don't block login
+                }
             }
 
             logger.info({ userId: user.id }, '[AuthService] syncSession nearly complete, fetching final profile');
@@ -407,11 +412,14 @@ class AuthService {
             throw new Error('User profile not found');
         }
 
-        // 5. Merge Guest Cart if guestId provided
+        // 5. Merge Guest Cart if guestId provided (AWAITED to prevent race conditions during checkout redirect)
         if (otpResult.metadata?.guestId) {
-            // Fire and forget merge
-            CartService.mergeGuestCart(profile.id, otpResult.metadata.guestId)
-                .catch(err => logger.error({ err }, 'Background cart merge failed'));
+            try {
+                await CartService.mergeGuestCart(profile.id, otpResult.metadata.guestId);
+                logger.info({ userId: profile.id }, '[AuthService] Guest cart merged during verifyLoginOtp');
+            } catch (err) {
+                logger.error({ err }, 'Cart merge failed during verifyLoginOtp');
+            }
         }
 
         return {

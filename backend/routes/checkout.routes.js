@@ -229,6 +229,40 @@ router.post('/create-payment-order', validate(createPaymentOrderSchema), request
             });
         }
 
+        // CRITICAL FIX: Validate coupon BEFORE creating Razorpay order
+        // This prevents payment-refund cycles when coupons become invalid
+        if (cart.applied_coupon_code) {
+            const { validateCoupon } = require('../services/coupon.service');
+
+            const validation = await validateCoupon(
+                cart.applied_coupon_code,
+                userId,
+                cart.cart_items,
+                totals.totalPrice,
+                true // Force live check for critical operation
+            );
+
+            if (!validation.valid) {
+                logger.warn({
+                    coupon: cart.applied_coupon_code,
+                    error: validation.error,
+                    userId
+                }, '[Checkout] Coupon validation failed before payment - preventing payment creation');
+
+                // Return clear error to frontend
+                return res.status(400).json({
+                    error: `Coupon "${cart.applied_coupon_code}" is no longer valid`,
+                    details: validation.error,
+                    code: 'INVALID_COUPON'
+                });
+            }
+
+            logger.debug({
+                coupon: cart.applied_coupon_code,
+                userId
+            }, '[Checkout] Coupon validated successfully before payment');
+        }
+
         // 3. Pre-generate Sequential Order Number
         // This ensures Razorpay invoice receipt matches the final DB order number
         const { data: orderNumberData, error: orderNumberError } = await supabase

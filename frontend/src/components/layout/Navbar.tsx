@@ -38,12 +38,8 @@ export const Navbar = () => {
   const location = useLocation();
   const cartItemCount = getTotalItems();
 
-  // Fetch cart on mount or when auth changes
-  useEffect(() => {
-    if (isAuthenticated && !initialized) {
-      fetchCart();
-    }
-  }, [isAuthenticated, initialized, fetchCart]);
+  // Cart fetch is handled independently by Cart.tsx component on mount
+  // No need to fetch here - prevents double-fetch and improves performance
 
   // Auto-open auth dialog if redirected from protected route OR via state
   useEffect(() => {
