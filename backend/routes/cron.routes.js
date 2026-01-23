@@ -8,16 +8,26 @@ const router = express.Router();
 const EmailRetryService = require('../services/email-retry.service');
 const { InvoiceOrchestrator } = require('../services/invoice-orchestrator.service');
 const { getSchedulerStatus } = require('../lib/scheduler');
+const { optionalAuth } = require('../middleware/auth.middleware');
 const { createModuleLogger } = require('../utils/logging-standards');
 
 const log = createModuleLogger('CronRoutes');
 
 // Simple auth middleware for cron endpoints
+// Allows access if:
+// 1. Valid CRON_SECRET is provided (via header or query)
+// 2. OR User is authenticated as admin/manager (via session)
 const cronAuth = (req, res, next) => {
+    // 1. Check for Admin/Manager session first (from optionalAuth)
+    if (req.user && (req.user.role === 'admin' || req.user.role === 'manager')) {
+        return next();
+    }
+
+    // 2. Fallback to Cron Secret check
     const cronSecret = process.env.CRON_SECRET;
     const providedSecret = req.headers['x-cron-secret'] || req.query.secret;
 
-    // In development, allow without secret
+    // In development, allow without secret if no user session
     if (process.env.NODE_ENV !== 'production') {
         return next();
     }
@@ -34,6 +44,12 @@ const cronAuth = (req, res, next) => {
 
     next();
 };
+
+// Use optionalAuth for all routes to identify user if session exists
+router.use((req, res, next) => {
+    if (req.path === '/health') return next();
+    optionalAuth(req, res, next);
+});
 
 /**
  * @route POST /api/cron/email-retry
