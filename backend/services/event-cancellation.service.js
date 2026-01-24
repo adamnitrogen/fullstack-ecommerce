@@ -1,8 +1,9 @@
 const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
-const RefundService = require('./refund.service');
+const EventRefundService = require('./event-refund.service');
 const emailService = require('./email');
 const { refundPayment } = require('../utils/razorpay-helper');
+const { mapToFrontend } = require('./event.utils');
 
 /**
  * Event Cancellation Service
@@ -214,6 +215,12 @@ class EventCancellationService {
      * Process single registration: refund, email, status update
      */
     static async processSingleRegistration(registration, event, correlationId) {
+        // 0. Idempotency check: Skip if already cancelled
+        if (registration.status === 'cancelled') {
+            logger.info({ registrationId: registration.id }, 'Registration already cancelled, skipping');
+            return;
+        }
+
         logger.info({ registrationId: registration.id, correlationId }, 'Processing registration cancellation');
 
         const isPaid = registration.payment_status === 'captured' || registration.payment_status === 'paid';
@@ -222,8 +229,8 @@ class EventCancellationService {
         // 1. Handle Refund if Paid
         if (isPaid && registration.razorpay_payment_id) {
             try {
-                // Initiate refund record
-                const refundRecord = await RefundService.initiateRefund({
+                // Initiate refund record (includes idempotency check inside service)
+                const refundRecord = await EventRefundService.initiateRefund({
                     eventId: event.id,
                     userId: registration.user_id,
                     registrationId: registration.id,
@@ -232,18 +239,22 @@ class EventCancellationService {
                     correlationId
                 });
 
-                // Request refund from Razorpay
-                const razorpayRefund = await refundPayment(registration.razorpay_payment_id, null, {
-                    registration_id: registration.id,
-                    event_id: event.id,
-                    correlation_id: correlationId,
-                    reason: `Event Cancelled: ${event.cancellation_reason || 'N/A'}`
-                });
+                // Request refund from Razorpay only if not already processing
+                if (refundRecord.status === 'INITIATED') {
+                    const razorpayRefund = await refundPayment(registration.razorpay_payment_id, null, {
+                        registration_id: registration.id,
+                        event_id: event.id,
+                        correlation_id: correlationId,
+                        reason: `Event Cancelled: ${event.cancellation_reason || 'N/A'}`
+                    });
 
-                // Update refund record
-                refundData = await RefundService.markProcessing(refundRecord.id, razorpayRefund.id);
-
-                logger.info({ registrationId: registration.id, refundId: razorpayRefund.id }, 'Refund initiated successfully');
+                    // Update refund record
+                    refundData = await EventRefundService.markProcessing(refundRecord.id, razorpayRefund.id);
+                    logger.info({ registrationId: registration.id, refundId: razorpayRefund.id }, 'Refund initiated successfully');
+                } else {
+                    refundData = refundRecord;
+                    logger.info({ registrationId: registration.id, refundStatus: refundRecord.status }, 'Refund already processing/settled');
+                }
             } catch (refundError) {
                 logger.error({ err: refundError, registrationId: registration.id }, 'Failed to process refund for registration');
                 throw refundError;
@@ -378,17 +389,5 @@ class EventCancellationService {
     }
 }
 
-// Minimal mapping needed for internal use if not already imported
-const mapToFrontend = (event) => {
-    if (!event) return null;
-    return {
-        id: event.id,
-        title: event.title,
-        startDate: event.start_date,
-        endDate: event.end_date,
-        location: event.location,
-        status: event.status
-    };
-};
 
 module.exports = EventCancellationService;

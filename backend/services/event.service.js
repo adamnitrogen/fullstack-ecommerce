@@ -1,67 +1,11 @@
 const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
 const { deletePhotoByUrl } = require('./photo.service');
+const EventPricingService = require('./event-pricing.service');
+const { mapToFrontend, mapToDb } = require('./event.utils');
+// We require EventCancellationService dynamically inside updateEvent to avoid immediate circular require issue
 
-// Helper to map snake_case DB object to camelCase frontend object
-const mapToFrontend = (event) => {
-    if (!event) return null;
-    return {
-        id: event.id,
-        title: event.title,
-        description: event.description,
-        startDate: event.start_date,
-        endDate: event.end_date,
-        location: event.location,
-        image: event.image,
-        capacity: event.capacity,
-        registrations: event.registrations,
-        registrationAmount: event.registration_amount,
-        category: event.category,
-        status: event.status,
-        kathaVachak: event.katha_vachak,
-        contactAddress: event.contact_address,
-        isRegistrationEnabled: event.is_registration_enabled,
-        keyHighlights: event.key_highlights,
-        specialPrivileges: event.special_privileges,
-        cancellationStatus: event.cancellation_status,
-        cancelledAt: event.cancelled_at,
-        cancellationReason: event.cancellation_reason,
-        cancellationCorrelationId: event.cancellation_correlation_id,
-        createdAt: event.created_at,
-        updatedAt: event.updated_at
-    };
-};
-
-// Helper to map camelCase frontend object to snake_case DB object
-const mapToDb = (event) => {
-    const dbEvent = {
-        title: event.title,
-        description: event.description,
-        start_date: event.startDate,
-        end_date: event.endDate,
-        location: event.location,
-        image: event.image,
-        capacity: event.capacity,
-        registration_amount: event.registrationAmount,
-        category: event.category,
-        status: event.status,
-        katha_vachak: event.kathaVachak,
-        contact_address: event.contactAddress,
-        is_registration_enabled: event.isRegistrationEnabled,
-        key_highlights: event.keyHighlights,
-        special_privileges: event.specialPrivileges,
-        cancellation_status: event.cancellationStatus,
-        cancelled_at: event.cancelledAt,
-        cancellation_reason: event.cancellationReason,
-        cancellation_correlation_id: event.cancellationCorrelationId,
-        updated_at: new Date().toISOString()
-    };
-
-    // Remove undefined fields
-    Object.keys(dbEvent).forEach(key => dbEvent[key] === undefined && delete dbEvent[key]);
-
-    return dbEvent;
-};
+// Helpers removed and moved to event.utils.js
 
 class EventService {
     /**
@@ -153,8 +97,18 @@ class EventService {
      * Update event
      */
     static async updateEvent(id, eventData) {
+        // 1. Get old event for comparison
+        const { data: oldEvent, error: fetchError } = await supabase
+            .from('events')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (fetchError) throw fetchError;
+
         const dbEvent = mapToDb(eventData);
 
+        // 2. Perform Update
         const { data, error } = await supabase
             .from('events')
             .update(dbEvent)
@@ -163,6 +117,26 @@ class EventService {
             .single();
 
         if (error) throw error;
+
+        // 3. CHECK FOR DATE CHANGES -> Trigger Notifications
+        const oldStart = oldEvent.start_date;
+        const newStart = data.start_date;
+        const oldEnd = oldEvent.end_date;
+        const newEnd = data.end_date;
+
+        if (oldStart !== newStart || oldEnd !== newEnd) {
+            logger.info({ eventId: id, oldStart, newStart }, '[EventService] Date change detected in updateEvent, triggering notifications');
+
+            // Require EventCancellationService here to avoid circular dependencies at load time
+            const EventCancellationService = require('./event-cancellation.service');
+
+            EventCancellationService.notifyScheduleUpdate(
+                id,
+                data,
+                'Event details updated by administrator.',
+                `AUTO_UPDATE_${Date.now()}`
+            ).catch(err => logger.error({ err: err.message }, 'Failed to trigger automatic schedule update emails'));
+        }
 
         return mapToFrontend(data);
     }

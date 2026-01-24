@@ -4,7 +4,9 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const emailService = require('../services/email');
 const { createInvoice } = require('../services/razorpay-invoice.service');
-const { capturePayment, voidAuthorization, refundPayment } = require('../utils/razorpay-helper');
+const { capturePayment, voidAuthorization, refundPayment, fetchPayment } = require('../utils/razorpay-helper');
+const EventPricingService = require('./event-pricing.service');
+const EventRefundService = require('./event-refund.service');
 
 // Initialize Razorpay
 const razorpay = new Razorpay({
@@ -75,12 +77,11 @@ class EventRegistrationService {
         }
 
         // Get event details
-        // Debug logging
-        // console.log(`[EventRegistration] Fetching event with ID: ${eventId}`);
+        logger.debug({ eventId }, '[EventRegistration] Fetching event');
 
         const { data: event, error: eventError } = await supabase
             .from('events')
-            .select('id, title, registration_amount, start_date, location, description, event_code, status, cancellation_status')
+            .select('id, title, registration_amount, gst_rate, base_price, gst_amount, registration_deadline, start_date, location, description, event_code, status, cancellation_status')
             .eq('id', eventId)
             .single();
 
@@ -91,6 +92,15 @@ class EventRegistrationService {
         // Check if event is cancelled
         if (event.status === 'cancelled' || event.cancellation_status === 'CANCELLED' || event.cancellation_status === 'CANCELLATION_PENDING') {
             throw new Error('This event has been cancelled and is no longer accepting registrations.');
+        }
+
+        // Check Registration Deadline
+        if (event.registration_deadline) {
+            const deadline = new Date(event.registration_deadline);
+            if (Date.now() > deadline.getTime()) {
+                logger.warn({ eventId, deadline: event.registration_deadline }, '[EventRegistration] Attempted registration after deadline');
+                throw new Error('Registration for this event has closed.');
+            }
         }
 
         // Generate Registration Number
@@ -111,6 +121,9 @@ class EventRegistrationService {
                 email,
                 phone,
                 amount: isFree ? 0 : event.registration_amount,
+                gst_rate: isFree ? 0 : event.gst_rate,
+                base_price: isFree ? 0 : event.base_price,
+                gst_amount: isFree ? 0 : event.gst_amount,
                 payment_status: isFree ? 'free' : 'pending',
                 status: isFree ? 'confirmed' : 'pending',
                 created_at: new Date().toISOString()
@@ -308,6 +321,9 @@ class EventRegistrationService {
                     isPaid: true,
                     paymentDetails: {
                         amount: registration.amount,
+                        basePrice: registration.base_price,
+                        gstAmount: registration.gst_amount,
+                        gstRate: registration.gst_rate,
                         transactionId: razorpay_payment_id,
                         razorpayPaymentId: razorpay_payment_id,
                         paidAt: new Date().toISOString(),
@@ -418,28 +434,77 @@ class EventRegistrationService {
         if (fetchError || !registration) throw new Error('Registration not found');
         if (registration.status === 'cancelled') throw new Error('Registration is already cancelled');
 
-        // Block cancellation for paid events (Backend Policy)
-        if (registration.payment_status === 'paid' || registration.payment_status === 'captured') {
-            throw new Error('Paid event registrations cannot be cancelled online. Please contact support for refund requests.');
+        // 2. Deadine Check (48 hours before start)
+        const eventStartTime = new Date(registration.events?.start_date).getTime();
+        const now = Date.now();
+        const fortyEightHoursInMs = 48 * 60 * 60 * 1000;
+
+        if (now > eventStartTime - fortyEightHoursInMs) {
+            logger.warn({ registrationId, eventId: registration.event_id, eventStartTime: registration.events?.start_date }, '[EventRegistration] Cancellation blocked: within 48h of event');
+            throw new Error('Cancellations are only allowed up to 48 hours before the event start time.');
         }
 
-        // 2. Cancellation
+        // 3. Handle Paid Refund
+        let refundSuccessful = false;
+        let refundId = null;
+        const isPaid = registration.payment_status === 'paid' || registration.payment_status === 'captured';
+
+        if (isPaid && registration.razorpay_payment_id) {
+            try {
+                logger.info({ registrationId, paymentId: registration.razorpay_payment_id }, '[EventRegistration] Initiating automatic refund for cancellation');
+
+                // 3.1. Create refund record
+                const refundRecord = await EventRefundService.initiateRefund({
+                    eventId: registration.event_id,
+                    userId: registration.user_id,
+                    registrationId: registrationId,
+                    paymentId: registration.razorpay_payment_id,
+                    amount: registration.amount,
+                    correlationId: 'USER_CANCEL' // Or pass one
+                });
+
+                if (refundRecord.status === 'INITIATED') {
+                    const refund = await refundPayment(registration.razorpay_payment_id, null, {
+                        reason: `User cancelled: ${reason}`,
+                        registration_id: registrationId,
+                        source: 'USER_CANCELLATION'
+                    });
+
+                    await EventRefundService.markProcessing(refundRecord.id, refund.id);
+                    refundSuccessful = true;
+                    refundId = refund.id;
+                } else {
+                    refundSuccessful = true;
+                    refundId = refundRecord.gateway_reference;
+                }
+            } catch (refundError) {
+                logger.error({ err: refundError, registrationId }, '[EventRegistration] Automatic refund failed');
+                throw new Error('Failed to process refund. Please contact support.');
+            }
+        }
+
+        // 4. Update Registration Status
         const { error: updateError } = await supabase
             .from('event_registrations')
             .update({
                 status: 'cancelled',
+                payment_status: refundSuccessful ? 'refunded' : registration.payment_status,
                 cancellation_reason: reason,
                 cancelled_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
             })
             .eq('id', registrationId);
 
-        if (updateError) throw updateError;
+        if (updateError) {
+            logger.error({ err: updateError, registrationId }, '[EventRegistration] Failed to update registration status after cancellation');
+            throw updateError;
+        }
 
-        // 3. Send cancellation email
-        const refundDetails = (registration.payment_status === 'paid' || registration.payment_status === 'captured') ? {
+        // 5. Send cancellation email
+        const refundDetails = isPaid ? {
             amount: registration.amount || 0,
-            isRefunded: false
+            isRefunded: refundSuccessful,
+            refundId: refundId
         } : null;
 
         emailService.sendEventCancellationEmail(
@@ -466,7 +531,7 @@ class EventRegistrationService {
      * Get User Registrations
      */
     static async getUserRegistrations(userId, { page = 1, limit = 5 } = {}) {
-        // console.log(`[EventRegistration] Fetching registrations for user: ${userId} page: ${page}`);
+        logger.debug({ userId, page }, '[EventRegistration] Fetching user registrations');
         const offset = (page - 1) * limit;
 
         const { data, error, count } = await supabase

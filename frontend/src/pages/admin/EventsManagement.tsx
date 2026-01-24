@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -203,6 +203,29 @@ export default function EventsManagement() {
       },
     });
 
+    // Notify on job completion if it was previously processing
+    const [lastStatus, setLastStatus] = useState<string | null>(null);
+    useEffect(() => {
+      if (jobStatus?.status && lastStatus && lastStatus !== jobStatus.status) {
+        if (jobStatus.status === 'COMPLETED') {
+          toast({
+            title: "Cancellation Complete",
+            description: "All registrants have been processed and refunded.",
+          });
+          queryClient.invalidateQueries({ queryKey: ["admin-events"] });
+        } else if (jobStatus.status === 'FAILED' || jobStatus.status === 'PARTIAL_FAILURE') {
+          toast({
+            title: "Job Warning",
+            description: `Cancellation job ended with status: ${jobStatus.status}`,
+            variant: "destructive",
+          });
+        }
+      }
+      if (jobStatus?.status) {
+        setLastStatus(jobStatus.status);
+      }
+    }, [jobStatus, lastStatus]);
+
     if (!jobStatus) return null;
 
     const statusConfig: Record<string, { icon: React.ReactNode; className: string; label: string }> = {
@@ -358,7 +381,6 @@ export default function EventsManagement() {
                               variant="ghost"
                               size="icon"
                               onClick={() => handleEditEvent(event)}
-                              disabled={event.status === 'cancelled'}
                               title="Edit"
                             >
                               <Edit className="h-4 w-4" />

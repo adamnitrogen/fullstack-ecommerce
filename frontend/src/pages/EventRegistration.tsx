@@ -433,12 +433,26 @@ const EventRegistration = () => {
                 {/* Registration Amount Display */}
                 <div className="space-y-2">
                   <Label>Registration Amount</Label>
-                  <div className="bg-muted/50 p-4 rounded-lg border">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-muted-foreground">
-                        Amount:
+                  <div className="bg-muted/50 p-4 rounded-lg border space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Base Price:</span>
+                      <span className="font-medium">
+                        {isFree ? "₹0.00" : `₹${(registrationAmount / (1 + (eventData.gstRate || 0) / 100)).toFixed(2)}`}
                       </span>
-                      <span className="text-lg font-bold">
+                    </div>
+                    {!isFree && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">GST ({eventData.gstRate || 0}%):</span>
+                        <span className="font-medium">
+                          ₹{(registrationAmount - (registrationAmount / (1 + (eventData.gstRate || 0) / 100))).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between pt-2 border-t mt-2">
+                      <span className="text-sm font-bold text-foreground">
+                        Total {!isFree && "(Inclusive of Tax)"}:
+                      </span>
+                      <span className="text-lg font-black text-primary">
                         {isFree ? "Free" : `₹${registrationAmount}`}
                       </span>
                     </div>
@@ -546,14 +560,26 @@ const EventRegistration = () => {
                   </div>
                 </div>
 
-                <div className="bg-primary/5 border border-primary/10 rounded-xl p-4 flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <Ticket className="w-5 h-5 text-primary" />
-                    <span className="font-medium">Total Amount</span>
+                <div className="bg-primary/5 border border-primary/10 rounded-xl p-4 space-y-2">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Base Price</span>
+                    <span>{isFree ? "₹0.00" : `₹${(registrationAmount / (1 + (eventData.gstRate || 0) / 100)).toFixed(2)}`}</span>
                   </div>
-                  <span className="text-2xl font-bold text-primary">
-                    {isFree ? "Free" : `₹${registrationAmount}`}
-                  </span>
+                  {!isFree && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-muted-foreground">GST ({eventData.gstRate || 0}%)</span>
+                      <span>₹{(registrationAmount - (registrationAmount / (1 + (eventData.gstRate || 0) / 100))).toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center pt-2 border-t">
+                    <div className="flex items-center gap-2">
+                      <Ticket className="w-5 h-5 text-primary" />
+                      <span className="font-bold">Total Amount</span>
+                    </div>
+                    <span className="text-2xl font-black text-primary">
+                      {isFree ? "Free" : `₹${registrationAmount}`}
+                    </span>
+                  </div>
                 </div>
 
                 {!isFree && (

@@ -45,9 +45,11 @@ function getEventRegistrationEmail({ event, registration, attendeeName, isPaid =
     if (isPaid && paymentDetails) {
         paymentSection = `
             <div class="info-box">
-                <strong>Payment Details:</strong><br>
-                💰 Amount Paid: ₹${paymentDetails.amount?.toFixed(2) || '0.00'}<br>
-                🧾 Transaction ID: ${paymentDetails.transactionId || paymentDetails.razorpayPaymentId || 'N/A'}<br>
+                <strong>Payment Details (Inclusive of all taxes):</strong><br>
+                💵 Base Price: ₹${paymentDetails.basePrice?.toFixed(2) || '0.00'}<br>
+                🧾 GST (${paymentDetails.gstRate || 0}%): ₹${paymentDetails.gstAmount?.toFixed(2) || '0.00'}<br>
+                💰 Total Amount Paid: ₹${paymentDetails.amount?.toFixed(2) || '0.00'}<br>
+                🔗 Transaction ID: ${paymentDetails.transactionId || paymentDetails.razorpayPaymentId || 'N/A'}<br>
                 📅 Payment Date: ${new Date(paymentDetails.paidAt || Date.now()).toLocaleDateString()}
                 ${paymentDetails.invoiceUrl ? `<br><br><a href="${paymentDetails.invoiceUrl}" style="color: #667eea; text-decoration: underline;">📄 Download Invoice</a>` : ''}
             </div>

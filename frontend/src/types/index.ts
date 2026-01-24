@@ -155,10 +155,14 @@ export interface Event {
   isRegistrationEnabled?: boolean;
   keyHighlights?: string[];
   specialPrivileges?: string[];
-  cancellationStatus?: "CANCELLATION_PENDING" | "CANCELLED";
-  cancelledAt?: string;
-  cancellationReason?: string;
-  cancellationCorrelationId?: string;
+  gstRate?: number;
+  basePrice?: number;
+  gstAmount?: number;
+  registrationDeadline?: string;
+  cancellationStatus?: "CANCELLATION_PENDING" | "CANCELLED" | null;
+  cancelledAt?: string | null;
+  cancellationReason?: string | null;
+  cancellationCorrelationId?: string | null;
 }
 
 export interface Blog {
@@ -653,6 +657,9 @@ export interface EventRegistration {
   email: string;
   phone: string;
   amount: number;
+  gst_rate?: number;
+  base_price?: number;
+  gst_amount?: number;
   payment_status: string;
   status: "pending" | "confirmed" | "cancelled" | "refunded";
   created_at: string;

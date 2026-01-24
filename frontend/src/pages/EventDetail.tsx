@@ -243,7 +243,18 @@ const EventDetail = () => {
                       <p className="text-4xl font-black text-[#2C1810]">
                         {isFree ? "Free Entry" : `₹${registrationAmount}`}
                       </p>
-                      <p className="text-[10px] text-[#B85C3C] mt-2 font-bold uppercase tracking-tighter">Limited Slots Available</p>
+                      {!isFree && (
+                        <div className="mt-2 space-y-1">
+                          <p className="text-[10px] text-[#B85C3C] font-bold uppercase tracking-tighter">
+                            Inclusive of all taxes
+                          </p>
+                          <div className="flex flex-col text-[10px] text-muted-foreground/80 font-medium">
+                            <span>Base: ₹{eventData.basePrice || (registrationAmount / (1 + (eventData.gstRate || 0) / 100)).toFixed(2)}</span>
+                            <span>GST ({eventData.gstRate || 0}%): ₹{eventData.gstAmount || (registrationAmount - (registrationAmount / (1 + (eventData.gstRate || 0) / 100))).toFixed(2)}</span>
+                          </div>
+                        </div>
+                      )}
+                      {isFree && <p className="text-[10px] text-[#B85C3C] mt-2 font-bold uppercase tracking-tighter">Limited Slots Available</p>}
                     </div>
                   )}
 
@@ -284,6 +295,32 @@ const EventDetail = () => {
                         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Location</p>
                         <p className="text-sm font-bold text-[#2C1810] leading-snug">
                           {eventData.location?.address}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-4 group">
+                      <div className="w-12 h-12 rounded-2xl bg-[#FAF7F2] flex items-center justify-center text-orange-600 group-hover:bg-orange-600 group-hover:text-white transition-all">
+                        <Clock size={20} />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Registration Deadline</p>
+                        <p className="text-sm font-bold text-[#2C1810]">
+                          {eventData.registrationDeadline
+                            ? format(new Date(eventData.registrationDeadline), "MMMM d, yyyy")
+                            : format(new Date(eventData.startDate), "MMMM d, yyyy")}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-blue-50 border border-blue-100/50 flex gap-3 items-start">
+                      <Shield className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <p className="text-blue-900 text-[10px] font-bold uppercase tracking-wider">Cancellation Policy</p>
+                        <p className="text-blue-700 text-[10px] leading-relaxed font-medium">
+                          {isFree
+                            ? "Free events can be cancelled at any time."
+                            : "Full refund if cancelled at least 48 hours before the event."}
                         </p>
                       </div>
                     </div>
