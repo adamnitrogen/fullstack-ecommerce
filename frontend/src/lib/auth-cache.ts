@@ -1,4 +1,5 @@
 import type { User } from "@/types";
+import { logger } from "@/lib/logger";
 
 interface CachedAuthState {
     user: User | null;
@@ -31,7 +32,7 @@ export const AuthCache = {
             localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
         } catch (error) {
             // Silent fail - localStorage might be disabled or full
-            console.warn('[AuthCache] Failed to cache auth state:', error);
+            logger.warn('Failed to cache auth state', { module: 'AuthCache', err: error });
         }
     },
 
@@ -48,7 +49,7 @@ export const AuthCache = {
 
             // Check if cache has expired
             if (data.expiresAt && data.expiresAt < Date.now()) {
-                console.debug('[AuthCache] Cache expired, clearing...');
+                // logger.debug('[AuthCache] Cache expired, clearing...');
                 this.clear();
                 return null;
             }
@@ -56,14 +57,14 @@ export const AuthCache = {
             // Additional validation: ensure cache is less than 24 hours old (safety check)
             const maxAge = 24 * 60 * 60 * 1000; // 24 hours
             if (Date.now() - data.cachedAt > maxAge) {
-                console.debug('[AuthCache] Cache too old (>24h), clearing...');
+                // logger.debug('[AuthCache] Cache too old (>24h), clearing...');
                 this.clear();
                 return null;
             }
 
             return data;
         } catch (error) {
-            console.warn('[AuthCache] Failed to read cache:', error);
+            logger.warn('Failed to read auth cache', { module: 'AuthCache', err: error });
             this.clear();
             return null;
         }

@@ -119,7 +119,13 @@ class EventRegistrationService {
             .single();
 
         if (regError) {
-            console.error('Registration Insert Error:', regError);
+            logger.error('Failed to create registration record', {
+                module: 'EventRegistration',
+                operation: 'CREATE_ORDER',
+                err: regError,
+                userId,
+                eventId
+            });
             throw new Error('Failed to create registration record: ' + regError.message);
         }
 

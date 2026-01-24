@@ -4,20 +4,19 @@ const path = require('path');
 const fs = require('fs');
 const { getContext } = require('./async-context');
 const newrelicPinoEnricher = require('@newrelic/pino-enricher');
-const pinoPretty = require('pino-pretty');
 
-const isProduction = process.env.NODE_ENV === 'production';
-const LOG_LEVEL = process.env.LOG_LEVEL || (isProduction ? 'info' : 'debug');
+const LOG_LEVEL = process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug');
+const LOG_PROVIDER = process.env.LOG_PROVIDER || 'file'; // 'file' or 'newrelic'
+const LOG_DIRECTORY = process.env.LOG_DIRECTORY || path.join(__dirname, '..', 'logs');
 
-// Create logs directory if it doesn't exist (for development)
-const logsDir = path.join(__dirname, '..', 'logs');
-if (!isProduction && !fs.existsSync(logsDir)) {
-    fs.mkdirSync(logsDir, { recursive: true });
+// Create logs directory if it doesn't exist
+if (!fs.existsSync(LOG_DIRECTORY)) {
+    fs.mkdirSync(LOG_DIRECTORY, { recursive: true });
 }
 
-// Core serializers
-
-// Custom Serializers for strict sanitization
+/**
+ * Custom Serializers for strict sanitization
+ */
 const reqSerializer = (req) => {
     if (!req) return req;
     const headers = req.headers || {};
@@ -27,8 +26,10 @@ const reqSerializer = (req) => {
         url: req.url,
         ip: req.remoteAddress,
         userAgent: headers['user-agent'],
-        userId: (req.user && req.user.id) || headers['x-user-id'],
-        // Explicitly exclude other headers to prevent leaking cookies/auth tokens
+        userId: (req.user && req.user.id) || headers['x-user-id'] || headers['X-User-ID'],
+        correlationId: headers['x-correlation-id'] || headers['X-Correlation-ID'],
+        traceId: headers['x-trace-id'] || headers['X-Trace-ID'],
+        spanId: headers['x-span-id'] || headers['X-Span-ID']
     };
 };
 
@@ -44,7 +45,6 @@ const MAX_LOG_SIZE_BYTES = 64 * 1024;
 
 /**
  * Defensive truncation function.
- * Returns a truncated string explanation if the object is too large.
  */
 const safePayload = (obj) => {
     try {
@@ -54,67 +54,61 @@ const safePayload = (obj) => {
         }
         return obj;
     } catch (e) {
-        // If stringify fails (e.g. circular refs like req/res), return original object
-        // and let Pino's configured serializers handle it.
         return obj;
     }
 };
 
-let logger;
-
-// Mixin to add context (Correlation ID) to every log
+// Mixin to add context (Tracing IDs) to every log
 const mixin = () => {
-    return getContext() || {};
+    const context = getContext();
+    if (!context) return {};
+    return {
+        correlationId: context.correlationId,
+        traceId: context.traceId,
+        spanId: context.spanId,
+        userId: context.userId
+    };
 };
 
 // Unified Log Structure Configuration
 const baseLog = {
-    layer: 'backend',
-    environment: process.env.NODE_ENV || 'development',
+    service: process.env.APP_NAME || 'ecommerce-backend',
+    env: process.env.NODE_ENV || 'development',
 };
 
-// Helper: Restructure arguments to match schema
+/**
+ * Restructure arguments to match the required schema
+ */
 const restructureLog = (inputArgs) => {
     let [arg1, arg2, ...rest] = inputArgs;
     let logObj = {};
     let msg = arg2;
 
-    // Handle case where first arg is message
     if (typeof arg1 === 'string') {
         msg = arg1;
         arg1 = {};
     } else if (typeof arg1 === 'object' && arg1 !== null) {
         logObj = { ...arg1 };
-        // If msg was not provided as second arg, check if it's in the object
-        if (!msg && logObj.msg) {
-            msg = logObj.msg;
+        if (!msg && (logObj.msg || logObj.message)) {
+            msg = logObj.msg || logObj.message;
             delete logObj.msg;
-        }
-        if (!msg && logObj.message) {
-            msg = logObj.message;
             delete logObj.message;
         }
     }
 
-    // Extract mandatory and top-level fields
     const { module, operation, err, error, req, res, ...otherContext } = logObj;
 
-    // Sanitize req/res if present
     const sanitizedContext = { ...otherContext };
     if (req) sanitizedContext.req = reqSerializer(req);
     if (res) sanitizedContext.res = resSerializer(res);
 
-    // Construct final object
     const finalObj = {
-        // Default to undefined to avoid cluttering if not provided? 
-        // User requirements said "Mandatory Fields (...) Module: Derive from file".
-        // If we can't derive, we use 'Unknown'.
         module: module || 'UnknownModule',
         operation: operation || 'UnknownOperation',
-        context: safePayload(sanitizedContext)
+        context: safePayload(sanitizedContext),
+        timestamp: new Date().toISOString()
     };
 
-    // Normalize Error
     const startError = err || error;
     if (startError) {
         finalObj.error = stdSerializers.err(startError);
@@ -122,105 +116,90 @@ const restructureLog = (inputArgs) => {
 
     const outputArgs = [finalObj];
     if (msg) outputArgs.push(msg);
-
     return outputArgs;
 };
 
-if (isProduction) {
-    // PRODUCTION: Use New Relic enricher for log correlation
-    const nrEnricher = newrelicPinoEnricher();
+let logger;
 
-    logger = pino(Object.assign({}, nrEnricher, {
-        level: LOG_LEVEL,
-        base: baseLog,
-        // Override timestamp key to 'timestamp'
-        timestamp: () => `,"timestamp":"${new Date().toISOString()}"`,
-        mixin,
-        hooks: {
-            logMethod(inputArgs, method, level) {
-                const newArgs = restructureLog(inputArgs);
-                return method.apply(this, newArgs);
-            }
-        },
-        redact: {
-            paths: [
-                'password', 'token', 'accessToken', 'refreshToken', 'cookie', 'authorization', 'secret',
-                'context.password', 'context.token', 'context.accessToken', 'context.refreshToken',
-                'context.cookie', 'context.authorization', 'context.secret',
-                'req.headers.cookie', 'req.headers.authorization',
-                'context.req.headers.cookie', 'context.req.headers.authorization',
-                '*.password', '*.token', '*.accessToken', '*.refreshToken', '*.cookie', '*.authorization', '*.secret'
-            ],
-            remove: true
-        },
-        formatters: {
-            ...nrEnricher.formatters,
-            level: (label) => {
-                return { level: label.toUpperCase() };
-            }
+const pinoOptions = {
+    level: LOG_LEVEL,
+    base: baseLog,
+    mixin,
+    hooks: {
+        logMethod(inputArgs, method, level) {
+            const newArgs = restructureLog(inputArgs);
+            return method.apply(this, newArgs);
         }
-    }));
+    },
+    redact: {
+        paths: [
+            'password', 'token', 'accessToken', 'refreshToken', 'cookie', 'authorization', 'secret',
+            'email', 'phone', 'phoneNumber', 'mobile', 'creditCard', 'card',
+            'gstin', 'pan',
+            'context.password', 'context.token', 'context.accessToken', 'context.refreshToken',
+            'context.cookie', 'context.authorization', 'context.secret',
+            '*.password', '*.token', '*.accessToken', '*.refreshToken', '*.cookie', '*.authorization', '*.secret'
+        ],
+        remove: true
+    },
+    formatters: {
+        level: (label) => ({ level: label.toUpperCase() })
+    }
+};
+
+if (LOG_PROVIDER === 'newrelic') {
+    const nrEnricher = newrelicPinoEnricher();
+    logger = pino({
+        ...pinoOptions,
+        ...nrEnricher,
+        formatters: {
+            ...pinoOptions.formatters,
+            ...nrEnricher.formatters
+        }
+    });
 } else {
-    // DEVELOPMENT: Write to log file + pretty console output using multistream (main thread)
-    const logFilePath = path.join(logsDir, 'app.log');
-
-    // Stream 1: Pretty Console
-    const prettyStream = pinoPretty({
-        colorize: true,
-        translateTime: 'SYS:standard',
-        ignore: 'pid,hostname,layer,environment,module,operation'
-    });
-
-    // Stream 2: File
-    const fileStream = pino.destination({
-        dest: logFilePath,
-        sync: false, // Async writing for performance
-        mkdir: true
-    });
-
-    // Combine streams
+    // Default File Logger with Daily Rotation
     const streams = [
-        { stream: prettyStream },
-        { stream: fileStream }
+        {
+            level: LOG_LEVEL,
+            stream: pino.transport({
+                target: 'pino-roll',
+                options: {
+                    file: path.join(LOG_DIRECTORY, 'merigaumata'),
+                    dateFormat: 'dd-MM-yyyy',
+                    extension: '.log',
+                    frequency: 'daily',
+                    mkdir: true,
+                    sync: false
+                }
+            })
+        }
     ];
 
-    logger = pino({
-        level: LOG_LEVEL,
-        base: baseLog,
-        timestamp: () => `,"timestamp":"${new Date().toISOString()}"`,
-        mixin,
-        hooks: {
-            logMethod(inputArgs, method, level) {
-                const newArgs = restructureLog(inputArgs);
-                return method.apply(this, newArgs);
-            }
-        },
-        redact: {
-            paths: [
-                'password', 'token', 'accessToken', 'refreshToken', 'cookie', 'authorization', 'secret',
-                'email', 'phone', 'phoneNumber', 'mobile', 'creditCard', 'card',
-                'gstin', 'pan',
-                'context.password', 'context.token', 'context.accessToken', 'context.refreshToken',
-                'context.cookie', 'context.authorization', 'context.secret',
-                'context.gstin', 'context.pan',
-                'req.headers.cookie', 'req.headers.authorization',
-                'context.req.headers.cookie', 'context.req.headers.authorization',
-                // Wildcards for deeply nested potential leaks
-                '*.password', '*.token', '*.accessToken', '*.refreshToken', '*.cookie', '*.authorization', '*.secret',
-                '*.email', '*.phone', '*.phoneNumber', '*.mobile', '*.creditCard', '*.card',
-                '*.gstin', '*.pan'
-            ],
-            remove: true
-        },
-        formatters: {
-            level: (label) => {
-                return { level: label.toUpperCase() };
-            }
-        }
-    }, pino.multistream(streams));
+    // Add pretty console in development
+    if (process.env.NODE_ENV !== 'production') {
+        streams.push({
+            level: LOG_LEVEL,
+            stream: pino.transport({
+                target: 'pino-pretty',
+                options: {
+                    colorize: true,
+                    translateTime: 'SYS:standard',
+                    ignore: 'pid,hostname,service,env,module,operation'
+                }
+            })
+        });
+    }
 
-    // Log startup message
-    logger.info({ module: 'Logger', operation: 'INIT' }, `Development logging to file: ${logFilePath}`);
+    logger = pino(pinoOptions, pino.multistream(streams));
 }
 
-module.exports = logger;
+// Map standard logging methods for ease of use and potential expansion
+module.exports = {
+    debug: (msg, meta) => logger.debug(meta, msg),
+    info: (msg, meta) => logger.info(meta, msg),
+    warn: (msg, meta) => logger.warn(meta, msg),
+    error: (msg, meta) => logger.error(meta, msg),
+    fatal: (msg, meta) => logger.fatal(meta, msg),
+    pino: logger // Export raw pino instance if needed
+};

@@ -122,7 +122,7 @@ export const addressService = {
      * Set an address as primary
      */
     setPrimary: async (id: string, type: 'home' | 'work' | 'other'): Promise<CheckoutAddress> => {
-        console.log(`[AddressService:setPrimary] id=${id}, type=${type}`);
+        // logger.info(`[AddressService:setPrimary] id=${id}, type=${type}`);
         const response = await apiClient.post(`/addresses/${id}/set-primary`, { type });
         return transformToCheckoutAddress(response.data.address);
     },

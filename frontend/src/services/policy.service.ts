@@ -1,4 +1,5 @@
 import { apiClient } from '@/lib/api-client';
+import { logger } from "@/lib/logger";
 
 export type PolicyType = 'privacy' | 'terms' | 'shipping-refund';
 
@@ -38,7 +39,7 @@ export const policyService = {
             if (cachedData) {
                 const parsed = JSON.parse(cachedData) as Policy;
                 if (parsed.version === version) {
-                    // console.log(`Serving ${policyType} policy from cache (v${version})`);
+                    // logger.debug(`Serving ${policyType} policy from cache (v${version})`);
                     return parsed;
                 }
             }
@@ -52,7 +53,7 @@ export const policyService = {
 
             return data;
         } catch (error) {
-            // console.error('Error fetching policy:', error);
+            logger.warn('Error fetching policy, falling back to direct fetch', { module: 'policyService', type: policyType, err: error });
             // Fallback to direct fetch if version check fails
             const response = await apiClient.get(`/policies/public/${policyType}`);
             return response.data;

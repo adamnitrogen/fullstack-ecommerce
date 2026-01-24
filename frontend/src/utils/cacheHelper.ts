@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 /**
  * Client-side Cache Helper
  * Provides localStorage/sessionStorage caching with TTL expiration
@@ -37,15 +38,15 @@ class CacheHelper {
 
             // Check if expired
             if (now - entry.timestamp > entry.ttl) {
-                console.log(`[Cache] EXPIRED: ${key}`);
+                // logger.debug(`[Cache] EXPIRED: ${key}`);
                 storage.removeItem(key);
                 return null;
             }
 
-            console.log(`[Cache] HIT: ${key}`);
+            // logger.debug(`[Cache] HIT: ${key}`);
             return entry.data;
         } catch (error) {
-            console.error(`[Cache] Error reading ${key}:`, error);
+            logger.error(`Cache read error for ${key}`, { module: 'CacheHelper', err: error });
             return null;
         }
     }
@@ -65,9 +66,9 @@ class CacheHelper {
 
             const storage = useSessionStorage ? sessionStorage : localStorage;
             storage.setItem(key, JSON.stringify(entry));
-            console.log(`[Cache] SET: ${key} (TTL: ${ttl}ms)`);
+            // logger.debug(`[Cache] SET: ${key} (TTL: ${ttl}ms)`);
         } catch (error) {
-            console.error(`[Cache] Error writing ${key}:`, error);
+            logger.error(`Cache write error for ${key}`, { module: 'CacheHelper', err: error });
         }
     }
 
@@ -78,9 +79,9 @@ class CacheHelper {
         try {
             const storage = useSessionStorage ? sessionStorage : localStorage;
             storage.removeItem(key);
-            console.log(`[Cache] REMOVED: ${key}`);
+            // logger.debug(`[Cache] REMOVED: ${key}`);
         } catch (error) {
-            console.error(`[Cache] Error removing ${key}:`, error);
+            logger.error(`Cache removal error for ${key}`, { module: 'CacheHelper', err: error });
         }
     }
 
@@ -100,9 +101,9 @@ class CacheHelper {
             }
 
             keysToRemove.forEach(key => storage.removeItem(key));
-            console.log(`[Cache] CLEARED ${keysToRemove.length} entries with prefix: ${prefix}`);
+            // logger.debug(`[Cache] CLEARED ${keysToRemove.length} entries with prefix: ${prefix}`);
         } catch (error) {
-            console.error(`[Cache] Error clearing prefix ${prefix}:`, error);
+            logger.error(`Cache clear by prefix error for ${prefix}`, { module: 'CacheHelper', err: error });
         }
     }
 
@@ -113,9 +114,9 @@ class CacheHelper {
         try {
             const storage = useSessionStorage ? sessionStorage : localStorage;
             storage.clear();
-            console.log('[Cache] CLEARED ALL');
+            // logger.debug('[Cache] CLEARED ALL');
         } catch (error) {
-            console.error('[Cache] Error clearing all:', error);
+            logger.error('Cache clear all error', { module: 'CacheHelper', err: error });
         }
     }
 
@@ -138,7 +139,7 @@ class CacheHelper {
         }
 
         // Cache miss - fetch fresh data
-        console.log(`[Cache] MISS: ${key} - fetching fresh data`);
+        // logger.debug(`[Cache] MISS: ${key} - fetching fresh data`);
         const data = await fetchFn();
 
         // Store in cache
@@ -176,10 +177,10 @@ class CacheHelper {
 
             keysToRemove.forEach(key => storage.removeItem(key));
             if (keysToRemove.length > 0) {
-                console.log(`[Cache] Cleared ${keysToRemove.length} expired entries`);
+                // logger.debug(`[Cache] Cleared ${keysToRemove.length} expired entries`);
             }
         } catch (error) {
-            console.error('[Cache] Error clearing expired entries:', error);
+            logger.error('Cache clear expired error', { module: 'CacheHelper', err: error });
         }
     }
 
@@ -196,7 +197,7 @@ class CacheHelper {
         const isReload = navigationEntries.length > 0 && navigationEntries[0].type === 'reload';
 
         if (isReload && clearOnReload) {
-            console.log('[Cache] Page reload detected - clearing cache for fresh data');
+            // logger.debug('[Cache] Page reload detected - clearing cache for fresh data');
             // Clear application cache (keep other localStorage data intact)
             this.remove('active_coupons');
             this.remove('user_addresses');

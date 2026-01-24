@@ -1,12 +1,11 @@
 import axios, { InternalAxiosRequestConfig } from "axios";
-import { logAPICall } from "./logger";
+import { logAPICall, logger } from "./logger";
 import { getGuestId } from "./guestId";
 
 declare module 'axios' {
   export interface InternalAxiosRequestConfig {
     metadata?: {
       startTime: number;
-      correlationId: string;
     };
   }
 }
@@ -25,16 +24,13 @@ export const api = axios.create({
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
-    // Add Correlation ID
-    const correlationId = (typeof crypto !== 'undefined' && crypto.randomUUID)
-      ? crypto.randomUUID()
-      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-      });
+    // Force refresh span ID for each new request
+    logger.refreshSpanId();
 
-    config.headers['X-Correlation-ID'] = correlationId;
+    // Attach tracing headers
+    config.headers['X-Correlation-ID'] = config.headers['X-Correlation-ID'] || (logger as any).correlationId;
+    config.headers['X-Trace-ID'] = (logger as any).traceId;
+    config.headers['X-Span-ID'] = (logger as any).spanId;
 
     // Attach Guest ID if present
     const guestId = getGuestId();
@@ -44,12 +40,9 @@ api.interceptors.request.use(
 
     // Track request start time
     config.metadata = {
-      startTime: Date.now(),
-      correlationId
+      startTime: Date.now()
     };
 
-    // NOTE: Auth tokens are managed via httpOnly cookies by Supabase SDK
-    // No need to manually attach Authorization header from localStorage
     return config;
   },
   (error) => Promise.reject(error)
@@ -68,7 +61,7 @@ api.interceptors.response.use(
       config.method?.toUpperCase() || 'UNKNOWN',
       response.status,
       duration,
-      config.metadata?.correlationId
+      config.headers['X-Correlation-ID'] as string
     );
     return response;
   },
@@ -83,7 +76,7 @@ api.interceptors.response.use(
       config?.method?.toUpperCase() || 'UNKNOWN',
       error.response?.status || 0,
       duration,
-      config?.metadata?.correlationId
+      config?.headers?.['X-Correlation-ID'] as string
     );
 
     if (error.response?.status === 401) {

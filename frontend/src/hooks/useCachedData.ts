@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { useState, useEffect } from 'react';
 
 interface CacheItem<T> {
@@ -44,7 +45,7 @@ export function useCachedData<T>(
                             return;
                         }
                     } catch (e) {
-                        // console.warn('Failed to parse cached data', e);
+                        logger.warn('Failed to parse cached data', { module: 'useCachedData', key, err: e });
                         localStorage.removeItem(key);
                     }
                 }
@@ -64,7 +65,7 @@ export function useCachedData<T>(
                 };
                 localStorage.setItem(key, JSON.stringify(cacheItem));
             } catch (e) {
-                // console.warn('Failed to save to localStorage (quota exceeded?)', e);
+                logger.warn('Failed to save to localStorage', { module: 'useCachedData', key, err: e });
             }
 
         } catch (err) {

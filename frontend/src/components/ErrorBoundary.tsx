@@ -1,19 +1,16 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { BrowserAgent } from '@newrelic/browser-agent/loaders/browser-agent';
+import React, { ErrorInfo, ReactNode } from "react";
+import { logger } from "@/lib/logger";
 
 interface Props {
     children: ReactNode;
+    fallback?: ReactNode;
 }
 
 interface State {
     hasError: boolean;
 }
 
-// We assume the agent might be initialized globally or we instance it here if strictly needed,
-// but usually the interaction is via window.newrelic if injected, or using the helper.
-// The @newrelic/browser-agent package allows direct import.
-
-class ErrorBoundary extends Component<Props, State> {
+export class ErrorBoundary extends React.Component<Props, State> {
     constructor(props: Props) {
         super(props);
         this.state = { hasError: false };
@@ -24,33 +21,33 @@ class ErrorBoundary extends Component<Props, State> {
     }
 
     componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-        // console.error('Uncaught error:', error, errorInfo);
-
-        // Send to New Relic if available
-        // We can use the global newrelic object if the snippet was loaded, or check our instance logic.
-        // Since we installed the npm package, we can technically import it, but the Agent instance is better.
-        // For simplicity, we assume window.newrelic might be available OR we rely on automatic capture 
-        // if the agent was initialized effectively.
-        // Explicit noticeError:
-        if (typeof window !== 'undefined' && window.newrelic) {
-            window.newrelic.noticeError(error, {
-                componentStack: errorInfo.componentStack
-            });
-        }
+        logger.error(`React Error: ${error.message}`, {
+            component: "ErrorBoundary",
+            action: "RENDER_ERROR",
+            stack: error.stack,
+            componentStack: errorInfo.componentStack,
+        });
     }
 
     render() {
         if (this.state.hasError) {
+            if (this.props.fallback) {
+                return this.props.fallback;
+            }
             return (
-                <div className="p-8 text-center">
-                    <h2 className="text-2xl font-bold text-red-600 mb-4">Something went wrong.</h2>
-                    <p className="text-gray-600">We have been notified and are working on the fix.</p>
-                    <button
-                        onClick={() => window.location.reload()}
-                        className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                    >
-                        Reload Page
-                    </button>
+                <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+                    <div className="max-w-md w-full text-center">
+                        <h1 className="text-2xl font-bold text-gray-900 mb-2">Something went wrong</h1>
+                        <p className="text-gray-600 mb-6">
+                            We've been notified and are looking into it. Please try refreshing the page.
+                        </p>
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="bg-primary text-white px-6 py-2 rounded-md hover:bg-primary/90 transition-colors"
+                        >
+                            Refresh Page
+                        </button>
+                    </div>
                 </div>
             );
         }
@@ -58,5 +55,3 @@ class ErrorBoundary extends Component<Props, State> {
         return this.props.children;
     }
 }
-
-export default ErrorBoundary;

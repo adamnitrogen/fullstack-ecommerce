@@ -96,7 +96,7 @@ app.use(cors({
         if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.some(o => origin.startsWith(o))) {
             callback(null, true);
         } else {
-            console.log('Blocked by CORS:', origin);
+            logger.warn('Blocked by CORS:', { origin });
             callback(new Error('Not allowed by CORS'));
         }
     },
@@ -107,77 +107,26 @@ app.use(cors({
 }));
 app.use(cookieParser()); // Parse cookies
 // Increase payload size limit to handle images (base64 encoded)
-// Request Logging & Correlation ID
-app.use(pinoHttp({
-    logger,
-
-    // Constraint: Correlation ID
-    // Automatically capture from headers or generate if missing.
-    // This ID attaches to every log in the request scope.
-    genReqId: function (req) {
-        return req.headers['x-correlation-id'] || req.headers['x-request-id'] || crypto.randomUUID();
-    },
-
-    // Constraint: Conciseness
-    // Only log essential metadata. No full headers. No full body.
-    serializers: {
-        req: (req) => ({
-            id: req.id,
-            method: req.method,
-            url: req.url,
-            url: req.url,
-            // query: req.query, // Optional: exclude if sensitive
-            // params: req.params,
-            ip: req.remoteAddress,
-            userAgent: req.headers['user-agent'], // Only specific header allowed
-            userId: req.user?.id || req.headers['x-user-id'], // Capture User ID if available
-            idempotencyKey: req.headers['x-idempotency-key'] // Capture Idempotency Key if present
-        }),
-        res: (res) => ({
-            statusCode: res.statusCode
-            // Duration is added automatically by pino-http
-        }),
-        err: pino.stdSerializers.err // Standard error serializer
-    },
-
-    // Quiet down health checks and static assets if needed
-    autoLogging: {
-        ignore: (req) => req.url === '/api/health'
-    },
-
-    customSuccessMessage: function (req, res) {
-        if (res.statusCode === 404) return `${req.method} ${req.url} - Resource not found`;
-        return `${req.method} ${req.url} completed with status ${res.statusCode}`;
-    },
-
-    // Use 'info' in production to capture standard request logs
-    level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
-
-    // Inject standard fields for the unified log structure
-    customProps: function (req, res) {
-        return {
-            module: 'API',
-            operation: 'HTTP_REQUEST'
-        };
-    }
-}));
-
-
 // Apply tracing middleware - generates/extracts traceId, spanId, correlationId
 app.use(tracingMiddleware);
 
+// Routes
+const logRoutes = require('./routes/log.routes');
+app.use('/api/logs', logRoutes);
+
 // New Relic custom attributes for searchability
 app.use((req, res, next) => {
-    newrelic.addCustomAttribute('traceId', req.traceId);
-    newrelic.addCustomAttribute('spanId', req.spanId);
-    newrelic.addCustomAttribute('correlationId', req.correlationId);
+    if (newrelic) {
+        newrelic.addCustomAttribute('traceId', req.traceId);
+        newrelic.addCustomAttribute('spanId', req.spanId);
+        newrelic.addCustomAttribute('correlationId', req.correlationId);
 
-    // Add User ID from header if present
-    const userIdHeader = req.headers['x-user-id'];
-    if (userIdHeader) {
-        newrelic.addCustomAttribute('userId', userIdHeader);
+        // Add User ID from header if present
+        const userIdHeader = req.user?.id || req.headers['x-user-id'] || req.headers['X-User-ID'];
+        if (userIdHeader) {
+            newrelic.addCustomAttribute('userId', userIdHeader);
+        }
     }
-
     next();
 });
 
@@ -250,7 +199,7 @@ function startServer(port, attempt = 0) {
     const maxAttempts = 10;
     const numericPort = Number(port);
     server = app.listen(numericPort, () => {
-        logger.info({ module: 'Server', operation: 'START' }, `Server running on port ${numericPort}`);
+        logger.info(`Server running on port ${numericPort}`, { module: 'Server', operation: 'START' });
     });
     server.on('error', (err) => {
         if (err.code === 'EADDRINUSE') {
@@ -331,8 +280,7 @@ async function initializeAndStart() {
         });
 
     } catch (error) {
-        console.error('Failed to initialize server:', error);
-        logger.fatal({ err: error }, 'Failed to initialize server');
+        logger.fatal('Failed to initialize server', { err: error });
         process.exit(1);
     }
 }

@@ -172,7 +172,7 @@ export default function UserOrderDetail() {
             const response = await apiClient.get(`/returns/orders/${id}/all`);
             setReturns(response.data);
         } catch (error) {
-            logger.error("Error fetching returns:", error);
+            logger.error("Error fetching returns", { err: error });
         }
     }, [id]);
 
@@ -181,7 +181,7 @@ export default function UserOrderDetail() {
             const response = await apiClient.get(`/returns/orders/${id}/items`);
             setReturnableItems(response.data);
         } catch (error) {
-            logger.error("Failed to fetch returnable items", error);
+            logger.error("Failed to fetch returnable items", { err: error });
         }
     }, [id]);
 
@@ -193,7 +193,7 @@ export default function UserOrderDetail() {
             fetchReturns(); // Fetch returns together
             fetchReturnableItems(); // Fetch items available for return
         } catch (error) {
-            logger.error("Error fetching order:", error);
+            logger.error("Error fetching order", { err: error });
             // toast.error("Failed to load order details");
             navigate("/my-orders");
         } finally {
@@ -301,7 +301,7 @@ export default function UserOrderDetail() {
                         .upload(path, file);
 
                     if (uploadError) {
-                        console.error('Upload error:', uploadError);
+                        logger.error('Return image upload failed', { module: 'UserOrderDetail', err: uploadError, orderId: id, itemId: item.id });
                         throw new Error(`Failed to upload image for item`);
                     }
 
@@ -342,7 +342,7 @@ export default function UserOrderDetail() {
             } catch (apiError) {
                 // CLEANUP: If API fails, delete uploaded images to avoid orphaned files
                 if (uploadedPaths.length > 0) {
-                    console.log('Cleaning up uploaded images due to API failure...', uploadedPaths);
+                    // logger.debug('Cleaning up uploaded images due to API failure...', { paths: uploadedPaths });
                     await supabase.storage
                         .from('return_images')
                         .remove(uploadedPaths);

@@ -1,4 +1,5 @@
 // Track if we're already loading to prevent duplicate script tags
+import { logger } from "./logger";
 let isLoading = false;
 let loadPromise: Promise<boolean> | null = null;
 
@@ -23,7 +24,7 @@ export const loadRazorpay = (): Promise<boolean> => {
             resolve(true);
         };
         script.onerror = () => {
-            console.error("Failed to load Razorpay SDK");
+            logger.error("Failed to load Razorpay SDK");
             isLoading = false;
             resolve(false);
         };

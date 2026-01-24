@@ -37,7 +37,7 @@ function getTraceContext() {
         traceId: store.traceId || 'no-trace',
         spanId: store.spanId || 'no-span',
         parentSpanId: store.parentSpanId || null,
-        correlationId: store.correlationId || store.traceId || 'no-correlation',
+        correlationId: store.correlationId || 'no-correlation',
         userId: store.userId || null,
         startTime: store.startTime
     };

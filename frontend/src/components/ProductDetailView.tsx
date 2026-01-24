@@ -120,7 +120,7 @@ export const ProductDetailView = ({
     // Optimistic update - don't await
     addItem(product, 1, selectedVariant?.id).catch((error) => {
       // Store handles the error toast and rollback
-      console.error("Add to cart failed:", error);
+      logger.error("Add to cart failed", { err: error });
     });
 
     const sizeLabel = selectedVariant ? ` (${selectedVariant.size_label})` : "";

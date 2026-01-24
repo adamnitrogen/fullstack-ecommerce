@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -158,7 +159,7 @@ const Cart = () => {
         item.delivery_meta?.source !== 'global' && (item.delivery_charge > 0 || item.delivery_gst > 0)
       );
       if (surchargeItems.length > 0) {
-        console.log('[Cart] Surcharge items detected:', surchargeItems.length);
+        // logger.debug('[Cart] Surcharge items detected:', { count: surchargeItems.length });
       }
     }
 

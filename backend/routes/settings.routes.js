@@ -36,9 +36,11 @@ router.patch('/delivery', authenticateToken, authorizeRole('admin', 'manager'), 
 
         res.json(result);
     } catch (error) {
-        logger.error({ err: error }, '[DEBUG-SETTINGS-FAIL] Error in PATCH /settings/delivery');
-        // also console.error to be sure
-        console.error('[DEBUG-SETTINGS-FAIL] Console Error:', error);
+        logger.error('Settings update failed', {
+            module: 'Settings',
+            operation: 'UPDATE_DELIVERY',
+            err: error
+        });
         next(error);
     }
 });

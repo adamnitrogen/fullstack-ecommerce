@@ -1,55 +1,28 @@
 /**
  * Tracing Middleware
- * 
- * Implements distributed tracing with:
- * - Trace ID: Unique ID for entire request journey (UI → Backend → DB)
- * - Span ID: Unique ID for each operation/hop within a trace
- * - Correlation ID: User-facing request ID (same as trace ID or client-provided)
- * 
- * Headers:
- * - X-Trace-ID: Trace identifier (extracted or generated)
- * - X-Span-ID: Parent span ID from upstream caller
- * - X-Correlation-ID: User/client correlation ID
  */
 
 const crypto = require('crypto');
-const { context, getContext } = require('../utils/async-context');
+const { context } = require('../utils/async-context');
+const logger = require('../utils/logger');
 
-/**
- * Generate a unique ID for tracing
- * Uses UUID v4 format for compatibility
- */
-function generateId() {
+function generateTraceId() {
     return crypto.randomUUID();
 }
 
-/**
- * Generate a short span ID (16 hex characters)
- */
 function generateSpanId() {
     return crypto.randomBytes(8).toString('hex');
 }
 
 /**
  * Tracing Middleware
- * Extracts or generates trace context and propagates through AsyncLocalStorage
  */
 function tracingMiddleware(req, res, next) {
-    // Extract or generate trace ID
-    const traceId = req.headers['x-trace-id'] ||
-        req.headers['x-request-id'] ||
-        generateId();
-
-    // Generate new span ID for this request
+    const traceId = req.headers['x-trace-id'] || req.headers['X-Trace-Id'] || generateTraceId();
+    const correlationId = req.headers['x-correlation-id'] || req.headers['X-Correlation-Id'] || traceId;
     const spanId = generateSpanId();
+    const parentSpanId = req.headers['x-span-id'] || req.headers['X-Span-Id'] || null;
 
-    // Extract parent span ID if provided (for nested calls)
-    const parentSpanId = req.headers['x-span-id'] || null;
-
-    // Correlation ID: use provided or fallback to trace ID
-    const correlationId = req.headers['x-correlation-id'] || traceId;
-
-    // Build trace context
     const traceContext = {
         traceId,
         spanId,
@@ -58,80 +31,51 @@ function tracingMiddleware(req, res, next) {
         startTime: Date.now()
     };
 
-    // Attach to request object for easy access
-    req.traceContext = traceContext;
     req.traceId = traceId;
-    req.spanId = spanId;
     req.correlationId = correlationId;
+    req.spanId = spanId;
+    req.traceContext = traceContext;
 
-    // Set response headers for downstream consumers
-    res.setHeader('X-Trace-ID', traceId);
-    res.setHeader('X-Span-ID', spanId);
-    res.setHeader('X-Correlation-ID', correlationId);
+    res.setHeader('X-Trace-Id', traceId);
+    res.setHeader('X-Correlation-Id', correlationId);
+    res.setHeader('X-Span-Id', spanId);
 
-    // Run request within async context for propagation to services
     const store = {
-        traceId,
-        spanId,
-        parentSpanId,
-        correlationId,
-        startTime: traceContext.startTime,
-        // Include user info if available (populated by auth middleware later)
-        userId: req.user?.id || req.headers['x-user-id'] || null
+        ...traceContext,
+        userId: req.user?.id || req.headers['x-user-id'] || req.headers['X-User-ID'] || null
     };
 
     context.run(store, () => {
+        // Log incoming request
+        logger.info(`${req.method} ${req.url} - Request Started`, {
+            module: 'API',
+            operation: 'HTTP_REQUEST_START',
+            req
+        });
+
+        // Hook into res.end to log completion
+        const start = Date.now();
+        const oldEnd = res.end;
+        res.end = function (...args) {
+            const durationMs = Date.now() - start;
+            const level = res.statusCode >= 500 ? 'error' : (res.statusCode >= 400 ? 'warn' : 'info');
+
+            logger[level](`${req.method} ${req.url} - Request Completed`, {
+                module: 'API',
+                operation: 'HTTP_REQUEST_END',
+                res,
+                durationMs
+            });
+
+            oldEnd.apply(this, args);
+        };
+
         next();
     });
 }
 
-/**
- * Get current trace context from AsyncLocalStorage
- * Can be called from any service without passing context explicitly
- */
-function getTraceContext() {
-    return getContext() || {
-        traceId: 'no-trace',
-        spanId: 'no-span',
-        parentSpanId: null,
-        correlationId: 'no-correlation'
-    };
-}
-
-/**
- * Create a child span for nested operations
- * @param {string} operationName - Name of the operation for logging
- * @returns {Object} Child span context
- */
-function createChildSpan(operationName) {
-    const parent = getTraceContext();
-    const childSpanId = generateSpanId();
-
-    return {
-        traceId: parent.traceId,
-        spanId: childSpanId,
-        parentSpanId: parent.spanId,
-        correlationId: parent.correlationId,
-        operationName,
-        startTime: Date.now()
-    };
-}
-
-/**
- * Calculate duration from trace context start time
- */
-function getDuration(traceContext) {
-    if (traceContext?.startTime) {
-        return Date.now() - traceContext.startTime;
-    }
-    return 0;
-}
-
 module.exports = {
     tracingMiddleware,
-    getTraceContext,
-    createChildSpan,
-    getDuration,
-    generateId,
+    generateTraceId,
     generateSpanId
 };

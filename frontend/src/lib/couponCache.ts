@@ -1,4 +1,5 @@
 import { Coupon } from "@/types";
+import { logger } from "@/lib/logger";
 
 interface CachedCoupon extends Coupon {
     cachedAt: number;
@@ -65,7 +66,7 @@ export class CouponCache {
             localStorage.setItem(CACHE_KEY, JSON.stringify(data));
         } catch (error) {
             // Silently fail if localStorage is full
-            console.warn("Failed to cache coupons:", error);
+            logger.warn("Failed to cache coupons:", { err: error });
         }
     }
 
@@ -112,7 +113,7 @@ export class CouponCache {
         }
 
         // Check usage limit
-        if (coupon.usage_limit !== null && coupon.usage_count >= coupon.usage_limit) {
+        if (coupon.usage_limit !== undefined && coupon.usage_limit !== null && coupon.usage_count >= coupon.usage_limit) {
             return { valid: false, error: "This coupon has reached its usage limit" };
         }
 

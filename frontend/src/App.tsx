@@ -73,7 +73,27 @@ import OrdersManagement from "./pages/admin/OrdersManagementNew";
 import OrderDetail from "./pages/admin/OrderDetail";
 import SettingsManagement from "./pages/admin/SettingsManagement";
 
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { logger } from "@/lib/logger";
+
 const queryClient = new QueryClient();
+
+// Global error handlers
+window.onerror = (message, source, lineno, colno, error) => {
+  logger.error(`Unhandled Window Error: ${message}`, {
+    source,
+    lineno,
+    colno,
+    stack: error?.stack
+  });
+};
+
+window.onunhandledrejection = (event) => {
+  logger.error(`Unhandled Promise Rejection: ${event.reason}`, {
+    reason: event.reason,
+    stack: event.reason?.stack
+  });
+};
 
 /**
  * Route tracker component for New Relic navigation analytics
@@ -111,17 +131,10 @@ const App = () => {
     // Coupon Management: Fetch active coupons and cache in session storage
     const fetchCoupons = async () => {
       try {
-        // Only fetch if not already cached to avoid redundant calls on page refresh
-        // But the requirement says "fetch the coupon for every session starts", which mount effectively is.
-        // We will fetch regardless to ensure fresh data on app load.
         const coupons = await couponService.getActive();
         sessionStorage.setItem('active_coupons', JSON.stringify(coupons));
-        // console.debug('[App] Coupons fetched and cached:', coupons.length); // keep logs clean
       } catch (error) {
-        // Gracefully handle error - log it but don't crash app
-        // Using console.error/warn here might be too noisy if it's just a network blip
-        // But better to know than not.
-        console.warn("[App] Failed to fetch active coupons:", error);
+        logger.warn("Failed to fetch active coupons", { err: error });
       }
     };
 
@@ -134,195 +147,197 @@ const App = () => {
   }, [initializeAuth]);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <I18nextProvider i18n={i18n}>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter
-            future={{
-              v7_startTransition: true,
-              v7_relativeSplatPath: true,
-            }}
-          >
-            <RouteTracker />
-            <ScrollToTop />
-            <CookieConsent />
-            <ForceChangePasswordDialog />
-            <ReactivationModal />
-            <Routes>
-              <Route element={<MainLayout />}>
-                <Route path="/" element={<Index />} />
-                <Route path="/shop" element={<Shop />} />
-                <Route path="/product/:productId" element={<ProductDetail />} />
-                <Route path="/cart" element={<Cart />} />
-                <Route
-                  path="/checkout"
-                  element={
-                    <ProtectedRoute requireAuth>
-                      <Checkout />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/order-summary"
-                  element={
-                    <ProtectedRoute requireAuth>
-                      <OrderSummary />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/order-confirmation/:id"
-                  element={
-                    <ProtectedRoute requireAuth>
-                      <OrderConfirmation />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/profile"
-                  element={
-                    <ProtectedRoute requireAuth>
-                      <Profile />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route path="/gallery" element={<Gallery />} />
-                <Route path="/donate" element={<Donate />} />
-                <Route path="/events" element={<Events />} />
-                <Route path="/event/:eventId" element={<EventDetail />} />
-                <Route
-                  path="/event/register/:eventId"
-                  element={
-                    <ProtectedRoute requireAuth>
-                      <EventRegistration />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/blog" element={<Blog />} />
-                <Route path="/blog/:postId" element={<BlogPost />} />
-                <Route path="/privacy-policy" element={<Privacy />} />
-                <Route path="/terms-and-conditions" element={<Terms />} />
-                <Route path="/shipping-and-refund-policy" element={<ShippingAndRefund />} />
-                <Route path="/faq" element={<FAQ />} />
-                <Route path="/auth/callback" element={<AuthCallback />} />
-                <Route path="/verify-email" element={<VerifyEmail />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                <Route
-                  path="/my-orders"
-                  element={
-                    <ProtectedRoute requireAuth>
-                      <MyOrders />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/my-orders/:id"
-                  element={
-                    <ProtectedRoute requireAuth>
-                      <UserOrderDetail />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/account/delete"
-                  element={
-                    <ProtectedRoute requireAuth>
-                      <AccountDeletion />
-                    </ProtectedRoute>
-                  }
-                />
-              </Route>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <I18nextProvider i18n={i18n}>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter
+              future={{
+                v7_startTransition: true,
+                v7_relativeSplatPath: true,
+              }}
+            >
+              <RouteTracker />
+              <ScrollToTop />
+              <CookieConsent />
+              <ForceChangePasswordDialog />
+              <ReactivationModal />
+              <Routes>
+                <Route element={<MainLayout />}>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/shop" element={<Shop />} />
+                  <Route path="/product/:productId" element={<ProductDetail />} />
+                  <Route path="/cart" element={<Cart />} />
+                  <Route
+                    path="/checkout"
+                    element={
+                      <ProtectedRoute requireAuth>
+                        <Checkout />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/order-summary"
+                    element={
+                      <ProtectedRoute requireAuth>
+                        <OrderSummary />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/order-confirmation/:id"
+                    element={
+                      <ProtectedRoute requireAuth>
+                        <OrderConfirmation />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/profile"
+                    element={
+                      <ProtectedRoute requireAuth>
+                        <Profile />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route path="/gallery" element={<Gallery />} />
+                  <Route path="/donate" element={<Donate />} />
+                  <Route path="/events" element={<Events />} />
+                  <Route path="/event/:eventId" element={<EventDetail />} />
+                  <Route
+                    path="/event/register/:eventId"
+                    element={
+                      <ProtectedRoute requireAuth>
+                        <EventRegistration />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route path="/contact" element={<Contact />} />
+                  <Route path="/about" element={<About />} />
+                  <Route path="/blog" element={<Blog />} />
+                  <Route path="/blog/:postId" element={<BlogPost />} />
+                  <Route path="/privacy-policy" element={<Privacy />} />
+                  <Route path="/terms-and-conditions" element={<Terms />} />
+                  <Route path="/shipping-and-refund-policy" element={<ShippingAndRefund />} />
+                  <Route path="/faq" element={<FAQ />} />
+                  <Route path="/auth/callback" element={<AuthCallback />} />
+                  <Route path="/verify-email" element={<VerifyEmail />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route
+                    path="/my-orders"
+                    element={
+                      <ProtectedRoute requireAuth>
+                        <MyOrders />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/my-orders/:id"
+                    element={
+                      <ProtectedRoute requireAuth>
+                        <UserOrderDetail />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/account/delete"
+                    element={
+                      <ProtectedRoute requireAuth>
+                        <AccountDeletion />
+                      </ProtectedRoute>
+                    }
+                  />
+                </Route>
 
-              {/* Admin Routes - Strictly for Admin */}
-              <Route
-                path="/admin"
-                element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
-                    <AdminLayout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route index element={<AdminDashboard />} />
-                <Route path="products" element={<ProductsManagement />} />
+                {/* Admin Routes - Strictly for Admin */}
                 <Route
-                  path="categories"
-                  element={<AllCategoriesManagement />}
-                />
-                <Route path="orders" element={<OrdersManagement />} />
-                <Route path="orders/:id" element={<OrderDetail />} />
-                <Route path="events" element={<EventsManagement />} />
-                <Route path="blogs" element={<BlogsManagement />} />
-                <Route path="gallery" element={<GalleryManagement />} />
-                <Route path="carousel" element={<CarouselManagement />} />
-                <Route path="users" element={<UsersManagement />} />
-                <Route path="managers" element={<ManagerManagement />} />
-                <Route path="reviews" element={<ReviewsManagement />} />
-                <Route path="comments" element={<FlaggedCommentsManagement />} />
-                <Route path="faqs" element={<FAQsManagement />} />
+                  path="/admin"
+                  element={
+                    <ProtectedRoute allowedRoles={["admin"]}>
+                      <AdminLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route index element={<AdminDashboard />} />
+                  <Route path="products" element={<ProductsManagement />} />
+                  <Route
+                    path="categories"
+                    element={<AllCategoriesManagement />}
+                  />
+                  <Route path="orders" element={<OrdersManagement />} />
+                  <Route path="orders/:id" element={<OrderDetail />} />
+                  <Route path="events" element={<EventsManagement />} />
+                  <Route path="blogs" element={<BlogsManagement />} />
+                  <Route path="gallery" element={<GalleryManagement />} />
+                  <Route path="carousel" element={<CarouselManagement />} />
+                  <Route path="users" element={<UsersManagement />} />
+                  <Route path="managers" element={<ManagerManagement />} />
+                  <Route path="reviews" element={<ReviewsManagement />} />
+                  <Route path="comments" element={<FlaggedCommentsManagement />} />
+                  <Route path="faqs" element={<FAQsManagement />} />
+                  <Route
+                    path="contact-management"
+                    element={<ContactManagement />}
+                  />
+                  <Route path="contact-messages" element={<ContactMessages />} />
+                  <Route path="contact-messages/:id" element={<ContactMessageDetail />} />
+                  <Route path="about-us" element={<AboutUsManagement />} />
+                  <Route path="policies" element={<PolicyManagement />} />
+                  <Route path="jobs" element={<BackgroundJobs />} />
+
+                  <Route path="settings" element={<SettingsManagement />} />
+                </Route>
+
+                {/* Manager Routes - For Managers (and Admins if they visit) */}
                 <Route
-                  path="contact-management"
-                  element={<ContactManagement />}
-                />
-                <Route path="contact-messages" element={<ContactMessages />} />
-                <Route path="contact-messages/:id" element={<ContactMessageDetail />} />
-                <Route path="about-us" element={<AboutUsManagement />} />
-                <Route path="policies" element={<PolicyManagement />} />
-                <Route path="jobs" element={<BackgroundJobs />} />
+                  path="/manager"
+                  element={
+                    <ProtectedRoute allowedRoles={["manager", "admin"]}>
+                      <AdminLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  {/* Reuse same components but accessed via /manager/... */}
+                  <Route index element={<AdminDashboard />} />
+                  <Route path="products" element={<ProductsManagement />} />
+                  <Route
+                    path="categories"
+                    element={<AllCategoriesManagement />}
+                  />
+                  <Route path="orders" element={<OrdersManagement />} />
+                  <Route path="orders/:id" element={<OrderDetail />} />
+                  <Route path="events" element={<EventsManagement />} />
+                  <Route path="blogs" element={<BlogsManagement />} />
+                  <Route path="gallery" element={<GalleryManagement />} />
+                  <Route path="carousel" element={<CarouselManagement />} />
+                  {/* Managers don't manage users/managers usually, but let RBAC handle inside components if needed */}
+                  {/* UsersManagement removed from Manager routes to prevent Admin Management access */}
+                  {/* ManagerManagement likely SHOULD BE HIDDEN for managers - will handle in Sidebar/Layout */}
+                  <Route path="reviews" element={<ReviewsManagement />} />
+                  <Route path="comments" element={<FlaggedCommentsManagement />} />
+                  <Route path="faqs" element={<FAQsManagement />} />
+                  <Route
+                    path="contact-management"
+                    element={<ContactManagement />}
+                  />
+                  <Route path="contact-messages" element={<ContactMessages />} />
+                  <Route path="contact-messages/:id" element={<ContactMessageDetail />} />
+                  <Route path="about-us" element={<AboutUsManagement />} />
+                  <Route path="policies" element={<PolicyManagement />} />
 
-                <Route path="settings" element={<SettingsManagement />} />
-              </Route>
+                  {/* Managers likely don't access creating managers or system settings */}
+                </Route>
 
-              {/* Manager Routes - For Managers (and Admins if they visit) */}
-              <Route
-                path="/manager"
-                element={
-                  <ProtectedRoute allowedRoles={["manager", "admin"]}>
-                    <AdminLayout />
-                  </ProtectedRoute>
-                }
-              >
-                {/* Reuse same components but accessed via /manager/... */}
-                <Route index element={<AdminDashboard />} />
-                <Route path="products" element={<ProductsManagement />} />
-                <Route
-                  path="categories"
-                  element={<AllCategoriesManagement />}
-                />
-                <Route path="orders" element={<OrdersManagement />} />
-                <Route path="orders/:id" element={<OrderDetail />} />
-                <Route path="events" element={<EventsManagement />} />
-                <Route path="blogs" element={<BlogsManagement />} />
-                <Route path="gallery" element={<GalleryManagement />} />
-                <Route path="carousel" element={<CarouselManagement />} />
-                {/* Managers don't manage users/managers usually, but let RBAC handle inside components if needed */}
-                {/* UsersManagement removed from Manager routes to prevent Admin Management access */}
-                {/* ManagerManagement likely SHOULD BE HIDDEN for managers - will handle in Sidebar/Layout */}
-                <Route path="reviews" element={<ReviewsManagement />} />
-                <Route path="comments" element={<FlaggedCommentsManagement />} />
-                <Route path="faqs" element={<FAQsManagement />} />
-                <Route
-                  path="contact-management"
-                  element={<ContactManagement />}
-                />
-                <Route path="contact-messages" element={<ContactMessages />} />
-                <Route path="contact-messages/:id" element={<ContactMessageDetail />} />
-                <Route path="about-us" element={<AboutUsManagement />} />
-                <Route path="policies" element={<PolicyManagement />} />
-
-                {/* Managers likely don't access creating managers or system settings */}
-              </Route>
-
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </I18nextProvider>
-    </QueryClientProvider>
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
+        </I18nextProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 };
 
