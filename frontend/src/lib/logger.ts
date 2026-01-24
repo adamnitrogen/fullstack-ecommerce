@@ -95,9 +95,20 @@ export const logRouteChange = (currentPath: string, previousPath?: string) => {
     }
 };
 
+/**
+ * Log a user action or system event
+ */
+export const logPageAction = (actionName: string, meta: Record<string, unknown> = {}) => {
+    // For now, redirect to info log which is safe
+    logger.info(`Page Action: ${actionName}`, {
+        action: actionName,
+        ...meta
+    });
+};
+
 // Legacy compatibility for any existing logAPICall
-export const logAPICall = (url: string, method: string, status: number, duration: number, correlationId?: string) => {
-    if (status >= 400) {
+export const logAPICall = (url: string, method: string, status: number, duration: number, correlationId?: string, silent?: boolean) => {
+    if (status >= 400 && !silent) {
         logger.error(`API Call Failed: ${method} ${url}`, {
             status,
             durationMs: duration,

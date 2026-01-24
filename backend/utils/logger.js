@@ -86,7 +86,12 @@ const restructureLog = (inputArgs) => {
 
     if (typeof arg1 === 'string') {
         msg = arg1;
-        arg1 = {};
+        // If arg2 is the context object, use it
+        if (typeof arg2 === 'object' && arg2 !== null) {
+            logObj = { ...arg2 };
+        } else {
+            arg1 = {};
+        }
     } else if (typeof arg1 === 'object' && arg1 !== null) {
         logObj = { ...arg1 };
         if (!msg && (logObj.msg || logObj.message)) {

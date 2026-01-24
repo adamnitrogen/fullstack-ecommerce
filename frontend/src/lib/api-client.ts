@@ -1,4 +1,5 @@
 import { logger, logAPICall, logPageAction } from "@/lib/logger";
+import { getErrorMessage } from "@/lib/errorUtils";
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { ApiErrorResponse } from "@/types";
 import { supabase } from "@/lib/supabase";
@@ -142,7 +143,7 @@ apiClient.interceptors.response.use(
                                             access_token: tokens.access_token,
                                             refresh_token: tokens.refresh_token
                                         });
-                                        if (error) logger.warn("[API Client] Supabase session sync warning:", error);
+                                        if (error) logger.warn("[API Client] Supabase session sync warning:", { error });
                                         else logger.debug("[API Client] Supabase session synced with new tokens");
                                     }
 
@@ -162,7 +163,7 @@ apiClient.interceptors.response.use(
                                         access_token: tokens.access_token,
                                         refresh_token: tokens.refresh_token
                                     });
-                                    if (error) logger.warn("[API Client] Supabase session sync warning:", error);
+                                    if (error) logger.warn("[API Client] Supabase session sync warning:", { error });
                                     else logger.debug("[API Client] Supabase session synced with new tokens");
                                 }
 
@@ -200,23 +201,8 @@ apiClient.interceptors.response.use(
         }
 
 
-
-        // ... existing imports
-
-        // Normalize error messages
-        if (error.response) {
-            const data = error.response.data as ApiErrorResponse | { error?: string; message?: string };
-            const serverMessage = ('error' in data ? data.error : (data as { message?: string }).message);
-            if (serverMessage && typeof serverMessage === 'string') {
-                error.message = serverMessage;
-            } else {
-                const status = error.response.status;
-                if (status === 404) error.message = "Resource not found.";
-                else if (status === 403) error.message = "Access denied.";
-                else if (status === 500) error.message = "Server error. Please try again.";
-                else if (status === 401) error.message = "Session expired.";
-            }
-        }
+        // Centralized error normalization using errorUtils
+        error.message = getErrorMessage(error);
 
         return Promise.reject(error);
     }
