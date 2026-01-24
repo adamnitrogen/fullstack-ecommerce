@@ -62,6 +62,7 @@ const customInvoiceRoutes = require('./routes/custom-invoice.routes');
 
 // Middleware
 const { tracingMiddleware } = require('./middleware/tracing.middleware');
+const friendlyErrorInterceptor = require('./middleware/friendly-error.middleware');
 const errorMiddleware = require('./middleware/error.middleware');
 
 // Libraries & Services
@@ -109,6 +110,7 @@ app.use(cookieParser()); // Parse cookies
 // Increase payload size limit to handle images (base64 encoded)
 // Apply tracing middleware - generates/extracts traceId, spanId, correlationId
 app.use(tracingMiddleware);
+app.use(friendlyErrorInterceptor);
 
 // Routes
 const logRoutes = require('./routes/log.routes');

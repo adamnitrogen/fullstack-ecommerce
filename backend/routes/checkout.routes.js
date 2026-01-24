@@ -666,21 +666,30 @@ router.post('/buy-now/verify-payment', requestLock('verify-payment'), idempotenc
     } catch (error) {
         logger.error({ err: error }, 'Error processing Buy Now payment:');
 
-        // Return user-friendly error messages based on error type
+        // Map to friendly messages
         let userMessage = 'Unable to complete your order. ';
+        let code = 'ORDER_PROCESS_ERROR';
+
         if (error.message?.includes('Invalid payment signature')) {
             userMessage = 'Payment verification failed. Please contact support if money was deducted.';
+            code = 'INVALID_PAYMENT_SIGNATURE';
         } else if (error.message?.includes('refunded')) {
-            userMessage = error.message; // Keep refund messages as-is
+            userMessage = error.message;
+            code = 'PAYMENT_REFUNDED';
         } else if (error.message?.includes('Insufficient stock')) {
             userMessage = 'Sorry, this item is now out of stock. Your payment has been refunded.';
+            code = 'INSUFFICIENT_STOCK';
         } else if (error.message?.includes('not found')) {
-            userMessage += 'The product or address could not be found.';
+            userMessage = 'The product or address could not be found.';
+            code = 'RESOURCE_NOT_FOUND';
         } else {
-            userMessage += 'Please try again or contact support.';
+            userMessage = 'An unexpected error occurred. Please try again or contact support.';
         }
 
-        res.status(error.status || 500).json({ error: userMessage });
+        res.status(error.status || 500).json({
+            error: userMessage,
+            code: code
+        });
     }
 });
 

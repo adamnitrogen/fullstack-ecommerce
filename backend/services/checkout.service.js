@@ -456,22 +456,22 @@ const createRazorpayInvoice = async (amount, receipt, customer, lineItems, total
     } catch (error) {
         log.operationError('CREATE_RAZORPAY_INVOICE', error, { amount, receipt });
 
-        // Extract error message from Razorpay error object
-        // Razorpay errors can have: error.error.description, error.message, or error.description
-        const errorMessage = error.error?.description ||
-            error.description ||
-            error.message ||
-            JSON.stringify(error);
+        // Extract error message from Razorpay error object for internal logging
+        const technicalMessage = error.error?.description || error.description || error.message || 'Unknown Razorpay error';
 
         logger.error({
             err: error,
-            errorMessage,
+            technicalMessage,
             amount,
             receipt,
             customer
         }, '[Checkout] Razorpay invoice creation failed');
 
-        throw new Error(`Failed to create Razorpay invoice: ${errorMessage}`);
+        // Throw a friendly error with a code for the middleware to map
+        const friendlyError = new Error('We encountered an issue with the payment gateway. Please try again in a moment.');
+        friendlyError.code = 'RAZORPAY_ERROR';
+        friendlyError.statusCode = 502; // Bad Gateway as it's a third-party issue
+        throw friendlyError;
     }
 };
 

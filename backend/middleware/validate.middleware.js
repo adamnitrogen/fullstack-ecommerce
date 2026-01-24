@@ -52,7 +52,8 @@ const validate = (schema, source = 'body') => (req, res, next) => {
             }, 'Validation Error');
 
             return res.status(400).json({
-                error: 'Validation Error',
+                error: 'Please check the information you entered and try again.',
+                code: 'VALIDATION_ERROR',
                 details: errors
             });
         }
