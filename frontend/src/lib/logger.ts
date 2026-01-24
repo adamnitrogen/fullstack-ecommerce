@@ -82,14 +82,12 @@ class FrontendLogger {
 
     debug(message: string, meta: LogMeta = {}) {
         if (import.meta.env.DEV) {
-            // We can log to console in dev but keep it clean
-            // Actually requirement says "Keeps the browser console clean."
-            // So we might skip or use a special flag.
+            // Logged but not shown in console unless explicitly needed
         }
     }
 
     info(message: string, meta: LogMeta = {}) {
-        // INFO logs usually don't go to backend to avoid noise, unless critical
+        // INFO logs usually don't go to backend to avoid noise
     }
 
     warn(message: string, meta: LogMeta = {}) {

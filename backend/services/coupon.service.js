@@ -392,7 +392,7 @@ async function getActiveCoupons() {
         // Cache miss - fetch from database
         const currentTime = new Date().toISOString();
 
-        const { data, error } = await supabase
+        const { data: coupons, error } = await supabase
             .from('coupons')
             .select('*')
             .eq('is_active', true)
@@ -405,10 +405,42 @@ async function getActiveCoupons() {
             throw error;
         }
 
-        logger.info({ total_active: data.length }, 'Fetched active coupons from DB');
+        if (!coupons || coupons.length === 0) {
+            activeCouponsCache.data = [];
+            activeCouponsCache.timestamp = now;
+            return [];
+        }
 
-        // Filter out coupons that have reached usage limit
-        const availableCoupons = data.filter(coupon => {
+        // Parallel enrichment of product and variant names
+        const productIds = coupons.filter(c => c.type === 'product' && c.target_id).map(c => c.target_id);
+        const variantIds = coupons.filter(c => c.type === 'variant' && c.target_id).map(c => c.target_id);
+
+        const [productsRes, variantsRes] = await Promise.all([
+            productIds.length > 0
+                ? supabase.from('products').select('id, title').in('id', productIds)
+                : Promise.resolve({ data: [] }),
+            variantIds.length > 0
+                ? supabase.from('product_variants').select('id, size_label, products:product_id(title)').in('id', variantIds)
+                : Promise.resolve({ data: [] })
+        ]);
+
+        if (productsRes.error) logger.error('productsRes error:', productsRes.error);
+        if (variantsRes.error) logger.error('variantsRes error:', variantsRes.error);
+
+        const productMap = new Map((productsRes.data || []).map(p => [p.id, p.title]));
+        const variantMap = new Map((variantsRes.data || []).map(v => [
+            v.id,
+            v.products?.title ? `${v.products.title} (${v.size_label})` : v.size_label
+        ]));
+
+        logger.info({
+            total_active: coupons.length,
+            product_names: productMap.size,
+            variant_names: variantMap.size
+        }, 'Fetched and enriched active coupons');
+
+        // Filter and enrich coupons with target names
+        const availableCoupons = coupons.filter(coupon => {
             const hasLimit = coupon.usage_limit !== null;
             const isWithinLimit = !hasLimit || (coupon.usage_count < coupon.usage_limit);
 
@@ -421,6 +453,19 @@ async function getActiveCoupons() {
             }
 
             return isWithinLimit;
+        }).map(coupon => {
+            // Add descriptive name based on type
+            let targetName = '';
+            if (coupon.type === 'product') {
+                targetName = productMap.get(coupon.target_id) || '';
+            } else if (coupon.type === 'variant') {
+                targetName = variantMap.get(coupon.target_id) || '';
+            }
+
+            return {
+                ...coupon,
+                target_name: targetName
+            };
         });
 
         // Update cache

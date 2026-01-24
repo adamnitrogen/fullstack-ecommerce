@@ -55,28 +55,24 @@ export function PromotionalBanner() {
                 const isOldVersion = version !== cacheVersion;
 
                 if (!isExpired && !isOldVersion && cachedCoupons.length > 0) {
-                    logger.debug("PromotionalBanner: Using cached coupons", { count: cachedCoupons.length, codes: cachedCoupons.map((c: any) => c.code) });
+                    logger.debug("PromotionalBanner: Using cached coupons", { count: cachedCoupons.length });
                     setCoupons(cachedCoupons);
                     setLoading(false);
                     return;
                 }
-                logger.debug("PromotionalBanner: Cache expired, version mismatch, or empty", { isExpired, isOldVersion, count: cachedCoupons?.length });
-            } else {
-                logger.debug("PromotionalBanner: No cache found");
             }
 
             fetchActiveCoupons();
         } catch (error) {
-            logger.error("PromotionalBanner: Error checking cache", error);
+            logger.error("PromotionalBanner: Cache error", error);
             fetchActiveCoupons();
         }
     };
 
     const fetchActiveCoupons = async () => {
         try {
-            logger.debug("PromotionalBanner: Fetching active coupons from API");
             const data = await couponService.getActive();
-            logger.info("PromotionalBanner: Fetched coupons", { count: data.length, codes: data.map(c => c.code) });
+            logger.info("PromotionalBanner: Fetched coupons", { count: data.length });
             setCoupons(data);
 
             localStorage.setItem("promo_coupons_cache", JSON.stringify({
@@ -85,13 +81,17 @@ export function PromotionalBanner() {
                 version: "v3" // Updated version
             }));
         } catch (error) {
-            logger.error("PromotionalBanner: Error fetching active coupons:", error);
+            logger.error("PromotionalBanner: API Error", error);
         } finally {
             setLoading(false);
         }
     };
 
     const getCouponDescription = (coupon: Coupon) => {
+        if (coupon.target_name) {
+            return coupon.target_name;
+        }
+
         if (coupon.type === "cart") {
             return "Sitewide Discount";
         } else if (coupon.type === "category") {
@@ -99,9 +99,9 @@ export function PromotionalBanner() {
         } else if (coupon.type === "product") {
             return "Product Deal";
         } else if (coupon.type === "variant") {
-            return "Exclusive Variant Offer";
+            return "Exclusive Offer";
         } else if (coupon.type === "free_delivery") {
-            return "Delivery Offer";
+            return "Free Delivery";
         }
         return "Limited Offer";
     };
@@ -122,7 +122,7 @@ export function PromotionalBanner() {
                 .animate-marquee-container {
                     display: inline-flex;
                     white-space: nowrap;
-                    animation: marquee 30s linear infinite;
+                    animation: marquee 120s linear infinite;
                     will-change: transform;
                 }
                 .animate-marquee-container:hover {
@@ -162,7 +162,7 @@ export function PromotionalBanner() {
                                         {coupon.type === 'free_delivery' ? 'FREE SHIPPING' : (coupon.discount_percentage ? `${coupon.discount_percentage}% OFF` : 'SPECIAL OFFER')}
                                     </span>
                                 </div>
-                                {coupon.min_purchase_amount && coupon.min_purchase_amount > 0 && (
+                                {typeof coupon.min_purchase_amount === 'number' && coupon.min_purchase_amount > 0 && (
                                     <span className="text-[10px] text-white/90 font-bold bg-white/10 px-1.5 py-0.5 rounded-full">
                                         Min: ₹{coupon.min_purchase_amount}
                                     </span>

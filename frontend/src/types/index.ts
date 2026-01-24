@@ -463,6 +463,7 @@ export interface Coupon {
   usage_limit?: number;
   usage_count: number;
   is_active: boolean;
+  target_name?: string;
   created_at: string;
   updated_at: string;
 }
