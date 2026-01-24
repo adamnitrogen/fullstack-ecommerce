@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Calendar, Clock, CheckCircle2, MapPin, Loader2, Sparkles } from "lucide-react";
 import { format } from "date-fns";
@@ -30,7 +31,12 @@ export default function Events() {
   const { user } = useAuthStore();
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [registrationOpen, setRegistrationOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("all");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || "all";
+
+  const setActiveTab = (tab: string) => {
+    setSearchParams({ tab });
+  };
   const [registrationData, setRegistrationData] = useState({
     name: "",
     email: "",

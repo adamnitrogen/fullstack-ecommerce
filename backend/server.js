@@ -108,9 +108,41 @@ app.use(cors({
 }));
 app.use(cookieParser()); // Parse cookies
 // Increase payload size limit to handle images (base64 encoded)
+
+// Request Logging (Pino) - Log every request
+app.use(pinoHttp({
+    logger: logger.pino,
+    // Define custom serializers or configuration if needed
+    customLogLevel: function (req, res, err) {
+        if (res.statusCode >= 400 && res.statusCode < 500) {
+            return 'warn';
+        } else if (res.statusCode >= 500 || err) {
+            return 'error';
+        }
+        return 'info';
+    },
+    // Redact sensitive headers
+    serializers: {
+        req: (req) => {
+            if (req.headers) {
+                req.headers['authorization'] = '[REDACTED]';
+                req.headers['cookie'] = '[REDACTED]';
+            }
+            return req;
+        }
+    },
+    // Quieter logging for health checks
+    autoLogging: {
+        ignore: (req) => req.url === '/api/health'
+    }
+}));
+
 // Apply tracing middleware - generates/extracts traceId, spanId, correlationId
 app.use(tracingMiddleware);
 app.use(friendlyErrorInterceptor);
+
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Routes
 const logRoutes = require('./routes/log.routes');

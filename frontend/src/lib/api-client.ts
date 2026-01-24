@@ -54,7 +54,7 @@ export const apiClient = axios.create({
 // ... (existing configuration)
 
 apiClient.interceptors.request.use(
-    (config) => {
+    async (config) => {
         const customConfig = config as CustomAxiosConfig;
         const correlationId = generateUUID();
         customConfig.metadata = {
@@ -62,6 +62,18 @@ apiClient.interceptors.request.use(
             correlationId
         };
         config.headers['X-Correlation-ID'] = correlationId;
+
+        // Robust Auth: Explicitly attach Bearer token from Supabase as a backup to cookies
+        // This solves SameSite=Lax issues on cross-port localhost requests
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.access_token) {
+                config.headers['Authorization'] = `Bearer ${session.access_token}`;
+            }
+        } catch (authErr) {
+            // Silent fail - cookie might still work
+            console.debug('[API Client] Non-critical auth header resolution failure:', authErr);
+        }
 
         // Attach Guest ID if present
         const guestId = getGuestId();

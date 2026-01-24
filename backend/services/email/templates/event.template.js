@@ -29,14 +29,23 @@ function getLocationString(location) {
  */
 function getEventRegistrationEmail({ event, registration, attendeeName, isPaid = false, paymentDetails = null }) {
     const firstName = attendeeName ? attendeeName.split(' ')[0] : 'there';
-    // Ensure event.startDate is parsed correctly
-    const eventDate = new Date(event.startDate || event.date);
+    // Format Date & Time Range
+    const startDate = new Date(event.startDate || event.date);
+    const endDate = event.endDate ? new Date(event.endDate) : null;
 
-    // Extract time string from the date object
-    const timeStr = event.startTime || eventDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    // Helper for date formatting
+    const formatDate = (d) => d.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const formatTime = (d) => d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
-    // Format date string
-    const dateStr = eventDate.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    let dateStr = formatDate(startDate);
+    if (endDate && endDate.toDateString() !== startDate.toDateString()) {
+        dateStr += ` - ${formatDate(endDate)}`;
+    }
+
+    let timeStr = event.startTime || formatTime(startDate);
+    if (event.endTime) {
+        timeStr += ` - ${event.endTime}`;
+    }
 
     const locationStr = getLocationString(event.location);
 
@@ -51,7 +60,8 @@ function getEventRegistrationEmail({ event, registration, attendeeName, isPaid =
                 💰 Total Amount Paid: ₹${paymentDetails.amount?.toFixed(2) || '0.00'}<br>
                 🔗 Transaction ID: ${paymentDetails.transactionId || paymentDetails.razorpayPaymentId || 'N/A'}<br>
                 📅 Payment Date: ${new Date(paymentDetails.paidAt || Date.now()).toLocaleDateString()}
-                ${paymentDetails.invoiceUrl ? `<br><br><a href="${paymentDetails.invoiceUrl}" style="color: #667eea; text-decoration: underline;">📄 Download Invoice</a>` : ''}
+                ${paymentDetails.invoiceUrl ? `<br><br><a href="${paymentDetails.invoiceUrl}" style="color: #667eea; text-decoration: underline;">📄 Download Receipt</a>` : ''}
+                ${paymentDetails.receiptUrl ? `<br><a href="${paymentDetails.receiptUrl}" style="color: #667eea; text-decoration: underline;">🧾 Download Payment Receipt</a>` : ''}
             </div>
         `;
     } else if (!isPaid || (event.fee === 0)) {
@@ -81,14 +91,7 @@ function getEventRegistrationEmail({ event, registration, attendeeName, isPaid =
         
         ${event.description ? `<p style="color: #666;">${event.description.substring(0, 300)}${event.description.length > 300 ? '...' : ''}</p>` : ''}
         
-        <div class="warning-box">
-            <strong>What to bring:</strong>
-            <ul style="margin: 5px 0;">
-                <li>This confirmation email (printed or on phone)</li>
-                <li>Valid photo ID for verification</li>
-                ${isPaid ? '<li>Payment receipt (if requested)</li>' : ''}
-            </ul>
-        </div>
+        ${event.description ? `<p style="color: #666;">${event.description.substring(0, 300)}${event.description.length > 300 ? '...' : ''}</p>` : ''}
         
         <p style="text-align: center;">
             <a href="${FRONTEND_URL}/event/${event.id}" class="button">View Event Details</a>

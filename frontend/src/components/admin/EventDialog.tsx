@@ -35,6 +35,7 @@ import { ImageUpload } from "./ImageUpload";
 import type { Event } from "@/types";
 import { categoryService } from "@/services/category.service";
 import { uploadService } from "@/services/upload.service";
+import { toast } from "../ui/use-toast";
 
 interface EventDialogProps {
   open: boolean;
@@ -58,6 +59,8 @@ export function EventDialog({
     keyHighlights: [],
     specialPrivileges: [],
     status: "upcoming",
+    startTime: "",
+    endTime: "",
   });
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
@@ -81,6 +84,8 @@ export function EventDialog({
       setFormData({
         ...event,
         imageFile: undefined,
+        startTime: event?.startTime || "",
+        endTime: event?.endTime || "",
       });
       setStartDate(event.startDate ? new Date(event.startDate) : undefined);
       setEndDate(event.endDate ? new Date(event.endDate) : undefined);
@@ -96,6 +101,8 @@ export function EventDialog({
         keyHighlights: [],
         specialPrivileges: [],
         status: "upcoming",
+        startTime: "",
+        endTime: "",
       });
       setStartDate(undefined);
       setEndDate(undefined);
@@ -153,18 +160,30 @@ export function EventDialog({
       !formData.description?.trim() ||
       !formData.location?.address?.trim()
     ) {
-      alert("Please fill in all required fields");
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields (Title, Description, Location)",
+        variant: "destructive",
+      });
       return;
     }
 
     if (!startDate) {
-      alert("Start date is required");
+      toast({
+        title: "Date Required",
+        description: "Please select a start date for the event",
+        variant: "destructive",
+      });
       return;
     }
 
     // Check for either existing image URL or new image file
     if (!formData.image?.trim() && !formData.imageFile) {
-      alert("Please upload an event image");
+      toast({
+        title: "Image Required",
+        description: "Please upload an event cover image",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -462,11 +481,46 @@ export function EventDialog({
                     </PopoverContent>
                   </Popover>
                 </div>
+
+                <div className="space-y-2">
+                  <Label>Start Time</Label>
+                  <Input
+                    type="time"
+                    value={formData.startTime || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, startTime: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>End Time</Label>
+                  <Input
+                    type="time"
+                    value={formData.endTime || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, endTime: e.target.value })
+                    }
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Registration Deadline (Optional)</Label>
+                  <div className="flex justify-between items-center">
+                    <Label>Registration Deadline (Optional)</Label>
+                    {registrationDeadline && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs text-red-500 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => setRegistrationDeadline(undefined)}
+                        type="button"
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -498,7 +552,7 @@ export function EventDialog({
                     </PopoverContent>
                   </Popover>
                   <p className="text-[10px] text-muted-foreground italic">
-                    If not set, registration remains open until event starts.
+                    If set, registration closes at start of this day.
                   </p>
                 </div>
 

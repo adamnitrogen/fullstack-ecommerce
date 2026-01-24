@@ -33,6 +33,7 @@ import { apiClient } from "@/lib/api-client";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { loadRazorpay, prefetchRazorpay } from "@/lib/razorpay";
 
 const EventRegistration = () => {
   const { eventId } = useParams<{ eventId: string }>();
@@ -78,12 +79,18 @@ const EventRegistration = () => {
 
   useEffect(() => {
     if (user) {
-      setFormData({
+      setFormData(prev => ({
+        ...prev,
         fullName: user.name || "",
         email: user.email || "",
-        phone: user.phone || "",
-      });
+        // STRICT: If phone is not present in profile, leave it completely blank
+        // Do not fallback to anything else to ensure empty field
+        phone: user.phone ? user.phone : "",
+      }));
     }
+
+    // Prefetch Razorpay script when user visits page
+    prefetchRazorpay();
   }, [user]);
 
   // Early return for loading state
@@ -199,7 +206,7 @@ const EventRegistration = () => {
             amount: "Free",
             email: formData.email
           },
-          onClose: () => navigate("/events"),
+          onClose: () => navigate("/profile?tab=events"),
         }));
         return;
       }
@@ -247,7 +254,8 @@ const EventRegistration = () => {
                   amount: verifyData.registration.amount,
                   email: formData.email
                 },
-                onClose: () => navigate("/events"),
+                // Redirect to Profile > Events tab on success
+                onClose: () => navigate("/profile?tab=events"),
               });
             } else {
               throw new Error("Verification returned unsuccessful status");
@@ -300,6 +308,17 @@ const EventRegistration = () => {
 
       // Close confirm dialog before opening Razorpay
       setShowConfirmDialog(false);
+
+      // Ensure Razorpay SDK is loaded
+      const isLoaded = await loadRazorpay();
+
+      if (!isLoaded) {
+        throw new Error('Failed to load payment gateway. Please check your internet connection and try again.');
+      }
+
+      if (!window.Razorpay) {
+        throw new Error('Razorpay SDK failed to initialize');
+      }
 
       const razorpayInstance = new window.Razorpay(options);
       razorpayInstance.open();

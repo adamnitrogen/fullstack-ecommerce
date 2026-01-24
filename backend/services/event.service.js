@@ -1,5 +1,5 @@
 const supabase = require('../config/supabase');
-const logger = require('../utils/logger');
+const { pino: logger } = require('../utils/logger');
 const { deletePhotoByUrl } = require('./photo.service');
 const EventPricingService = require('./event-pricing.service');
 const { mapToFrontend, mapToDb } = require('./event.utils');
@@ -13,6 +13,7 @@ class EventService {
      */
     static async getAllEvents({ page = 1, limit = 15, search = '', status = 'all' } = {}) {
         const offset = (page - 1) * limit;
+        logger.info({ page, limit, search, status }, '[EventService] getAllEvents: Fetching events');
 
         let query = supabase
             .from('events')
@@ -47,9 +48,16 @@ class EventService {
             .order('start_date', { ascending: true })
             .range(offset, offset + limit - 1);
 
+        const startTime = Date.now();
         const { data, error, count } = await query;
+        const duration = Date.now() - startTime;
 
-        if (error) throw error;
+        if (error) {
+            logger.error({ err: error, duration }, '[EventService] getAllEvents: DB Error');
+            throw error;
+        }
+
+        logger.info({ count, resultCount: data.length, duration }, '[EventService] getAllEvents: Success');
 
         return {
             events: data.map(mapToFrontend),
@@ -76,6 +84,7 @@ class EventService {
      * Create event
      */
     static async createEvent(eventData) {
+        logger.info({ title: eventData.title }, '[EventService] createEvent: Creating new event');
         const dbEvent = mapToDb(eventData);
         // Add created_at for new records
         dbEvent.created_at = new Date().toISOString();
@@ -88,8 +97,12 @@ class EventService {
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) {
+            logger.error({ err: error, title: eventData.title }, '[EventService] createEvent: DB Error');
+            throw error;
+        }
 
+        logger.info({ id: data.id }, '[EventService] createEvent: Success');
         return mapToFrontend(data);
     }
 
@@ -97,6 +110,7 @@ class EventService {
      * Update event
      */
     static async updateEvent(id, eventData) {
+        logger.info({ id, updates: Object.keys(eventData) }, '[EventService] updateEvent: Updating event');
         // 1. Get old event for comparison
         const { data: oldEvent, error: fetchError } = await supabase
             .from('events')
@@ -104,7 +118,10 @@ class EventService {
             .eq('id', id)
             .single();
 
-        if (fetchError) throw fetchError;
+        if (fetchError) {
+            logger.error({ err: fetchError, id }, '[EventService] updateEvent: Event not found');
+            throw fetchError;
+        }
 
         const dbEvent = mapToDb(eventData);
 
@@ -116,7 +133,10 @@ class EventService {
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) {
+            logger.error({ err: error, id }, '[EventService] updateEvent: DB Update Error');
+            throw error;
+        }
 
         // 3. CHECK FOR DATE CHANGES -> Trigger Notifications
         const oldStart = oldEvent.start_date;

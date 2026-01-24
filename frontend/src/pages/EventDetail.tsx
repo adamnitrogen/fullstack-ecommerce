@@ -43,6 +43,19 @@ const EventDetail = () => {
     }
   };
 
+  const formatTime = (time: string) => {
+    if (!time) return "";
+    try {
+      // Handle HH:mm:ss format from DB
+      const [hours, minutes] = time.split(':');
+      const date = new Date();
+      date.setHours(parseInt(hours), parseInt(minutes));
+      return format(date, "h:mm a");
+    } catch (e) {
+      return time;
+    }
+  };
+
   if (isLoading) {
     return <LoadingOverlay isLoading={true} message="Getting event details..." />;
   }
@@ -282,7 +295,11 @@ const EventDetail = () => {
                       <div className="space-y-1">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Time</p>
                         <p className="text-sm font-bold text-[#2C1810]">
-                          {eventData.startTime || "Check Details"} {eventData.endTime && <>- {eventData.endTime}</>}
+                          {eventData.startTime && eventData.endTime ? (
+                            <>Daily: {formatTime(eventData.startTime)} - {formatTime(eventData.endTime)}</>
+                          ) : (
+                            <>{eventData.startTime || "Check Details"} {eventData.endTime && <>- {eventData.endTime}</>}</>
+                          )}
                         </p>
                       </div>
                     </div>

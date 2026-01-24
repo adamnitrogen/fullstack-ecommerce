@@ -500,6 +500,20 @@ export default function Profile() {
                                 Details
                               </Button>
 
+                              {reg.status === 'pending' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-0 text-[11px] font-bold uppercase tracking-wider text-primary hover:bg-transparent hover:text-primary/80"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/event/${reg.event_id}`);
+                                  }}
+                                >
+                                  Complete Payment
+                                </Button>
+                              )}
+
                               {reg.status !== 'cancelled' && reg.status !== 'completed' && reg.payment_status !== 'paid' && (
                                 <button
                                   className="text-[11px] font-bold uppercase tracking-wider text-red-500 hover:text-red-700 transition-colors"

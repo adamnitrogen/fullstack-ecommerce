@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +37,7 @@ export default function EventsManagement() {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [rescheduleDialogOpen, setRescheduleDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -49,9 +51,14 @@ export default function EventsManagement() {
     mutationFn: async (eventData: Partial<Event> & { imageFile?: File }) => {
       const finalEvent = { ...eventData };
       if (eventData.imageFile) {
-        const response = await uploadService.uploadImage(eventData.imageFile, 'event');
-        finalEvent.image = response.url;
-        delete finalEvent.imageFile;
+        setIsUploading(true);
+        try {
+          const response = await uploadService.uploadImage(eventData.imageFile, 'event');
+          finalEvent.image = response.url;
+          delete finalEvent.imageFile;
+        } finally {
+          setIsUploading(false);
+        }
       }
       if (finalEvent.id) {
         return eventService.update(finalEvent.id, finalEvent);
@@ -76,6 +83,7 @@ export default function EventsManagement() {
       });
     },
   });
+
 
 
   const cancelMutation = useMutation({
@@ -142,6 +150,22 @@ export default function EventsManagement() {
       });
     },
   });
+
+  const getLoadingMessage = () => {
+    if (isUploading) return "Uploading event image...";
+    if (eventMutation.isPending) return selectedEvent ? "Updating event details..." : "Creating new event...";
+    if (cancelMutation.isPending) return "Initiating event cancellation...";
+    if (rescheduleMutation.isPending) return "Updating event schedule...";
+    if (retryMutation.isPending) return "Retrying cancellation process...";
+    return "Processing request...";
+  };
+
+  const isAnyMutationPending =
+    eventMutation.isPending ||
+    cancelMutation.isPending ||
+    rescheduleMutation.isPending ||
+    retryMutation.isPending ||
+    isUploading;
 
   const handleAddEvent = () => {
     setSelectedEvent(null);
@@ -276,8 +300,13 @@ export default function EventsManagement() {
     );
   };
 
+
   return (
     <div className="space-y-6">
+      <LoadingOverlay
+        isLoading={isAnyMutationPending}
+        message={getLoadingMessage()}
+      />
       <div>
         <h2 className="text-3xl font-bold tracking-tight">Events Management</h2>
         <p className="text-muted-foreground">Manage events, workshops, and ceremonies</p>
