@@ -43,7 +43,7 @@ export function PromotionalBanner() {
 
     const checkAndFetchCoupons = async () => {
         const cacheKey = "promo_coupons_cache";
-        const cacheVersion = "v2"; // Increment to force cache invalidation
+        const cacheVersion = "v3"; // Bumped version to v3
         const cacheDuration = 60 * 1000; // 1 minute cache for faster updates
 
         try {
@@ -55,30 +55,37 @@ export function PromotionalBanner() {
                 const isOldVersion = version !== cacheVersion;
 
                 if (!isExpired && !isOldVersion && cachedCoupons.length > 0) {
+                    logger.debug("PromotionalBanner: Using cached coupons", { count: cachedCoupons.length, codes: cachedCoupons.map((c: any) => c.code) });
                     setCoupons(cachedCoupons);
                     setLoading(false);
                     return;
                 }
+                logger.debug("PromotionalBanner: Cache expired, version mismatch, or empty", { isExpired, isOldVersion, count: cachedCoupons?.length });
+            } else {
+                logger.debug("PromotionalBanner: No cache found");
             }
 
             fetchActiveCoupons();
         } catch (error) {
+            logger.error("PromotionalBanner: Error checking cache", error);
             fetchActiveCoupons();
         }
     };
 
     const fetchActiveCoupons = async () => {
         try {
+            logger.debug("PromotionalBanner: Fetching active coupons from API");
             const data = await couponService.getActive();
+            logger.info("PromotionalBanner: Fetched coupons", { count: data.length, codes: data.map(c => c.code) });
             setCoupons(data);
 
             localStorage.setItem("promo_coupons_cache", JSON.stringify({
                 coupons: data,
                 timestamp: Date.now(),
-                version: "v2" // Store version with cache
+                version: "v3" // Updated version
             }));
         } catch (error) {
-            logger.error("Error fetching active coupons:", error);
+            logger.error("PromotionalBanner: Error fetching active coupons:", error);
         } finally {
             setLoading(false);
         }
@@ -88,17 +95,21 @@ export function PromotionalBanner() {
         if (coupon.type === "cart") {
             return "Sitewide Discount";
         } else if (coupon.type === "category") {
-            return `${coupon.target_id} Special`;
+            return `${coupon.target_id || 'Category'} Special`;
         } else if (coupon.type === "product") {
             return "Product Deal";
+        } else if (coupon.type === "variant") {
+            return "Exclusive Variant Offer";
+        } else if (coupon.type === "free_delivery") {
+            return "Delivery Offer";
         }
         return "Limited Offer";
     };
 
     if (loading || coupons.length === 0) return null;
 
-    // Duplicate coupons to ensure smooth marquee loop
-    const marqueeItems = [...coupons, ...coupons, ...coupons, ...coupons];
+    // Duplicate coupons to ensure smooth marquee loop - using 6 copies for safety with few items
+    const marqueeItems = [...coupons, ...coupons, ...coupons, ...coupons, ...coupons, ...coupons];
 
     return (
         <div className="relative w-full z-[60] bg-[#2C1810] text-white border-b border-[#B85C3C]/30 h-10 overflow-hidden flex items-center">
@@ -108,28 +119,35 @@ export function PromotionalBanner() {
                     0% { transform: translateX(0); }
                     100% { transform: translateX(-50%); }
                 }
-                .animate-marquee {
-                    display: flex;
+                .animate-marquee-container {
+                    display: inline-flex;
                     white-space: nowrap;
-                    animation: marquee 25s linear infinite;
+                    animation: marquee 30s linear infinite;
+                    will-change: transform;
                 }
-                .animate-marquee:hover {
+                .animate-marquee-container:hover {
                     animation-play-state: paused;
+                }
+                .coupon-item {
+                    display: flex;
+                    align-items: center;
+                    flex-shrink: 0;
+                    margin-right: 4rem; /* 64px gap replacement for tailwind gap in style block */
                 }
             `}} />
 
-            <div className="relative flex items-center w-full px-4 overflow-hidden group">
+            <div className="relative flex items-center w-full px-4 overflow-hidden group h-full">
                 {/* Fixed Label to the left */}
-                <div className="flex-shrink-0 flex items-center gap-2 bg-[#2C1810] pr-6 border-r border-white/10 z-10 shadow-[20px_0_30px_-5px_#2C1810]">
+                <div className="flex-shrink-0 flex items-center gap-2 bg-[#2C1810] pr-6 border-r border-white/10 z-10 shadow-[20px_0_30px_-5px_#2C1810] h-full">
                     <Sparkles className="h-4 w-4 text-[#B85C3C] animate-pulse" />
                     <span className="font-bold text-[10px] uppercase tracking-[0.2em] text-[#B85C3C]">Exclusive Offers</span>
                 </div>
 
                 {/* Marquee Container */}
-                <div className="flex-1 overflow-hidden">
-                    <div className="animate-marquee gap-16">
+                <div className="flex-1 overflow-hidden h-full flex items-center">
+                    <div className="animate-marquee-container">
                         {marqueeItems.map((coupon, idx) => (
-                            <div key={`${coupon.id}-${idx}`} className="flex items-center gap-8 group cursor-default">
+                            <div key={`${coupon.id}-${idx}`} className="coupon-item gap-8 group cursor-default">
                                 <div className="flex items-center gap-2">
                                     <Tag className="h-4 w-4 text-white/40 group-hover:text-[#B85C3C] transition-colors" />
                                     <span className="font-medium text-xs tracking-wider uppercase">

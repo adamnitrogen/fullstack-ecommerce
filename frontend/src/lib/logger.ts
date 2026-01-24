@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 
 const LOG_ENDPOINT = "/api/logs/client-error";
 
-export interface LogMeta {
+export interface LogMetaBase {
     component?: string;
     action?: string;
     correlationId?: string;
@@ -11,6 +11,8 @@ export interface LogMeta {
     spanId?: string;
     [key: string]: unknown;
 }
+
+export type LogMeta = LogMetaBase | Error | unknown;
 
 class FrontendLogger {
     private correlationId: string;
@@ -37,12 +39,33 @@ class FrontendLogger {
 
     private formatMessage(level: string, message: string, meta: LogMeta = {}) {
         const ids = this.getIds();
+
+        let formattedMeta: Record<string, unknown> = {};
+
+        if (meta instanceof Error) {
+            formattedMeta = {
+                error: {
+                    name: meta.name,
+                    message: meta.message,
+                    stack: meta.stack,
+                }
+            };
+        } else if (typeof meta === 'object' && meta !== null) {
+            if (Array.isArray(meta)) {
+                formattedMeta = { data: meta };
+            } else {
+                formattedMeta = { ...(meta as Record<string, unknown>) };
+            }
+        } else if (meta !== undefined) {
+            formattedMeta = { data: meta };
+        }
+
         return {
             timestamp: new Date().toISOString(),
             level,
             message,
             ...ids,
-            ...meta,
+            ...formattedMeta,
         };
     }
 

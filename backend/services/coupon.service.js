@@ -400,22 +400,40 @@ async function getActiveCoupons() {
             .gte('valid_until', currentTime)
             .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (error) {
+            logger.error({ err: error }, 'Error fetching active coupons from database:');
+            throw error;
+        }
+
+        logger.info({ total_active: data.length }, 'Fetched active coupons from DB');
 
         // Filter out coupons that have reached usage limit
         const availableCoupons = data.filter(coupon => {
-            if (coupon.usage_limit === null) return true;
-            return coupon.usage_count < coupon.usage_limit;
+            const hasLimit = coupon.usage_limit !== null;
+            const isWithinLimit = !hasLimit || (coupon.usage_count < coupon.usage_limit);
+
+            if (!isWithinLimit) {
+                logger.info({
+                    code: coupon.code,
+                    usage: coupon.usage_count,
+                    limit: coupon.usage_limit
+                }, 'Coupon excluded: usage limit reached');
+            }
+
+            return isWithinLimit;
         });
 
         // Update cache
         activeCouponsCache.data = availableCoupons;
         activeCouponsCache.timestamp = now;
-        logger.debug(`Cached ${availableCoupons.length} active coupons`);
+        logger.info({
+            available: availableCoupons.length,
+            codes: availableCoupons.map(c => c.code)
+        }, 'Returning active coupons for banner');
 
         return availableCoupons;
     } catch (error) {
-        logger.error({ err: error }, 'Error fetching active coupons:');
+        logger.error({ err: error }, 'Error in getActiveCoupons service:');
         return [];
     }
 }
