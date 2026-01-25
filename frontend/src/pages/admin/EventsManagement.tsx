@@ -399,9 +399,6 @@ export default function EventsManagement() {
                           <div className="flex flex-col gap-1">
                             <Badge variant={getStatusBadgeVariant(event.status)}>{event.status.toUpperCase()}</Badge>
                             {event.status === 'cancelled' && <JobStatusBadge eventId={event.id} />}
-                            {event.cancellationStatus === 'CANCELLATION_PENDING' && (
-                              <Badge variant="outline" className="text-[10px] animate-pulse">PROCESSING...</Badge>
-                            )}
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
@@ -461,6 +458,7 @@ export default function EventsManagement() {
         isOpen={cancelDialogOpen}
         onClose={() => setCancelDialogOpen(false)}
         onConfirm={handleConfirmCancel}
+        isUser={false}
         isLoading={cancelMutation.isPending}
       />
       <RescheduleDialog

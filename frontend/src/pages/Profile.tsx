@@ -514,17 +514,29 @@ export default function Profile() {
                                 </Button>
                               )}
 
-                              {reg.status !== 'cancelled' && reg.status !== 'completed' && reg.payment_status !== 'paid' && (
-                                <button
-                                  className="text-[11px] font-bold uppercase tracking-wider text-red-500 hover:text-red-700 transition-colors"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedRegId(reg.id);
-                                  }}
-                                >
-                                  Cancel
-                                </button>
-                              )}
+                              {(() => {
+                                const isCancelled = reg.status === 'cancelled';
+                                const isCompleted = reg.status === 'completed';
+                                const eventDate = reg.events?.start_date ? new Date(reg.events.start_date) : null;
+                                const now = new Date();
+                                const fortyEightHoursBefore = eventDate ? new Date(eventDate.getTime() - 48 * 60 * 60 * 1000) : null;
+                                const canCancel = !isCancelled && !isCompleted && fortyEightHoursBefore && now < fortyEightHoursBefore;
+
+                                if (canCancel) {
+                                  return (
+                                    <button
+                                      className="text-[11px] font-bold uppercase tracking-wider text-red-500 hover:text-red-700 transition-colors"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedRegId(reg.id);
+                                      }}
+                                    >
+                                      Cancel
+                                    </button>
+                                  );
+                                }
+                                return null;
+                              })()}
                             </div>
                           </div>
                         </div>
@@ -598,9 +610,10 @@ export default function Profile() {
         isOpen={!!selectedRegId}
         onClose={() => setSelectedRegId(null)}
         onConfirm={confirmCancelRegistration}
+        isUser={true}
         title="Cancel Registration?"
         description="Are you sure you want to cancel your attendance? A reason is required to free up space for another seeker."
-        warningText="This action is irreversible. For free events, this happens immediately. For paid events, please contact support as automated online cancellation is disabled for security."
+        warningText="This action is irreversible. For paid events, refunds are processed automatically to your original payment method."
         confirmLabel="Confirm Cancellation"
         isLoading={cancelRegistrationMutation.isPending}
       />

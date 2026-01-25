@@ -214,7 +214,7 @@ export function EventDialog({
       ...restartUpdates,
       startDate: startDate.toISOString(),
       endDate: endDate?.toISOString(),
-      registrationDeadline: registrationDeadline?.toISOString(),
+      registrationDeadline: registrationDeadline ? registrationDeadline.toISOString() : undefined,
       status: finalStatus,
       id: event?.id,
       imageFile: formData.imageFile instanceof File ? formData.imageFile : undefined,

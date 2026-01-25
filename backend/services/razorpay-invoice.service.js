@@ -106,6 +106,7 @@ async function createInvoice(data) {
         return {
             success: true,
             invoiceId: finalInvoice.id,
+            orderId: finalInvoice.order_id, // Added to support automatic status updates
             invoiceUrl: finalInvoice.short_url,
             invoiceNumber: finalInvoice.invoice_number
         };

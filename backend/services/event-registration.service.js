@@ -1,8 +1,9 @@
+const { v4: uuidv4 } = require('uuid');
 const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
-const emailService = require('../services/email');
+const emailService = require('./email');
 const { createInvoice } = require('../services/razorpay-invoice.service');
 const { capturePayment, voidAuthorization, refundPayment, fetchPayment } = require('../utils/razorpay-helper');
 const EventPricingService = require('./event-pricing.service');
@@ -139,6 +140,12 @@ class EventRegistrationService {
             basePrice = breakdown.basePrice;
             gstAmount = breakdown.gstAmount;
             gstRate = breakdown.gstRate;
+
+            logger.info({
+                registrationAmount: event.registration_amount,
+                calculatedBase: basePrice,
+                calculatedGst: gstAmount
+            }, '[EventRegistration] Calculated missing tax breakdown');
         }
 
         // Create initial registration record
@@ -208,26 +215,55 @@ class EventRegistrationService {
         }
 
         // --- PAID EVENT FLOW ---
-        // Create Razorpay Order with AUTO CAPTURE
-        const razorpayOrder = await razorpay.orders.create({
-            amount: Math.round(event.registration_amount * 100), // Amount in paise
-            currency: 'INR',
-            receipt: registration.registration_number,
-            payment_capture: 1, // AUTO CAPTURE - capture immediately
-            notes: {
-                registration_id: registration.id,
-                event_id: eventId,
-                event_title: event.title
-            }
+        // Create Razorpay INVOICE (replaces simple Order)
+        // This generates a detailed PDF Invoice + Receipt linked to the payment
+        const invoiceResult = await createInvoice({
+            paymentId: null, // No payment ID yet
+            amount: event.registration_amount,
+            customerName: fullName,
+            customerEmail: email,
+            customerPhone: phone,
+            receiptNumber: registration.registration_number,
+            description: `Registration: ${event.title}`
         });
+
+        if (!invoiceResult.success) {
+            logger.error({ err: invoiceResult.error, registrationId: registration.id }, '[EventRegistration] Failed to create Razorpay invoice');
+            // We continue but the user won't have a nice invoice link yet. 
+            // However, we NEED the order_id for the checkout to work.
+            // If invoice creation fails, we might need to fallback or fail the registration.
+            // For now, let's fail to ensure consistency.
+            throw new Error('Failed to initiate payment gateway. Please try again.');
+        }
+
+        logger.info({ invoiceResult }, '[EventRegistration] Invoice created successfully');
+
+        // Update registration with invoice details immediately
+        const { error: updateError } = await supabase
+            .from('event_registrations')
+            .update({
+                invoice_id: invoiceResult.invoiceId,
+                invoice_url: invoiceResult.invoiceUrl,
+                razorpay_order_id: invoiceResult.orderId // Store Order ID for verification
+            })
+            .eq('id', registration.id);
+
+        if (updateError) {
+            logger.error({ err: updateError, registrationId: registration.id }, '[EventRegistration] Failed to save invoice URL to DB');
+            // Validate if column exists error
+            if (updateError.code === '42703') { // Undefined column
+                logger.warn('Column invoice_url might be missing. Proceeding without saving it.');
+            }
+        }
 
         return {
             success: true,
             isFree: false,
             key_id: process.env.RAZORPAY_KEY_ID,
-            amount: razorpayOrder.amount,
-            currency: razorpayOrder.currency,
-            order_id: razorpayOrder.id,
+            amount: Math.round(event.registration_amount * 100),
+            currency: 'INR',
+            order_id: invoiceResult.orderId, // CRITICAL: Frontend expects Order ID linked to Invoice
+            invoice_id: invoiceResult.invoiceId, // Pass Invoice ID so frontend can return it for verification
             registration_id: registration.id,
             registration: {
                 registrationNumber: registration.registration_number
@@ -244,93 +280,145 @@ class EventRegistrationService {
      * 4. If DB succeeds → All good
      * 5. If DB fails → REFUND payment
      */
-    static async verifyPayment({ razorpay_order_id, razorpay_payment_id, razorpay_signature, registration_id }) {
-        if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !registration_id) {
+    static async verifyPayment({ razorpay_order_id, razorpay_payment_id, razorpay_signature, registration_id, razorpay_invoice_id }) {
+        logger.info({
+            razorpay_payment_id,
+            razorpay_order_id,
+            registration_id,
+            has_signature: !!razorpay_signature,
+            has_invoice_id: !!razorpay_invoice_id
+        }, '[EventRegistration] Starting payment verification');
+
+        // Relaxed check: We NEED payment_id and registration_id. The rest can be fetched via S2S if missing.
+        if (!razorpay_payment_id || !registration_id) {
+            logger.error({ razorpay_payment_id, registration_id }, '[EventRegistration] Missing critical verification parameters');
             throw new Error('Missing payment verification parameters');
         }
 
-        // Fetch registration for amount
+        // Fetch registration for amount - GET FULL EVENT DETAILS
         const { data: regData, error: fetchError } = await supabase
             .from('event_registrations')
-            .select('*, events(title, registration_amount)')
+            .select('*, events!inner(*)') // Fetch ALL event fields
             .eq('id', registration_id)
             .single();
 
         if (fetchError || !regData) {
+            logger.error({ err: fetchError, registration_id }, '[EventRegistration] Registration not found during verify');
             throw new Error('Registration not found');
         }
 
-        const amount = regData.amount || regData.events?.registration_amount || 0;
+        // define registration alias for consistency with downstream code
+        const registration = regData;
 
-        // 1. Verify Signature
-        const generated_signature = crypto
-            .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-            .update(razorpay_order_id + '|' + razorpay_payment_id)
-            .digest('hex');
+        // Initial amount (might be updated by RPC later)
+        let amount = regData.amount || regData.events?.registration_amount || 0;
+        let isSignatureVerified = false;
 
-        if (generated_signature !== razorpay_signature) {
-            throw new Error('Invalid payment signature');
+        // 1. Signature Verification (Preferred if all params present)
+        if (razorpay_order_id && razorpay_signature) {
+            try {
+                const generated_signature = crypto
+                    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+                    .update(razorpay_order_id + '|' + razorpay_payment_id)
+                    .digest('hex');
+
+                if (generated_signature === razorpay_signature) {
+                    isSignatureVerified = true;
+                    logger.info({ razorpay_payment_id }, '[EventRegistration] Signature verification successful');
+                } else {
+                    logger.warn({
+                        razorpay_payment_id,
+                        expected: generated_signature,
+                        received: razorpay_signature
+                    }, '[EventRegistration] Signature mismatch. Falling back to S2S verification.');
+                }
+            } catch (sigErr) {
+                logger.error({ err: sigErr }, '[EventRegistration] Signature check error');
+            }
+        } else {
+            logger.info('[EventRegistration] Missing checks for signature verification. Proceeding to S2S check.');
         }
 
-        // --- PAYMENT SIGNATURE VERIFIED ---
-        // Payment is ALREADY CAPTURED (Auto-Capture)
-        logger.info({
-            razorpay_payment_id,
-            registration_id,
-            amount
-        }, '[EventRegistration] Payment signature verified (Auto-captured), proceeding with DB update');
+        // 2. S2S Verification (Fallback / Source of Truth)
+        if (!isSignatureVerified) {
+            try {
+                logger.info({ razorpay_payment_id }, '[EventRegistration] Initiating S2S verification fetch');
+                const payment = await razorpay.payments.fetch(razorpay_payment_id);
+
+                logger.info({
+                    id: payment.id,
+                    status: payment.status,
+                    amount: payment.amount,
+                    order_id: payment.order_id,
+                    email: payment.email
+                }, '[EventRegistration] S2S Payment Details Fetched');
+
+                // Check Status
+                if (payment.status !== 'captured' && payment.status !== 'authorized') {
+                    throw new Error(`Payment status is ${payment.status} (expected captured/authorized)`);
+                }
+
+                // Verify Amount (Prevent manipulation)
+                const expectedAmount = Math.round(amount * 100);
+                if (payment.amount !== expectedAmount) {
+                    logger.error({
+                        expected: expectedAmount,
+                        received: payment.amount
+                    }, '[EventRegistration] Payment amount mismatch');
+                    throw new Error('Payment amount does not match registration amount');
+                }
+
+                // If we have an order_id on record, it MUST match the payment's order_id if present
+                if (razorpay_order_id && payment.order_id && payment.order_id !== razorpay_order_id) {
+                    logger.error({
+                        payment_order_id: payment.order_id,
+                        input_order_id: razorpay_order_id
+                    }, '[EventRegistration] Order ID mismatch');
+                    throw new Error('Order ID mismatch');
+                }
+
+                // If the input didn't have an order_id (null case), we adopt the one from payment
+                if (!razorpay_order_id && payment.order_id) {
+                    razorpay_order_id = payment.order_id;
+                    logger.info({ razorpay_order_id }, '[EventRegistration] Adopted Order ID from S2S payment');
+                }
+
+                isSignatureVerified = true; // S2S is authoritative
+                logger.info('[EventRegistration] S2S Verification PASSED');
+
+            } catch (s2sError) {
+                logger.error({ err: s2sError, razorpay_payment_id }, '[EventRegistration] S2S Verification FAILED');
+                throw new Error(`Payment verification failed: ${s2sError.message}`);
+            }
+        }
+
+        // --- PAYMENT VERIFIED (Either Signature or S2S) ---
+
+        // Auto-Capture check (if somehow authorized but not captured)
+        // Note: We used payment_capture=1 so it should be captured, but good to be safe.
+        // We update status to 'captured' locally.
 
         await supabase
             .from('event_registrations')
-            .update({ payment_status: 'captured' })
+            .update({
+                payment_status: 'captured',
+                updated_at: new Date().toISOString()
+            })
             .eq('id', registration_id);
 
-        // Fetch payment details to get receipt URL (if available) or construct it
         let receiptUrl = null;
-        try {
-            const paymentDetails = await fetchPayment(razorpay_payment_id);
-            // Razorpay doesn't always return a direct PDF receipt URL via API for all auth types,
-            // but we can try to construct a dashboard link or use the one if available.
-            // For now, we'll rely on our internal Invoice URL if generated, or just pass the ID.
-            // However, the user asked for a "Razorpay payment receipt".
-            // We can't easily generate a public Razorpay receipt URL programmatically without their hosted pages 
-            // if it wasn't a standard checkout. 
-            // BUT, if we used standard checkout, we might get it.
-            // Let's rely on our custom Invoice for now as the primary receipt, but pass the payment ID for reference.
-        } catch (ignored) {
-            logger.warn({ err: ignored }, 'Failed to fetch payment details for receipt');
-        }
 
         // --- DB TRANSACTION PHASE ---
         try {
-            // 2. Generate Invoice (Optional but recommended)
-            let invoiceUrl = null;
-            try {
-                invoiceUrl = await createInvoice({
-                    customer: {
-                        name: regData.full_name,
-                        email: regData.email,
-                        contact: regData.phone
-                    },
-                    lineItems: [{
-                        name: `Registration: ${regData.events?.title}`,
-                        amount: amount,
-                        currency: 'INR',
-                        quantity: 1
-                    }],
-                    referenceId: regData.registration_number
-                });
-            } catch (invErr) {
-                logger.error({ err: invErr }, 'Failed to generate invoice during verification');
-            }
-
             // 3. Update Registration Status - TRANSACTIONAL VERSION
+            // We pass null for invoice_url because we rely on the one generated during createRegistrationOrder
+            // We pass our verified (or adopted) razorpay parameters
             const { data: rpcResult, error: rpcError } = await supabase
                 .rpc('verify_event_registration_transactional', {
                     p_registration_id: registration_id,
                     p_razorpay_payment_id: razorpay_payment_id,
-                    p_razorpay_signature: razorpay_signature,
-                    p_invoice_url: invoiceUrl
+                    p_razorpay_signature: razorpay_signature || 's2s_verified', // specific marker if sig missing
+                    p_invoice_url: null
                 });
 
             if (rpcError) {
@@ -338,26 +426,104 @@ class EventRegistrationService {
                 throw new Error('Failed to update registration status: ' + rpcError.message);
             }
 
-            const registration = rpcResult.registration;
-            const event = rpcResult.event;
+            // Update local registration object with RPC result
+            if (rpcResult && rpcResult.registration) {
+                Object.assign(registration, rpcResult.registration);
+            } else {
+                // Fallback fetch
+                const { data: refreshedReg } = await supabase
+                    .from('event_registrations')
+                    .select('*, events!inner(*)')
+                    .eq('id', registration_id)
+                    .single();
+                if (refreshedReg) Object.assign(registration, refreshedReg);
+            }
+
+            // Consolidate Event Data
+            const event = registration.events;
+            const eventData = event;
+
+            // Fallback Tax Calculation if missing
+            let finalBasePrice = registration.base_price;
+            let finalGstAmount = registration.gst_amount;
+
+            if (finalBasePrice === undefined || finalBasePrice === null) {
+                const breakdown = EventPricingService.calculateBreakdown(registration.amount, registration.gst_rate);
+                finalBasePrice = breakdown.basePrice;
+                finalGstAmount = breakdown.gstAmount;
+            }
+
+            // Get Invoice URL (should have been set during creation)
+            let invoiceUrl = registration.invoice_url;
+
+            // FALLBACK: Recover Invoice URL if missing
+            // Priority: DB -> Frontend Argument -> DB Invoice ID -> Razorpay Payment Object
+            if (!invoiceUrl) {
+                try {
+                    // 1. Try to get Invoice ID from anywhere
+                    let targetInvoiceId = registration.invoice_id || razorpay_invoice_id;
+
+                    // 2. If missing, and we have a payment ID, fetch the payment to find the linked invoice
+                    if (!targetInvoiceId && razorpay_payment_id) {
+                        logger.info('[EventRegistration] Invoice ID missing. Fetching payment details to find it.');
+                        const payment = await razorpay.payments.fetch(razorpay_payment_id);
+                        if (payment && payment.invoice_id) {
+                            targetInvoiceId = payment.invoice_id;
+                            logger.info({ targetInvoiceId }, '[EventRegistration] Found Invoice ID in payment details');
+                        }
+                    }
+
+                    if (targetInvoiceId) {
+                        logger.info({ invoiceId: targetInvoiceId }, '[EventRegistration] Fetching Invoice URL from Razorpay');
+                        const { fetchInvoice } = require('../services/razorpay-invoice.service');
+                        const invoiceResult = await fetchInvoice(targetInvoiceId);
+
+                        if (invoiceResult.success && invoiceResult.invoiceUrl) {
+                            invoiceUrl = invoiceResult.invoiceUrl;
+
+                            // Opportunistically update the DB
+                            // We also update invoice_id if we found it via payment but it wasn't in DB
+                            const updates = { invoice_url: invoiceUrl };
+                            if (!registration.invoice_id) updates.invoice_id = targetInvoiceId;
+
+                            await supabase
+                                .from('event_registrations')
+                                .update(updates)
+                                .eq('id', registration.id)
+                                .then(({ error }) => {
+                                    if (error) logger.warn({ err: error }, '[EventRegistration] Failed to backfill invoice details');
+                                });
+                        }
+                    } else {
+                        logger.warn('[EventRegistration] Could not find any Invoice ID to recover URL');
+                    }
+                } catch (fetchErr) {
+                    logger.error({ err: fetchErr }, '[EventRegistration] Failed to recover invoice URL');
+                }
+            }
 
             // --- DB SUCCESS ---
             logger.info({
                 registrationId: registration.id,
-                registrationNumber: registration.registration_number
-            }, '[EventRegistration] Registration confirmed successfully');
+                registrationNumber: registration.registration_number,
+                paymentId: razorpay_payment_id,
+                hasInvoiceUrl: !!invoiceUrl
+            }, '[EventRegistration] Registration confirmed successfully in DB');
 
-            // 4. Send Confirmation Email
+            // 4. Send Confirmation Email - NON-BLOCKING
             emailService.sendEventRegistrationEmail(
                 registration.email,
                 {
                     event: {
-                        id: event.id,
-                        title: event.title || 'Event',
-                        startDate: event.start_date,
-                        location: event.location,
-                        description: event.description,
-                        eventCode: event.event_code
+                        id: eventData.id,
+                        title: eventData.title || 'Event',
+                        startDate: eventData.start_date,
+                        endDate: eventData.end_date,
+                        startTime: eventData.start_time,
+                        endTime: eventData.end_time,
+                        location: eventData.location,
+                        description: eventData.description,
+                        eventCode: eventData.event_code
                     },
                     registration: {
                         id: registration.id,
@@ -367,8 +533,8 @@ class EventRegistrationService {
                     isPaid: true,
                     paymentDetails: {
                         amount: registration.amount,
-                        basePrice: registration.base_price,
-                        gstAmount: registration.gst_amount,
+                        basePrice: finalBasePrice,
+                        gstAmount: finalGstAmount,
                         gstRate: registration.gst_rate,
                         transactionId: razorpay_payment_id,
                         razorpayPaymentId: razorpay_payment_id,
@@ -385,8 +551,8 @@ class EventRegistrationService {
                     id: registration.id,
                     registrationNumber: registration.registration_number,
                     eventTitle: event.title,
-                    status: registration.status,
-                    paymentStatus: registration.payment_status,
+                    status: 'confirmed',
+                    paymentStatus: 'paid',
                     amount: registration.amount
                 }
             };
@@ -395,12 +561,11 @@ class EventRegistrationService {
             // --- DB FAILURE: REFUND PAYMENT ---
             logger.error({
                 err: systemError,
+                stack: systemError.stack,
                 razorpay_payment_id,
                 registration_id
-            }, '[EventRegistration] DB update failed. Initiating REFUND.');
+            }, '[EventRegistration] Verification process failed. Initiating REFUND.');
 
-            // Mark as cancelled immediately in case refund fails logic below
-            // We will update payment_status to 'refunded' if successful, otherwise it remains 'captured' (indicating manual refund needed)
             const cancellationUpdate = {
                 status: 'cancelled',
                 updated_at: new Date().toISOString()
@@ -440,13 +605,10 @@ class EventRegistrationService {
                     registration_id
                 }, '[EventRegistration] CRITICAL: Failed to refund payment after DB failure!');
 
-                // Refund Failed: Mark as Cancelled (so admin sees it)
-                // Payment status stays 'captured' or whatever it was, signaling manual intervention
                 await supabase
                     .from('event_registrations')
                     .update({
                         ...cancellationUpdate
-                        // payment_status left as is (likely 'captured') so admin knows to look at it
                     })
                     .eq('id', registration_id);
 
@@ -506,7 +668,8 @@ class EventRegistrationService {
                     registrationId: registrationId,
                     paymentId: registration.razorpay_payment_id,
                     amount: registration.amount,
-                    correlationId: 'USER_CANCEL' // Or pass one
+                    amount: registration.amount,
+                    correlationId: uuidv4() // Generate valid UUID for user cancellation
                 });
 
                 if (refundRecord.status === 'INITIATED') {
@@ -602,18 +765,26 @@ class EventRegistrationService {
     /**
      * Get Registration by ID
      */
-    static async getRegistrationById(id, userId = null) {
-        const { data, error } = await supabase
+    static async getRegistrationById(id, userId = null, options = {}) {
+        const client = options.useAdmin ? require('../config/supabase').supabaseAdmin : supabase;
+
+        const { data, error } = await client
             .from('event_registrations')
             .select(`*, events (id, title, start_date, end_date, location, image)`)
             .eq('id', id)
             .single();
 
-        if (error || !data) throw new Error('Registration not found');
+        if (error || !data) {
+            const err = new Error('Registration not found');
+            err.statusCode = 404;
+            throw err;
+        }
 
-        // Access Control
-        if (userId && data.user_id && data.user_id !== userId) {
-            throw new Error('Unauthorized');
+        // Access Control (Skip if using admin for public links)
+        if (!options.useAdmin && userId && data.user_id && data.user_id !== userId) {
+            const err = new Error('Unauthorized');
+            err.statusCode = 403;
+            throw err;
         }
 
         return data;

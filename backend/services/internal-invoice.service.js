@@ -23,7 +23,7 @@ class InternalInvoiceService {
     /**
      * Generate Internal GST Invoice for a Delivered Order
      */
-    static async generateInvoice(order) {
+    static async generateInvoice(order, options = {}) {
         log.operationStart('GENERATE_INTERNAL_INVOICE', { orderId: order.id });
         const startTime = Date.now();
 
@@ -56,26 +56,31 @@ class InternalInvoiceService {
                 publicUrl = await this._uploadToStorage(filename, pdfBuffer);
             }
 
-            // Persist Metadata
-            const expiryDate = new Date();
-            expiryDate.setDate(expiryDate.getDate() + 30);
+            // Persist Metadata (Skip for Events or if requested)
+            let invoiceRecord = { id: null, file_path: filePath, public_url: publicUrl };
 
-            const { data: invoiceRecord, error } = await supabase
-                .from('invoices')
-                .insert({
-                    order_id: order.id,
-                    type: isGstInvoice ? 'TAX_INVOICE' : 'BILL_OF_SUPPLY',
-                    invoice_number: invoiceNumber,
-                    file_path: filePath,
-                    public_url: publicUrl,
-                    status: 'GENERATED',
-                    generated_at: new Date().toISOString(),
-                    expires_at: expiryDate.toISOString()
-                })
-                .select()
-                .single();
+            if (!options.skipDb) {
+                const expiryDate = new Date();
+                expiryDate.setDate(expiryDate.getDate() + 30);
 
-            if (error) throw error;
+                const { data: insertedRec, error } = await supabase
+                    .from('invoices')
+                    .insert({
+                        order_id: order.id,
+                        type: isGstInvoice ? 'TAX_INVOICE' : 'BILL_OF_SUPPLY',
+                        invoice_number: invoiceNumber,
+                        file_path: filePath,
+                        public_url: publicUrl,
+                        status: 'GENERATED',
+                        generated_at: new Date().toISOString(),
+                        expires_at: expiryDate.toISOString()
+                    })
+                    .select()
+                    .single();
+
+                if (error) throw error;
+                invoiceRecord = insertedRec;
+            }
 
             log.operationSuccess('GENERATE_INTERNAL_INVOICE', {
                 invoiceId: invoiceRecord.id,
@@ -85,9 +90,9 @@ class InternalInvoiceService {
             return {
                 success: true,
                 invoiceId: invoiceRecord.id,
-                filePath: invoiceRecord.file_path,
+                filePath: filePath || invoiceRecord.file_path,
                 invoiceNumber,
-                publicUrl: invoiceRecord.public_url
+                publicUrl: publicUrl || invoiceRecord.public_url
             };
 
         } catch (error) {

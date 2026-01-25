@@ -237,6 +237,7 @@ const EventRegistration = () => {
                 razorpay_payment_id: paymentResponse.razorpay_payment_id,
                 razorpay_signature: paymentResponse.razorpay_signature,
                 registration_id: data.registration_id,
+                razorpay_invoice_id: data.invoice_id // Pass invoice ID for fallback
               }
             );
 
@@ -262,19 +263,22 @@ const EventRegistration = () => {
             }
           } catch (verifyError: unknown) {
             logger.error("Verification error:", verifyError);
+            setIsProcessing(false); // Reset processing state so user can retry
 
             // Determine user-friendly error message
-            let userMessage = "We couldn't verify your payment. Please contact support.";
+            let userMessage = "We couldn't verify your payment instantly. Please contact support.";
             const serverMsg = getErrorMessage(verifyError);
 
             // Handle specific refund cases
             if (serverMsg && (serverMsg.includes('refunded') || serverMsg.includes('Registration failed'))) {
               userMessage = "Payment was successful but registration failed. \n\nYour payment has been automatically refunded. \nPlease try registering again.";
+            } else if (serverMsg && serverMsg.includes('timeout')) {
+              userMessage = "Payment verification timed out. \n\nIf money was deducted, please do not pay again. \nContact support with your details.";
             }
 
             setStatusDialog({
               open: true,
-              title: "Registration Failed",
+              title: "Verification Issue",
               message: userMessage,
               type: "error",
             });
