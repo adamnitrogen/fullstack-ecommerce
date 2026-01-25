@@ -127,9 +127,9 @@ export default function ReviewsManagement() {
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="flex items-center gap-1">
-                                            <Star className="h-4 w-4 fill-accent text-accent" />
-                                            <span>{review.rating}</span>
+                                        <div className="flex items-center gap-1.5 bg-[#D4AF37]/5 px-2 py-1 rounded-md border border-[#D4AF37]/10">
+                                            <Star className="h-4 w-4 fill-[#D4AF37] text-[#D4AF37] drop-shadow-[0_0_4px_rgba(212,175,55,0.2)]" />
+                                            <span className="font-bold text-[#2C1810]">{review.rating}</span>
                                         </div>
                                     </TableCell>
                                     <TableCell className="max-w-md">

@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Trash2, Save, Phone, Mail, MapPin, Loader2 } from "lucide-react";
 import { ContactPhone, ContactEmail, ContactAddress, contactInfoService } from "@/services/contact-info.service";
 import { toast } from "@/hooks/use-toast";
-import { getErrorMessage } from "@/lib/errorUtils";
+import { getErrorMessage, getFriendlyTitle } from "@/lib/errorUtils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface ContactInfoSectionProps {
@@ -41,7 +41,7 @@ export function ContactInfoSection({
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
+        title: getFriendlyTitle(error, "Notice"),
         description: getErrorMessage(error, "Failed to add phone"),
         variant: "destructive",
       });
@@ -57,7 +57,7 @@ export function ContactInfoSection({
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
+        title: getFriendlyTitle(error, "Notice"),
         description: getErrorMessage(error, "Failed to update phone"),
         variant: "destructive",
       });
@@ -73,7 +73,7 @@ export function ContactInfoSection({
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
+        title: getFriendlyTitle(error, "Notice"),
         description: getErrorMessage(error, "Failed to remove phone"),
         variant: "destructive",
       });
@@ -82,7 +82,7 @@ export function ContactInfoSection({
 
   const handleAddPhone = () => {
     if (!newPhone.number) {
-      toast({ title: "Validation Error", description: "Please enter a phone number", variant: "destructive" });
+      toast({ title: "Check your info", description: "Please enter a phone number", variant: "destructive" });
       return;
     }
     addPhoneMutation.mutate({
@@ -105,7 +105,7 @@ export function ContactInfoSection({
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
+        title: getFriendlyTitle(error, "Notice"),
         description: getErrorMessage(error, "Failed to add email"),
         variant: "destructive",
       });
@@ -121,7 +121,7 @@ export function ContactInfoSection({
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
+        title: getFriendlyTitle(error, "Notice"),
         description: getErrorMessage(error, "Failed to update email"),
         variant: "destructive",
       });
@@ -137,7 +137,7 @@ export function ContactInfoSection({
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
+        title: getFriendlyTitle(error, "Notice"),
         description: getErrorMessage(error, "Failed to remove email"),
         variant: "destructive",
       });
@@ -146,7 +146,7 @@ export function ContactInfoSection({
 
   const handleAddEmail = () => {
     if (!newEmail.email) {
-      toast({ title: "Validation Error", description: "Please enter an email address", variant: "destructive" });
+      toast({ title: "Check your info", description: "Please enter an email address", variant: "destructive" });
       return;
     }
     addEmailMutation.mutate({
@@ -169,7 +169,7 @@ export function ContactInfoSection({
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
+        title: getFriendlyTitle(error, "Notice"),
         description: getErrorMessage(error, "Failed to update address"),
         variant: "destructive",
       });

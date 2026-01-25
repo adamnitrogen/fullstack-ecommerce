@@ -9,9 +9,27 @@ const FRIENDLY_MESSAGES: Record<string, string> = {
     'RAZORPAY_ERROR': 'We encountered an issue with the payment gateway. Please try again in a moment.',
     'INSUFFICIENT_STOCK': 'Some items in your cart are no longer available in the requested quantity.',
     'INTERNAL_ERROR': 'Something went wrong on our end. We are looking into it.',
-    'NETWORK_ERROR': 'We are having trouble connecting to the server. Please check your internet connection and try again.',
-    'VALIDATION_ERROR': 'Please check the information you entered and try again.',
+    'NETWORK_ERROR': 'We are having trouble connecting to the server. Please check your internet connection.',
+    'VALIDATION_ERROR': 'Check your information and try again.',
 };
+
+/**
+ * Returns a user-friendly Title for an error
+ */
+export function getFriendlyTitle(error: unknown, defaultTitle: string = "Notice"): string {
+    const apiError = getApiError(error);
+    const code = apiError?.code;
+
+    if (code === 'VALIDATION_ERROR') return 'Check your info';
+    if (code === 'AUTHENTICATION_REQUIRED' || code === 'UNAUTHORIZED') return 'Login Required';
+    if (code === 'PAYMENT_FAILED' || code === 'RAZORPAY_ERROR') return 'Payment Update';
+    if (code === 'INSUFFICIENT_STOCK') return 'Stock Update';
+    if (code === 'INTERNAL_ERROR') return 'Oops!';
+
+    if (isNetworkError(error)) return 'Connection Issue';
+
+    return defaultTitle;
+}
 
 export function getApiError(error: unknown): ApiErrorResponse | undefined {
     if (axios.isAxiosError(error)) {

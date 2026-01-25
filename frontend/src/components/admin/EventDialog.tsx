@@ -161,7 +161,7 @@ export function EventDialog({
       !formData.location?.address?.trim()
     ) {
       toast({
-        title: "Validation Error",
+        title: "Check your info",
         description: "Please fill in all required fields (Title, Description, Location)",
         variant: "destructive",
       });

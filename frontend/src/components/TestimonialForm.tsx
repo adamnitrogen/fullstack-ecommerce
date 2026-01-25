@@ -183,12 +183,12 @@ export function TestimonialForm() {
                   onClick={() => setRating(star)}
                   onMouseEnter={() => setHoveredRating(star)}
                   onMouseLeave={() => setHoveredRating(0)}
-                  className="transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary rounded"
+                  className="transition-all hover:scale-125 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 rounded"
                 >
                   <Star
-                    className={`h-8 w-8 ${star <= (hoveredRating || rating)
-                      ? "fill-accent text-accent"
-                      : "text-muted-foreground"
+                    className={`h-9 w-9 ${star <= (hoveredRating || rating)
+                      ? "fill-[#D4AF37] text-[#D4AF37] drop-shadow-[0_0_8px_rgba(212,175,55,0.3)]"
+                      : "text-[#D4AF37]/20"
                       }`}
                   />
                 </button>

@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Star } from "lucide-react";
+import { Star, MessageSquare, Send, CheckCircle2, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,7 +14,7 @@ import { z } from "zod";
 import { useAuthStore } from "@/store/authStore";
 import AuthPage from "@/pages/Auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getErrorMessage } from "@/lib/errorUtils";
+import { getErrorMessage, getFriendlyTitle } from "@/lib/errorUtils";
 
 interface ProductReviewsProps {
   productId: string;
@@ -34,6 +35,7 @@ const reviewSchema = z.object({
 });
 
 export const ProductReviews = ({ productId }: ProductReviewsProps) => {
+  const { t } = useTranslation();
   const { user, isAuthenticated } = useAuthStore();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
@@ -67,7 +69,7 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
+        title: getFriendlyTitle(error, "Notice"),
         description: getErrorMessage(error, "Failed to submit review"),
         variant: "destructive",
       });
@@ -134,7 +136,7 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
     } catch (error) {
       if (error instanceof z.ZodError) {
         toast({
-          title: "Validation Error",
+          title: "Check your info",
           description: error.errors[0].message,
           variant: "destructive",
         });
@@ -174,7 +176,7 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
     <div className="space-y-8 animate-in fade-in duration-700">
       <Card className="border-none shadow-xl rounded-[2rem] overflow-hidden bg-white">
         <CardHeader className="p-8 pb-4">
-          <CardTitle className="text-2xl font-bold text-[#2C1810] font-playfair">Guest Reviews</CardTitle>
+          <CardTitle className="text-2xl font-bold text-[#2C1810] font-playfair">{t("products.reviews")}</CardTitle>
         </CardHeader>
         <CardContent className="p-8 pt-4 space-y-8">
           {/* Rating Summary */}
@@ -184,12 +186,12 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
                 <div className="text-5xl font-black text-[#2C1810]">
                   {averageRating.toFixed(1)}
                 </div>
-                <div className="flex items-center justify-center md:justify-start gap-0.5">
+                <div className="flex items-center justify-center md:justify-start gap-1">
                   {[...Array(5)].map((_, i) => (
                     <Star
                       key={i}
-                      size={16}
-                      className={i < Math.floor(averageRating) ? "fill-[#D4AF37] text-[#D4AF37]" : "text-muted"}
+                      size={20}
+                      className={i < Math.floor(averageRating) ? "fill-[#D4AF37] text-[#D4AF37]" : "text-[#D4AF37]/20"}
                     />
                   ))}
                 </div>
@@ -242,7 +244,7 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
               </div>
 
               <div className="space-y-4">
-                <div className="flex gap-1">
+                <div className="flex gap-2">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
                       key={star}
@@ -250,11 +252,15 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
                       onClick={() => setRating(star)}
                       onMouseEnter={() => setHoveredRating(star)}
                       onMouseLeave={() => setHoveredRating(0)}
-                      className="transition-transform hover:scale-110"
+                      className="transition-all hover:scale-125 active:scale-95"
                     >
                       <Star
-                        size={24}
-                        className={star <= (hoveredRating || rating) ? "fill-[#D4AF37] text-[#D4AF37]" : "text-muted"}
+                        size={32}
+                        strokeWidth={1.5}
+                        className={star <= (hoveredRating || rating)
+                          ? "fill-[#D4AF37] text-[#D4AF37] drop-shadow-[0_0_8px_rgba(212,175,55,0.3)]"
+                          : "text-[#D4AF37]/30 hover:text-[#D4AF37]/50"
+                        }
                       />
                     </button>
                   ))}
@@ -333,12 +339,12 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-[#2C1810] text-xs">{review.userName}</span>
-                            <div className="flex items-center gap-0.5">
+                            <div className="flex items-center gap-1">
                               {[...Array(5)].map((_, i) => (
                                 <Star
                                   key={i}
-                                  size={10}
-                                  className={i < review.rating ? "fill-[#D4AF37] text-[#D4AF37]" : "text-muted"}
+                                  size={12}
+                                  className={i < review.rating ? "fill-[#D4AF37] text-[#D4AF37]" : "text-[#D4AF37]/20"}
                                 />
                               ))}
                             </div>

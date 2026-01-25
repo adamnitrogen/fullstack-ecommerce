@@ -20,7 +20,7 @@ const ERROR_MESSAGES = {
     // General System Errors
     'INTERNAL_ERROR': 'Something went wrong on our end. We have been notified and are looking into it.',
     'DATABASE_ERROR': 'We are experiencing some technical difficulties with our database. Please try again shortly.',
-    'VALIDATION_ERROR': 'Please check the information you entered and try again.',
+    'VALIDATION_ERROR': 'Check your information and try again.',
 
     // Fallback
     'GENERIC_ERROR': 'An unexpected error occurred. Please try again or contact support.'
@@ -49,7 +49,11 @@ const TECHNICAL_PATTERNS = [
     /fetch/i,
     /internal server error/i,
     /read property/i,
-    /is not a function/i
+    /is not a function/i,
+    /cannot read/i,
+    /property of null/i,
+    /property of undefined/i,
+    /invalid input/i
 ];
 
 /**

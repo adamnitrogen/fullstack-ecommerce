@@ -251,8 +251,9 @@ router.post('/refresh', async (req, res) => {
 
         if (isAuthError) {
             logger.warn('[AuthRoutes] Clearing cookies due to definitive auth failure during refresh');
-            res.clearCookie('access_token', cookieOptions);
-            res.clearCookie('refresh_token', cookieOptions);
+            const { maxAge, ...clearOptions } = cookieOptions;
+            res.clearCookie('access_token', clearOptions);
+            res.clearCookie('refresh_token', clearOptions);
             return res.status(error.status).json({ error: error.message });
         }
 
@@ -287,8 +288,10 @@ router.post('/logout', async (req, res) => {
     const refreshOptions = getCookieOptions(true);
 
     const clearCookies = (response) => {
-        response.clearCookie('access_token', cookieOptions);
-        response.clearCookie('refresh_token', refreshOptions);
+        const { maxAge: _a, ...accessClearOptions } = cookieOptions;
+        const { maxAge: _r, ...refreshClearOptions } = refreshOptions;
+        response.clearCookie('access_token', accessClearOptions);
+        response.clearCookie('refresh_token', refreshClearOptions);
     };
 
     try {

@@ -11,7 +11,7 @@ import { toast } from "@/hooks/use-toast";
 import { FcGoogle } from "react-icons/fc";
 import { validateCredentials, verifyLoginOtp } from "@/lib/services/auth.service";
 import { useAuthStore } from "@/store/authStore";
-import { getErrorMessage } from "@/lib/errorUtils";
+import { getErrorMessage, getFriendlyTitle } from "@/lib/errorUtils";
 
 interface LoginFormProps {
   emailOrPhone?: string;
@@ -100,7 +100,7 @@ export function LoginForm({
 
     if (!isValid) {
       toast({
-        title: "Validation Error",
+        title: "Check your info",
         description: "Please fix the errors before continuing",
         variant: "destructive",
       });
@@ -125,7 +125,7 @@ export function LoginForm({
       }
     } catch (error: unknown) {
       toast({
-        title: "Error",
+        title: getFriendlyTitle(error, "Notice"),
         description: getErrorMessage(error, "An error occurred"),
         variant: "destructive"
       });

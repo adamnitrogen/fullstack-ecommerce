@@ -9,11 +9,11 @@ interface TestimonialCardProps {
 // Reusable compact star rating for cards
 function CompactStarRating({ rating }: { rating: number }) {
   return (
-    <div className="flex gap-1">
+    <div className="flex gap-1.5">
       {[...Array(5)].map((_, i) => (
         <svg
           key={i}
-          className={`h-4 w-4 ${i < rating ? "text-accent fill-accent" : "text-muted fill-muted"
+          className={`h-4.5 w-4.5 ${i < rating ? "text-[#D4AF37] fill-[#D4AF37] drop-shadow-[0_0_4px_rgba(212,175,55,0.2)]" : "text-[#D4AF37]/20 fill-[#D4AF37]/10"
             }`}
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 24 24"

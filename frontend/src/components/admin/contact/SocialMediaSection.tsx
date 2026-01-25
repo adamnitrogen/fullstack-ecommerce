@@ -15,7 +15,7 @@ import { Plus, Trash2, Save, X, Loader2 } from "lucide-react";
 import { SocialMediaLink } from "@/types/contact";
 import { socialMediaService } from "@/services/social-media.service";
 import { toast } from "@/hooks/use-toast";
-import { getErrorMessage } from "@/lib/errorUtils";
+import { getErrorMessage, getFriendlyTitle } from "@/lib/errorUtils";
 
 const socialPlatforms = [
   { value: "facebook", label: "Facebook", icon: "facebook" },
@@ -58,7 +58,7 @@ export function SocialMediaSection() {
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
+        title: getFriendlyTitle(error, "Notice"),
         description: getErrorMessage(error, "Failed to add link"),
         variant: "destructive",
       });
@@ -75,7 +75,7 @@ export function SocialMediaSection() {
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
+        title: getFriendlyTitle(error, "Notice"),
         description: getErrorMessage(error, "Failed to update link"),
         variant: "destructive",
       });
@@ -90,7 +90,7 @@ export function SocialMediaSection() {
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
+        title: getFriendlyTitle(error, "Notice"),
         description: getErrorMessage(error, "Failed to remove link"),
         variant: "destructive",
       });
@@ -100,7 +100,7 @@ export function SocialMediaSection() {
   const handleAdd = () => {
     if (!newLink.platform || !newLink.url) {
       toast({
-        title: "Validation Error",
+        title: "Check your info",
         description: "Please fill in all fields",
         variant: "destructive"
       });
