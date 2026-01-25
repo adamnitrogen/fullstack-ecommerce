@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { blogCommentService } from "@/services/blog-comment.service";
+import { commentService } from "@/services/comment.service";
 import { apiClient } from "@/lib/api-client";
 import { useAuthStore } from "@/store/authStore";
 import {
@@ -40,11 +40,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { Search, Flag, CheckCircle, Trash2, AlertTriangle } from "lucide-react";
+import { Search, Flag, CheckCircle, Trash2, AlertTriangle, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
-import { Comment } from "@/types";
+import { Comment } from "@/types/comment";
+import { Link } from "react-router-dom";
 
 
 export default function FlaggedCommentsManagement() {
@@ -54,19 +55,26 @@ export default function FlaggedCommentsManagement() {
   const [selectedComment, setSelectedComment] = useState<Comment | null>(null);
   const [actionType, setActionType] = useState<"dismiss" | "delete" | "block" | "unblock" | null>(null);
 
-  const { data: flaggedComments = [], isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["flagged-comments"],
-    queryFn: blogCommentService.getFlaggedComments,
+    queryFn: () => commentService.getFlaggedComments(1, 100),
   });
 
+  const flaggedComments = data?.comments || [];
+
   const resolveMutation = useMutation({
-    mutationFn: ({ id, action }: { id: string; action: "dismiss" | "delete" }) =>
-      blogCommentService.resolveFlaggedComment(id, action, user?.id),
+    mutationFn: ({ id, action }: { id: string; action: "approve" | "hide" }) => {
+      if (action === "approve") {
+        return commentService.approveComment(id);
+      } else {
+        return commentService.hideComment(id);
+      }
+    },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["flagged-comments"] });
       toast({
         title: "Success",
-        description: variables.action === "delete" ? "Comment deleted" : "Flag dismissed",
+        description: variables.action === "hide" ? "Comment hidden" : "Comment approved",
       });
       setActionType(null);
       setSelectedComment(null);
@@ -75,6 +83,26 @@ export default function FlaggedCommentsManagement() {
       toast({
         title: "Error",
         description: getErrorMessage(error, "Failed to resolve flag"),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deletePermanentlyMutation = useMutation({
+    mutationFn: (id: string) => commentService.deleteCommentPermanently(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["flagged-comments"] });
+      toast({
+        title: "Success",
+        description: "Comment permanently deleted",
+      });
+      setActionType(null);
+      setSelectedComment(null);
+    },
+    onError: (error: unknown) => {
+      toast({
+        title: "Error",
+        description: getErrorMessage(error, "Failed to delete comment"),
         variant: "destructive",
       });
     },
@@ -123,29 +151,26 @@ export default function FlaggedCommentsManagement() {
   const filteredComments = flaggedComments.filter(
     (comment) =>
       comment.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      comment.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      comment.blogTitle.toLowerCase().includes(searchQuery.toLowerCase())
+      comment.profiles?.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      comment.profiles?.last_name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleAction = () => {
     if (selectedComment && actionType) {
       if (actionType === "block") {
-        blockUserMutation.mutate(selectedComment.userId);
+        blockUserMutation.mutate(selectedComment.user_id);
       } else if (actionType === "unblock") {
-        unblockUserMutation.mutate(selectedComment.userId);
-      } else {
-        resolveMutation.mutate({ id: selectedComment.id, action: actionType });
+        unblockUserMutation.mutate(selectedComment.user_id);
+      } else if (actionType === "delete") {
+        deletePermanentlyMutation.mutate(selectedComment.id);
+      } else if (actionType === "dismiss") {
+        resolveMutation.mutate({ id: selectedComment.id, action: "approve" });
       }
     }
   };
 
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
+  const getInitials = (firstName?: string, lastName?: string) => {
+    return `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase() || "U";
   };
 
   return (
@@ -211,10 +236,14 @@ export default function FlaggedCommentsManagement() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Avatar className="h-8 w-8">
-                          <AvatarImage src={comment.userAvatar} />
-                          <AvatarFallback>{getInitials(comment.userName)}</AvatarFallback>
+                          <AvatarImage src={comment.profiles?.avatar_url} />
+                          <AvatarFallback>
+                            {getInitials(comment.profiles?.first_name, comment.profiles?.last_name)}
+                          </AvatarFallback>
                         </Avatar>
-                        <span className="font-medium">{comment.userName}</span>
+                        <span className="font-medium">
+                          {comment.profiles?.first_name} {comment.profiles?.last_name}
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell className="max-w-[300px]">
@@ -223,18 +252,29 @@ export default function FlaggedCommentsManagement() {
                       </p>
                     </TableCell>
                     <TableCell className="max-w-[200px]">
-                      <p className="truncate" title={comment.blogTitle}>
-                        {comment.blogTitle}
-                      </p>
+                      <div className="flex items-center gap-1">
+                        <p className="truncate" title={comment.blog_id}>
+                          {comment.blog_id.slice(0, 8)}...
+                        </p>
+                        <Link
+                          to={`/blog/${comment.blog_id}`}
+                          target="_blank"
+                          className="text-primary hover:text-primary/80"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                        </Link>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
-                        {comment.flagReason}
+                        {comment.flag_reason || 'Unknown'}
                       </Badge>
                     </TableCell>
-                    <TableCell>{comment.flaggedBy}</TableCell>
                     <TableCell>
-                      {format(new Date(comment.createdAt), "MMM d, yyyy")}
+                      {comment.flag_count} flags
+                    </TableCell>
+                    <TableCell>
+                      {format(new Date(comment.created_at), "MMM d, yyyy")}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
@@ -248,7 +288,7 @@ export default function FlaggedCommentsManagement() {
                           }}
                         >
                           <CheckCircle className="h-4 w-4 mr-1" />
-                          Dismiss
+                          Approve
                         </Button>
                         <Button
                           variant="destructive"
@@ -259,35 +299,20 @@ export default function FlaggedCommentsManagement() {
                           }}
                         >
                           <Trash2 className="h-4 w-4 mr-1" />
-                          Delete
+                          Perm Delete
                         </Button>
-                        {comment.userBlocked ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                            onClick={() => {
-                              setSelectedComment(comment);
-                              setActionType("unblock");
-                            }}
-                          >
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            Unblock User
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => {
-                              setSelectedComment(comment);
-                              setActionType("block");
-                            }}
-                          >
-                            <AlertTriangle className="h-4 w-4 mr-1" />
-                            Block User
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => {
+                            setSelectedComment(comment);
+                            setActionType("block");
+                          }}
+                        >
+                          <AlertTriangle className="h-4 w-4 mr-1" />
+                          Block User
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -302,22 +327,22 @@ export default function FlaggedCommentsManagement() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {actionType === "delete" ? "Delete Comment" : actionType === "block" ? "Block User" : actionType === "unblock" ? "Unblock User" : "Dismiss Flag"}
+              {actionType === "delete" ? "Delete Comment Permanently" : actionType === "block" ? "Block User" : actionType === "unblock" ? "Unblock User" : "Approve Comment"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {actionType === "delete" ? (
                 <>
-                  Are you sure you want to delete this comment? This action cannot be undone.
+                  Are you sure you want to <strong>permanently delete</strong> this comment? This action cannot be undone.
                   <div className="mt-4 p-4 bg-muted rounded-md text-sm italic">
                     "{selectedComment?.content}"
                   </div>
                 </>
               ) : actionType === "block" ? (
                 <>
-                  Are you sure you want to block <strong>{selectedComment?.userName}</strong>? They will no longer be able to log in or comment.
+                  Are you sure you want to block <strong>{selectedComment?.profiles?.first_name} {selectedComment?.profiles?.last_name}</strong>? They will no longer be able to log in or comment.
                 </>
               ) : (
-                "Are you sure you want to dismiss this flag? The comment will remain visible."
+                "Are you sure you want to approve this comment? All flags will be cleared."
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -327,7 +352,7 @@ export default function FlaggedCommentsManagement() {
               onClick={handleAction}
               className={actionType === "delete" || actionType === "block" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
             >
-              {actionType === "delete" ? "Delete" : actionType === "block" ? "Block User" : actionType === "unblock" ? "Unblock User" : "Dismiss"}
+              {actionType === "delete" ? "Delete Permanently" : actionType === "block" ? "Block User" : actionType === "unblock" ? "Unblock User" : "Approve"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -8,6 +8,8 @@ class CommentService {
     async getComments(blogId, page = 1, limit = 20, sortBy = 'newest') {
         const offset = (page - 1) * limit;
 
+        logger.info({ blogId, page, limit, sortBy }, 'Service: Fetching threaded comments');
+
         // Call the stored procedure to get flat list of threaded comments
         const { data: flatComments, error } = await supabase
             .rpc('get_threaded_comments', {
@@ -17,15 +19,23 @@ class CommentService {
                 p_sort_by: sortBy
             });
 
-        if (error) throw error;
+        if (error) {
+            logger.error({ err: error, blogId }, 'Service: Error calling get_threaded_comments RPC');
+            throw error;
+        }
 
         // Get total count of ROOT comments for pagination
-        const { count } = await supabase
+        const { count, error: countError } = await supabase
             .from('comments')
             .select('*', { count: 'exact', head: true })
             .eq('blog_id', blogId)
             .eq('status', 'active')
             .is('parent_id', null);
+
+        if (countError) {
+            logger.error({ err: countError, blogId }, 'Service: Error fetching root comments count');
+            throw countError;
+        }
 
         // Build nested tree structure
         const commentMap = {};
@@ -38,7 +48,7 @@ class CommentService {
                 ...c,
                 profiles: {
                     id: c.user_id,
-                    name: c.user_name,
+                    first_name: c.user_name, // RPC returns name as user_name
                     avatar_url: c.user_avatar_url,
                     role: c.user_role
                 },
@@ -61,10 +71,13 @@ class CommentService {
             } else if (!c.parent_id) {
                 rootComments.push(comment);
             }
-            // Note: If parent is not in the map (e.g. parent is on another page but we fetched child? 
-            // The RPC ensures we fetch roots and their descendants, so this shouldn't happen 
-            // unless we have orphans, which we treat as roots or ignore)
         });
+
+        logger.info({
+            blogId,
+            rootCount: rootComments.length,
+            totalRootCount: count
+        }, 'Service: Threaded comments built successfully');
 
         return {
             comments: rootComments,
@@ -76,10 +89,13 @@ class CommentService {
             }
         };
     }
+
     /**
      * Create a new comment
      */
     async createComment(userId, blogId, content, parentId = null) {
+        logger.info({ userId, blogId, parentId }, 'Service: Creating comment');
+
         const { data, error } = await supabase
             .from('comments')
             .insert({
@@ -91,11 +107,14 @@ class CommentService {
             })
             .select(`
                 *,
-                profiles: user_id(id, name, avatar_url, roles(name))
+                profiles: user_id(id, first_name, last_name, avatar_url, roles(name))
             `)
             .single();
 
-        if (error) throw error;
+        if (error) {
+            logger.error({ err: error, userId, blogId }, 'Service: Error inserting comment');
+            throw error;
+        }
 
         // Flatten the role structure to match frontend expectation
         if (data.profiles) {
@@ -110,6 +129,8 @@ class CommentService {
      * Update a comment (owner only)
      */
     async updateComment(commentId, userId, content) {
+        logger.info({ commentId, userId }, 'Service: Updating comment');
+
         // First check ownership and time limit (15 mins)
         const { data: comment, error: fetchError } = await supabase
             .from('comments')
@@ -117,15 +138,20 @@ class CommentService {
             .eq('id', commentId)
             .single();
 
-        if (fetchError) throw fetchError;
+        if (fetchError) {
+            logger.error({ err: fetchError, commentId }, 'Service: Error fetching comment for update');
+            throw fetchError;
+        }
         if (!comment) throw new Error('Comment not found');
 
         if (comment.user_id !== userId) {
+            logger.warn({ commentId, userId, ownerId: comment.user_id }, 'Service: Unauthorized update attempt');
             throw new Error('Unauthorized: You can only edit your own comments');
         }
 
         const minutesSincePost = (new Date() - new Date(comment.created_at)) / 60000;
         if (minutesSincePost > 15) {
+            logger.warn({ commentId, minutesSincePost }, 'Service: Update time limit exceeded');
             throw new Error('Edit time limit exceeded (15 minutes)');
         }
 
@@ -133,13 +159,16 @@ class CommentService {
             .from('comments')
             .update({
                 content,
-                edit_count: supabase.rpc('increment_counter', { row_id: commentId }) // Simplified, actual logic in trigger
+                updated_at: new Date().toISOString()
             })
             .eq('id', commentId)
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) {
+            logger.error({ err: error, commentId }, 'Service: Error updating comment content');
+            throw error;
+        }
         return data;
     }
 
@@ -147,6 +176,8 @@ class CommentService {
      * Soft delete a comment
      */
     async deleteComment(commentId, userId, userRole) {
+        logger.info({ commentId, userId, userRole }, 'Service: Deleting comment');
+
         // Check permissions
         const { data: comment, error: fetchError } = await supabase
             .from('comments')
@@ -154,13 +185,17 @@ class CommentService {
             .eq('id', commentId)
             .single();
 
-        if (fetchError) throw fetchError;
+        if (fetchError) {
+            logger.error({ err: fetchError, commentId }, 'Service: Error fetching comment for deletion');
+            throw fetchError;
+        }
         if (!comment) throw new Error('Comment not found');
 
         const isOwner = comment.user_id === userId;
         const isAdmin = ['admin', 'manager'].includes(userRole);
 
         if (!isOwner && !isAdmin) {
+            logger.warn({ commentId, userId, userRole }, 'Service: Unauthorized deletion attempt');
             throw new Error('Unauthorized');
         }
 
@@ -175,7 +210,10 @@ class CommentService {
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) {
+            logger.error({ err: error, commentId }, 'Service: Error soft-deleting comment');
+            throw error;
+        }
         return data;
     }
 
@@ -183,8 +221,8 @@ class CommentService {
      * Flag a comment
      */
     async flagComment(commentId, userId, reason, details) {
-        // Insert into comment_flags table
-        // The trigger will automatically update the comments table
+        logger.info({ commentId, userId, reason }, 'Service: Flagging comment');
+
         const { data, error } = await supabase
             .from('comment_flags')
             .insert({
@@ -198,8 +236,10 @@ class CommentService {
 
         if (error) {
             if (error.code === '23505') { // Unique violation
+                logger.warn({ commentId, userId }, 'Service: User already flagged this comment');
                 throw new Error('You have already flagged this comment');
             }
+            logger.error({ err: error, commentId, userId }, 'Service: Error flagging comment');
             throw error;
         }
         return data;
