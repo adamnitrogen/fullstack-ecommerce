@@ -11,7 +11,8 @@ router.get('/', async (req, res) => {
             page: page ? parseInt(page) : 1,
             limit: limit ? parseInt(limit) : 15,
             search: search || '',
-            status: status || 'all'
+            status: status || 'all',
+            lang: req.language
         });
         res.json(result);
     } catch (error) {
@@ -22,7 +23,7 @@ router.get('/', async (req, res) => {
 // Get single event
 router.get('/:id', async (req, res) => {
     try {
-        const event = await EventService.getEventById(req.params.id);
+        const event = await EventService.getEventById(req.params.id, req.language);
         res.json(event);
     } catch (error) {
         res.status(500).json({ error: error.message });

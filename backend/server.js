@@ -62,6 +62,7 @@ const customInvoiceRoutes = require('./routes/custom-invoice.routes');
 // Middleware
 const { tracingMiddleware } = require('./middleware/tracing.middleware');
 const friendlyErrorInterceptor = require('./middleware/friendly-error.middleware');
+const i18nMiddleware = require('./middleware/i18n.middleware');
 const errorMiddleware = require('./middleware/error.middleware');
 
 // Libraries & Services
@@ -73,6 +74,10 @@ const app = express();
 const PORT = parseInt(process.env.PORT, 10) || 5001;
 
 // Middleware
+app.use((req, res, next) => {
+    console.log(`[RAW DEBUG] Incoming Request: ${req.method} ${req.url}`);
+    next();
+});
 app.use(cors({
     origin: function (origin, callback) {
         const allowedOrigins = [
@@ -106,6 +111,7 @@ app.use(cors({
     exposedHeaders: ['x-rtb-fingerprint-id']
 }));
 app.use(cookieParser()); // Parse cookies
+app.use(i18nMiddleware);
 // Increase payload size limit to handle images (base64 encoded)
 
 // Request Logging (Pino) - Log every request
@@ -252,7 +258,7 @@ function startServer(port, attempt = 0) {
 async function initializeAndStart() {
     try {
         logger.info({ module: 'Server', operation: 'INIT' }, 'Verifying database connection...');
-        await SupabaseLogger.checkConnection();
+        // await SupabaseLogger.checkConnection();
         logger.info({ module: 'Server', operation: 'INIT' }, 'Database connection verified');
 
         await bootstrapAdmin();

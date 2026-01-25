@@ -127,7 +127,7 @@ export const Navbar = () => {
                   MeriGauMata
                 </span>
                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#B85C3C] mt-1">
-                  Sacred Vedic Tradition
+                  {t("nav.brandSubtitle")}
                 </span>
               </div>
             </Link>
@@ -230,14 +230,14 @@ export const Navbar = () => {
                     <DropdownMenuItem asChild className="rounded-xl cursor-pointer">
                       <Link to="/my-orders" className="flex items-center gap-2">
                         <ShoppingCart className="h-4 w-4" />
-                        My Orders
+                        {t("nav.myOrders")}
                       </Link>
                     </DropdownMenuItem>
                     {(user?.role === "admin" || user?.role === "manager") && (
                       <DropdownMenuItem asChild className="rounded-xl cursor-pointer">
                         <Link to="/admin" className="flex items-center gap-2">
                           <LayoutDashboard className="h-4 w-4" />
-                          {user.role === "manager" ? "Manager Portal" : "Admin Portal"}
+                          {user.role === "manager" ? t("nav.managerPortal") : t("nav.adminPortal")}
                         </Link>
                       </DropdownMenuItem>
                     )}

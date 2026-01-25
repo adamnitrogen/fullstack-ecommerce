@@ -283,7 +283,7 @@ export default function Checkout() {
         currency: orderData.currency,
         name: "MeriGauMata",
         description: isBuyNow ? "Buy Now Order" : "Order Payment",
-        image: "/favicon.ico", // Note: Will cause CORS warning on localhost, but works in production via public URL. For dev, consider using absolute URL if needed.
+        image: "https://wjdncjhlpioohrjkamqw.supabase.co/storage/v1/object/public/brand-assets/brand-logo.png",
         order_id: orderData.order_id,
         handler: async function (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) {
           // Show full screen loader during verification

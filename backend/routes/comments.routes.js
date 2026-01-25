@@ -150,7 +150,19 @@ router.delete('/:id', authenticateToken, async (req, res) => {
             traceId: req.traceId
         }, 'Attempting to delete comment');
 
-        const comment = await commentService.deleteComment(id, userId, userRole);
+        let token = req.headers.authorization;
+        if (!token && req.cookies && req.cookies.access_token) {
+            token = `Bearer ${req.cookies.access_token}`;
+        }
+
+        logger.info({
+            msg: 'Token resolution for delete',
+            hasToken: !!token,
+            isHeader: !!req.headers.authorization,
+            isCookie: !!req.cookies?.access_token
+        });
+
+        const comment = await commentService.deleteComment(id, userId, userRole, token);
 
         logger.info({
             commentId: id,

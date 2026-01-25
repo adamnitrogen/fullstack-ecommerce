@@ -41,6 +41,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
 
 export default function BlogsManagement() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -393,6 +394,17 @@ export default function BlogsManagement() {
         title="Delete Blog"
         description={`Are you sure you want to delete "${selectedBlog?.title}"? This action cannot be undone.`}
         onConfirm={handleConfirmDelete}
+      />
+
+      <LoadingOverlay
+        isLoading={blogMutation.isPending || deleteMutation.isPending || togglePublishMutation.isPending}
+        message={
+          blogMutation.isPending
+            ? (selectedBlog ? "Updating blog..." : "Creating blog...")
+            : deleteMutation.isPending
+              ? "Deleting blog..."
+              : "Updating status..."
+        }
       />
     </div>
   );

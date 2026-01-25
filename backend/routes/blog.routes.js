@@ -6,13 +6,13 @@ const { authenticateToken, checkPermission } = require('../middleware/auth.middl
 const { deletePhotoByUrl } = require('../services/photo.service');
 
 // Helper to map snake_case DB object to camelCase frontend object
-const mapToFrontend = (blog) => {
+const mapToFrontend = (blog, lang = 'en') => {
     if (!blog) return null;
     return {
         id: blog.id,
-        title: blog.title,
-        excerpt: blog.excerpt,
-        content: blog.content,
+        title: (blog.title_i18n && blog.title_i18n[lang]) || blog.title,
+        excerpt: (blog.excerpt_i18n && blog.excerpt_i18n[lang]) || blog.excerpt,
+        content: (blog.content_i18n && blog.content_i18n[lang]) || blog.content,
         author: blog.author,
         date: blog.date,
         image: blog.image,
@@ -69,7 +69,7 @@ router.get('/', async (req, res) => {
 
         if (error) throw error;
 
-        const formattedBlogs = data.map(mapToFrontend);
+        const formattedBlogs = data.map(b => mapToFrontend(b, req.language));
 
         // If pagination was requested, return object with data and total
         if (page && limit) {
@@ -100,7 +100,7 @@ router.get('/:id', async (req, res) => {
 
         if (error) throw error;
 
-        res.json(mapToFrontend(data));
+        res.json(mapToFrontend(data, req.language));
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

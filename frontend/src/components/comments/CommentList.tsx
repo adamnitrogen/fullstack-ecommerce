@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, MessageSquare, ChevronDown } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
+import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
 import {
     Select,
     SelectContent,
@@ -37,6 +38,7 @@ const CommentSkeleton = () => (
 export const CommentList = ({ blogId }: CommentListProps) => {
     const queryClient = useQueryClient();
     const [sortBy, setSortBy] = useState("newest");
+    const [deleteId, setDeleteId] = useState<string | null>(null);
     const LIMIT = 10; // Number of root comments per page
 
     // Infinite Query for comments
@@ -100,6 +102,7 @@ export const CommentList = ({ blogId }: CommentListProps) => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['comments', blogId] });
             toast({ title: "Comment deleted" });
+            setDeleteId(null);
         },
         onError: (error: unknown) => {
             toast({
@@ -134,8 +137,12 @@ export const CommentList = ({ blogId }: CommentListProps) => {
     };
 
     const handleDelete = async (id: string) => {
-        if (window.confirm("Are you sure you want to delete this comment?")) {
-            await deleteMutation.mutateAsync(id);
+        setDeleteId(id);
+    };
+
+    const confirmDelete = async () => {
+        if (deleteId) {
+            await deleteMutation.mutateAsync(deleteId);
         }
     };
 
@@ -237,6 +244,15 @@ export const CommentList = ({ blogId }: CommentListProps) => {
                     </Button>
                 </div>
             )}
+
+            <DeleteConfirmDialog
+                open={!!deleteId}
+                onOpenChange={(open) => !open && setDeleteId(null)}
+                title="Delete Comment"
+                description="Are you sure you want to delete this comment? This action cannot be undone."
+                onConfirm={confirmDelete}
+                isLoading={deleteMutation.isPending}
+            />
         </div>
     );
 };

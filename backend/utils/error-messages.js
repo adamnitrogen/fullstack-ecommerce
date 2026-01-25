@@ -1,29 +1,34 @@
 /**
- * User-friendly error messages mapping
+ * i18n Compatible Error Keys mapping
+ * Keys follow the structure: error.<category>.<code_name>
  */
 const ERROR_MESSAGES = {
     // Auth Errors
-    'AUTHENTICATION_REQUIRED': 'Please log in to continue.',
-    'UNAUTHORIZED': 'Your session has expired. Please log in again.',
-    'FORBIDDEN': "You don't have permission to perform this action.",
+    'AUTHENTICATION_REQUIRED': 'errors.auth.authentication_required',
+    'UNAUTHORIZED': 'errors.auth.unauthorized',
+    'FORBIDDEN': 'errors.auth.forbidden',
+    'INVALID_PASSWORD': 'errors.auth.invalid_password',
+    'ACCOUNT_NOT_FOUND': 'errors.auth.account_not_found',
+    'ACCOUNT_BLOCKED': 'errors.auth.account_blocked',
+    'ACCOUNT_DELETED': 'errors.auth.account_deleted',
 
     // Checkout & Payment Errors
-    'PAYMENT_FAILED': 'Your payment could not be processed. Please check your details and try again.',
-    'RAZORPAY_ERROR': 'We encountered an issue with the payment gateway. Please try again in a moment.',
-    'INVALID_PAYMENT_SIGNATURE': 'Payment verification failed. If money was deducted, please contact support.',
-    'INVALID_COUPON': 'This coupon code is no longer valid or applicable.',
+    'PAYMENT_FAILED': 'errors.payment.payment_failed',
+    'RAZORPAY_ERROR': 'errors.payment.razorpay_error',
+    'INVALID_PAYMENT_SIGNATURE': 'errors.payment.invalid_signature',
+    'INVALID_COUPON': 'errors.payment.invalid_coupon',
 
     // Inventory & Products
-    'INSUFFICIENT_STOCK': 'Some items in your cart are no longer available in the requested quantity.',
-    'PRODUCT_NOT_FOUND': 'This product is no longer available.',
+    'INSUFFICIENT_STOCK': 'errors.inventory.insufficient_stock',
+    'PRODUCT_NOT_FOUND': 'errors.inventory.product_not_found',
 
     // General System Errors
-    'INTERNAL_ERROR': 'Something went wrong on our end. We have been notified and are looking into it.',
-    'DATABASE_ERROR': 'We are experiencing some technical difficulties with our database. Please try again shortly.',
-    'VALIDATION_ERROR': 'Check your information and try again.',
+    'INTERNAL_ERROR': 'errors.system.internal_error',
+    'DATABASE_ERROR': 'errors.system.database_error',
+    'VALIDATION_ERROR': 'errors.system.validation_error',
 
     // Fallback
-    'GENERIC_ERROR': 'An unexpected error occurred. Please try again or contact support.'
+    'GENERIC_ERROR': 'errors.system.generic_error'
 };
 
 /**
@@ -57,7 +62,7 @@ const TECHNICAL_PATTERNS = [
 ];
 
 /**
- * Translates an error or message into a user-friendly one
+ * Translates an error or message into a user-friendly key
  * @param {Error|string} err 
  * @param {number} statusCode 
  * @returns {string}
@@ -66,18 +71,15 @@ const getFriendlyMessage = (err, statusCode) => {
     const message = typeof err === 'string' ? err : (err.message || '');
     const code = err.code || '';
 
-    // If it's already a friendly message (doesn't match technical patterns), return it
-    const isTechnical = TECHNICAL_PATTERNS.some(pattern => pattern.test(message)) ||
-        TECHNICAL_PATTERNS.some(pattern => pattern.test(code));
-
-    if (!isTechnical && message && statusCode < 500) {
+    // If it's a known error key already, return it
+    if (Object.values(ERROR_MESSAGES).includes(message)) {
         return message;
     }
 
     // Map by code
     if (ERROR_MESSAGES[code]) return ERROR_MESSAGES[code];
 
-    // Map by status code
+    // Status code fallbacks
     if (statusCode === 401) return ERROR_MESSAGES.AUTHENTICATION_REQUIRED;
     if (statusCode === 403) return ERROR_MESSAGES.FORBIDDEN;
     if (statusCode === 404) return ERROR_MESSAGES.PRODUCT_NOT_FOUND;

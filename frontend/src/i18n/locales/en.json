@@ -12,8 +12,12 @@
     "testimonials": "Testimonials",
     "contact": "Contact",
     "profile": "Profile",
+    "myOrders": "My Orders",
+    "adminPortal": "Admin Portal",
+    "managerPortal": "Manager Portal",
     "login": "Login",
-    "logout": "Logout"
+    "logout": "Logout",
+    "brandSubtitle": "Sacred Vedic Tradition"
   },
   "hero": {
     "exploreProducts": "Explore Our Products",

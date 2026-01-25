@@ -8,84 +8,138 @@ class CommentService {
     async getComments(blogId, page = 1, limit = 20, sortBy = 'newest') {
         const offset = (page - 1) * limit;
 
-        logger.info({ blogId, page, limit, sortBy }, 'Service: Fetching threaded comments');
+        logger.info({ blogId, page, limit, sortBy }, 'Service: Fetching threaded comments via fallback (non-RPC)');
 
-        // Call the stored procedure to get flat list of threaded comments
-        const { data: flatComments, error } = await supabase
-            .rpc('get_threaded_comments', {
-                p_blog_id: blogId,
-                p_limit: limit,
-                p_offset: offset,
-                p_sort_by: sortBy
-            });
+        // Fallback: Fetch ALL active comments for the blog to build thread in-memory
+        // This is a workaround for the broken get_threaded_comments RPC which has a schema mismatch
+        const { data: rawComments, error } = await supabase
+            .from('comments')
+            .select(`
+                *,
+                profiles: user_id (
+                    id,
+                    first_name,
+                    last_name,
+                    avatar_url,
+                    roles ( name )
+                )
+            `)
+            .eq('blog_id', blogId)
+            .in('status', ['active', 'deleted']);
 
         if (error) {
-            logger.error({ err: error, blogId }, 'Service: Error calling get_threaded_comments RPC');
+            logger.error({ err: error, blogId }, 'Service: Error fetching raw comments');
             throw error;
-        }
-
-        // Get total count of ROOT comments for pagination
-        const { count, error: countError } = await supabase
-            .from('comments')
-            .select('*', { count: 'exact', head: true })
-            .eq('blog_id', blogId)
-            .eq('status', 'active')
-            .is('parent_id', null);
-
-        if (countError) {
-            logger.error({ err: countError, blogId }, 'Service: Error fetching root comments count');
-            throw countError;
         }
 
         // Build nested tree structure
         const commentMap = {};
-        const rootComments = [];
+        const allRootComments = [];
 
         // First pass: Create objects and map them
-        flatComments.forEach(c => {
+        rawComments.forEach(c => {
             // Map DB columns to frontend expected structure
-            const comment = {
-                ...c,
-                profiles: {
-                    id: c.user_id,
-                    first_name: c.user_name, // RPC returns name as user_name
-                    avatar_url: c.user_avatar_url,
-                    role: c.user_role
-                },
-                replies: []
+            // Handle profile data structure difference (RPC vs Raw)
+            const roleName = c.profiles?.roles?.name || 'customer';
+
+            // Scrub deleted comments content only, keep profile unless profile is missing
+            const isDeleted = c.status === 'deleted';
+            const displayContent = isDeleted ? '[This comment has been deleted]' : c.content;
+
+            // Only show "Deleted User" if the profile itself is missing (hard deleted)
+            // Otherwise show original author even if comment is deleted
+            const displayProfile = c.profiles ? {
+                id: c.user_id,
+                first_name: c.profiles.first_name || 'Unknown',
+                avatar_url: c.profiles.avatar_url,
+                role: roleName
+            } : {
+                id: null,
+                first_name: 'Deleted User',
+                avatar_url: null,
+                role: 'customer'
             };
 
-            // Remove flattened user columns to keep it clean
-            delete comment.user_name;
-            delete comment.user_avatar_url;
-            delete comment.user_role;
+            const comment = {
+                id: c.id,
+                blog_id: c.blog_id,
+                user_id: c.user_id,
+                parent_id: c.parent_id,
+                content: displayContent,
+                status: c.status,
+                created_at: c.created_at,
+                updated_at: c.updated_at,
+                reply_count: c.reply_count || 0, // Note: This might include deleted replies
+                upvotes: c.upvotes || 0,
+                downvotes: c.downvotes || 0,
+                is_flagged: c.is_flagged,
+                profiles: displayProfile,
+                replies: []
+            };
 
             commentMap[c.id] = comment;
         });
 
         // Second pass: Link parents and children
-        flatComments.forEach(c => {
+        rawComments.forEach(c => {
             const comment = commentMap[c.id];
             if (c.parent_id && commentMap[c.parent_id]) {
                 commentMap[c.parent_id].replies.push(comment);
             } else if (!c.parent_id) {
-                rootComments.push(comment);
+                allRootComments.push(comment);
             }
         });
 
+        // Recursive pruning: Remove deleted comments that have no visible replies
+        const pruneComments = (comments) => {
+            return comments.filter(comment => {
+                if (comment.replies.length > 0) {
+                    comment.replies = pruneComments(comment.replies);
+                }
+                // Keep if active OR has visible replies remaining
+                return comment.status === 'active' || comment.replies.length > 0;
+            });
+        };
+
+        const prunedRoots = pruneComments(allRootComments);
+
+        // Update total count after pruning (for accurate pagination)
+        const rootCount = prunedRoots.length;
+
+        // Determine sort function
+        const getSortValue = (a) => {
+            if (sortBy === 'oldest') return new Date(a.created_at).getTime();
+            if (sortBy === 'most-replies') return a.replies.length; // Approximate using actual replies loaded
+            // Default newest
+            return -new Date(a.created_at).getTime();
+        };
+
+        const sortDir = sortBy === 'oldest' ? 1 : -1;
+
+        // Sort roots
+        prunedRoots.sort((a, b) => {
+            if (sortBy === 'most-replies') return b.replies.length - a.replies.length;
+            if (sortBy === 'oldest') return new Date(a.created_at) - new Date(b.created_at);
+            return new Date(b.created_at) - new Date(a.created_at);
+        });
+
+        // Pagination
+        const paginatedRoots = prunedRoots.slice(offset, offset + limit);
+
         logger.info({
             blogId,
-            rootCount: rootComments.length,
-            totalRootCount: count
-        }, 'Service: Threaded comments built successfully');
+            fetchedTotal: rawComments.length,
+            rootCount: paginatedRoots.length,
+            totalRootCount: rootCount
+        }, 'Service: Threaded comments built successfully (In-Memory)');
 
         return {
-            comments: rootComments,
+            comments: paginatedRoots,
             pagination: {
                 page,
                 limit,
-                total: count || 0,
-                totalPages: Math.ceil((count || 0) / limit)
+                total: rootCount,
+                totalPages: Math.ceil(rootCount / limit)
             }
         };
     }
@@ -150,9 +204,9 @@ class CommentService {
         }
 
         const minutesSincePost = (new Date() - new Date(comment.created_at)) / 60000;
-        if (minutesSincePost > 15) {
+        if (minutesSincePost > 60) {
             logger.warn({ commentId, minutesSincePost }, 'Service: Update time limit exceeded');
-            throw new Error('Edit time limit exceeded (15 minutes)');
+            throw new Error('Edit time limit exceeded (60 minutes)');
         }
 
         const { data, error } = await supabase
@@ -175,13 +229,13 @@ class CommentService {
     /**
      * Soft delete a comment
      */
-    async deleteComment(commentId, userId, userRole) {
-        logger.info({ commentId, userId, userRole }, 'Service: Deleting comment');
+    async deleteComment(commentId, userId, userRole, token = null) {
+        logger.info({ commentId, userId, userRole }, 'Service: Deleting comment (Smart Delete)');
 
-        // Check permissions
+        // Check permissions and reply count
         const { data: comment, error: fetchError } = await supabase
             .from('comments')
-            .select('user_id')
+            .select('user_id, reply_count')
             .eq('id', commentId)
             .single();
 
@@ -199,19 +253,40 @@ class CommentService {
             throw new Error('Unauthorized');
         }
 
-        const { data, error } = await supabase
-            .from('comments')
-            .update({
-                status: 'deleted',
-                deleted_at: new Date().toISOString(),
-                deleted_by: userId
-            })
-            .eq('id', commentId)
-            .select()
-            .single();
+        // Use service role client (supabase) to avoid RLS issues in triggers
+        // Specifically, update_parent_reply_count trigger needs to update parent comments
+        // which may belong to other users. RLS would block this if using scoped client.
+        const dbClient = supabase;
+
+        let data, error;
+
+        // Smart Delete Logic
+        if (comment.reply_count > 0) {
+            // Soft Delete
+            logger.info({ commentId }, 'Service: Comment has replies, performing Soft Delete');
+            ({ data, error } = await dbClient
+                .from('comments')
+                .update({
+                    status: 'deleted',
+                    deleted_at: new Date().toISOString(),
+                    deleted_by: userId
+                })
+                .eq('id', commentId)
+                .select()
+                .single());
+        } else {
+            // Hard Delete
+            logger.info({ commentId }, 'Service: Comment has no replies, performing Hard Delete');
+            ({ data, error } = await dbClient
+                .from('comments')
+                .delete()
+                .eq('id', commentId)
+                .select()
+                .single());
+        }
 
         if (error) {
-            logger.error({ err: error, commentId }, 'Service: Error soft-deleting comment');
+            logger.error({ err: error, commentId }, 'Service: Error deleting comment');
             throw error;
         }
         return data;

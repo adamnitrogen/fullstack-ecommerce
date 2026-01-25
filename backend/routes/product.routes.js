@@ -12,7 +12,8 @@ router.get('/', async (req, res) => {
             limit: limit ? parseInt(limit) : 15,
             search: search || '',
             category: category || 'all',
-            sortBy: sortBy || 'newest'
+            sortBy: sortBy || 'newest',
+            lang: req.language
         });
         res.json(result);
     } catch (error) {
@@ -23,7 +24,7 @@ router.get('/', async (req, res) => {
 // Get single product
 router.get('/:id', async (req, res) => {
     try {
-        const product = await ProductService.getProductById(req.params.id);
+        const product = await ProductService.getProductById(req.params.id, req.language);
         res.json(product);
     } catch (error) {
         res.status(500).json({ error: error.message });

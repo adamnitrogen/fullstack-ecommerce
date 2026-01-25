@@ -12,8 +12,12 @@
     "testimonials": "प्रशंसापत्र",
     "contact": "संपर्क",
     "profile": "प्रोफ़ाइल",
+    "myOrders": "मेरे ऑर्डर",
+    "adminPortal": "एडमिन पोर्टल",
+    "managerPortal": "मैनेजर पोर्टल",
     "login": "लॉगिन",
-    "logout": "लॉगआउट"
+    "logout": "लॉगआउट",
+    "brandSubtitle": "पवित्र वैदिक परंपरा"
   },
   "hero": {
     "exploreProducts": "हमारे उत्पाद देखें",

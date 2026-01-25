@@ -3,12 +3,12 @@ const EventPricingService = require('./event-pricing.service');
 /**
  * Map snake_case DB object to camelCase frontend object
  */
-const mapToFrontend = (event) => {
+const mapToFrontend = (event, lang = 'en') => {
     if (!event) return null;
     return {
         id: event.id,
-        title: event.title,
-        description: event.description,
+        title: (event.title_i18n && event.title_i18n[lang]) || event.title,
+        description: (event.description_i18n && event.description_i18n[lang]) || event.description,
         startDate: event.start_date,
         startTime: event.start_time,
         endDate: event.end_date,
@@ -27,8 +27,8 @@ const mapToFrontend = (event) => {
         kathaVachak: event.katha_vachak,
         contactAddress: event.contact_address,
         isRegistrationEnabled: event.is_registration_enabled,
-        keyHighlights: event.key_highlights,
-        specialPrivileges: event.special_privileges,
+        keyHighlights: (event.key_highlights_i18n && event.key_highlights_i18n[lang]) || event.key_highlights,
+        specialPrivileges: (event.special_privileges_i18n && event.special_privileges_i18n[lang]) || event.special_privileges,
         cancellationStatus: event.cancellation_status,
         cancelledAt: event.cancelled_at,
         cancellationReason: event.cancellation_reason,

@@ -12,7 +12,7 @@ class ProductService {
     /**
      * Get all products with dynamic ratings and pagination
      */
-    static async getAllProducts({ page = 1, limit = 15, search = '', category = 'all', sortBy = 'newest' } = {}) {
+    static async getAllProducts({ page = 1, limit = 15, search = '', category = 'all', sortBy = 'newest', lang = 'en' } = {}) {
         const offset = (page - 1) * limit;
 
         // Parallel requests: Products Query + Inventory Stats
@@ -86,6 +86,11 @@ class ProductService {
         products.forEach(product => {
             const createdDateStr = product.createdAt || product.created_at;
             product.isNew = createdDateStr ? new Date(createdDateStr) >= thirtyDaysAgo : false;
+
+            // Language processing
+            if (product.title_i18n && product.title_i18n[lang]) product.title = product.title_i18n[lang];
+            if (product.description_i18n && product.description_i18n[lang]) product.description = product.description_i18n[lang];
+            if (product.benefits_i18n && product.benefits_i18n[lang]) product.benefits = product.benefits_i18n[lang];
         });
 
         return {
@@ -98,10 +103,10 @@ class ProductService {
     /**
      * Get single product by ID with variants
      */
-    static async getProductById(id) {
+    static async getProductById(id, lang = 'en') {
         const { data, error } = await supabase
             .from('products')
-            .select('*')
+            .select('*, variants:product_variants(*)')
             .eq('id', id)
             .single();
 
@@ -157,6 +162,11 @@ class ProductService {
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         data.isNew = createdDateStr ? new Date(createdDateStr) >= thirtyDaysAgo : false;
+
+        // Language processing
+        if (data.title_i18n && data.title_i18n[lang]) data.title = data.title_i18n[lang];
+        if (data.description_i18n && data.description_i18n[lang]) data.description = data.description_i18n[lang];
+        if (data.benefits_i18n && data.benefits_i18n[lang]) data.benefits = data.benefits_i18n[lang];
 
         return data;
     }

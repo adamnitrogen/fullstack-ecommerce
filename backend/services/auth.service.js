@@ -341,23 +341,23 @@ class AuthService {
         const { data: { user, session } = {}, error: authError } = authResponse;
 
         if (profileError || !profile) {
-            return { success: false, error: 'Account does not exist with this email ID', status: 404 };
+            return { success: false, error: 'errors.auth.account_not_found', status: 404 };
         }
 
         if (profile.is_deleted) {
             return {
                 success: false,
-                error: 'This account has been deleted. If you wish to use our services again, please create a new account.',
+                error: 'errors.auth.account_deleted',
                 status: 403
             };
         }
 
         if (profile.is_blocked) {
-            return { success: false, error: 'Account is blocked. Please contact support.', status: 403 };
+            return { success: false, error: 'errors.auth.account_blocked', status: 403 };
         }
 
         if (authError || !session) {
-            return { success: false, error: 'Invalid password', status: 401 };
+            return { success: false, error: 'errors.auth.invalid_password', status: 401 };
         }
 
         // Encrypt tokens
@@ -452,11 +452,11 @@ class AuthService {
 
         if (existingProfile) {
             if (existingProfile.is_deleted) {
-                const error = new Error('This account has been deleted. Please use a different email address to create a new account.');
+                const error = new Error('errors.auth.account_deleted');
                 error.status = 403;
                 throw error;
             }
-            const error = new Error('An account with this email already exists');
+            const error = new Error('errors.auth.account_already_exists');
             error.status = 400;
             throw error;
         }

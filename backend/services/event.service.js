@@ -11,7 +11,7 @@ class EventService {
     /**
      * Get all events with pagination and search
      */
-    static async getAllEvents({ page = 1, limit = 15, search = '', status = 'all' } = {}) {
+    static async getAllEvents({ page = 1, limit = 15, search = '', status = 'all', lang = 'en' } = {}) {
         const offset = (page - 1) * limit;
         logger.info({ page, limit, search, status }, '[EventService] getAllEvents: Fetching events');
 
@@ -60,7 +60,7 @@ class EventService {
         logger.info({ count, resultCount: data.length, duration }, '[EventService] getAllEvents: Success');
 
         return {
-            events: data.map(mapToFrontend),
+            events: data.map(e => mapToFrontend(e, lang)),
             total: count
         };
     }
@@ -68,7 +68,7 @@ class EventService {
     /**
      * Get single event by ID
      */
-    static async getEventById(id) {
+    static async getEventById(id, lang = 'en') {
         const { data, error } = await supabase
             .from('events')
             .select('*')
@@ -77,7 +77,7 @@ class EventService {
 
         if (error) throw error;
 
-        return mapToFrontend(data);
+        return mapToFrontend(data, lang);
     }
 
     /**

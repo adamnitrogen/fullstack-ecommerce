@@ -8,7 +8,7 @@ const validateCommentInput = (req, res, next) => {
     const { content, blogId } = req.body;
 
     // 1. Check required fields
-    if (!blogId) {
+    if (!blogId && req.method === 'POST') {
         return res.status(400).json({ error: 'Blog ID is required' });
     }
 
