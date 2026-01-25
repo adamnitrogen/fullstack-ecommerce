@@ -45,6 +45,7 @@
     "upcoming": "Upcoming",
     "ongoing": "Ongoing",
     "completed": "Completed",
+    "cancelled": "Cancelled",
     "registered": "Registered",
     "eventFull": "Event Full",
     "onlySpots": "Only {{count}} spots left!",
@@ -61,6 +62,9 @@
     "confirmRegistration": "Confirm Registration",
     "registrationSuccess": "Registration Successful!",
     "confirmationSent": "A confirmation email has been sent to you",
+    "eventCancelled": "Event Cancelled",
+    "bookingUnavailable": "Booking Unavailable",
+    "gatheringCancelled": "This gathering has been cancelled.",
     "error": "Error",
     "fillRequired": "Please fill in all required fields"
   },

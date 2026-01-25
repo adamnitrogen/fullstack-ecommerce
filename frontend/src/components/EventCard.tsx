@@ -151,7 +151,7 @@ export const EventCard = ({
             disabled
             className="w-full h-12 rounded-full bg-red-100 text-red-700 font-bold uppercase tracking-widest text-xs shadow-none cursor-not-allowed border-none"
           >
-            Event Cancelled
+            {t("events.cancelled")}
           </Button>
         </CardFooter>
       )}

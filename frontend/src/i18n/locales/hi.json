@@ -44,6 +44,7 @@
     "upcoming": "आगामी",
     "ongoing": "चल रहा है",
     "completed": "पूर्ण",
+    "cancelled": "रद्द",
     "registered": "पंजीकृत",
     "eventFull": "कार्यक्रम भरा हुआ है",
     "onlySpots": "केवल {{count}} स्थान बचे हैं!",
@@ -60,6 +61,9 @@
     "confirmRegistration": "पंजीकरण की पुष्टि करें",
     "registrationSuccess": "पंजीकरण सफल!",
     "confirmationSent": "आपको एक पुष्टिकरण ईमेल भेजा गया है",
+    "eventCancelled": "कार्यक्रम रद्द",
+    "bookingUnavailable": "बुकिंग अनुपलब्ध",
+    "gatheringCancelled": "यह कार्यक्रम रद्द कर दिया गया है।",
     "error": "त्रुटि",
     "fillRequired": "कृपया सभी आवश्यक फ़ील्ड भरें"
   },

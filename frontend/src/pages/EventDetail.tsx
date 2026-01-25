@@ -115,7 +115,7 @@ const EventDetail = () => {
                     </Tag>
                   )}
                   <Tag variant={getStatusVariant(eventData.status)} size="sm" className="font-bold uppercase tracking-widest text-[10px]">
-                    {eventData.status === 'cancelled' ? 'CANCELLED' : t(`events.${eventData.status}`)}
+                    {t(`events.${eventData.status}`)}
                   </Tag>
                 </div>
                 <h1 className="text-4xl md:text-6xl font-bold font-playfair leading-tight animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
@@ -131,7 +131,7 @@ const EventDetail = () => {
                   <div className="mt-6 flex items-start gap-4 p-5 rounded-2xl bg-red-500/10 border border-red-500/20 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-300">
                     <AlertTriangle className="h-6 w-6 text-red-400 flex-shrink-0" />
                     <div className="space-y-1">
-                      <p className="text-red-400 font-bold uppercase tracking-widest text-xs">Event Cancelled</p>
+                      <p className="text-red-400 font-bold uppercase tracking-widest text-xs">{t("events.eventCancelled")}</p>
                       <p className="text-white/90 text-sm font-light leading-relaxed">
                         Reason: {eventData.cancellationReason}
                       </p>
@@ -358,8 +358,8 @@ const EventDetail = () => {
                     <div className="space-y-4">
                       <div className="p-6 rounded-3xl bg-red-50 border border-red-100 text-center">
                         <XCircle className="h-10 w-10 text-red-500 mx-auto mb-3" />
-                        <h4 className="text-red-900 font-bold">Booking Unavailable</h4>
-                        <p className="text-red-700 text-xs mt-2 font-medium">This gathering has been cancelled.</p>
+                        <h4 className="text-red-900 font-bold">{t("events.bookingUnavailable")}</h4>
+                        <p className="text-red-700 text-xs mt-2 font-medium">{t("events.gatheringCancelled")}</p>
                       </div>
 
                       {!isFree && (
