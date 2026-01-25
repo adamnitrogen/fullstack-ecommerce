@@ -231,12 +231,28 @@ class EmailService {
      * @param {string} eventType - EmailEventTypes enum value
      * @param {string} to - Recipient email address
      * @param {Object} data - Template data
-     * @param {Object} options - Additional options (userId, referenceId)
+     * @param {Object} options - Additional options (userId, referenceId, lang)
      * @returns {Promise<{success: boolean, messageId?: string, error?: string}>}
      */
     async send(eventType, to, data, options = {}) {
-        const { userId = null, referenceId = null } = options;
+        let { userId = null, referenceId = null, lang = 'en' } = options;
         let logId = null;
+
+        // If no lang provided, try to detect from user profile
+        if (!options.lang && userId) {
+            try {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('preferred_language')
+                    .eq('id', userId)
+                    .single();
+                if (profile?.preferred_language) {
+                    lang = profile.preferred_language;
+                }
+            } catch (err) {
+                logger.warn({ err: err.message, userId }, '[EmailService] Failed to fetch user lang, falling back to en');
+            }
+        }
 
         // POLICY ENFORCEMENT: Block deprecated email types
         if (DEPRECATED_EMAIL_TYPES.includes(eventType)) {
@@ -254,11 +270,11 @@ class EmailService {
             };
         }
 
-        logger.info({ eventType, to, userId, hasData: !!data }, '[EmailService] Internal send triggered');
+        logger.info({ eventType, to, userId, lang, hasData: !!data }, '[EmailService] Internal send triggered');
 
         try {
             // Get template
-            const templateResult = this._getTemplate(eventType, data);
+            const templateResult = this._getTemplate(eventType, { ...data, lang });
             const { subject, html } = templateResult;
             logger.info({ eventType, to, subject }, '[EmailService] Template generated successfully');
 

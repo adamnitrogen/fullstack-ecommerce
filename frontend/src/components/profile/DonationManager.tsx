@@ -9,6 +9,7 @@ import { Loader2, AlertCircle, Heart } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { getErrorMessage } from "@/lib/errorUtils";
+import { useTranslation } from "react-i18next";
 
 import {
     AlertDialog,
@@ -31,6 +32,7 @@ interface Subscription {
 }
 
 export default function DonationManager() {
+    const { t } = useTranslation();
     const queryClient = useQueryClient();
     const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
 
@@ -48,15 +50,15 @@ export default function DonationManager() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["mySubscriptions"] });
             toast({
-                title: "Subscription Cancelled",
-                description: "Your recurring donation has been cancelled successfully.",
+                title: t("profile.recurringDonations.cancelled"),
+                description: t("profile.recurringDonations.cancelledDesc"),
             });
             setSelectedSubId(null);
         },
         onError: (error: unknown) => {
             toast({
-                title: "Cancellation Failed",
-                description: getErrorMessage(error, "Could not cancel subscription."),
+                title: t("profile.recurringDonations.cancelFailed"),
+                description: getErrorMessage(error, t("profile.recurringDonations.cancelFailedDesc")),
                 variant: "destructive",
             });
             setSelectedSubId(null);
@@ -68,14 +70,14 @@ export default function DonationManager() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["mySubscriptions"] });
             toast({
-                title: "Subscription Paused",
-                description: "Your recurring donation has been paused.",
+                title: t("profile.recurringDonations.paused"),
+                description: t("profile.recurringDonations.pausedDesc"),
             });
         },
         onError: (error: unknown) => {
             toast({
-                title: "Pause Failed",
-                description: getErrorMessage(error, "Could not pause subscription."),
+                title: t("profile.recurringDonations.pauseFailed"),
+                description: getErrorMessage(error, t("profile.recurringDonations.pauseFailedDesc")),
                 variant: "destructive",
             });
         },
@@ -86,14 +88,14 @@ export default function DonationManager() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["mySubscriptions"] });
             toast({
-                title: "Subscription Resumed",
-                description: "Your recurring donation is now active.",
+                title: t("profile.recurringDonations.resumed"),
+                description: t("profile.recurringDonations.resumedDesc"),
             });
         },
         onError: (error: unknown) => {
             toast({
-                title: "Resume Failed",
-                description: getErrorMessage(error, "Could not resume subscription."),
+                title: t("profile.recurringDonations.resumeFailed"),
+                description: getErrorMessage(error, t("profile.recurringDonations.resumeFailedDesc")),
                 variant: "destructive",
             });
         },
@@ -124,16 +126,16 @@ export default function DonationManager() {
                 <CardHeader>
                     <div className="flex items-center gap-2">
                         <Heart className="h-5 w-5" />
-                        <CardTitle>My Recurring Donations</CardTitle>
+                        <CardTitle>{t("profile.recurringDonations.title")}</CardTitle>
                     </div>
                     <CardDescription>
-                        You have no active monthly donations.
+                        {t("profile.recurringDonations.noActive")}
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="text-center py-8 text-muted-foreground">
                         <Heart className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                        <p>Consider starting a monthly donation to support our cause continuously.</p>
+                        <p>{t("profile.recurringDonations.considerStarting")}</p>
                     </div>
                 </CardContent>
             </Card>
@@ -146,21 +148,21 @@ export default function DonationManager() {
                 <CardHeader>
                     <div className="flex items-center gap-2">
                         <Heart className="h-5 w-5" />
-                        <CardTitle>My Recurring Donations</CardTitle>
+                        <CardTitle>{t("profile.recurringDonations.title")}</CardTitle>
                     </div>
                     <CardDescription>
-                        Manage your monthly contributions and subscription status
+                        {t("profile.recurringDonations.manageDesc")}
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Reference ID</TableHead>
-                                <TableHead>Amount</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Next Billing</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
+                                <TableHead>{t("profile.recurringDonations.refId")}</TableHead>
+                                <TableHead>{t("profile.recurringDonations.amount")}</TableHead>
+                                <TableHead>{t("profile.recurringDonations.status")}</TableHead>
+                                <TableHead>{t("profile.recurringDonations.nextBilling")}</TableHead>
+                                <TableHead className="text-right">{t("profile.recurringDonations.actions")}</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -183,7 +185,7 @@ export default function DonationManager() {
                                     <TableCell>
                                         {sub.next_billing_at
                                             ? format(new Date(sub.next_billing_at), 'PP')
-                                            : (sub.status === 'created' ? 'Pending First Payment' : 'N/A')}
+                                            : (sub.status === 'created' ? t("profile.recurringDonations.pendingFirst") : t("profile.recurringDonations.na"))}
                                     </TableCell>
                                     <TableCell className="text-right space-x-2">
                                         {sub.status === 'paused' && (
@@ -193,7 +195,7 @@ export default function DonationManager() {
                                                 onClick={() => resumeMutation.mutate(sub.razorpay_subscription_id)}
                                                 disabled={resumeMutation.isPending}
                                             >
-                                                Resume
+                                                {t("profile.recurringDonations.resume")}
                                             </Button>
                                         )}
 
@@ -204,7 +206,7 @@ export default function DonationManager() {
                                                 onClick={() => pauseMutation.mutate(sub.razorpay_subscription_id)}
                                                 disabled={pauseMutation.isPending}
                                             >
-                                                Pause
+                                                {t("profile.recurringDonations.pause")}
                                             </Button>
                                         )}
 
@@ -215,7 +217,7 @@ export default function DonationManager() {
                                                 onClick={() => handleCancelClick(sub.razorpay_subscription_id)}
                                                 disabled={cancelMutation.isPending}
                                             >
-                                                Cancel
+                                                {t("profile.recurringDonations.cancel")}
                                             </Button>
                                         )}
                                     </TableCell>
@@ -229,19 +231,18 @@ export default function DonationManager() {
             <AlertDialog open={!!selectedSubId} onOpenChange={(open) => !open && setSelectedSubId(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Stop Recurring Donation?</AlertDialogTitle>
+                        <AlertDialogTitle>{t("profile.recurringDonations.stopTitle")}</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Are you sure you want to cancel this monthly donation?
-                            You will not be charged again, but previous donations remain recorded.
+                            {t("profile.recurringDonations.stopDesc")}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Keep Active</AlertDialogCancel>
+                        <AlertDialogCancel>{t("profile.recurringDonations.keepActive")}</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={confirmCancel}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                            {cancelMutation.isPending ? 'Cancelling...' : 'Yes, Cancel Donation'}
+                            {cancelMutation.isPending ? t("profile.recurringDonations.cancelling") : t("profile.recurringDonations.confirmStop")}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

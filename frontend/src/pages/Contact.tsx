@@ -121,7 +121,7 @@ export default function Contact() {
       });
 
       toast({
-        title: "Success",
+        title: t("auth.success") || "Success",
         description: "Message sent successfully! We'll get back to you soon.",
       });
       setFormData({ name: "", email: "", subject: "", message: "" });
@@ -136,7 +136,7 @@ export default function Contact() {
         setErrors(backendErrors);
       } else {
         toast({
-          title: "Error",
+          title: t("auth.error") || "Error",
           description: getErrorMessage(error, "Failed to send message. Please try again."),
           variant: "destructive",
         });
@@ -222,7 +222,7 @@ export default function Contact() {
                   )}
                 </div>
               ) : (
-                <p className="text-muted-foreground italic opacity-70">Not set</p>
+                <p className="text-muted-foreground italic opacity-70">{t("contact.closed")}</p> // Reusing 'closed' for 'Not set'
               )}
             </CardContent>
           </Card>
@@ -244,7 +244,7 @@ export default function Contact() {
                   )}
                 </div>
               ) : (
-                <p className="text-muted-foreground italic opacity-70">Not set</p>
+                <p className="text-muted-foreground italic opacity-70">{t("contact.closed")}</p>
               )}
             </CardContent>
           </Card>
@@ -262,7 +262,7 @@ export default function Contact() {
                   <p>{address.city}, {address.state} {address.pincode}</p>
                 </div>
               ) : (
-                <p className="text-muted-foreground italic opacity-70">Not set</p>
+                <p className="text-muted-foreground italic opacity-70">{t("contact.closed")}</p>
               )}
             </CardContent>
           </Card>
@@ -397,7 +397,7 @@ export default function Contact() {
                 <div className="p-4 bg-white flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm font-medium text-[#2C1810]">
                     <MapPin className="h-4 w-4 text-[#B85C3C]" />
-                    <span>Our Location</span>
+                    <span>{t("contact.address")}</span>
                   </div>
                   <Button
                     variant="link"
@@ -430,7 +430,7 @@ export default function Contact() {
                   <div className="w-10 h-10 rounded-lg bg-[#B85C3C]/10 flex items-center justify-center text-[#B85C3C]">
                     <Clock className="h-5 w-5" />
                   </div>
-                  <h3 className="text-xl font-bold text-[#2C1810]">Office Hours</h3>
+                  <h3 className="text-xl font-bold text-[#2C1810]">{t("contact.officeHours")}</h3>
                 </div>
 
                 <div className="space-y-4">
@@ -474,14 +474,14 @@ export default function Contact() {
                           </span>
                           <span className="text-muted-foreground font-mono">
                             {group.is_closed
-                              ? <span className="text-destructive font-bold uppercase tracking-tighter">Closed</span>
+                              ? <span className="text-destructive font-bold uppercase tracking-tighter">{t("contact.closed")}</span>
                               : `${formatTime(group.open_time)} - ${formatTime(group.close_time)}`}
                           </span>
                         </div>
                       ));
                     })()
                   ) : (
-                    <p className="text-muted-foreground italic opacity-70">Not available</p>
+                    <p className="text-muted-foreground italic opacity-70">{t("contact.closed")}</p>
                   )}
                 </div>
               </Card>

@@ -52,14 +52,14 @@ export default function Gallery() {
   if (loadingFolders) {
     return (
       <div className="min-h-screen bg-background relative">
-        <LoadingOverlay message="Unveiling Sacred Moments..." isLoading={true} />
+        <LoadingOverlay message={t("gallery.unveiling")} isLoading={true} />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <LoadingOverlay message="Unveiling Sacred Moments..." isLoading={loadingFolders} />
+      <LoadingOverlay message={t("gallery.unveiling")} isLoading={loadingFolders} />
 
       {/* Premium Compact Hero Section */}
       <section className="bg-[#2C1810] text-white py-12 md:py-16 relative overflow-hidden shadow-2xl">
@@ -70,10 +70,10 @@ export default function Gallery() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-2">
               <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-[0.2em] mb-2">
-                <Sparkles className="h-3 w-3" /> Visual Heritage
+                <Sparkles className="h-3 w-3" /> {t("gallery.heritageBadge")}
               </div>
               <h1 className="text-3xl md:text-5xl font-bold font-playfair">
-                {t("gallery.title")} <span className="text-[#B85C3C]">Archive</span>
+                {t("gallery.title")} <span className="text-[#B85C3C]">{t("gallery.archive")}</span>
               </h1>
             </div>
             <p className="text-white/50 text-sm md:text-base max-w-md font-light border-l border-[#B85C3C]/30 pl-6 hidden md:block">
@@ -111,7 +111,7 @@ export default function Gallery() {
                       label={t("gallery.backToAlbums")}
                     />
                     <div className="text-sm font-bold uppercase tracking-[0.2em] text-[#B85C3C] bg-[#B85C3C]/10 px-4 py-2 rounded-full">
-                      {items.length} Photos
+                      {items.length} {t("gallery.photosCount")}
                     </div>
                   </div>
                 </div>
@@ -135,7 +135,7 @@ export default function Gallery() {
                       )}
                     </div>
                     <div className="text-sm font-bold uppercase tracking-[0.2em] text-[#B85C3C] whitespace-nowrap bg-muted/50 px-6 py-3 rounded-2xl">
-                      {items.length} Elements
+                      {items.length} {t("gallery.elementsCount")}
                     </div>
                   </div>
                 </div>
@@ -151,7 +151,7 @@ export default function Gallery() {
                       >
                         <img
                           src={item.thumbnail_url || item.image_url}
-                          alt={item.title || "Gallery image"}
+                          alt={item.title || t("gallery.photosCount")}
                           loading="lazy"
                           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                         />
@@ -175,7 +175,7 @@ export default function Gallery() {
                 ) : (
                   <div className="text-center py-24 bg-muted/20 rounded-[3rem] border-2 border-dashed border-border/50">
                     <p className="text-muted-foreground font-light text-lg italic">
-                      No images gathered in this collection yet.
+                      {t("gallery.noImages")}
                     </p>
                   </div>
                 )}
@@ -240,7 +240,7 @@ export default function Gallery() {
               <div className="text-center py-24 bg-muted/20 rounded-[3rem] border-2 border-dashed border-border/50 max-w-4xl mx-auto">
                 <FolderOpen className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
                 <p className="text-muted-foreground font-light text-lg italic">
-                  No visual archives available yet.
+                  {t("gallery.emptyState")}
                 </p>
               </div>
             )}
@@ -287,7 +287,7 @@ export default function Gallery() {
             ) : (
               <div className="text-center py-24 bg-muted/20 rounded-[3rem] border-2 border-dashed border-border/50 max-w-4xl mx-auto">
                 <Play className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-                <p className="text-muted-foreground font-light text-lg italic">No motion archives available yet.</p>
+                <p className="text-muted-foreground font-light text-lg italic">{t("gallery.noVideos")}</p>
               </div>
             )}
           </TabsContent>

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
     Card,
@@ -37,6 +38,7 @@ export default function AddressManager({
     onDelete,
     onSetPrimary
 }: AddressManagerProps) {
+    const { t } = useTranslation();
     const [showForm, setShowForm] = useState(false);
     const [editingAddress, setEditingAddress] = useState<CheckoutAddress | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -90,8 +92,8 @@ export default function AddressManager({
                                 <MapPin className="h-5 w-5 text-[#B85C3C]" />
                             </div>
                             <div>
-                                <CardTitle className="text-xl font-playfair">Address Books</CardTitle>
-                                <CardDescription>Your essential sanctuary locations</CardDescription>
+                                <CardTitle className="text-xl font-playfair">{t("profile.address.manageTitle")}</CardTitle>
+                                <CardDescription>{t("profile.address.sanctuaryDesc")}</CardDescription>
                             </div>
                         </div>
                         <Button
@@ -99,7 +101,7 @@ export default function AddressManager({
                             className="w-full sm:w-auto rounded-full bg-[#2C1810] hover:bg-[#B85C3C] text-white font-bold text-xs uppercase tracking-widest px-6"
                         >
                             <Plus className="mr-2 h-4 w-4" />
-                            Secure New Location
+                            {t("profile.address.addNew")}
                         </Button>
                     </div>
                 </CardHeader>
@@ -109,16 +111,16 @@ export default function AddressManager({
                             <div className="bg-white w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-soft">
                                 <MapPin className="h-10 w-10 text-[#B85C3C] opacity-30" />
                             </div>
-                            <h3 className="text-[#2C1810] font-bold text-lg">No Sanctuaries Found</h3>
+                            <h3 className="text-[#2C1810] font-bold text-lg">{t("profile.address.noAddresses")}</h3>
                             <p className="text-muted-foreground text-sm max-w-xs mx-auto mt-2 mb-8 italic">
-                                Map your delivery path to receive sacred offerings directly at your doorstep.
+                                {t("profile.address.mappingPath")}
                             </p>
                             <Button
                                 variant="outline"
                                 className="rounded-full border-[#B85C3C] text-[#B85C3C] hover:bg-[#B85C3C]/5 font-bold text-xs uppercase tracking-widest px-8"
                                 onClick={() => setShowForm(true)}
                             >
-                                <Plus className="mr-2 h-4 w-4" /> Add Your First Sanctuary
+                                <Plus className="mr-2 h-4 w-4" /> {t("profile.address.firstSanctuary")}
                             </Button>
                         </div>
                     ) : (
@@ -166,7 +168,7 @@ export default function AddressManager({
                                                 </Badge>
                                                 {address.is_primary && (
                                                     <Badge className="bg-[#B85C3C] text-white hover:bg-[#B85C3C] text-[9px] font-bold tracking-widest py-0 px-2 rounded-full">
-                                                        PRIMARY
+                                                        {t("profile.default").toUpperCase()}
                                                     </Badge>
                                                 )}
                                             </div>
@@ -200,14 +202,14 @@ export default function AddressManager({
                                                 ) : (
                                                     <Star className="h-3.5 w-3.5 group-hover/btn:fill-current" />
                                                 )}
-                                                {settingPrimaryId === address.id ? 'Sanctifying...' : 'Set as Primary'}
+                                                {settingPrimaryId === address.id ? t("profile.address.sanctifying") : t("profile.setAsDefault")}
                                             </div>
                                             <ChevronRight className={`h-3.5 w-3.5 ${settingPrimaryId === address.id ? 'opacity-0' : ''}`} />
                                         </Button>
                                     )}
                                     {address.is_primary && (
                                         <div className="flex items-center justify-center gap-2 w-full h-10 rounded-2xl bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-widest">
-                                            <Truck className="h-4 w-4" /> Default Haven
+                                            <Truck className="h-4 w-4" /> {t("profile.address.defaultHaven")}
                                         </div>
                                     )}
                                 </div>
@@ -228,13 +230,13 @@ export default function AddressManager({
             <AlertDialog open={!!deletingId} onOpenChange={() => setDeletingId(null)}>
                 <AlertDialogContent className="rounded-[2.5rem] border-none shadow-elevated p-8 max-w-md">
                     <AlertDialogHeader>
-                        <AlertDialogTitle className="text-2xl font-playfair text-[#2C1810]">Abolish Location?</AlertDialogTitle>
+                        <AlertDialogTitle className="text-2xl font-playfair text-[#2C1810]">{t("profile.address.abolishTitle")}</AlertDialogTitle>
                         <AlertDialogDescription className="text-base pt-2">
-                            Are you certain you wish to remove this address from your sacred records? This path cannot be retraced.
+                            {t("profile.address.abolishDesc")}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="pt-8">
-                        <AlertDialogCancel className="rounded-full px-8">Remain</AlertDialogCancel>
+                        <AlertDialogCancel className="rounded-full px-8">{t("profile.address.remain")}</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={() => {
                                 if (deletingId) {
@@ -244,7 +246,7 @@ export default function AddressManager({
                             }}
                             className="bg-red-600 text-white hover:bg-red-700 rounded-full px-8"
                         >
-                            Abolish
+                            {t("profile.address.abolish")}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

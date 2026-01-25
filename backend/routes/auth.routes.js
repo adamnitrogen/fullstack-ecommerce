@@ -8,6 +8,7 @@ const { loginSchema, registerSchema, changePasswordSchema } = require('../schema
 const AuthService = require('../services/auth.service');
 const { supabase, supabaseAdmin } = require('../lib/supabase'); // Consolidated Supabase client usage
 const { createClient } = require('@supabase/supabase-js');
+const { getFriendlyMessage, getI18nKey } = require('../utils/error-messages');
 
 // NOTE: /auth/me endpoint REMOVED
 // Session initialization now uses supabase.auth.getSession() on frontend
@@ -81,20 +82,21 @@ router.post('/validate-credentials', validate(loginSchema), async (req, res) => 
         const otpResult = await AuthService.validateCredentials(email, password, guestId);
 
         if (!otpResult.success) {
-            // Return 200 OK for validation errors to prevent browser console noise (client request),
-            // but keep 429 for rate limiting.
+            logger.warn({ email, guestId, otpResult }, '[AuthRoutes] Credentials validation failed');
             return res.status(otpResult.retryAfter ? 429 : 200).json(otpResult);
         }
 
+        logger.info({ email, guestId }, '[AuthRoutes] Credentials validated, OTP sent');
         res.json({
             success: true,
-            message: 'Credentials validated. OTP sent to your email.',
+            message: getI18nKey('OTP_SENT'),
             expiresIn: otpResult.expiresIn,
             attemptsAllowed: otpResult.attemptsAllowed
         });
     } catch (error) {
-        logger.error({ err: error }, 'Validate credentials error');
-        res.status(error.status || 500).json({ error: error.message });
+        const friendlyMessage = getFriendlyMessage(error);
+        logger.error({ err: error, email, friendlyMessage }, 'Validate credentials error');
+        res.status(error.status || 500).json({ error: friendlyMessage });
     }
 });
 
@@ -124,14 +126,16 @@ router.post('/register', validate(registerSchema), async (req, res) => {
             isOtpVerified: req.body.otpVerified === true
         });
 
+        logger.info({ userId: user.id }, '[AuthRoutes] User registered successfully');
         res.status(201).json({
             success: true,
-            message: "Registration successful. Please check your email to verify your account.",
+            message: getI18nKey('REGISTER_SUCCESS'),
             user
         });
     } catch (error) {
-        logger.error({ err: error }, 'Registration error');
-        res.status(error.status || 500).json({ error: error.message });
+        const friendlyMessage = getFriendlyMessage(error);
+        logger.error({ err: error, email: req.body.email, friendlyMessage }, 'Registration error');
+        res.status(error.status || 500).json({ error: friendlyMessage });
     }
 });
 
@@ -144,13 +148,15 @@ router.get('/verify-email', async (req, res) => {
     try {
         await AuthService.verifyEmail(token);
 
+        logger.info({ token: token ? `${token.substring(0, 5)}...` : 'null' }, '[AuthRoutes] Email verified successfully');
         res.json({
             success: true,
-            message: 'Email verified successfully! You can now log in.'
+            message: getI18nKey('EMAIL_VERIFIED')
         });
     } catch (error) {
-        logger.error({ err: error }, 'Email verification error');
-        res.status(error.status || 500).json({ error: error.message });
+        const friendlyMessage = getFriendlyMessage(error);
+        logger.error({ err: error, friendlyMessage }, 'Email verification error');
+        res.status(error.status || 500).json({ error: friendlyMessage });
     }
 });
 
@@ -164,31 +170,32 @@ router.post('/verify-login-otp', validate(z.object({ email: z.string().email(), 
     try {
         const { user, tokens } = await AuthService.verifyLoginOtp(email, otp);
 
-        res.cookie('access_token', tokens.access_token, {
+        const cookieOptions = {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production' && process.env.FRONTEND_URL?.startsWith('https'),
             sameSite: (process.env.NODE_ENV === 'production' && process.env.FRONTEND_URL?.startsWith('https')) ? 'none' : 'lax',
             maxAge: 15 * 60 * 1000,
             path: '/'
-        });
+        };
+
+        res.cookie('access_token', tokens.access_token, cookieOptions);
 
         res.cookie('refresh_token', tokens.refresh_token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production' && process.env.FRONTEND_URL?.startsWith('https'),
-            sameSite: (process.env.NODE_ENV === 'production' && process.env.FRONTEND_URL?.startsWith('https')) ? 'none' : 'lax',
-            maxAge: 7 * 24 * 60 * 60 * 1000,
-            path: '/'
+            ...cookieOptions,
+            maxAge: 7 * 24 * 60 * 60 * 1000
         });
 
+        logger.info({ email, userId: user.id }, '[AuthRoutes] Login OTP verified successfully');
         res.json({
             success: true,
-            message: 'Logged in successfully',
+            message: getI18nKey('LOGIN_SUCCESS'),
             user,
             tokens
         });
     } catch (error) {
-        logger.error({ err: error }, 'Verify Login OTP error');
-        res.status(error.status || 400).json({ error: error.message, attemptsRemaining: error.attemptsRemaining });
+        const friendlyMessage = getFriendlyMessage(error);
+        logger.error({ err: error, email, friendlyMessage }, 'Verify Login OTP error');
+        res.status(error.status || 400).json({ error: friendlyMessage, attemptsRemaining: error.attemptsRemaining });
     }
 });
 
@@ -203,7 +210,7 @@ router.post('/refresh', async (req, res) => {
     const refreshToken = req.cookies?.refresh_token;
 
     if (!refreshToken) {
-        return res.status(401).json({ error: 'Refresh token required' });
+        return res.status(401).json({ error: getI18nKey('REFRESH_TOKEN_REQUIRED') });
     }
 
     // Helper to get consistent cookie options
@@ -242,8 +249,6 @@ router.post('/refresh', async (req, res) => {
 
         // Clear cookies with SAME options used to set them
         const cookieOptions = getCookieOptions(false);
-        const refreshOptions = getCookieOptions(true);
-
 
         // ONLY clear cookies if the error is definitely an auth failure (4xx)
         // If it's a 5xx (Supabase down, network error), let the user keep their cookies and try again later.
@@ -254,11 +259,10 @@ router.post('/refresh', async (req, res) => {
             const { maxAge, ...clearOptions } = cookieOptions;
             res.clearCookie('access_token', clearOptions);
             res.clearCookie('refresh_token', clearOptions);
-            return res.status(error.status).json({ error: error.message });
         }
 
         res.status(error.status || 500).json({
-            error: 'Failed to refresh token',
+            error: getI18nKey('INTERNAL_ERROR'),
             detailed: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
@@ -297,11 +301,12 @@ router.post('/logout', async (req, res) => {
     try {
         await AuthService.logout(accessToken, refreshToken);
         clearCookies(res);
-        res.json({ success: true, message: 'Logged out successfully' });
+        logger.info({ userId: req.user?.id }, '[AuthRoutes] User logged out successfully');
+        res.json({ success: true, message: getI18nKey('LOGOUT_SUCCESS') });
     } catch (error) {
-        logger.error({ err: error }, 'Logout error:');
+        logger.error({ err: error, userId: req.user?.id }, 'Logout error:');
         clearCookies(res);
-        res.json({ success: true, message: 'Logged out successfully' });
+        res.json({ success: true, message: getI18nKey('LOGOUT_SUCCESS') });
     }
 });
 
@@ -323,7 +328,7 @@ router.post('/change-password', authenticateToken, validate(changePasswordSchema
 
         if (profile?.auth_provider === 'GOOGLE') {
             return res.status(403).json({
-                error: 'Password cannot be changed for Google sign-in accounts. Please use "Forgot Password" from the login page to set a password.'
+                error: getI18nKey('GOOGLE_AUTH_BLOCKED')
             });
         }
 
@@ -341,7 +346,7 @@ router.post('/change-password', authenticateToken, validate(changePasswordSchema
         });
 
         if (signInError) {
-            return res.status(401).json({ error: 'Incorrect current password' });
+            return res.status(401).json({ error: getI18nKey('INVALID_PASSWORD') });
         }
 
         const { error: updateError } = await supabase.auth.admin.updateUserById(
@@ -353,14 +358,16 @@ router.post('/change-password', authenticateToken, validate(changePasswordSchema
             throw updateError;
         }
 
+        logger.info({ userId: req.user.id }, '[AuthRoutes] Password updated successfully');
         res.json({
             success: true,
-            message: 'Password updated successfully'
+            message: getI18nKey('PASSWORD_UPDATED')
         });
 
     } catch (error) {
-        logger.error({ err: error }, 'Change password error:');
-        res.status(500).json({ error: 'Failed to update password' });
+        const friendlyMessage = getFriendlyMessage(error);
+        logger.error({ err: error, userId: req.user.id, friendlyMessage }, 'Change password error:');
+        res.status(500).json({ error: friendlyMessage });
     }
 });
 

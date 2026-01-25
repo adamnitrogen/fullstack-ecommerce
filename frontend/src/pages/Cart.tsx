@@ -102,23 +102,23 @@ const Cart = () => {
   const benefits = [
     {
       icon: <Truck className="w-6 h-6" />,
-      title: "Fast Delivery",
-      description: "Get your orders delivered within 2-4 business days."
+      title: t("cart.benefits.fastDelivery"),
+      description: t("cart.benefits.fastDeliveryDesc")
     },
     {
       icon: <ShieldCheck className="w-6 h-6" />,
-      title: "Secure Payment",
-      description: "100% secure payment processing with top-tier encryption."
+      title: t("cart.benefits.securePayment"),
+      description: t("cart.benefits.securePaymentDesc")
     },
     {
       icon: <RotateCcw className="w-6 h-6" />,
-      title: "Easy Returns",
-      description: "Not satisfied? Return your items within 30 days easily."
+      title: t("cart.benefits.easyReturns"),
+      description: t("cart.benefits.easyReturnsDesc")
     },
     {
       icon: <Headphones className="w-6 h-6" />,
-      title: "24/7 Support",
-      description: "Our dedicated support team is always here to help you."
+      title: t("cart.benefits.support"),
+      description: t("cart.benefits.supportDesc")
     }
   ];
 
@@ -213,10 +213,10 @@ const Cart = () => {
             <h1 className="text-4xl md:text-5xl font-black tracking-tight font-playfair">{t("cart.title")}</h1>
             <p className="text-muted-foreground flex items-center gap-2">
               <span className="inline-block w-2 h-2 rounded-full bg-primary" />
-              You have {items.length} {items.length === 1 ? 'item' : 'items'} in your shopping bag
+              {t("cart.shoppingBagCount", { count: items.length, item: items.length === 1 ? t("cart.item") : t("cart.items") })}
             </p>
           </div>
-          <BackButton to="/shop" label="Continue Shopping" variant="pill" className="rounded-full px-6" />
+          <BackButton to="/shop" label={t("cart.continue")} variant="pill" className="rounded-full px-6" />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 lg:gap-16 items-start">
@@ -243,8 +243,8 @@ const Cart = () => {
                     (item.variant?.tax_applicable ?? item.product?.default_tax_applicable ?? false) &&
                     !(item.variant?.price_includes_tax ?? item.product?.default_price_includes_tax ?? false)
                   )
-                    ? "* Additional taxes will be calculated at checkout"
-                    : "* Prices are inclusive of all taxes"}
+                    ? t("cart.taxDisclaimerAdditional")
+                    : t("cart.taxDisclaimerInclusive")}
                 </p>
               )}
             </div>

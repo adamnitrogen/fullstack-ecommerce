@@ -96,7 +96,7 @@ const Shop = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <LoadingOverlay isLoading={isLoading} message="Curating Pure Goods..." />
+      <LoadingOverlay isLoading={isLoading} message={t("shop.curatingGoods")} />
 
       <ProductQuickView
         product={quickViewProduct}
@@ -113,14 +113,14 @@ const Shop = () => {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-2">
               <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-[0.2em]">
-                <Sparkles className="h-3 w-3" /> Pure & Vedic
+                <Sparkles className="h-3 w-3" /> {t("shop.pureVedicBadge")}
               </div>
               <h1 className="text-3xl md:text-5xl font-bold font-playfair">
-                {t("nav.shop")} <span className="text-[#B85C3C]">Collection</span>
+                {t("nav.shop")} <span className="text-[#B85C3C]">{t("shop.collection")}</span>
               </h1>
             </div>
             <p className="text-white/50 text-sm md:text-base max-w-md font-light border-l border-[#B85C3C]/30 pl-6 hidden md:block">
-              Hand-crafted A2 dairy and natural wellness products, rooted in tradition and purity.
+              {t("shop.subtitle")}
             </p>
           </div>
         </div>
@@ -132,7 +132,7 @@ const Shop = () => {
           <div className="flex flex-col lg:flex-row gap-4 lg:gap-8 items-stretch lg:items-end">
             {/* Search */}
             <div className="w-full lg:flex-1 space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Search Products</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">{t("shop.filterSearch")}</label>
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#B85C3C]" />
                 <Input
@@ -150,16 +150,16 @@ const Shop = () => {
               {/* Category Filter */}
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1 flex items-center gap-2">
-                  <Filter className="h-3 w-3" /> Category
+                  <Filter className="h-3 w-3" /> {t("shop.filterCategory")}
                 </label>
                 <Select value={category} onValueChange={setCategory}>
                   <SelectTrigger className="h-14 rounded-2xl bg-muted/30 border-none focus:ring-1 focus:ring-[#B85C3C]">
-                    <SelectValue placeholder="All Categories" />
+                    <SelectValue placeholder={t("shop.allCollections")} />
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl border-none shadow-elevated">
                     {categories.map((cat) => (
                       <SelectItem key={cat} value={cat} className="rounded-xl mt-1 first:mt-0">
-                        {cat === "all" ? "All Collections" : cat}
+                        {cat === "all" ? t("shop.allCollections") : cat}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -169,7 +169,7 @@ const Shop = () => {
               {/* Sort */}
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1 flex items-center gap-2">
-                  <SlidersHorizontal className="h-3 w-3" /> Sorting
+                  <SlidersHorizontal className="h-3 w-3" /> {t("shop.filterSorting")}
                 </label>
                 <Select value={sortBy} onValueChange={setSortBy}>
                   <SelectTrigger className="h-14 rounded-2xl bg-muted/30 border-none focus:ring-1 focus:ring-[#B85C3C]">
@@ -220,7 +220,7 @@ const Shop = () => {
                   size="lg"
                   className="rounded-full px-12 h-14 text-lg font-bold border-[#B85C3C] text-[#B85C3C] hover:bg-[#B85C3C] hover:text-white transition-all shadow-xl disabled:opacity-50"
                 >
-                  {isFetchingNextPage ? "Curating More..." : "Discover More Products"}
+                  {isFetchingNextPage ? t("shop.loadingMore") : t("shop.loadMore")}
                 </Button>
               </div>
             )}
@@ -230,9 +230,9 @@ const Shop = () => {
             <div className="mb-6 inline-flex p-6 rounded-full bg-muted/50">
               <Search className="h-12 w-12 text-muted-foreground/50" />
             </div>
-            <p className="text-2xl font-bold text-[#2C1810] mb-2">No Products Found</p>
+            <p className="text-2xl font-bold text-[#2C1810] mb-2">{t("shop.noProductsTitle")}</p>
             <p className="text-muted-foreground mb-8">
-              We couldn't find any products matching your current criteria.
+              {t("shop.noProductsDesc")}
             </p>
             <Button
               variant="outline"
@@ -243,7 +243,7 @@ const Shop = () => {
                 setSortBy("newest");
               }}
             >
-              Clear all filters
+              {t("shop.clearFilters")}
             </Button>
           </div>
         )}

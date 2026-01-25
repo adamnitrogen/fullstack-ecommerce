@@ -164,7 +164,7 @@ export const ProductCard = ({
                 <p className="text-lg font-bold text-[#2C1810]">
                   ₹{product.price}
                   {product.default_tax_applicable && product.default_price_includes_tax === false && (
-                    <span className="text-[10px] font-normal text-muted-foreground ml-1">+ Tax</span>
+                    <span className="text-[10px] font-normal text-muted-foreground ml-1">{t("products.taxPlus")}</span>
                   )}
                 </p>
                 {product.mrp && product.mrp > product.price && (
@@ -173,7 +173,7 @@ export const ProductCard = ({
                       ₹{product.mrp}
                     </span>
                     <span className="text-[9px] font-black text-[#B85C3C] uppercase tracking-tighter">
-                      Save {calculateDiscount(product.mrp, product.price)}%
+                      {t("products.save")} {calculateDiscount(product.mrp, product.price)}%
                     </span>
                   </div>
                 )}

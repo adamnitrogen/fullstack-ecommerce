@@ -117,14 +117,19 @@ export const Navbar = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
             {/* Logo - More Premium */}
+            {/* Logo - More Premium */}
             <Link to="/" className="flex items-center gap-3 group">
-              <div className="w-13 h-13 bg-gradient-to-br from-[#2C1810] to-[#1A0E09] rounded-[1.25rem] flex items-center justify-center shadow-xl group-hover:shadow-[#2C1810]/20 group-hover:scale-105 transition-all duration-500 overflow-hidden relative">
+              <div className="w-16 h-16 bg-gradient-to-br from-[#2C1810] to-[#1A0E09] rounded-full flex items-center justify-center shadow-xl group-hover:shadow-[#2C1810]/20 group-hover:scale-105 transition-all duration-500 overflow-hidden relative p-0.5">
                 <div className="absolute inset-0 bg-gradient-to-tr from-[#D4AF37]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <span className="text-white font-bold text-3xl z-10">🐄</span>
+                <img
+                  src="/favicon.ico"
+                  alt={t('common.brandName')}
+                  className="w-full h-full object-contain relative z-10"
+                />
               </div>
               <div className="flex flex-col">
                 <span className="text-2xl font-black text-[#2C1810] font-playfair tracking-tight leading-none">
-                  MeriGauMata
+                  {t('common.brandName')}
                 </span>
                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#B85C3C] mt-1">
                   {t("nav.brandSubtitle")}

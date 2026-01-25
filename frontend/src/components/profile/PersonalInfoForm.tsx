@@ -18,6 +18,7 @@ import {
 import { Loader2, User, Mail, Phone, Shield, Lock, ChevronRight, UserCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { useTranslation } from "react-i18next";
 
 interface PersonalInfoFormProps {
     initialData: {
@@ -43,6 +44,7 @@ export default function PersonalInfoForm({
     loading = false,
     onChangePassword
 }: PersonalInfoFormProps) {
+    const { t } = useTranslation();
     const [formData, setFormData] = useState({
         firstName: initialData.firstName || '',
         lastName: initialData.lastName || '',
@@ -65,11 +67,11 @@ export default function PersonalInfoForm({
         const newErrors: Record<string, string> = {};
 
         if (!formData.firstName.trim()) {
-            newErrors.firstName = 'First name is required';
+            newErrors.firstName = t("errors.inventory.titleRequired"); // Or a more specific key if exists
         }
 
         if (!formData.phone || formData.phone.trim().length < 10) {
-            newErrors.phone = 'Phone number is required';
+            newErrors.phone = t("errors.auth.invalidEmailPhone");
         }
 
         setErrors(newErrors);
@@ -106,8 +108,8 @@ export default function PersonalInfoForm({
                         <User className="h-5 w-5 text-[#B85C3C]" />
                     </div>
                     <div>
-                        <CardTitle className="text-xl font-playfair">Personal Details</CardTitle>
-                        <CardDescription>Refine your identity and contact information</CardDescription>
+                        <CardTitle className="text-xl font-playfair">{t("profile.personalInfo.title")}</CardTitle>
+                        <CardDescription>{t("profile.personalInfo.subtitle")}</CardDescription>
                     </div>
                 </div>
             </CardHeader>
@@ -116,7 +118,7 @@ export default function PersonalInfoForm({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2.5">
                             <Label htmlFor="firstName" className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                                <UserCircle className="h-3.5 w-3.5" /> First Name <span className="text-red-500">*</span>
+                                <UserCircle className="h-3.5 w-3.5" /> {t("profile.personalInfo.firstName")} <span className="text-red-500">*</span>
                             </Label>
                             <Input
                                 id="firstName"
@@ -133,12 +135,12 @@ export default function PersonalInfoForm({
                         </div>
                         <div className="space-y-2.5">
                             <Label htmlFor="lastName" className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                                <UserCircle className="h-3.5 w-3.5" /> Last Name
+                                <UserCircle className="h-3.5 w-3.5" /> {t("profile.personalInfo.lastName")}
                             </Label>
                             <Input
                                 id="lastName"
                                 value={formData.lastName}
-                                placeholder="Enter your last name"
+                                placeholder={t("profile.personalInfo.lastNamePlaceholder")}
                                 onChange={(e) =>
                                     setFormData({ ...formData, lastName: e.target.value })
                                 }
@@ -150,7 +152,7 @@ export default function PersonalInfoForm({
 
                     <div className="space-y-2.5">
                         <Label htmlFor="email" className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                            <Mail className="h-3.5 w-3.5" /> Email Address
+                            <Mail className="h-3.5 w-3.5" /> {t("profile.personalInfo.email")}
                         </Label>
                         <div className="relative">
                             <Input
@@ -165,7 +167,7 @@ export default function PersonalInfoForm({
                             </div>
                         </div>
                         <p className="text-[10px] text-muted-foreground flex items-center gap-1.5 ml-1 italic">
-                            <Shield className="h-3 w-3" /> To change your email, please contact our sacred support team.
+                            <Shield className="h-3 w-3" /> {t("profile.personalInfo.emailNotice")}
                         </p>
                     </div>
 
@@ -173,7 +175,7 @@ export default function PersonalInfoForm({
                         {/* Gender */}
                         <div className="space-y-2.5">
                             <Label htmlFor="gender" className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                                <ChevronRight className="h-3.5 w-3.5" /> Gender
+                                <ChevronRight className="h-3.5 w-3.5" /> {t("profile.personalInfo.gender")}
                             </Label>
                             <Select
                                 value={formData.gender}
@@ -182,14 +184,14 @@ export default function PersonalInfoForm({
                                 }
                             >
                                 <SelectTrigger className="rounded-xl border-border/60 bg-white/80 focus:ring-[#B85C3C]/20 focus:border-[#B85C3C] h-11">
-                                    <SelectValue placeholder="Select gender" />
+                                    <SelectValue placeholder={t("profile.personalInfo.selectGender")} />
                                 </SelectTrigger>
                                 <SelectContent className="rounded-2xl border-none shadow-elevated">
-                                    <SelectItem value="male">Male</SelectItem>
-                                    <SelectItem value="female">Female</SelectItem>
-                                    <SelectItem value="other">Other</SelectItem>
+                                    <SelectItem value="male">{t("profile.personalInfo.male")}</SelectItem>
+                                    <SelectItem value="female">{t("profile.personalInfo.female")}</SelectItem>
+                                    <SelectItem value="other">{t("profile.personalInfo.other")}</SelectItem>
                                     <SelectItem value="prefer_not_to_say">
-                                        Prefer not to say
+                                        {t("profile.personalInfo.preferNotToSay")}
                                     </SelectItem>
                                 </SelectContent>
                             </Select>
@@ -198,7 +200,7 @@ export default function PersonalInfoForm({
                         {/* Phone */}
                         <div className="space-y-2.5">
                             <Label htmlFor="phone" className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                                <Phone className="h-3.5 w-3.5" /> Mobile Number <span className="text-red-500">*</span>
+                                <Phone className="h-3.5 w-3.5" /> {t("profile.personalInfo.mobile")} <span className="text-red-500">*</span>
                             </Label>
                             <PhoneInput
                                 id="phone"
@@ -218,7 +220,7 @@ export default function PersonalInfoForm({
                             onClick={onChangePassword}
                             className="w-full sm:w-auto text-[#B85C3C] hover:bg-[#B85C3C]/10 rounded-full font-bold text-xs uppercase tracking-widest px-6"
                         >
-                            <Lock className="h-3.5 w-3.5 mr-2" /> Change Password
+                            <Lock className="h-3.5 w-3.5 mr-2" /> {t("profile.personalInfo.changePassword")}
                         </Button>
 
                         {hasChanges() && (
@@ -232,7 +234,7 @@ export default function PersonalInfoForm({
                                 ) : (
                                     <ChevronRight className="mr-1 h-4 w-4" />
                                 )}
-                                Save Information
+                                {loading ? t("profile.personalInfo.saving") : t("profile.personalInfo.saveInfo")}
                             </Button>
                         )}
                     </div>

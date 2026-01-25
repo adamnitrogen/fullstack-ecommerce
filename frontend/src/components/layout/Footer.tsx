@@ -66,12 +66,12 @@ export function Footer() {
   });
 
   // Comprehensive Fallbacks
-  const primaryPhone = contactInfo?.phones.find(p => p.is_primary) || contactInfo?.phones[0] || { number: "+91 98765 43210" };
-  const primaryEmail = contactInfo?.emails.find(e => e.is_primary) || contactInfo?.emails[0] || { email: "info@merigaumata.com" };
+  const primaryPhone = contactInfo?.phones.find(p => p.is_primary) || contactInfo?.phones[0] || { number: t("footer.defaultPhone", "+91 98765 43210") };
+  const primaryEmail = contactInfo?.emails.find(e => e.is_primary) || contactInfo?.emails[0] || { email: t("footer.defaultEmail", "info@merigaumata.com") };
   const address = contactInfo?.address || {
-    address_line1: "123 Vedic Plaza",
-    city: "New Delhi",
-    state: "Delhi",
+    address_line1: t("footer.defaultAddress"),
+    city: t("footer.defaultCity"),
+    state: t("footer.defaultState"),
     pincode: "110001"
   };
   const donationBankAccount = bankDetails.find(b => b.type === 'donation' && b.is_active) || bankDetails[0];
@@ -95,23 +95,26 @@ export function Footer() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 mb-6">
             <div className="space-y-5 lg:col-span-2 pr-0 md:pr-12">
               <Link to="/" className="flex items-center gap-3 group">
-                <div className="w-11 h-11 bg-gradient-to-br from-[#2C1810] to-[#1A0E09] rounded-xl flex items-center justify-center shadow-lg border border-white/5 group-hover:scale-105 transition-transform duration-500 overflow-hidden relative">
+                <div className="w-11 h-11 bg-gradient-to-br from-[#2C1810] to-[#1A0E09] rounded-xl flex items-center justify-center shadow-lg border border-white/5 group-hover:scale-105 transition-transform duration-500 overflow-hidden relative p-1.5">
                   <div className="absolute inset-0 bg-gradient-to-tr from-[#D4AF37]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <span className="text-white text-2xl z-10">🐄</span>
+                  <img
+                    src="/favicon.ico"
+                    alt={t('common.brandName')}
+                    className="w-full h-full object-contain relative z-10"
+                  />
                 </div>
                 <div className="flex flex-col">
                   <span className="text-xl font-black text-white font-playfair tracking-tight leading-none">
-                    MeriGauMata
+                    {t('common.brandName')}
                   </span>
                   <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[#D4AF37] mt-1">
-                    Sacred Vedic Essence
+                    {t("nav.brandSubtitle")}
                   </span>
                 </div>
               </Link>
 
               <p className="text-[#E6D5AC]/70 text-[12px] leading-relaxed font-light italic max-w-sm">
-                "{aboutSettings?.footerDescription ||
-                  "Dedicated to the preservation and promotion of indigenous cow culture through sustainable products and education."}"
+                "{aboutSettings?.footerDescription || t("footer.aboutDescription")}"
               </p>
 
               <div className="flex items-center gap-3">
@@ -140,17 +143,17 @@ export function Footer() {
               </h4>
               <ul className="space-y-2.5">
                 {[
-                  { label: "Shop Products", to: "/shop" },
-                  { label: "Sacred Events", to: "/events" },
-                  { label: "The Journal", to: "/blog" },
-                  { label: "Vedic Gallery", to: "/gallery" }
+                  { label: "shopProducts", to: "/shop" },
+                  { label: "sacredEvents", to: "/events" },
+                  { label: "theJournal", to: "/blog" },
+                  { label: "vedicGallery", to: "/gallery" }
                 ].map((item, idx) => (
                   <li key={idx}>
                     <Link
                       to={item.to}
                       className="text-[13px] font-light text-[#E6D5AC]/70 hover:text-[#D4AF37] transition-all duration-300 inline-block"
                     >
-                      {item.label}
+                      {t(`footer.${item.label}`)}
                     </Link>
                   </li>
                 ))}
@@ -165,20 +168,20 @@ export function Footer() {
               <ul className="space-y-2.5">
                 <li>
                   <Link to="/contact" className="text-[13px] font-light text-[#E6D5AC]/70 hover:text-[#D4AF37] transition-all duration-300 inline-block">
-                    Contact Us
+                    {t("footer.contactUs")}
                   </Link>
                 </li>
                 {[
-                  { label: "Shipping & Returns", to: "/shipping-and-refund-policy" },
-                  { label: "Privacy Sanctuary", to: "/privacy-policy" },
-                  { label: "Terms & Conditions", to: "/terms-and-conditions" }
+                  { label: "shipping", to: "/shipping-and-refund-policy" },
+                  { label: "privacy", to: "/privacy-policy" },
+                  { label: "terms", to: "/terms-and-conditions" }
                 ].map((item, idx) => (
                   <li key={idx}>
                     <Link
                       to={item.to}
                       className="text-[13px] font-light text-[#E6D5AC]/70 hover:text-[#D4AF37] transition-all duration-300 inline-block text-left"
                     >
-                      {item.label}
+                      {t(`footer.${item.label}`)}
                     </Link>
                   </li>
                 ))}
@@ -215,21 +218,21 @@ export function Footer() {
             {donationBankAccount && (
               <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-white/[0.02] rounded-2xl p-3 md:px-5 border border-white/5">
                 <div className="flex flex-col items-center md:items-start text-center md:text-left">
-                  <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-[#D4AF37] mb-0.5">Support our Heritage</h4>
-                  <p className="text-[10px] text-[#E6D5AC]/50 italic font-light tracking-wide">Direct bank donations for Gau Seva</p>
+                  <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-[#D4AF37] mb-0.5">{t("footer.supportHeritage")}</h4>
+                  <p className="text-[10px] text-[#E6D5AC]/50 italic font-light tracking-wide">{t("footer.bankDonations")}</p>
                 </div>
 
                 <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 md:gap-x-10 w-full md:w-auto">
                   {[
-                    { label: "Name", value: donationBankAccount.account_name },
-                    { label: "Bank Name", value: donationBankAccount.bank_name },
-                    { label: "Branch", value: donationBankAccount.branch_name },
-                    { label: "Account", value: donationBankAccount.account_number },
-                    { label: "IFSC", value: donationBankAccount.ifsc_code },
-                    { label: "UPI ID", value: donationBankAccount.upi_id, color: "text-[#D4AF37]" }
+                    { label: "name", value: donationBankAccount.account_name },
+                    { label: "bank", value: donationBankAccount.bank_name },
+                    { label: "branch", value: donationBankAccount.branch_name },
+                    { label: "account", value: donationBankAccount.account_number },
+                    { label: "ifsc", value: donationBankAccount.ifsc_code },
+                    { label: "upi", value: donationBankAccount.upi_id, color: "text-[#D4AF37]" }
                   ].map((item, idx) => item.value ? (
                     <div key={idx} className="space-y-0.5">
-                      <p className="text-[8px] font-black uppercase text-white/50 tracking-widest">{item.label}</p>
+                      <p className="text-[8px] font-black uppercase text-white/50 tracking-widest">{t(`footer.${item.label}`)}</p>
                       <p className={`text-[10px] font-medium ${item.color || "text-[#E6D5AC]/90"}`}>{item.value}</p>
                     </div>
                   ) : null)}
@@ -239,13 +242,13 @@ export function Footer() {
 
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] font-light text-[#E6D5AC]/40 tracking-wider">
               <p>
-                © {new Date().getFullYear()} MeriGauMata. <span className="text-[#D4AF37]/80 font-bold uppercase tracking-widest ml-1">Vedic Tradition Preserved.</span>
+                © {new Date().getFullYear()} MeriGauMata. <span className="text-[#D4AF37]/80 font-bold uppercase tracking-widest ml-1">{t("footer.rights")}</span>
               </p>
 
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-white/[0.02] border border-white/5 opacity-40">
                   <ShieldCheck className="h-3 w-3 text-green-500/60" />
-                  <span className="uppercase tracking-[0.1em] text-[9px]">Secure Vedic Checkout</span>
+                  <span className="uppercase tracking-[0.1em] text-[9px]">{t("footer.secureCheckout")}</span>
                 </div>
               </div>
             </div>

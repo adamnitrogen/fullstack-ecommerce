@@ -1,20 +1,20 @@
 const { z } = require('zod');
 
 const createReviewSchema = z.object({
-    productId: z.string().uuid('Invalid product ID'),
-    userId: z.string().uuid('Invalid user ID'),
+    productId: z.string().uuid('errors.cart.invalidProductId'),
+    userId: z.string().uuid('errors.auth.invalidUserId'), // I should add this key if not present, using internal key for now
     rating: z.number()
-        .min(1, 'Rating must be at least 1')
-        .max(5, 'Rating cannot exceed 5')
-        .int('Rating must be an integer'),
+        .min(1, 'errors.review.ratingMin')
+        .max(5, 'errors.review.ratingMax')
+        .int('errors.review.ratingInt'),
     title: z.string()
         .trim()
-        .min(2, 'Title is too short')
-        .max(100, 'Title is too long'),
+        .min(2, 'errors.review.titleShort')
+        .max(100, 'errors.review.titleLong'),
     comment: z.string()
         .trim()
-        .min(10, 'Review comment must be at least 10 characters')
-        .max(2000, 'Review comment is too long')
+        .min(10, 'errors.review.commentShort')
+        .max(2000, 'errors.review.commentLong')
 });
 
 module.exports = {

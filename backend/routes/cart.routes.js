@@ -47,7 +47,7 @@ router.get('/', async (req, res) => {
         const { userId, guestId } = getContextIds(req);
 
         if (!userId && !guestId) {
-            return res.status(400).json({ error: 'Guest ID or Authentication required' });
+            return res.status(400).json({ error: req.t('errors.auth.authentication_required') });
         }
 
         const cart = await getUserCart(userId, guestId);
@@ -69,7 +69,7 @@ router.post('/items', validate(addToCartSchema), async (req, res) => {
         const { userId, guestId } = getContextIds(req);
 
         if (!userId && !guestId) {
-            return res.status(400).json({ error: 'Guest ID or Authentication required' });
+            return res.status(400).json({ error: req.t('errors.auth.authentication_required') });
         }
 
         const { product_id, quantity, variant_id } = req.body; // Added variant_id support if missing in schema? Schema handles it?
@@ -79,7 +79,7 @@ router.post('/items', validate(addToCartSchema), async (req, res) => {
         const totals = await calculateCartTotals(userId, guestId);
 
         res.json({
-            message: 'Item added to cart',
+            message: req.t('success.cart.item_added'),
             cart,
             totals
         });
@@ -95,7 +95,7 @@ router.put('/items/:product_id', validate(updateCartSchema), async (req, res) =>
         const { userId, guestId } = getContextIds(req);
 
         if (!userId && !guestId) {
-            return res.status(401).json({ error: 'Authentication required' });
+            return res.status(401).json({ error: req.t('errors.auth.authentication_required') });
         }
 
         const { product_id } = req.params;
@@ -107,7 +107,7 @@ router.put('/items/:product_id', validate(updateCartSchema), async (req, res) =>
         const totals = await calculateCartTotals(userId, guestId, null, { skipValidation: true });
 
         res.json({
-            message: 'Cart updated',
+            message: req.t('success.cart.cart_updated'),
             cart,
             totals
         });
@@ -123,7 +123,7 @@ router.delete('/items/:product_id', async (req, res) => {
         const { userId, guestId } = getContextIds(req);
 
         if (!userId && !guestId) {
-            return res.status(401).json({ error: 'Authentication required' });
+            return res.status(401).json({ error: req.t('errors.auth.authentication_required') });
         }
 
         const { product_id } = req.params;
@@ -133,7 +133,7 @@ router.delete('/items/:product_id', async (req, res) => {
         const totals = await calculateCartTotals(userId, guestId);
 
         res.json({
-            message: 'Item removed from cart',
+            message: req.t('success.cart.item_removed'),
             cart,
             totals
         });
@@ -149,13 +149,13 @@ router.post('/apply-coupon', async (req, res) => {
         const { userId, guestId } = getContextIds(req);
 
         if (!userId && !guestId) {
-            return res.status(401).json({ error: 'Authentication required' });
+            return res.status(401).json({ error: req.t('errors.auth.authentication_required') });
         }
 
         const { code } = req.body;
 
         if (!code) {
-            return res.status(400).json({ error: 'Coupon code is required' });
+            return res.status(400).json({ error: req.t('errors.payment.invalid_coupon') });
         }
 
         const result = await applyCouponToCart(userId, guestId, code);
@@ -184,14 +184,14 @@ router.delete('/coupon', async (req, res) => {
         const { userId, guestId } = getContextIds(req);
 
         if (!userId && !guestId) {
-            return res.status(401).json({ error: 'Authentication required' });
+            return res.status(401).json({ error: req.t('errors.auth.authentication_required') });
         }
 
         const cart = await removeCouponFromCart(userId, guestId);
         const totals = await calculateCartTotals(userId, guestId);
 
         res.json({
-            message: 'Coupon removed',
+            message: req.t('success.cart.coupon_removed'),
             cart,
             totals
         });
@@ -207,7 +207,7 @@ router.post('/calculate', async (req, res) => {
         const { userId, guestId } = getContextIds(req);
 
         if (!userId && !guestId) {
-            return res.status(401).json({ error: 'Authentication required' });
+            return res.status(401).json({ error: req.t('errors.auth.authentication_required') });
         }
 
         const totals = await calculateCartTotals(userId, guestId);
@@ -225,12 +225,12 @@ router.delete('/', async (req, res) => {
         const { userId, guestId } = getContextIds(req);
 
         if (!userId && !guestId) {
-            return res.status(401).json({ error: 'Authentication required' });
+            return res.status(401).json({ error: req.t('errors.auth.authentication_required') });
         }
 
         await clearCart(userId, guestId);
 
-        res.json({ message: 'Cart cleared successfully' });
+        res.json({ message: req.t('success.cart.cart_cleared') });
     } catch (error) {
         logger.error({ err: error }, 'Error clearing cart');
         res.status(500).json({ error: error.message });

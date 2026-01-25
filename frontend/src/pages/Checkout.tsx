@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/store/authStore";
 import { useCartStore } from "@/store/cartStore";
 import { checkoutService } from "@/services/checkout.service";
@@ -41,6 +42,7 @@ interface BuyNowState {
 }
 
 export default function Checkout() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated, user } = useAuthStore();
@@ -80,7 +82,7 @@ export default function Checkout() {
       const data = await checkoutService.getSummary(addressId);
 
       if (!data.cart || !data.cart.cart_items || data.cart.cart_items.length === 0) {
-        toast.error("Your cart is empty");
+        toast.error(t("cart.empty"));
         navigate("/cart");
         return;
       }
@@ -115,7 +117,7 @@ export default function Checkout() {
 
     } catch (error) {
       logger.error("Checkout error", error);
-      toast.error("Failed to load checkout details");
+      toast.error(t("checkout.error") || "Failed to load checkout details");
     } finally {
       setLoading(false);
     }
@@ -184,7 +186,7 @@ export default function Checkout() {
     };
 
     initCheckout();
-  }, [isAuthenticated, navigate, fetchCheckoutSummary, location]);
+  }, [isAuthenticated, navigate, fetchCheckoutSummary, location, t]);
 
   // Prefetch Razorpay SDK after summary loads (non-blocking)
   useEffect(() => {
@@ -195,7 +197,7 @@ export default function Checkout() {
 
   const handlePayment = async () => {
     if (!shippingAddress) {
-      toast.error("Please select a shipping address");
+      toast.error(t("checkout.shipping") + " is required"); // Simplified but localized
       return;
     }
 
@@ -206,7 +208,7 @@ export default function Checkout() {
     }
 
     if (!billingSameAsShipping && !billingAddress) {
-      toast.error("Please select a billing address");
+      toast.error(t("checkout.billing") + " is required");
       return;
     }
 
@@ -282,7 +284,7 @@ export default function Checkout() {
         amount: orderData.amount,
         currency: orderData.currency,
         name: "MeriGauMata",
-        description: isBuyNow ? "Buy Now Order" : "Order Payment",
+        description: isBuyNow ? t("products.buyNow") : t("checkout.title"),
         image: "https://wjdncjhlpioohrjkamqw.supabase.co/storage/v1/object/public/brand-assets/brand-logo.png",
         order_id: orderData.order_id,
         handler: async function (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) {
@@ -319,7 +321,7 @@ export default function Checkout() {
             await fetchCart();
 
             if (result.success) {
-              toast.success("Order placed successfully!");
+              toast.success(t("checkout.success") || "Order placed successfully!");
               navigate(`/order-confirmation/${result.order.id}`, { state: { order: result.order } });
             }
           } catch (error: unknown) {
@@ -400,7 +402,7 @@ export default function Checkout() {
   };
 
   if (loading && !summary) {
-    return <LoadingOverlay isLoading={true} message="Preparing your checkout..." />;
+    return <LoadingOverlay isLoading={true} message={t("checkout.preparing")} />;
   }
 
   if (!summary) return null;
@@ -427,7 +429,7 @@ export default function Checkout() {
     <div className="min-h-screen bg-background pb-20">
       <LoadingOverlay
         isLoading={processing && loading}
-        message="Placing your order..."
+        message={t("checkout.processing")}
       />
 
       {/* Compact Premium Hero Section */}
@@ -439,13 +441,13 @@ export default function Checkout() {
 
         <div className="container mx-auto px-4 relative z-10">
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-            <BackButton to="/cart" label="Back to Cart" className="text-white/80 hover:text-white hover:bg-white/10" />
+            <BackButton to="/cart" label={t("checkout.backToCart")} className="text-white/80 hover:text-white hover:bg-white/10" />
             <div className="space-y-1">
               <h1 className="text-3xl md:text-4xl font-bold font-playfair">
-                Secure <span className="text-[#B85C3C]">Checkout</span>
+                {t("checkout.secure")} <span className="text-[#B85C3C]">{t("checkout.title")}</span>
               </h1>
               <p className="text-white/60 text-sm font-light">
-                Complete your purchase to support our mission
+                {t("checkout.secureCheckoutSub")}
               </p>
             </div>
           </div>
@@ -459,7 +461,7 @@ export default function Checkout() {
             <CardHeader className="bg-muted/30 pb-4">
               <CardTitle className="flex items-center gap-3">
                 <ShoppingBag className="w-5 h-5 text-primary" />
-                Items in your Order
+                {t("checkout.itemsInOrder")}
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
@@ -477,7 +479,7 @@ export default function Checkout() {
                     <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm shadow-md">
                       1
                     </div>
-                    Shipping Address
+                    {t("checkout.shipping")}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6">
@@ -504,7 +506,7 @@ export default function Checkout() {
                     <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm shadow-md">
                       2
                     </div>
-                    Billing Address
+                    {t("checkout.billing")}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6 space-y-6">
@@ -515,7 +517,7 @@ export default function Checkout() {
                       onCheckedChange={(checked) => setBillingSameAsShipping(checked as boolean)}
                     />
                     <Label htmlFor="billing-same" className="cursor-pointer font-medium">
-                      Same as shipping address
+                      {t("checkout.sameAsShipping")}
                     </Label>
                   </div>
 
@@ -552,14 +554,14 @@ export default function Checkout() {
                       ) : (
                         <>
                           <Lock className="mr-2 h-4 w-4" />
-                          Pay ₹{summary.totals.finalAmount.toFixed(2)}
+                          {t("checkout.pay")} ₹{summary.totals.finalAmount.toFixed(2)}
                         </>
                       )}
                     </Button>
 
                     <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground bg-muted/30 py-2 rounded-full">
                       <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                      <span>Secure Payment via Razorpay</span>
+                      <span>{t("checkout.secureGateway")}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -571,9 +573,9 @@ export default function Checkout() {
         <AlertDialog open={showPhoneWarning} onOpenChange={setShowPhoneWarning}>
           <AlertDialogContent className="rounded-2xl">
             <AlertDialogHeader>
-              <AlertDialogTitle className="font-playfair text-2xl text-destructive">Phone Number Required</AlertDialogTitle>
+              <AlertDialogTitle className="font-playfair text-2xl text-destructive">{t("checkout.phoneWarning.title")}</AlertDialogTitle>
               <AlertDialogDescription className="text-base">
-                To ensure smooth delivery, we need a valid phone number. Please update your shipping address to include a contact number.
+                {t("checkout.phoneWarning.desc")}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -581,7 +583,7 @@ export default function Checkout() {
                 if (shippingAddress) setAddressIdToEdit(shippingAddress.id);
                 setShowPhoneWarning(false);
               }} className="rounded-full px-6">
-                OK, I'll add it
+                {t("checkout.phoneWarning.action")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

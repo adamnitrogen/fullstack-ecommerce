@@ -1,11 +1,13 @@
 import { logger } from "@/lib/logger";
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Tag, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Coupon } from "@/types";
 import { couponService } from "@/services/coupon.service";
 
 export function PromotionalBanner() {
+    const { t } = useTranslation();
     const [coupons, setCoupons] = useState<Coupon[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -93,17 +95,17 @@ export function PromotionalBanner() {
         }
 
         if (coupon.type === "cart") {
-            return "Sitewide Discount";
+            return t("hero.promo.sitewideDiscount");
         } else if (coupon.type === "category") {
-            return `${coupon.target_id || 'Category'} Special`;
+            return t("hero.promo.categorySpecial", { category: coupon.target_id || 'Category' });
         } else if (coupon.type === "product") {
-            return "Product Deal";
+            return t("hero.promo.productDeal");
         } else if (coupon.type === "variant") {
-            return "Exclusive Offer";
+            return t("hero.promo.exclusiveOffer");
         } else if (coupon.type === "free_delivery") {
-            return "Free Delivery";
+            return t("hero.promo.freeShipping");
         }
-        return "Limited Offer";
+        return t("hero.promo.limitedOffer");
     };
 
     if (loading || coupons.length === 0) return null;
@@ -140,7 +142,7 @@ export function PromotionalBanner() {
                 {/* Fixed Label to the left */}
                 <div className="flex-shrink-0 flex items-center gap-2 bg-[#2C1810] pr-6 border-r border-white/10 z-10 shadow-[20px_0_30px_-5px_#2C1810] h-full">
                     <Sparkles className="h-4 w-4 text-[#B85C3C] animate-pulse" />
-                    <span className="font-bold text-[10px] uppercase tracking-[0.2em] text-[#B85C3C]">Exclusive Offers</span>
+                    <span className="font-bold text-[10px] uppercase tracking-[0.2em] text-[#B85C3C]">{t("hero.promo.exclusiveOffers")}</span>
                 </div>
 
                 {/* Marquee Container */}
@@ -159,7 +161,7 @@ export function PromotionalBanner() {
                                         {coupon.code}
                                     </Badge>
                                     <span className="font-black text-xs text-[#B85C3C]">
-                                        {coupon.type === 'free_delivery' ? 'FREE SHIPPING' : (coupon.discount_percentage ? `${coupon.discount_percentage}% OFF` : 'SPECIAL OFFER')}
+                                        {coupon.type === 'free_delivery' ? t("hero.promo.freeShipping") : (coupon.discount_percentage ? `${coupon.discount_percentage}% OFF` : t("hero.promo.specialOffer"))}
                                     </span>
                                 </div>
                                 {typeof coupon.min_purchase_amount === 'number' && coupon.min_purchase_amount > 0 && (
@@ -179,7 +181,7 @@ export function PromotionalBanner() {
 
                 {/* Fixed Action to the right */}
                 <div className="flex-shrink-0 flex items-center gap-2 bg-[#2C1810] pl-6 border-l border-white/10 z-10 shadow-[-20px_0_30px_-5px_#2C1810] hidden md:flex">
-                    <span className="text-[10px] font-medium uppercase tracking-widest text-white/60">Limited Time Only</span>
+                    <span className="text-[10px] font-medium uppercase tracking-widest text-white/60">{t("hero.promo.limitedTime")}</span>
                 </div>
             </div>
         </div>

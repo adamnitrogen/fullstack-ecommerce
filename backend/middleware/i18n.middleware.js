@@ -1,32 +1,51 @@
+const i18next = require('i18next');
+const middleware = require('i18next-http-middleware');
+const Backend = require('i18next-fs-backend');
+const path = require('path');
+
+// Initialize i18next
+i18next
+    .use(Backend)
+    .use(middleware.LanguageDetector)
+    .init({
+        fallbackLng: 'en',
+        preload: ['en', 'hi'],
+        ns: ['translation'],
+        defaultNS: 'translation',
+        backend: {
+            loadPath: path.join(__dirname, '../../frontend/src/i18n/locales/{{lng}}.json')
+        },
+        detection: {
+            order: ['querystring', 'header', 'cookie'],
+            lookupQuerystring: 'lang',
+            lookupHeader: 'x-user-lang',
+            caches: false
+        }
+    });
+
 /**
- * i18n Language Detection Middleware
- * Determines the target language for the request.
- * Priority: Query Param > Header > User Profile > Default (en)
+ * i18n Language Detection and Translation Middleware
+ * Attaches the 't' function and 'language' to the request object.
  */
 const i18nMiddleware = (req, res, next) => {
-    // 1. Check Query Parameter (?lang=hi)
-    let lang = req.query.lang;
+    // Determine language (detecting from query, header, or user profile)
+    let lang = req.query.lang || req.headers['x-user-lang'];
 
-    // 2. Check Header (x-user-lang: hi)
-    if (!lang) {
-        lang = req.headers['x-user-lang'];
-    }
-
-    // 3. Check User Profile (if authenticated)
     if (!lang && req.user && req.user.preferred_language) {
         lang = req.user.preferred_language;
     }
 
-    // 4. Fallback to English
     if (!lang || !['en', 'hi'].includes(lang)) {
         lang = 'en';
     }
 
-    // Attach to request object for use in controllers/services
+    // Set language for the current request
     req.language = lang;
 
-    // Also set as a global context if needed or pass down explicitly
-    next();
+    // The i18next-http-middleware handles attaching the 't' function
+    // and setting the language based on detection.
+    // We just need to wrap the standard next() call.
+    middleware.handle(i18next)(req, res, next);
 };
 
 module.exports = i18nMiddleware;

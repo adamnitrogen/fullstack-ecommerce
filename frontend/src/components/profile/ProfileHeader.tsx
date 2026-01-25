@@ -1,5 +1,6 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "react-i18next";
 import { Camera, Mail, Phone, ShieldCheck, Heart } from "lucide-react";
 import { useState } from "react";
 import ImageCropperModal from "./ImageCropperModal";
@@ -23,6 +24,7 @@ export default function ProfileHeader({
     onAvatarUpdate,
     onAvatarDelete
 }: ProfileHeaderProps) {
+    const { t } = useTranslation();
     const [showCropper, setShowCropper] = useState(false);
 
     const getInitials = () => {
@@ -83,7 +85,7 @@ export default function ProfileHeader({
                                         <span className="text-sm font-medium group-hover/info:text-[#B85C3C] transition-colors">{email}</span>
                                         {isEmailVerified && (
                                             <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[9px] font-bold uppercase tracking-wider border border-emerald-100">
-                                                <ShieldCheck className="h-2.5 w-2.5" /> Verified
+                                                <ShieldCheck className="h-2.5 w-2.5" /> {t("common.verified", "Verified")}
                                             </div>
                                         )}
                                     </div>

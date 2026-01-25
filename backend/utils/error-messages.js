@@ -2,7 +2,7 @@
  * i18n Compatible Error Keys mapping
  * Keys follow the structure: error.<category>.<code_name>
  */
-const ERROR_MESSAGES = {
+const I18N_MESSAGES = {
     // Auth Errors
     'AUTHENTICATION_REQUIRED': 'errors.auth.authentication_required',
     'UNAUTHORIZED': 'errors.auth.unauthorized',
@@ -11,6 +11,16 @@ const ERROR_MESSAGES = {
     'ACCOUNT_NOT_FOUND': 'errors.auth.account_not_found',
     'ACCOUNT_BLOCKED': 'errors.auth.account_blocked',
     'ACCOUNT_DELETED': 'errors.auth.account_deleted',
+    'GOOGLE_AUTH_BLOCKED': 'errors.auth.google_auth_blocked',
+    'REFRESH_TOKEN_REQUIRED': 'errors.auth.refresh_token_required',
+
+    // Auth Success
+    'LOGIN_SUCCESS': 'success.auth.login',
+    'REGISTER_SUCCESS': 'success.auth.register',
+    'OTP_SENT': 'success.auth.otp_sent',
+    'EMAIL_VERIFIED': 'success.auth.email_verified',
+    'PASSWORD_UPDATED': 'success.auth.password_updated',
+    'LOGOUT_SUCCESS': 'success.auth.logout',
 
     // Checkout & Payment Errors
     'PAYMENT_FAILED': 'errors.payment.payment_failed',
@@ -72,23 +82,33 @@ const getFriendlyMessage = (err, statusCode) => {
     const code = err.code || '';
 
     // If it's a known error key already, return it
-    if (Object.values(ERROR_MESSAGES).includes(message)) {
+    if (Object.values(I18N_MESSAGES).includes(message)) {
         return message;
     }
 
     // Map by code
-    if (ERROR_MESSAGES[code]) return ERROR_MESSAGES[code];
+    if (I18N_MESSAGES[code]) return I18N_MESSAGES[code];
 
     // Status code fallbacks
-    if (statusCode === 401) return ERROR_MESSAGES.AUTHENTICATION_REQUIRED;
-    if (statusCode === 403) return ERROR_MESSAGES.FORBIDDEN;
-    if (statusCode === 404) return ERROR_MESSAGES.PRODUCT_NOT_FOUND;
-    if (statusCode >= 500) return ERROR_MESSAGES.INTERNAL_ERROR;
+    if (statusCode === 401) return I18N_MESSAGES.AUTHENTICATION_REQUIRED;
+    if (statusCode === 403) return I18N_MESSAGES.FORBIDDEN;
+    if (statusCode === 404) return I18N_MESSAGES.PRODUCT_NOT_FOUND;
+    if (statusCode >= 500) return I18N_MESSAGES.INTERNAL_ERROR;
 
-    return ERROR_MESSAGES.GENERIC_ERROR;
+    return I18N_MESSAGES.GENERIC_ERROR;
+};
+
+/**
+ * Get i18n key for a literal name
+ * @param {string} keyName 
+ * @returns {string}
+ */
+const getI18nKey = (keyName) => {
+    return I18N_MESSAGES[keyName] || keyName;
 };
 
 module.exports = {
-    ERROR_MESSAGES,
-    getFriendlyMessage
+    I18N_MESSAGES,
+    getFriendlyMessage,
+    getI18nKey
 };

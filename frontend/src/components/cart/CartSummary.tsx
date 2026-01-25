@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation, Trans } from "react-i18next";
 import { Loader2, X, Truck, RotateCcw, ShieldCheck, Sparkles, Tag, CheckCircle2, Gift } from "lucide-react";
 import { CartTotals, Coupon } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -33,13 +34,14 @@ export const CartSummary = ({
     isCalculating = false,
     items = []
 }: CartSummaryProps & { items?: any[] }) => {
+    const { t } = useTranslation();
     const [couponCode, setCouponCode] = useState("");
     const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
 
     const handleApplyCoupon = async (codeOverride?: string) => {
         const code = codeOverride || couponCode;
         if (!code.trim()) {
-            toast.error("Please enter a coupon code");
+            toast.error(t("cart.summary.enterCoupon"));
             return;
         }
 
@@ -68,9 +70,9 @@ export const CartSummary = ({
 
             <CardHeader className="pb-4">
                 <CardTitle className="text-2xl font-black tracking-tight font-playfair flex items-center justify-between">
-                    Order Summary
+                    {t("checkout.orderSummary")}
                     <div className="bg-primary/10 text-primary text-[10px] px-2 py-1 rounded-full uppercase tracking-widest font-bold">
-                        {itemsCount} {itemsCount === 1 ? 'Item' : 'Items'}
+                        {itemsCount} {itemsCount === 1 ? t("cart.item") : t("cart.items")}
                     </div>
                 </CardTitle>
             </CardHeader>
@@ -81,7 +83,7 @@ export const CartSummary = ({
                     <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-700">
                         <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-primary/80">
                             <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                            Available Offers
+                            {t("cart.summary.availableOffers")}
                         </div>
                         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none snap-x">
                             {availableCoupons.map((coupon) => (
@@ -109,14 +111,14 @@ export const CartSummary = ({
                                             </p>
                                             <p className="text-[10px] text-muted-foreground font-semibold">
                                                 {coupon.min_purchase_amount
-                                                    ? `Min. ₹${coupon.min_purchase_amount}`
-                                                    : 'No minimum purchase'}
+                                                    ? t("cart.summary.minPurchase", { amount: coupon.min_purchase_amount })
+                                                    : t("cart.summary.noMinPurchase")}
                                             </p>
                                         </div>
 
                                         <div className="pt-1 border-t border-border/40">
                                             <p className="text-[9px] text-primary font-bold uppercase tracking-wider">
-                                                Tap to apply →
+                                                {t("cart.summary.tapToApply")}
                                             </p>
                                         </div>
                                     </div>
@@ -133,7 +135,7 @@ export const CartSummary = ({
                         isCalculating && "opacity-50 blur-[1px] pointer-events-none"
                     )}>
                         <div className="flex justify-between text-muted-foreground font-medium">
-                            <span>Items Total (MRP)</span>
+                            <span>{t("cart.summary.itemsTotal")}</span>
                             <span className="text-foreground">₹{(totals?.totalMrp || 0).toFixed(2)}</span>
                         </div>
 
@@ -141,7 +143,7 @@ export const CartSummary = ({
                             <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold">
                                 <span className="flex items-center gap-1.5">
                                     <Tag className="w-3.5 h-3.5" />
-                                    Product Discounts
+                                    {t("cart.summary.productDiscounts")}
                                 </span>
                                 <span>-₹{totals.discount.toFixed(2)}</span>
                             </div>
@@ -152,7 +154,7 @@ export const CartSummary = ({
                             <div className="pt-2 border-t border-dashed border-border/40 space-y-2">
                                 <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] font-bold uppercase tracking-wider mb-1">
                                     <Truck className="w-3.5 h-3.5" />
-                                    Delivery & Handling
+                                    {t("cart.summary.deliveryHandling")}
                                 </div>
 
                                 {/* Standard Delivery - Always show, mark as FREE if coupon applied */}
@@ -167,13 +169,13 @@ export const CartSummary = ({
                                         return (
                                             <div className="flex justify-between items-center group/del">
                                                 <span className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium">
-                                                    Standard Delivery
+                                                    {t("cart.summary.standardDelivery")}
                                                     {!isFreeDelivery && (
                                                         <>
                                                             <span className="text-[9px] opacity-40 font-normal">(Non-Ref)</span>
                                                             {globalGST > 0 && (
                                                                 <span className="text-[8px] uppercase tracking-wider text-emerald-600 bg-emerald-50/50 border border-emerald-100/50 px-1 py-0 rounded-sm font-bold">
-                                                                    Incl. Tax
+                                                                    {t("cart.summary.inclTax")}
                                                                 </span>
                                                             )}
                                                         </>
@@ -185,7 +187,7 @@ export const CartSummary = ({
                                                             <span className="text-muted-foreground/40 line-through">
                                                                 ₹{globalTotal.toFixed(2)}
                                                             </span>
-                                                            <span className="text-emerald-600 font-black">FREE</span>
+                                                            <span className="text-emerald-600 font-black">{t("cart.summary.free")}</span>
                                                         </>
                                                     ) : (
                                                         <span className="text-foreground">
@@ -231,10 +233,10 @@ export const CartSummary = ({
                                                 <div className="flex justify-between items-center pl-1 group/sur">
                                                     <span className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium">
                                                         <div className="w-1.5 h-1.5 rounded-full bg-[#3B82F6]" />
-                                                        Refundable Surcharge
+                                                        {t("cart.summary.refundableSurcharge")}
                                                         {refundableGst > 0 && (
                                                             <span className="text-[8px] uppercase tracking-wider text-blue-600 bg-blue-50/50 border border-blue-100/50 px-1 py-0 rounded-sm font-bold">
-                                                                Incl. Tax
+                                                                {t("cart.summary.inclTax")}
                                                             </span>
                                                         )}
                                                     </span>
@@ -247,11 +249,11 @@ export const CartSummary = ({
                                                 <div className="flex justify-between items-center pl-1 group/sur">
                                                     <span className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium">
                                                         <div className="w-1.5 h-1.5 rounded-full bg-[#F97316]" />
-                                                        Addt. Processing
+                                                        {t("cart.summary.additionalProcessing")}
                                                         <span className="text-[9px] opacity-40 font-normal">(Non-Ref)</span>
                                                         {nonRefundableGst > 0 && (
                                                             <span className="text-[8px] uppercase tracking-wider text-orange-600 bg-orange-50/50 border border-orange-100/50 px-1 py-0 rounded-sm font-bold">
-                                                                Incl. Tax
+                                                                {t("cart.summary.inclTax")}
                                                             </span>
                                                         )}
                                                     </span>
@@ -271,22 +273,22 @@ export const CartSummary = ({
                             <div className="pt-3 border-t border-dashed border-border/40 space-y-2">
                                 <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] font-bold uppercase tracking-wider mb-1">
                                     <Sparkles className="w-3 h-3 text-primary/70" />
-                                    Tax Breakdown (GST)
+                                    {t("cart.summary.taxBreakdown")}
                                 </div>
 
                                 {totals.tax.isInterState ? (
                                     <div className="flex justify-between items-center pl-1">
-                                        <span className="text-muted-foreground text-xs font-medium">IGST (Inter-state Tax)</span>
+                                        <span className="text-muted-foreground text-xs font-medium">{t("cart.summary.igst")}</span>
                                         <span className="font-bold text-xs text-foreground">₹{totals.tax.igst.toFixed(2)}</span>
                                     </div>
                                 ) : (
                                     <>
                                         <div className="flex justify-between items-center pl-1">
-                                            <span className="text-muted-foreground text-xs font-medium">CGST (Central Tax)</span>
+                                            <span className="text-muted-foreground text-xs font-medium">{t("cart.summary.cgst")}</span>
                                             <span className="font-bold text-xs text-foreground">₹{totals.tax.cgst.toFixed(2)}</span>
                                         </div>
                                         <div className="flex justify-between items-center pl-1">
-                                            <span className="text-muted-foreground text-xs font-medium">SGST (State Tax)</span>
+                                            <span className="text-muted-foreground text-xs font-medium">{t("cart.summary.sgst")}</span>
                                             <span className="font-bold text-xs text-foreground">₹{totals.tax.sgst.toFixed(2)}</span>
                                         </div>
                                     </>
@@ -294,7 +296,7 @@ export const CartSummary = ({
 
                                 <div className="flex justify-between items-center px-1 pt-1 border-t border-border/5">
                                     <span className="text-[10px] text-muted-foreground font-medium italic">
-                                        Total Tax (Included)
+                                        {t("cart.summary.totalTaxIncluded")}
                                     </span>
                                     <span className="text-[10px] text-muted-foreground/80 font-bold">
                                         ₹{totals.tax.totalTax.toFixed(2)}
@@ -304,7 +306,7 @@ export const CartSummary = ({
                                 <details className="group mt-1 px-1">
                                     <summary className="text-[9px] text-primary cursor-pointer hover:opacity-80 transition-opacity mb-1 list-none flex items-center gap-1 font-bold uppercase tracking-wider">
                                         <div className="w-1.5 h-1.5 rounded-full bg-primary/30 group-open:bg-primary transition-colors animate-pulse" />
-                                        <span>View Product-wise Tax</span>
+                                        <span>{t("cart.summary.viewProductTax")}</span>
                                     </summary>
                                     <div className="bg-muted/30 rounded-xl p-3 space-y-2.5 mt-2 max-h-[160px] overflow-y-auto custom-scrollbar border border-border/10 shadow-inner">
                                         {/* Product Tax */}
@@ -322,11 +324,11 @@ export const CartSummary = ({
                                                         <span className="text-[9px] bg-primary/5 px-1.5 py-0.5 rounded text-primary">{taxRate}% GST</span>
                                                     </div>
                                                     <div className="flex justify-between pl-1 opacity-80">
-                                                        <span>Taxable Amount</span>
+                                                        <span>{t("cart.summary.taxableAmount")}</span>
                                                         <span>₹{(itemTotal - itemTax).toFixed(2)}</span>
                                                     </div>
                                                     <div className="flex justify-between pl-1 font-bold text-foreground/60">
-                                                        <span>Tax Amount</span>
+                                                        <span>{t("cart.summary.taxAmount")}</span>
                                                         <span>₹{itemTax.toFixed(2)}</span>
                                                     </div>
                                                 </div>
@@ -353,7 +355,7 @@ export const CartSummary = ({
                                                         <span className="text-[9px] bg-primary/5 px-1.5 py-0.5 rounded text-primary">18% GST</span>
                                                     </div>
                                                     <div className="flex justify-between pl-1 font-bold text-foreground/60">
-                                                        <span>Tax Amount</span>
+                                                        <span>{t("cart.summary.taxAmount")}</span>
                                                         <span>₹{line.amount.toFixed(2)}</span>
                                                     </div>
                                                 </div>
@@ -369,7 +371,7 @@ export const CartSummary = ({
                     {isCalculating && (
                         <div className="absolute inset-0 flex items-center justify-center z-10 bg-background/20 backdrop-blur-[1px]">
                             <span className="flex items-center gap-2 px-3 py-1 bg-background/80 rounded-full border shadow-sm text-[10px] font-bold uppercase tracking-widest animate-pulse">
-                                Updating...
+                                {t("cart.summary.applying")}
                             </span>
                         </div>
                     )}
@@ -385,7 +387,14 @@ export const CartSummary = ({
                             />
                         </div>
                         <p className="text-[11px] text-muted-foreground text-center italic">
-                            Add <span className="font-bold text-foreground">₹{remainingForFreeDelivery.toFixed(2)}</span> more for <span className="text-emerald-600 font-bold uppercase tracking-tighter">Free Delivery</span>
+                            <Trans
+                                i18nKey="cart.summary.addMoreForFreeDelivery"
+                                values={{ amount: remainingForFreeDelivery.toFixed(2) }}
+                                components={{
+                                    bold: <span className="font-bold text-foreground" />,
+                                    green: <span className="text-emerald-600 font-bold uppercase tracking-tighter" />
+                                }}
+                            />
                         </p>
                     </div>
                 )}
@@ -394,11 +403,11 @@ export const CartSummary = ({
                     <div className="flex justify-between text-[#0D9488] font-bold pt-1 border-t border-dashed border-[#CCFBF1]">
                         <span className="flex items-center gap-1.5">
                             <Sparkles className="w-3.5 h-3.5" />
-                            Coupon ({totals.coupon.code})
+                            {t("cart.summary.couponApplied")} ({totals.coupon.code})
                         </span>
                         <span>
                             {totals.coupon.type === 'free_delivery' && (totals.couponDiscount || 0) === 0
-                                ? 'Applied'
+                                ? t("cart.summary.couponApplied")
                                 : `-₹${(totals.couponDiscount || 0).toFixed(2)}`}
                         </span>
                     </div>
@@ -410,7 +419,7 @@ export const CartSummary = ({
                 <div className="space-y-3">
                     <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground/80">
                         <Tag className="w-3.5 h-3.5 text-primary" />
-                        Apply Promotion
+                        {t("cart.summary.applyPromotion")}
                     </div>
 
                     {totals?.coupon ? (
@@ -424,18 +433,18 @@ export const CartSummary = ({
                                             </div>
                                             <div className="flex items-center gap-1 text-emerald-700 text-xs font-bold">
                                                 <CheckCircle2 className="w-3.5 h-3.5" />
-                                                Applied
+                                                {t("cart.summary.couponApplied")}
                                             </div>
                                         </div>
                                         <div className="space-y-1">
                                             <p className="text-sm font-bold text-emerald-900">
                                                 {totals.coupon.type === 'free_delivery'
-                                                    ? '🎉 Free Delivery Unlocked!'
-                                                    : `💰 ${totals.coupon.discount_percentage}% Discount Applied`}
+                                                    ? t("cart.summary.unlockedFreeDelivery")
+                                                    : t("cart.summary.discountApplied", { percentage: totals.coupon.discount_percentage })}
                                             </p>
                                             {totals.couponDiscount > 0 && (
                                                 <p className="text-xs text-emerald-700 font-semibold">
-                                                    You saved ₹{totals.couponDiscount.toFixed(2)}
+                                                    {t("cart.summary.youSaved", { amount: totals.couponDiscount.toFixed(2) })}
                                                 </p>
                                             )}
                                         </div>
@@ -444,7 +453,7 @@ export const CartSummary = ({
                                         onClick={onRemoveCoupon}
                                         disabled={isLoading}
                                         className="p-2 hover:bg-emerald-100 rounded-lg transition-colors group-hover:opacity-100 opacity-60"
-                                        title="Remove coupon"
+                                        title={t("cart.summary.removeCoupon")}
                                     >
                                         <X className="w-4 h-4 text-emerald-700" />
                                     </button>
@@ -457,7 +466,7 @@ export const CartSummary = ({
                             <div className="flex gap-2">
                                 <div className="relative flex-1">
                                     <Input
-                                        placeholder="Enter coupon code"
+                                        placeholder={t("cart.summary.enterCouponPlaceholder")}
                                         value={couponCode}
                                         onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
                                         onKeyDown={(e) => {
@@ -485,10 +494,10 @@ export const CartSummary = ({
                                     {isApplyingCoupon ? (
                                         <div className="flex items-center gap-2">
                                             <Loader2 className="w-4 h-4 animate-spin" />
-                                            <span className="hidden sm:inline">Applying...</span>
+                                            <span className="hidden sm:inline">{t("cart.summary.applying")}</span>
                                         </div>
                                     ) : (
-                                        'Apply'
+                                        t("cart.summary.apply")
                                     )}
                                 </Button>
                             </div>
@@ -504,13 +513,13 @@ export const CartSummary = ({
                 {/* Final Total */}
                 <div className="space-y-4">
                     <div className="flex justify-between items-end">
-                        <span className="text-sm font-black text-muted-foreground/60 uppercase tracking-[0.1em]">Total Pay</span>
+                        <span className="text-sm font-black text-muted-foreground/60 uppercase tracking-[0.1em]">{t("cart.summary.totalPay")}</span>
                         <div className="text-right">
                             <span className="text-4xl font-black text-primary block leading-none tracking-tighter font-playfair">
                                 ₹{totals?.finalAmount?.toFixed(2) || '0.00'}
                             </span>
                             <span className="text-[10px] text-muted-foreground/40 font-bold uppercase tracking-widest mt-1 block">
-                                Including GST & Fees
+                                {t("cart.summary.includingGst")}
                             </span>
                         </div>
                     </div>
@@ -521,7 +530,7 @@ export const CartSummary = ({
 
                         return totals && totalSavings > 0 ? (
                             <div className="bg-[#F0FDFA] border border-[#CCFBF1] text-[#0D9488] text-[11px] p-3 rounded-xl text-center font-bold animate-in zoom-in-95">
-                                Congrats! You are saving ₹{totalSavings.toFixed(2)}
+                                {t("cart.summary.savingsMessage", { amount: totalSavings.toFixed(2) })}
                             </div>
                         ) : null;
                     })()}
@@ -532,7 +541,7 @@ export const CartSummary = ({
                         onClick={onCheckout}
                         disabled={isLoading || itemsCount === 0}
                     >
-                        {isLoading ? <Loader2 className="animate-spin mr-2" /> : "Checkout Securely"}
+                        {isLoading ? <Loader2 className="animate-spin mr-2" /> : t("cart.summary.checkoutSecurely")}
                     </Button>
                 </div>
 
@@ -542,15 +551,15 @@ export const CartSummary = ({
                 <div className="grid grid-cols-3 gap-2">
                     <div className="flex flex-col items-center gap-1 opacity-60">
                         <ShieldCheck className="w-4 h-4 text-primary" />
-                        <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter">Secure</span>
+                        <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter">{t("cart.summary.trust.secure")}</span>
                     </div>
                     <div className="flex flex-col items-center gap-1 opacity-60">
                         <Truck className="w-4 h-4 text-primary" />
-                        <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter">Fast</span>
+                        <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter">{t("cart.summary.trust.fast")}</span>
                     </div>
                     <div className="flex flex-col items-center gap-1 opacity-60">
                         <RotateCcw className="w-4 h-4 text-primary" />
-                        <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter">Returns</span>
+                        <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter">{t("cart.summary.trust.returns")}</span>
                     </div>
                 </div>
             </CardContent>

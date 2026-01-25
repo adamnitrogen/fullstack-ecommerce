@@ -1,5 +1,6 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface LoadingOverlayProps {
     isLoading: boolean;
@@ -8,8 +9,11 @@ interface LoadingOverlayProps {
 
 export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
     isLoading,
-    message = 'Loading...'
+    message
 }) => {
+    const { t } = useTranslation();
+    const displayMessage = message || t('common.loading');
+
     if (!isLoading) return null;
 
     return (
@@ -21,10 +25,10 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
                 </div>
                 <div className="flex flex-col items-center gap-1">
                     <p className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-                        {message}
+                        {displayMessage}
                     </p>
                     <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                        Please wait while we process your request
+                        {t('common.pleaseWait')}
                     </p>
                 </div>
             </div>

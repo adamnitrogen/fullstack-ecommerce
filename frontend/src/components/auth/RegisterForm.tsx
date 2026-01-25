@@ -57,12 +57,12 @@ export function RegisterForm({
   // Password strength indicator
   const getPasswordStrength = () => {
     if (password.length === 0) return null;
-    if (password.length < 6) return { level: 1, text: "Weak", color: "bg-red-500" };
-    if (password.length < 8) return { level: 2, text: "Fair", color: "bg-orange-500" };
+    if (password.length < 6) return { level: 1, text: t("auth.passwordStrength.weak"), color: "bg-red-500" };
+    if (password.length < 8) return { level: 2, text: t("auth.passwordStrength.fair"), color: "bg-orange-500" };
     if (password.length >= 8 && /[A-Z]/.test(password) && /[0-9]/.test(password)) {
-      return { level: 3, text: "Strong", color: "bg-green-500" };
+      return { level: 3, text: t("auth.passwordStrength.strong"), color: "bg-green-500" };
     }
-    return { level: 2, text: "Good", color: "bg-yellow-500" };
+    return { level: 2, text: t("auth.passwordStrength.good"), color: "bg-yellow-500" };
   };
 
   const passwordStrength = getPasswordStrength();
@@ -77,23 +77,23 @@ export function RegisterForm({
           </div>
         </div>
         <h2 className="text-2xl font-bold text-[#2C1810] font-playfair mb-1">
-          Create Account
+          {t("auth.createAccountTitle")}
         </h2>
-        <p className="text-sm text-[#2C1810]/60">Join our community today</p>
+        <p className="text-sm text-[#2C1810]/60">{t("auth.joinCommunity")}</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4" action="#">
         {/* Full Name */}
         <div className="space-y-2">
           <Label htmlFor="name" className="text-xs font-bold uppercase tracking-wider text-[#2C1810]">
-            Full Name <span className="text-[#B85C3C]">*</span>
+            {t("profile.name")} <span className="text-[#B85C3C]">*</span>
           </Label>
           <Input
             id="name"
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Enter your full name"
+            placeholder={t("auth.namePlaceholder")}
             required
             className="h-12 rounded-xl border-2 bg-[#FAF7F2] focus:bg-white border-[#B85C3C]/10 focus:border-[#B85C3C] transition-colors"
           />
@@ -102,14 +102,14 @@ export function RegisterForm({
         {/* Email */}
         <div className="space-y-2">
           <Label htmlFor="email" className="text-xs font-bold uppercase tracking-wider text-[#2C1810]">
-            Email <span className="text-[#B85C3C]">*</span>
+            {t("profile.email")} <span className="text-[#B85C3C]">*</span>
           </Label>
           <Input
             id="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="Enter your email address"
+            placeholder={t("auth.emailPlaceholder")}
             required
             className="h-12 rounded-xl border-2 bg-[#FAF7F2] focus:bg-white border-[#B85C3C]/10 focus:border-[#B85C3C] transition-colors"
           />
@@ -118,20 +118,20 @@ export function RegisterForm({
         {/* Phone */}
         <div className="space-y-2">
           <Label htmlFor="phone" className="text-xs font-bold uppercase tracking-wider text-[#2C1810]">
-            Mobile Number <span className="text-[#B85C3C]">*</span>
+            {t("profile.phone")} <span className="text-[#B85C3C]">*</span>
           </Label>
           <PhoneInput
             id="phone"
             value={phone}
             onChange={(value) => setPhone(value as string)}
-            placeholder="Enter your mobile number"
+            placeholder={t("auth.phonePlaceholder")}
           />
         </div>
 
         {/* Password */}
         <div className="space-y-2">
           <Label htmlFor="password" className="text-xs font-bold uppercase tracking-wider text-[#2C1810]">
-            Password <span className="text-[#B85C3C]">*</span>
+            {t("auth.password")} <span className="text-[#B85C3C]">*</span>
           </Label>
           <div className="relative">
             <Input
@@ -139,7 +139,7 @@ export function RegisterForm({
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={handlePasswordChange}
-              placeholder="Create a strong password"
+              placeholder={t("auth.createPasswordPlaceholder")}
               required
               minLength={8}
               className={`h-12 rounded-xl border-2 bg-[#FAF7F2] focus:bg-white pr-12 transition-colors ${passwordError ? "border-red-500" : "border-[#B85C3C]/10 focus:border-[#B85C3C]"}`}
@@ -175,28 +175,28 @@ export function RegisterForm({
           <div className="text-[10px] text-[#2C1810]/40 mt-2 space-y-0.5">
             <div className={`flex items-center gap-1 ${password.length >= 8 ? 'text-green-600' : ''}`}>
               {password.length >= 8 && <CheckCircle size={10} />}
-              <span>At least 8 characters</span>
+              <span>{t("auth.passwordRequirements.length")}</span>
             </div>
             <div className={`flex items-center gap-1 ${/[A-Z]/.test(password) ? 'text-green-600' : ''}`}>
               {/[A-Z]/.test(password) && <CheckCircle size={10} />}
-              <span>One uppercase letter</span>
+              <span>{t("auth.passwordRequirements.uppercase")}</span>
             </div>
             <div className={`flex items-center gap-1 ${/[0-9]/.test(password) ? 'text-green-600' : ''}`}>
               {/[0-9]/.test(password) && <CheckCircle size={10} />}
-              <span>One number</span>
+              <span>{t("auth.passwordRequirements.number")}</span>
             </div>
           </div>
         </div>
 
         {/* Terms */}
         <p className="text-[10px] text-[#2C1810]/50 text-center leading-relaxed">
-          By creating an account, you agree to our{" "}
+          {t("auth.termsAgree")}{" "}
           <button
             type="button"
             className="text-[#B85C3C] hover:underline font-medium"
             onClick={() => window.open("/terms-and-conditions", "_blank")}
           >
-            Terms of Use
+            {t("auth.termsOfUse")}
           </button>{" "}
           and{" "}
           <button
@@ -204,7 +204,7 @@ export function RegisterForm({
             className="text-[#B85C3C] hover:underline font-medium"
             onClick={() => window.open("/privacy-policy", "_blank")}
           >
-            Privacy Policy
+            {t("auth.privacyPolicy")}
           </button>
           .
         </p>
@@ -214,7 +214,7 @@ export function RegisterForm({
           className="w-full h-12 rounded-xl text-base font-bold bg-[#B85C3C] hover:bg-[#2C1810] transition-all duration-300 shadow-lg shadow-[#B85C3C]/20"
           size="lg"
         >
-          Create Account
+          {t("auth.createAccountTitle")}
         </Button>
       </form>
 
@@ -224,7 +224,7 @@ export function RegisterForm({
           <span className="w-full border-t border-[#B85C3C]/10" />
         </div>
         <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
-          <span className="bg-white px-3 text-[#2C1810]/40 font-medium">Or continue with</span>
+          <span className="bg-white px-3 text-[#2C1810]/40 font-medium">{t("auth.orContinueWith")}</span>
         </div>
       </div>
 
@@ -237,18 +237,18 @@ export function RegisterForm({
         onClick={onGoogleSignIn}
       >
         <FcGoogle className="h-5 w-5" />
-        <span className="font-medium">Continue with Google</span>
+        <span className="font-medium">{t("auth.googleContinue")}</span>
       </Button>
 
       {/* Switch to Login */}
       <p className="text-center mt-6 text-sm text-[#2C1810]/60">
-        Already have an account?{" "}
+        {t("auth.alreadyHaveAccount")}{" "}
         <button
           type="button"
           className="text-[#B85C3C] hover:text-[#2C1810] font-bold transition-colors"
           onClick={onSwitchToLogin}
         >
-          Login here
+          {t("auth.loginHere")}
         </button>
       </p>
     </div>

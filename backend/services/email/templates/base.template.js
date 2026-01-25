@@ -11,11 +11,24 @@ const FRONTEND_URL = rawFrontendUrl.split(',')[0].trim();
  * Wrap content in the base email template
  */
 function wrapInTemplate(content, options = {}) {
-    const { title = APP_NAME } = options;
+    const { title = APP_NAME, lang = 'en' } = options;
+
+    const i18n = {
+        en: {
+            rights: 'All rights reserved.',
+            visit: 'Visit our website'
+        },
+        hi: {
+            rights: 'सर्वाधिकार सुरक्षित।',
+            visit: 'हमारी वेबसाइट पर जाएँ'
+        }
+    };
+
+    const strings = i18n[lang] || i18n.en;
 
     return `
 <!DOCTYPE html>
-<html lang="en">
+<html lang="${lang}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -102,9 +115,9 @@ function wrapInTemplate(content, options = {}) {
             ${content}
         </div>
         <div class="footer">
-            <p>© ${new Date().getFullYear()} ${APP_NAME}. All rights reserved.</p>
+            <p>© ${new Date().getFullYear()} ${APP_NAME}. ${strings.rights}</p>
             <p class="text-muted">
-                <a href="${FRONTEND_URL}" style="color: #667eea;">Visit our website</a>
+                <a href="${FRONTEND_URL}" style="color: #667eea;">${strings.visit}</a>
             </p>
         </div>
     </div>

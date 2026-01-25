@@ -1,5 +1,6 @@
 import { logger } from "@/lib/logger";
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogContent,
@@ -40,6 +41,7 @@ export default function AuthPage({
   onOpenChange,
   defaultStep = "login",
 }: AuthPageProps) {
+  const { t } = useTranslation();
   const initialStep = defaultStep.includes("register") ? "register" : "login";
 
   const [step, setStep] = useState<AuthStep>(initialStep);
@@ -89,7 +91,7 @@ export default function AuthPage({
       if (showOtp) {
         // Step 2: Verify OTP
         if (!formData.otp || formData.otp.length < 6) {
-          toast.error("Please enter a valid OTP");
+          toast.error(t("auth.invalidOtpToast"));
           setIsLoading(false);
           return;
         }
@@ -97,7 +99,7 @@ export default function AuthPage({
         const user = await verifyLoginOtp(formData.email, formData.otp);
 
         login(user);
-        toast.success("Login successful!");
+        toast.success(t("auth.loginSuccessToast"));
         onOpenChange(false);
         setShowOtp(false); // Reset for next time
 
@@ -116,7 +118,7 @@ export default function AuthPage({
         // Step 1: Validate Credentials
         const res = await validateCredentials(formData.email, formData.password);
         if (res.success) {
-          toast.success("Credentials valid. OTP sent to your email.");
+          toast.success(t("auth.otpSentToast"));
           setShowOtp(true);
           setFieldErrors({}); // Clear errors when moving to OTP step
         } else {
@@ -136,7 +138,7 @@ export default function AuthPage({
         });
         setFieldErrors(errors);
       } else {
-        setFieldErrors({ general: getErrorMessage(error, "Login failed") });
+        setFieldErrors({ general: getErrorMessage(error, t("auth.loginFailed")) });
       }
     } finally {
       setIsLoading(false);
@@ -150,7 +152,7 @@ export default function AuthPage({
 
     // Validate phone
     if (!formData.phone || formData.phone.length < 10) {
-      setFieldErrors(prev => ({ ...prev, phone: "Please enter a valid phone number" }));
+      setFieldErrors(prev => ({ ...prev, phone: t("auth.phoneRequiredToast") }));
       setIsLoading(false);
       return;
     }
@@ -158,19 +160,19 @@ export default function AuthPage({
     // Validate password
     const passwordErrors: string[] = [];
     if (formData.password.length < 8) {
-      passwordErrors.push("• Password must be at least 8 characters long");
+      passwordErrors.push(t("auth.passwordLength"));
     }
     if (!/[A-Z]/.test(formData.password)) {
-      passwordErrors.push("• Password must contain at least one uppercase letter");
+      passwordErrors.push(t("auth.passwordUppercase"));
     }
     if (!/[a-z]/.test(formData.password)) {
-      passwordErrors.push("• Password must contain at least one lowercase letter");
+      passwordErrors.push(t("auth.passwordLowercase"));
     }
     if (!/[0-9]/.test(formData.password)) {
-      passwordErrors.push("• Password must contain at least one number");
+      passwordErrors.push(t("auth.passwordNumber"));
     }
     if (!/[!@#$%^&*(),.?":{}|<>]/.test(formData.password)) {
-      passwordErrors.push("• Password must contain at least one special character");
+      passwordErrors.push(t("auth.passwordSpecial"));
     }
 
     if (passwordErrors.length > 0) {
@@ -188,7 +190,7 @@ export default function AuthPage({
       });
 
       setStep("success");
-      toast.success("Account created successfully!");
+      toast.success(t("auth.accountCreatedToast"));
 
     } catch (error: unknown) {
       logger.error("Registration error:", error);
@@ -202,9 +204,9 @@ export default function AuthPage({
         });
         setFieldErrors(errors);
       } else {
-        const errorMsg = getErrorMessage(error, "Registration failed");
+        const errorMsg = getErrorMessage(error, t("auth.registrationFailed"));
         if (errorMsg.includes("already registered")) {
-          toast.error("Account already exists. Please log in.");
+          toast.error(t("auth.accountExistsToast"));
           setStep("login");
         } else {
           setFieldErrors({ general: errorMsg });
@@ -221,10 +223,10 @@ export default function AuthPage({
 
     try {
       await requestPasswordReset(formData.email);
-      toast.success("Password reset email sent! Check your inbox.");
+      toast.success(t("auth.resetEmailSentToast"));
       setStep("login");
     } catch (error: unknown) {
-      setFieldErrors({ general: getErrorMessage(error, "Failed to send reset email") });
+      setFieldErrors({ general: getErrorMessage(error, t("auth.resetFailed")) });
     } finally {
       setIsLoading(false);
     }
@@ -253,11 +255,11 @@ export default function AuthPage({
     try {
       const res = await validateCredentials(formData.email, formData.password);
       if (res.success) {
-        toast.success("OTP resent successfully.");
+        toast.success(t("auth.otpSentToast"));
         setResendCooldown(30);
       }
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Failed to resend OTP"));
+      toast.error(getErrorMessage(error, t("auth.otpFailed")));
     } finally {
       setIsLoading(false);
     }
@@ -268,10 +270,10 @@ export default function AuthPage({
     setIsLoading(true);
     try {
       await resendConfirmationEmail(formData.email);
-      toast.success("Confirmation email resent!");
+      toast.success(t("auth.otpSentToast")); // Re-using OTP sent toast for email confirmation too
       setResendCooldown(30);
     } catch (error: unknown) {
-      const msg = getErrorMessage(error, "Failed to resend email");
+      const msg = getErrorMessage(error, t("auth.confirmationFailed"));
       toast.error(msg);
       if (msg.toLowerCase().includes("already verified")) {
         setStep("login");
@@ -283,19 +285,19 @@ export default function AuthPage({
 
   const getTitle = () => {
     switch (step) {
-      case "register": return "Create Account";
-      case "forgot-password": return "Reset Password";
-      case "success": return "Registration Successful!";
-      default: return "Welcome Back";
+      case "register": return t("auth.createAccountTitle");
+      case "forgot-password": return t("auth.resetPasswordTitle");
+      case "success": return t("auth.regSuccessTitle");
+      default: return t("auth.welcomeBack");
     }
   };
 
   const getDescription = () => {
     switch (step) {
-      case "register": return "Sign up to get started";
-      case "forgot-password": return "Enter your email to receive reset instructions";
-      case "success": return "Your account has been created successfully.";
-      default: return "Sign in to your account";
+      case "register": return t("auth.signUpSubtitle");
+      case "forgot-password": return t("auth.resetSubtitle");
+      case "success": return t("auth.regSuccessSubtitle");
+      default: return t("auth.journeySubtitle");
     }
   };
 
@@ -320,7 +322,7 @@ export default function AuthPage({
                   type="button"
                 >
                   <FcGoogle className="w-5 h-5" />
-                  Continue with Google
+                  {t("auth.googleContinue")}
                 </Button>
 
                 <div className="relative mb-4">
@@ -329,7 +331,7 @@ export default function AuthPage({
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
                     <span className="bg-background px-2 text-muted-foreground">
-                      Or continue with email
+                      {t("auth.orContinueWithEmail")}
                     </span>
                   </div>
                 </div>
@@ -347,11 +349,11 @@ export default function AuthPage({
                 {!showOtp ? (
                   <>
                     <div>
-                      <Label htmlFor="email">Email Address</Label>
+                      <Label htmlFor="email">{t("auth.emailLabel")}</Label>
                       <Input
                         id="email"
                         type="email"
-                        placeholder="you@example.com"
+                        placeholder={t("auth.emailPlaceholder")}
                         value={formData.email}
                         onChange={(e) => {
                           setFormData({ ...formData, email: e.target.value });
@@ -369,12 +371,12 @@ export default function AuthPage({
                     </div>
 
                     <div>
-                      <Label htmlFor="password">Password</Label>
+                      <Label htmlFor="password">{t("auth.passwordLabel")}</Label>
                       <div className="relative">
                         <Input
                           id="password"
                           type={showLoginPassword ? "text" : "password"}
-                          placeholder="Enter your password"
+                          placeholder={t("auth.passwordPlaceholder")}
                           value={formData.password}
                           onChange={(e) => {
                             setFormData({ ...formData, password: e.target.value });
@@ -412,16 +414,16 @@ export default function AuthPage({
                         onClick={() => setStep("forgot-password")}
                         type="button"
                       >
-                        Forgot password?
+                        {t("auth.forgotPassword")}
                       </Button>
                     </div>
                   </>
                 ) : (
                   <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
                     <div className="text-center">
-                      <h3 className="text-lg font-medium">Verification Required</h3>
+                      <h3 className="text-lg font-medium">{t("auth.verificationRequired")}</h3>
                       <p className="text-sm text-muted-foreground">
-                        Enter the OTP sent to {formData.email}
+                        {t("auth.enterOtpSentTo")} {formData.email}
                       </p>
                     </div>
                     <div>
@@ -454,7 +456,7 @@ export default function AuthPage({
                         onClick={handleResendOtp}
                         disabled={isLoading || resendCooldown > 0}
                       >
-                        {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : "Resend OTP"}
+                        {resendCooldown > 0 ? `${t("auth.resendAvailableIn")} ${resendCooldown}s` : t("auth.resendOtp")}
                       </Button>
                       <div>
                         <Button
@@ -463,7 +465,7 @@ export default function AuthPage({
                           className="text-sm"
                           onClick={() => setShowOtp(false)}
                         >
-                          Change Email / Password
+                          {t("auth.changeEmailPassword")}
                         </Button>
                       </div>
                     </div>
@@ -474,16 +476,16 @@ export default function AuthPage({
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {showOtp ? "Verifying..." : "Sign In"}
+                      {showOtp ? t("auth.verifying") : t("auth.signIn")}
                     </>
                   ) : (
-                    showOtp ? "Verify Login" : "Next"
+                    showOtp ? t("auth.verifyLogin") : t("auth.next")
                   )}
                 </Button>
 
                 <div className="text-center text-sm">
                   <span className="text-muted-foreground">
-                    Don't have an account?{" "}
+                    {t("auth.dontHaveAccount")}{" "}
                   </span>
                   <Button
                     variant="link"
@@ -491,7 +493,7 @@ export default function AuthPage({
                     onClick={() => setStep("register")}
                     type="button"
                   >
-                    Sign up
+                    {t("auth.signUp")}
                   </Button>
                 </div>
               </form>
@@ -500,11 +502,11 @@ export default function AuthPage({
             {step === "register" && (
               <form onSubmit={handleRegisterSubmit} className="space-y-4" action="#">
                 <div>
-                  <Label htmlFor="reg-name">Full Name</Label>
+                  <Label htmlFor="reg-name">{t("profile.personalInfo.firstName")} / {t("profile.personalInfo.lastName")}</Label>
                   <Input
                     id="reg-name"
                     type="text"
-                    placeholder="John Doe"
+                    placeholder={t("auth.namePlaceholder")}
                     value={formData.name}
                     onChange={(e) => {
                       setFormData({ ...formData, name: e.target.value });
@@ -522,11 +524,11 @@ export default function AuthPage({
                 </div>
 
                 <div>
-                  <Label htmlFor="reg-email">Email Address</Label>
+                  <Label htmlFor="reg-email">{t("auth.emailLabel")}</Label>
                   <Input
                     id="reg-email"
                     type="email"
-                    placeholder="you@example.com"
+                    placeholder={t("auth.emailPlaceholder")}
                     value={formData.email}
                     onChange={(e) => {
                       setFormData({ ...formData, email: e.target.value });
@@ -543,10 +545,10 @@ export default function AuthPage({
                 </div>
 
                 <div>
-                  <Label htmlFor="reg-phone">Phone Number <span className="text-destructive">*</span></Label>
+                  <Label htmlFor="reg-phone">{t("profile.phone")} <span className="text-destructive">*</span></Label>
                   <PhoneInput
                     id="reg-phone"
-                    placeholder="Enter phone number"
+                    placeholder={t("profile.address.phonePlaceholder")}
                     value={formData.phone}
                     onChange={(value) => {
                       setFormData({ ...formData, phone: value as string });
@@ -562,12 +564,12 @@ export default function AuthPage({
                 </div>
 
                 <div>
-                  <Label htmlFor="reg-password">Password</Label>
+                  <Label htmlFor="reg-password">{t("auth.passwordLabel")}</Label>
                   <div className="relative">
                     <Input
                       id="reg-password"
                       type={showRegisterPassword ? "text" : "password"}
-                      placeholder="Create a password (min 8 characters)"
+                      placeholder={t("auth.createPasswordPlaceholder")}
                       value={formData.password}
                       onChange={(e) => {
                         setFormData({ ...formData, password: e.target.value });
@@ -602,16 +604,16 @@ export default function AuthPage({
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Creating Account...
+                      {t("auth.creatingAccount")}
                     </>
                   ) : (
-                    "Create Account"
+                    t("auth.createAccountTitle")
                   )}
                 </Button>
 
                 <div className="text-center text-sm">
                   <span className="text-muted-foreground">
-                    Already have an account?{" "}
+                    {t("auth.alreadyHaveAccount")}{" "}
                   </span>
                   <Button
                     variant="link"
@@ -619,7 +621,7 @@ export default function AuthPage({
                     onClick={() => setStep("login")}
                     type="button"
                   >
-                    Sign in
+                    {t("auth.signIn")}
                   </Button>
                 </div>
               </form>
@@ -628,11 +630,11 @@ export default function AuthPage({
             {step === "forgot-password" && (
               <form onSubmit={handleForgotPasswordSubmit} className="space-y-4" action="#">
                 <div>
-                  <Label htmlFor="reset-email">Email Address</Label>
+                  <Label htmlFor="reset-email">{t("auth.emailLabel")}</Label>
                   <Input
                     id="reset-email"
                     type="email"
-                    placeholder="you@example.com"
+                    placeholder={t("auth.emailPlaceholder")}
                     value={formData.email}
                     onChange={(e) => {
                       setFormData({ ...formData, email: e.target.value });
@@ -648,10 +650,10 @@ export default function AuthPage({
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Sending...
+                      {t("auth.sending")}
                     </>
                   ) : (
-                    "Send Reset Link"
+                    t("auth.sendResetLink")
                   )}
                 </Button>
 
@@ -662,7 +664,7 @@ export default function AuthPage({
                   type="button"
                 >
                   <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to Login
+                  {t("auth.backToLogin")}
                 </Button>
               </form>
             )}
@@ -670,12 +672,13 @@ export default function AuthPage({
             {step === "success" && (
               <div className="space-y-6 text-center">
                 <p className="text-sm text-muted-foreground">
-                  We have sent a confirmation email to your inbox.
-                  Please verify your email, then log in to continue.
+                  {t("auth.regSuccessEmailSent")}
+                  <br />
+                  {t("auth.regSuccessInstruction")}
                 </p>
                 <div className="space-y-2">
                   <Button className="w-full" onClick={() => setStep("login")}>
-                    Proceed to Login
+                    {t("auth.proceedToLogin")}
                   </Button>
                   <Button
                     variant="ghost"
@@ -684,7 +687,7 @@ export default function AuthPage({
                     onClick={handleResendConfirmation}
                     disabled={isLoading || resendCooldown > 0}
                   >
-                    {resendCooldown > 0 ? `Resend available in ${resendCooldown}s` : "Resend Confirmation Email"}
+                    {resendCooldown > 0 ? `${t("auth.resendAvailableIn")} ${resendCooldown}s` : t("auth.resendConfirmationEmail")}
                   </Button>
                 </div>
               </div>

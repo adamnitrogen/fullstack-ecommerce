@@ -51,7 +51,7 @@ async function authenticateToken(req, res, next) {
 
         if (!token) {
             logger.info('[AuthMiddleware] No token found in cookies or headers');
-            return res.status(401).json({ error: 'Access token missing', code: 'TOKEN_MISSING' });
+            return res.status(401).json({ error: req.t('errors.auth.authentication_required'), code: 'TOKEN_MISSING' });
         }
 
         // 1. Check Cache first (reduces Supabase API calls)
@@ -76,7 +76,7 @@ async function authenticateToken(req, res, next) {
 
         if (error || !user) {
             logger.info({ err: error?.message }, '[AuthMiddleware] Supabase validation failed (Invalid or expired token)');
-            return res.status(401).json({ error: 'Invalid or expired token' });
+            return res.status(401).json({ error: req.t('errors.auth.authentication_required') });
         }
 
         // 3. Check Account Deletion Status and Role (Critical Security Check)
@@ -113,7 +113,7 @@ async function authenticateToken(req, res, next) {
 
         // ENFORCE ACCESS RULES
         if (deletionStatus === 'DELETED') {
-            return res.status(410).json({ error: 'Account deleted', code: 'ACCOUNT_DELETED' });
+            return res.status(410).json({ error: req.t('errors.auth.account_deleted'), code: 'ACCOUNT_DELETED' });
         }
         if (deletionStatus === 'DELETION_IN_PROGRESS') {
             return res.status(403).json({ error: 'Account deletion in progress', code: 'DELETION_IN_PROGRESS' });
@@ -166,7 +166,7 @@ async function authenticateToken(req, res, next) {
         next();
     } catch (error) {
         logger.error({ err: error }, '[AuthMiddleware] Error');
-        return res.status(500).json({ error: 'Internal server error during authentication' });
+        return res.status(500).json({ error: req.t('errors.system.internal_error') });
     }
 }
 
@@ -190,7 +190,7 @@ function authorizeRole(...roles) {
                 actual: req.user.role,
                 userId: req.user.id
             });
-            return res.status(403).json({ error: 'Insufficient permissions' });
+            return res.status(403).json({ error: req.t('errors.auth.forbidden') });
         }
 
         next();

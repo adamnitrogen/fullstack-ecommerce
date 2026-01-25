@@ -5,6 +5,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { IndianRupee, FileText, Info } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import {
     Tooltip,
     TooltipContent,
@@ -41,6 +42,7 @@ export function TaxBreakdown({
     deliveryGST = 0,
     role = 'customer'
 }: TaxBreakdownProps) {
+    const { t } = useTranslation();
     // 1. Calculate Product-only tax from items
     const productTaxableFromItems = items.reduce((sum, item) => {
         const qty = item.quantity || 1;
@@ -126,7 +128,7 @@ export function TaxBreakdown({
                 <CardTitle className="flex items-center justify-between text-base">
                     <div className="flex items-center gap-2">
                         <FileText size={18} className={role === 'admin' ? "text-primary" : ""} />
-                        <span>{role === 'admin' ? 'Detailed Tax Summary & Audit' : 'Price Breakdown'}</span>
+                        <span>{role === 'admin' ? t("tax.summary") : t("tax.priceBreakdown")}</span>
                     </div>
                 </CardTitle>
             </CardHeader>
@@ -135,11 +137,11 @@ export function TaxBreakdown({
                     {/* Primary Taxable & Tax Split */}
                     <div className="grid grid-cols-2 gap-4 bg-muted/30 p-3 rounded-lg border border-muted">
                         <div className="space-y-1">
-                            <span className="text-[10px] uppercase font-bold text-muted-foreground block">{role === 'admin' ? 'Total Taxable' : 'Subtotal (Before Tax)'}</span>
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground block">{role === 'admin' ? t("tax.totalTaxable") : t("tax.subtotalBeforeTax")}</span>
                             <span className="text-sm font-semibold">{formatAmount(effectiveTaxable)}</span>
                         </div>
                         <div className="space-y-1 text-right">
-                            <span className="text-[10px] uppercase font-bold text-muted-foreground block">{role === 'admin' ? 'Total GST' : 'Taxes (GST)'}</span>
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground block">{role === 'admin' ? t("tax.totalGST") : t("tax.taxesGST")}</span>
                             <span className="text-sm font-semibold text-primary">{formatAmount(displayTotalTax)}</span>
                         </div>
                     </div>
@@ -147,12 +149,12 @@ export function TaxBreakdown({
                     {/* Detailed Breakdown */}
                     <div className="space-y-2 px-1">
                         <div className="flex justify-between text-xs">
-                            <span className="text-muted-foreground">{role === 'admin' ? 'Product(s) Net Taxable' : 'Items Total'}</span>
+                            <span className="text-muted-foreground">{role === 'admin' ? t("tax.netTaxable") : t("tax.itemsTotal")}</span>
                             <span>{formatAmount(productTaxableFromItems)}</span>
                         </div>
                         {deliveryCharge > 0 && (
                             <div className="flex justify-between text-xs">
-                                <span className="text-muted-foreground italic">{role === 'admin' ? 'Delivery Service Taxable' : 'Shipping Charges'}</span>
+                                <span className="text-muted-foreground italic">{role === 'admin' ? t("tax.shippingCharges") : t("orderDetail.delivery")}</span>
                                 <span>{formatAmount(deliveryCharge)}</span>
                             </div>
                         )}
@@ -198,16 +200,16 @@ export function TaxBreakdown({
                                         <div key={idx} className="px-3 py-2.5 hover:bg-muted/5 transition-colors">
                                             <div className="flex justify-between items-start mb-1">
                                                 <div className="space-y-0.5">
-                                                    <div className="font-medium truncate max-w-[200px]" title={item.title || item.product?.title}>{item.title || item.product?.title || 'Product'}</div>
+                                                    <div className="font-medium truncate max-w-[200px]" title={item.title || item.product?.title}>{item.title || item.product?.title || t("products.defaultTitle") || 'Product'}</div>
                                                     <div className="flex items-center gap-2 text-[9px] text-muted-foreground">
                                                         <span>HSN: {hsn}</span>
                                                         <span>•</span>
-                                                        <span>Qty: {qty}</span>
+                                                        <span>{t("products.qty") || "Qty"}: {qty}</span>
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
                                                     <div className="font-semibold text-primary">{taxRate}% GST</div>
-                                                    <div className="text-[9px] text-muted-foreground">{formatAmount(itemTax)} tax</div>
+                                                    <div className="text-[9px] text-muted-foreground">{formatAmount(itemTax)} {t("tax.taxesGST").split(' ')[0]}</div>
                                                 </div>
                                             </div>
                                             <div className="flex justify-between items-center text-[10px] bg-muted/20 px-2 py-1 rounded mt-1">
@@ -222,12 +224,12 @@ export function TaxBreakdown({
                                     <div className="px-3 py-2.5 bg-amber-50/30 border-t border-dashed transition-all">
                                         <div className="flex justify-between items-start mb-1">
                                             <div className="space-y-0.5">
-                                                <div className="font-medium text-amber-900">Delivery Charges</div>
+                                                <div className="font-medium text-amber-900">{t("tax.shippingCharges")}</div>
                                                 <div className="text-[9px] text-amber-700 font-mono">HSN: 996812</div>
                                             </div>
                                             <div className="text-right">
                                                 <div className="font-semibold text-amber-600">18% GST</div>
-                                                <div className="text-[9px] text-amber-700">{formatAmount(deliveryGST)} tax</div>
+                                                <div className="text-[9px] text-amber-700">{formatAmount(deliveryGST)} {t("tax.taxesGST").split(' ')[0]}</div>
                                             </div>
                                         </div>
                                         <div className="flex justify-between items-center text-[10px] bg-white/50 px-2 py-1 rounded mt-1 border border-amber-200">
@@ -244,10 +246,10 @@ export function TaxBreakdown({
                 <div className="border-t-2 border-primary/20 pt-4 mt-2">
                     <div className="flex justify-between items-end">
                         <div className="space-y-0.5">
-                            <span className="text-[10px] uppercase font-bold text-muted-foreground block">{role === 'admin' ? 'Final Amount Payable' : 'Grand Total'}</span>
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground block">{role === 'admin' ? t("tax.finalAmount") : t("tax.grandTotal")}</span>
                             <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                                 <Info size={10} />
-                                {role === 'admin' ? 'Taxable Value + Total GST' : 'Includes all taxes'}
+                                {role === 'admin' ? t("tax.taxableValueGST") : t("tax.includesTaxes")}
                             </span>
                         </div>
                         <div className="text-right">
@@ -268,7 +270,7 @@ export function TaxBreakdown({
                             className="text-sm font-bold text-white bg-primary hover:bg-primary/90 transition-all flex items-center gap-2 justify-center w-full py-3 rounded-lg shadow-sm"
                         >
                             <FileText size={16} />
-                            Download Invoice
+                            {t("tax.downloadInvoice")}
                         </a>
                     </div>
                 )}

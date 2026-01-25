@@ -118,7 +118,7 @@ export default function Events() {
     if (isLoading) {
       return (
         <div className="min-h-[400px] relative">
-          <LoadingOverlay message="Gathering Sacred Events..." isLoading={true} />
+          <LoadingOverlay message={t("events.loadingEvents")} isLoading={true} />
         </div>
       );
     }
@@ -168,7 +168,7 @@ export default function Events() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <LoadingOverlay message="Gathering Sacred Events..." isLoading={isLoading && !isFetchingNextPage} />
+      <LoadingOverlay message={t("events.loadingEvents")} isLoading={isLoading && !isFetchingNextPage} />
 
       {/* Compact Premium Hero Section (Unified Height) */}
       <section className="bg-[#2C1810] text-white py-12 md:py-16 relative overflow-hidden shadow-2xl">
@@ -182,21 +182,21 @@ export default function Events() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-2">
               <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-[#D4AF37]/10 text-[#D4AF37] text-[10px] font-bold uppercase tracking-[0.2em] mb-2">
-                <Sparkles className="h-3 w-3" /> Community & Vedic Spirit
+                <Sparkles className="h-3 w-3" /> {t("events.spiritBadge")}
               </div>
               <h1 className="text-3xl md:text-5xl font-bold font-playfair">
-                Sacred <span className="text-[#D4AF37] italic">Gatherings</span>
+                {t("events.sacred")} <span className="text-[#D4AF37] italic">{t("events.gatherings")}</span>
               </h1>
             </div>
 
             <div className="flex flex-col md:flex-row gap-6 md:items-center max-w-xl">
               <p className="text-white/50 text-sm md:text-base font-light border-l border-[#D4AF37]/30 pl-6 hidden md:block">
-                Experience the divine essence of our community through traditional festivals, workshops, and spiritual events.
+                {t("events.subtitle")}
               </p>
               <div className="flex items-center gap-4 text-sm font-medium">
                 <div className="px-4 py-2 rounded-2xl bg-[#D4AF37]/10 border border-[#D4AF37]/20 text-[#D4AF37] min-w-[120px]">
-                  <span className="block text-[9px] uppercase tracking-wider opacity-60 mb-0.5">Total Events</span>
-                  <span className="text-base font-bold">{totalEvents} Active</span>
+                  <span className="block text-[9px] uppercase tracking-wider opacity-60 mb-0.5">{t("events.upcoming")}</span>
+                  <span className="text-base font-bold">{totalEvents} {t("events.activeCount")}</span>
                 </div>
               </div>
             </div>
@@ -210,7 +210,7 @@ export default function Events() {
           <div className="flex justify-center mb-12">
             <TabsList className="h-16 rounded-full bg-white shadow-elevated p-1.5 border border-border/50">
               <TabsTrigger value="all" className="rounded-full px-8 data-[state=active]:bg-[#2C1810] data-[state=active]:text-white transition-all font-bold text-xs uppercase tracking-widest">
-                All {activeTab === "all" && events.length > 0 && <span className="ml-2 opacity-50">{totalEvents}</span>}
+                {t("events.allTab")} {activeTab === "all" && events.length > 0 && <span className="ml-2 opacity-50">{totalEvents}</span>}
               </TabsTrigger>
               <TabsTrigger value="upcoming" className="rounded-full px-8 data-[state=active]:bg-[#2C1810] data-[state=active]:text-white transition-all font-bold text-xs uppercase tracking-widest">
                 {t("events.upcoming")} {activeTab === "upcoming" && events.length > 0 && <span className="ml-2 opacity-50">{totalEvents}</span>}
@@ -228,7 +228,7 @@ export default function Events() {
             <TabsContent value="all" className="mt-0 focus-visible:outline-none">
               {renderEventList(
                 <div className="mb-6 inline-flex p-6 rounded-full bg-muted/50"><Calendar className="h-12 w-12 text-muted-foreground/50" /></div>,
-                "No events available at the moment"
+                t("events.noEventsFound")
               )}
             </TabsContent>
 

@@ -1,9 +1,11 @@
 import { useNavigate } from "react-router-dom";
 import { ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "react-i18next";
 
 export const EmptyCart = () => {
     const navigate = useNavigate();
+    const { t } = useTranslation();
 
     return (
         <div className="min-h-[70vh] flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-700">
@@ -15,12 +17,11 @@ export const EmptyCart = () => {
             </div>
 
             <h1 className="text-4xl md:text-5xl font-black mb-4 font-playfair tracking-tighter text-foreground">
-                Your cart is empty
+                {t("cart.emptyTitle")}
             </h1>
 
             <p className="text-muted-foreground max-w-sm mb-12 text-sm md:text-base leading-relaxed font-medium px-4">
-                Looks like you haven't added anything to your cart yet.
-                Discover our premium collection of authentic products today.
+                {t("cart.emptyDescription")}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 items-center">
@@ -29,7 +30,7 @@ export const EmptyCart = () => {
                     size="lg"
                     className="text-base font-black uppercase tracking-widest px-10 py-7 h-auto rounded-2xl shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all hover:-translate-y-1 active:scale-95"
                 >
-                    Start Shopping
+                    {t("cart.startShopping")}
                 </Button>
                 <Button
                     variant="outline"
@@ -37,7 +38,7 @@ export const EmptyCart = () => {
                     size="lg"
                     className="text-base font-black uppercase tracking-widest px-10 py-7 h-auto rounded-2xl bg-background/50 backdrop-blur-sm border-border/60 hover:bg-muted transition-all"
                 >
-                    Back to Home
+                    {t("cart.backToHome")}
                 </Button>
             </div>
         </div>

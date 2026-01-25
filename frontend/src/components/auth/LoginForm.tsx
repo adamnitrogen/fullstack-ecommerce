@@ -46,7 +46,7 @@ export function LoginForm({
   const [errors, setErrors] = useState<ValidationError>({});
 
   const validateEmailOrPhone = (value: string): string | null => {
-    const requiredError = validators.required(value, "Email or Phone");
+    const requiredError = validators.required(value, t("auth.emailPhone"));
     if (requiredError) return requiredError;
 
     const emailError = validators.email(value);
@@ -56,7 +56,7 @@ export function LoginForm({
       return null;
     }
 
-    return "Please enter a valid email address or 10-digit phone number";
+    return t("errors.auth.invalidEmailPhone");
   };
 
   const handleEmailOrPhoneChange = (value: string) => {
@@ -77,7 +77,7 @@ export function LoginForm({
 
     if (showOtp) {
       if (!otp || otp.length < 6) {
-        newErrors.otp = "Please enter a valid 6-digit OTP";
+        newErrors.otp = t("errors.auth.invalidOtp");
         isValid = false;
       }
     } else if (!showPasswordField) {
@@ -88,8 +88,8 @@ export function LoginForm({
       }
     } else {
       const passwordError =
-        validators.required(password, "Password") ||
-        validators.minLength(password, 6, "Password");
+        validators.required(password, t("auth.password")) ||
+        validators.minLength(password, 6, t("auth.password"));
       if (passwordError) {
         newErrors.password = passwordError;
         isValid = false;
@@ -100,8 +100,8 @@ export function LoginForm({
 
     if (!isValid) {
       toast({
-        title: "Check your info",
-        description: "Please fix the errors before continuing",
+        title: t("errors.auth.checkInfo"),
+        description: t("errors.auth.fixErrors"),
         variant: "destructive",
       });
       return;
@@ -112,12 +112,12 @@ export function LoginForm({
       if (showOtp) {
         const user = await verifyLoginOtp(emailOrPhone, otp);
         login(user);
-        toast({ title: "Login Successful", description: `Welcome back, ${user.name}!` });
+        toast({ title: t("auth.loginSuccessful"), description: t("auth.welcomeBackUser", { name: user.name }) });
         if (onPasswordSubmit) onPasswordSubmit("otp_verified_placeholder");
       } else if (showPasswordField) {
         const res = await validateCredentials(emailOrPhone, password);
         if (res.success) {
-          toast({ title: "Verification Required", description: "OTP sent to your email." });
+          toast({ title: t("auth.verificationRequired"), description: t("auth.otpSentEmail") });
           setShowOtp(true);
         }
       } else {
@@ -125,8 +125,8 @@ export function LoginForm({
       }
     } catch (error: unknown) {
       toast({
-        title: getFriendlyTitle(error, "Notice"),
-        description: getErrorMessage(error, "An error occurred"),
+        title: getFriendlyTitle(error, t("errors.auth.notice")),
+        description: getErrorMessage(error, t("errors.auth.errorOccurred")),
         variant: "destructive"
       });
     } finally {
@@ -143,7 +143,7 @@ export function LoginForm({
           className="absolute top-4 left-4 flex items-center gap-1.5 text-[#2C1810]/60 hover:text-[#B85C3C] transition-colors text-sm font-medium"
         >
           <ArrowLeft size={16} />
-          Back
+          {t("common.back")}
         </button>
       )}
 
@@ -155,9 +155,9 @@ export function LoginForm({
           </div>
         </div>
         <h2 className="text-2xl font-bold text-[#2C1810] font-playfair mb-1">
-          Welcome Back
+          {t("auth.welcomeBack")}
         </h2>
-        <p className="text-sm text-[#2C1810]/60">Sign in to continue your journey</p>
+        <p className="text-sm text-[#2C1810]/60">{t("auth.journeySubtitle")}</p>
       </div>
 
       {/* Form */}
@@ -166,14 +166,14 @@ export function LoginForm({
           <>
             <div className="space-y-2">
               <Label htmlFor="emailOrPhone" className="text-xs font-bold uppercase tracking-wider text-[#2C1810]">
-                Email / Phone Number <span className="text-[#B85C3C]">*</span>
+                {t("auth.emailPhone")} <span className="text-[#B85C3C]">*</span>
               </Label>
               <Input
                 id="emailOrPhone"
                 type="text"
                 value={emailOrPhone}
                 onChange={(e) => handleEmailOrPhoneChange(e.target.value)}
-                placeholder="Enter your email or phone number"
+                placeholder={t("auth.emailPhonePlaceholder")}
                 disabled={showPasswordField}
                 className={`h-12 rounded-xl border-2 bg-[#FAF7F2] focus:bg-white transition-colors ${errors.emailOrPhone ? "border-red-500" : "border-[#B85C3C]/10 focus:border-[#B85C3C]"}`}
               />
@@ -184,14 +184,14 @@ export function LoginForm({
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <Label htmlFor="password" className="text-xs font-bold uppercase tracking-wider text-[#2C1810]">
-                    Password <span className="text-[#B85C3C]">*</span>
+                    {t("auth.password")} <span className="text-[#B85C3C]">*</span>
                   </Label>
                   <button
                     type="button"
                     className="text-xs text-[#B85C3C] hover:text-[#2C1810] font-medium transition-colors"
                     onClick={onForgotPassword}
                   >
-                    Forgot Password?
+                    {t("auth.forgotPassword")}
                   </button>
                 </div>
                 <Input
@@ -199,7 +199,7 @@ export function LoginForm({
                   type="password"
                   value={password}
                   onChange={(e) => handlePasswordChange(e.target.value)}
-                  placeholder="Enter your password"
+                  placeholder={t("auth.passwordPlaceholder")}
                   className={`h-12 rounded-xl border-2 bg-[#FAF7F2] focus:bg-white transition-colors ${errors.password ? "border-red-500" : "border-[#B85C3C]/10 focus:border-[#B85C3C]"}`}
                 />
                 <FormError error={errors.password} />
@@ -213,14 +213,14 @@ export function LoginForm({
               <div className="w-12 h-12 bg-[#B85C3C]/10 rounded-full flex items-center justify-center mx-auto mb-3">
                 <span className="text-2xl">🔐</span>
               </div>
-              <h3 className="font-bold text-[#2C1810] text-lg">Enter Verification Code</h3>
+              <h3 className="font-bold text-[#2C1810] text-lg">{t("auth.enterOtpTitle")}</h3>
               <p className="text-sm text-[#2C1810]/60 mt-1">
-                We sent a 6-digit code to <span className="font-medium text-[#B85C3C]">{emailOrPhone}</span>
+                {t("auth.otpSentTo")} <span className="font-medium text-[#B85C3C]">{emailOrPhone}</span>
               </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="otp" className="text-xs font-bold uppercase tracking-wider text-[#2C1810]">
-                OTP Code <span className="text-[#B85C3C]">*</span>
+                {t("auth.otpCode")} <span className="text-[#B85C3C]">*</span>
               </Label>
               <Input
                 id="otp"
@@ -242,32 +242,30 @@ export function LoginForm({
               className="text-sm text-[#B85C3C] hover:text-[#2C1810] font-medium transition-colors w-full text-center"
               onClick={() => setShowOtp(false)}
             >
-              ← Back to Login
+              ← {t("auth.backToLogin")}
             </button>
           </div>
         )}
 
-        {!showOtp && (
-          <p className="text-[10px] text-[#2C1810]/50 text-center leading-relaxed">
-            By continuing, you agree to our{" "}
-            <button
-              type="button"
-              className="text-[#B85C3C] hover:underline font-medium"
-              onClick={() => window.open("/terms-and-conditions", "_blank")}
-            >
-              Terms of Use
-            </button>{" "}
-            and{" "}
-            <button
-              type="button"
-              className="text-[#B85C3C] hover:underline font-medium"
-              onClick={() => window.open("/privacy-policy", "_blank")}
-            >
-              Privacy Policy
-            </button>
-            .
-          </p>
-        )}
+        <p className="text-[10px] text-[#2C1810]/50 text-center leading-relaxed">
+          {t("auth.termsAgree")}{" "}
+          <button
+            type="button"
+            className="text-[#B85C3C] hover:underline font-medium"
+            onClick={() => window.open("/terms-and-conditions", "_blank")}
+          >
+            {t("auth.termsOfUse")}
+          </button>{" "}
+          and{" "}
+          <button
+            type="button"
+            className="text-[#B85C3C] hover:underline font-medium"
+            onClick={() => window.open("/privacy-policy", "_blank")}
+          >
+            {t("auth.privacyPolicy")}
+          </button>
+          .
+        </p>
 
         <Button
           type="submit"
@@ -275,7 +273,7 @@ export function LoginForm({
           size="lg"
           disabled={isLoading}
         >
-          {isLoading ? "Signing you in..." : (showOtp ? "Verify & Login" : (showPasswordField ? "Sign In" : "Continue"))}
+          {isLoading ? t("auth.signingIn") : (showOtp ? t("auth.verifyLogin") : (showPasswordField ? t("auth.signIn") : t("common.next")))}
         </Button>
       </form>
 
@@ -286,7 +284,7 @@ export function LoginForm({
             <span className="w-full border-t border-[#B85C3C]/10" />
           </div>
           <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
-            <span className="bg-white px-3 text-[#2C1810]/40 font-medium">Or continue with</span>
+            <span className="bg-white px-3 text-[#2C1810]/40 font-medium">{t("auth.orContinueWith")}</span>
           </div>
         </div>
       )}
@@ -301,26 +299,26 @@ export function LoginForm({
           onClick={onGoogleSignIn}
         >
           <FcGoogle className="h-5 w-5" />
-          <span className="font-medium">Continue with Google</span>
+          <span className="font-medium">{t("auth.googleContinue")}</span>
         </Button>
       )}
 
       {/* Switch to Register */}
       <p className="text-center mt-6 text-sm text-[#2C1810]/60">
-        Don't have an account?{" "}
+        {t("auth.dontHaveAccount")}{" "}
         <button
           type="button"
           className="text-[#B85C3C] hover:text-[#2C1810] font-bold transition-colors"
           onClick={onSwitchToRegister}
         >
-          Register here
+          {t("auth.registerHere")}
         </button>
       </p>
 
       {/* Social Media Links */}
       <div className="mt-8 pt-6 border-t border-[#B85C3C]/10">
         <p className="text-center text-[10px] text-[#2C1810]/40 uppercase tracking-wider font-medium mb-3">
-          Follow Us
+          {t("nav.followUs")}
         </p>
         <div className="flex justify-center gap-2">
           <button className="w-9 h-9 rounded-full bg-[#FAF7F2] flex items-center justify-center text-[#2C1810]/50 hover:bg-[#B85C3C] hover:text-white transition-all">

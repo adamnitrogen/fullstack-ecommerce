@@ -120,27 +120,27 @@ export function AddressDialog({
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {address ? "Edit Address" : "Add New Address"}
+            {address ? t("profile.address.refineSanctuary") : t("profile.address.establishSanctuary")}
           </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Name *</Label>
+              <Label htmlFor="name">{t("profile.name")} *</Label>
               <Input
                 id="name"
                 value={formData.name || ""}
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
-                placeholder="Enter name"
+                placeholder={t("auth.namePlaceholder")}
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number *</Label>
+              <Label htmlFor="phone">{t("profile.phone")} *</Label>
               <Input
                 id="phone"
                 type="tel"
@@ -148,7 +148,7 @@ export function AddressDialog({
                 onChange={(e) =>
                   setFormData({ ...formData, phone: e.target.value })
                 }
-                placeholder="10-digit mobile number"
+                placeholder={t("profile.address.phonePlaceholder")}
                 required
               />
             </div>
@@ -156,41 +156,41 @@ export function AddressDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="pincode">Pincode *</Label>
+              <Label htmlFor="pincode">{t("profile.zipcode")} *</Label>
               <Input
                 id="pincode"
                 value={formData.pincode || ""}
                 onChange={(e) =>
                   setFormData({ ...formData, pincode: e.target.value })
                 }
-                placeholder="6-digit pincode"
+                placeholder={t("profile.address.postalPlaceholder")}
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="locality">Locality *</Label>
+              <Label htmlFor="locality">{t("profile.address.landmarkLabel")} *</Label>
               <Input
                 id="locality"
                 value={formData.locality || ""}
                 onChange={(e) =>
                   setFormData({ ...formData, locality: e.target.value })
                 }
-                placeholder="Locality/Town"
+                placeholder={t("profile.address.landmarkPlaceholder")}
                 required
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="addressLine">Street Address *</Label>
+            <Label htmlFor="addressLine">{t("profile.addressLine")} *</Label>
             <Textarea
               id="addressLine"
               value={formData.addressLine || ""}
               onChange={(e) =>
                 setFormData({ ...formData, addressLine: e.target.value })
               }
-              placeholder="House No., Building Name, Road, Area"
+              placeholder={t("profile.address.housePlaceholder")}
               rows={3}
               required
             />
@@ -198,20 +198,20 @@ export function AddressDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="city">City/District *</Label>
+              <Label htmlFor="city">{t("profile.city")} *</Label>
               <Input
                 id="city"
                 value={formData.city || ""}
                 onChange={(e) =>
                   setFormData({ ...formData, city: e.target.value })
                 }
-                placeholder="City/District"
+                placeholder={t("profile.city")}
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="state">State *</Label>
+              <Label htmlFor="state">{t("profile.state")} *</Label>
               <Select
                 value={formData.state || ""}
                 onValueChange={(value) =>
@@ -219,7 +219,7 @@ export function AddressDialog({
                 }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select State" />
+                  <SelectValue placeholder={t("profile.address.selectState")} />
                 </SelectTrigger>
                 <SelectContent>
                   {INDIAN_STATES.map((state) => (
@@ -234,19 +234,19 @@ export function AddressDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="landmark">Landmark (Optional)</Label>
+              <Label htmlFor="landmark">{t("profile.address.landmarkLabel")} ({t("profile.address.optional")})</Label>
               <Input
                 id="landmark"
                 value={formData.landmark || ""}
                 onChange={(e) =>
                   setFormData({ ...formData, landmark: e.target.value })
                 }
-                placeholder="Near famous place"
+                placeholder={t("profile.address.landmarkPlaceholder")}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="alternatePhone">Alternate Phone (Optional)</Label>
+              <Label htmlFor="alternatePhone">{t("profile.address.alternatePhoneLabel")} ({t("profile.address.optional")})</Label>
               <Input
                 id="alternatePhone"
                 type="tel"
@@ -254,13 +254,13 @@ export function AddressDialog({
                 onChange={(e) =>
                   setFormData({ ...formData, alternatePhone: e.target.value })
                 }
-                placeholder="Alternate contact number"
+                placeholder={t("profile.address.alternatePhonePlaceholder")}
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label>Address Type *</Label>
+            <Label>{t("profile.addressType")} *</Label>
             <RadioGroup
               value={formData.addressType || "home"}
               onValueChange={(value) =>
@@ -273,13 +273,13 @@ export function AddressDialog({
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="home" id="home" />
                 <Label htmlFor="home" className="font-normal">
-                  Home
+                  {t("profile.address.typeHome")}
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="work" id="work" />
                 <Label htmlFor="work" className="font-normal">
-                  Work
+                  {t("profile.address.typeWork")}
                 </Label>
               </div>
             </RadioGroup>
@@ -291,9 +291,9 @@ export function AddressDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
-            <Button type="submit">Save Address</Button>
+            <Button type="submit">{t("common.save")}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

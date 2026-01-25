@@ -142,29 +142,29 @@ const Index = () => {
   const benefits = [
     {
       icon: Milk,
-      title: "Pure Dairy Products",
-      description: "Fresh milk, ghee, and dairy products rich in nutrients",
+      title: t("index.benefits.pure.title"),
+      description: t("index.benefits.pure.desc"),
     },
     {
       icon: Leaf,
-      title: "Organic & Natural",
-      description: "Chemical-free, traditional farming methods",
+      title: t("index.benefits.organic.title"),
+      description: t("index.benefits.organic.desc"),
     },
     {
       icon: Recycle,
-      title: "Eco-Friendly",
-      description: "Sustainable farming with natural fertilizers",
+      title: t("index.benefits.eco.title"),
+      description: t("index.benefits.eco.desc"),
     },
     {
       icon: Heart,
-      title: "Cultural Heritage",
-      description: "Preserving ancient wisdom and traditions",
+      title: t("index.benefits.heritage.title"),
+      description: t("index.benefits.heritage.desc"),
     },
   ];
 
   return (
     <div className="min-h-screen">
-      <LoadingOverlay isLoading={isLoading} message="Just a moment..." />
+      <LoadingOverlay isLoading={isLoading} message={t("index.loading")} />
       <ProductQuickView
         product={quickViewProduct}
         open={quickViewProduct !== null}
@@ -188,13 +188,13 @@ const Index = () => {
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-6">
             <div className="space-y-3">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-widest">
-                <Leaf className="h-3 w-3" /> Nature's Bounty
+                <Leaf className="h-3 w-3" /> {t("index.featured.badge")}
               </div>
               <h2 className="text-4xl md:text-6xl font-bold font-playfair text-[#2C1810]">
                 {t("products.title")}
               </h2>
               <p className="text-muted-foreground text-base md:text-lg font-light max-w-xl">
-                Discover our curated selection of pure, organic cow products crafted with ancient wisdom.
+                {t("index.featured.desc")}
               </p>
             </div>
             <Link to="/shop">
@@ -244,7 +244,7 @@ const Index = () => {
           ) : (
             <div className="text-center py-20 bg-muted/20 rounded-[3rem] border-2 border-dashed border-border/50">
               <p className="text-muted-foreground text-lg italic font-light">
-                No products available at the moment
+                {t("index.featured.noProducts")}
               </p>
             </div>
           )}
@@ -261,13 +261,13 @@ const Index = () => {
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-6">
             <div className="space-y-3">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#2C1810]/5 text-[#2C1810] text-[10px] font-bold uppercase tracking-widest">
-                <Sparkles className="h-3 w-3" /> Community Connection
+                <Sparkles className="h-3 w-3" /> {t("index.events.badge")}
               </div>
               <h2 className="text-4xl md:text-6xl font-bold font-playfair text-[#2C1810]">
-                Sacred Gatherings
+                {t("index.events.title")}
               </h2>
               <p className="text-muted-foreground text-base md:text-lg font-light max-w-xl">
-                Join our community programs, festivals, and spiritual experiences.
+                {t("index.events.desc")}
               </p>
             </div>
             <Link to="/events">
@@ -314,7 +314,7 @@ const Index = () => {
           ) : (
             <div className="text-center py-20 bg-white/50 rounded-[3rem] border-2 border-dashed border-[#2C1810]/10">
               <p className="text-muted-foreground text-lg italic font-light">
-                No upcoming events at the moment
+                {t("index.events.noEvents")}
               </p>
             </div>
           )}
@@ -326,7 +326,7 @@ const Index = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-10 space-y-3">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-widest">
-              <Milk className="h-3 w-3" /> Ancient Wisdom
+              <Milk className="h-3 w-3" /> {t("hero.ancientWisdom")}
             </div>
             <h2 className="text-4xl md:text-5xl font-bold font-playfair text-[#2C1810]">
               {t("benefits.title")}
@@ -360,18 +360,18 @@ const Index = () => {
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-6">
             <div className="space-y-3">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-widest">
-                <Leaf className="h-3 w-3" /> The Journal
+                <Leaf className="h-3 w-3" /> {t("index.whatsNew.badge")}
               </div>
               <h2 className="text-4xl md:text-5xl font-bold font-playfair text-[#2C1810]">
                 {t("whatsNew")}
               </h2>
               <p className="text-muted-foreground text-base md:text-lg font-light max-w-xl">
-                Latest news, sacred stories, and articles from our community.
+                {t("index.whatsNew.desc")}
               </p>
             </div>
             <Link to="/blog">
               <Button variant="outline" className="rounded-full px-8 py-6 border-[#2C1810]/20 hover:bg-[#2C1810] hover:text-white transition-all duration-500 font-bold uppercase tracking-widest text-xs h-auto bg-transparent">
-                View All Stories
+                {t("index.whatsNew.viewAll")}
               </Button>
             </Link>
           </div>
@@ -385,7 +385,7 @@ const Index = () => {
           ) : (
             <div className="text-center py-20 bg-white/50 rounded-[3rem] border-2 border-dashed border-[#2C1810]/10">
               <p className="text-muted-foreground text-lg italic font-light">
-                No blog posts available at the moment
+                {t("index.whatsNew.noBlogs")}
               </p>
             </div>
           )}
@@ -398,18 +398,18 @@ const Index = () => {
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-6">
             <div className="space-y-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-widest">
-                <MessageSquare className="h-3 w-3" /> Voice of Community
+                <MessageSquare className="h-3 w-3" /> {t("index.testimonials.badge")}
               </div>
               <h2 className="text-4xl md:text-5xl font-bold font-playfair text-[#2C1810]">
-                What People Say
+                {t("index.testimonials.title")}
               </h2>
               <p className="text-muted-foreground text-base md:text-lg font-light max-w-xl">
-                Hear from our satisfied customers and community members about their divine experiences.
+                {t("index.testimonials.desc")}
               </p>
             </div>
             <Link to="/about#feedback">
               <Button variant="outline" className="rounded-full px-8 py-6 border-[#2C1810]/20 hover:bg-[#2C1810] hover:text-white transition-all duration-500 font-bold uppercase tracking-widest text-xs h-auto bg-transparent">
-                Share Your Story
+                {t("index.testimonials.share")}
               </Button>
             </Link>
           </div>
@@ -454,7 +454,7 @@ const Index = () => {
           ) : (
             <div className="text-center py-20 bg-muted/20 rounded-[3rem] border-2 border-dashed border-border/50">
               <p className="text-muted-foreground text-lg italic font-light">
-                No testimonials yet. Be the first to share your experience!
+                {t("index.testimonials.noTestimonials")}
               </p>
             </div>
           )}

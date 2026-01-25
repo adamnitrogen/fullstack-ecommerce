@@ -27,7 +27,7 @@ const validate = (schema, source = 'body') => (req, res, next) => {
             if (error.errors) {
                 errors = error.errors.map(err => ({
                     field: err.path.join('.'),
-                    message: err.message
+                    message: req.t ? req.t(err.message) : err.message
                 }));
             } else {
                 // Fallback if errors array is missing
@@ -36,13 +36,13 @@ const validate = (schema, source = 'body') => (req, res, next) => {
                     if (Array.isArray(parsed)) {
                         errors = parsed.map(err => ({
                             field: err.path?.join('.') || 'unknown',
-                            message: err.message
+                            message: req.t ? req.t(err.message) : err.message
                         }));
                     } else {
-                        errors = [{ field: 'unknown', message: error.message }];
+                        errors = [{ field: 'unknown', message: req.t ? req.t(error.message) : error.message }];
                     }
                 } catch (e) {
-                    errors = [{ field: 'unknown', message: error.message }];
+                    errors = [{ field: 'unknown', message: req.t ? req.t(error.message) : error.message }];
                 }
             }
 
@@ -52,7 +52,7 @@ const validate = (schema, source = 'body') => (req, res, next) => {
             }, 'Validation Error');
 
             return res.status(400).json({
-                error: 'Check your information and try again.',
+                error: req.t ? req.t('errors.auth.fixErrors') : 'Check your information and try again.',
                 code: 'VALIDATION_ERROR',
                 details: errors
             });

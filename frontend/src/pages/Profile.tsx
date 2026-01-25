@@ -80,15 +80,15 @@ export default function Profile() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["myEventRegistrations"] });
       toast({
-        title: "Registration Cancelled",
-        description: "Your event registration has been cancelled successfully.",
+        title: t("profile.registrationCancelled"),
+        description: t("profile.registrationCancelledDesc"),
       });
       setSelectedRegId(null);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Cancellation Failed",
-        description: getErrorMessage(error, "Could not cancel registration."),
+        title: t("profile.cancellationFailed"),
+        description: getErrorMessage(error, t("profile.cancellationFailedDesc")),
         variant: "destructive",
       });
     },
@@ -106,14 +106,14 @@ export default function Profile() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       toast({
-        title: "Success",
-        description: "Profile updated successfully",
+        title: t("common.success"),
+        description: t("profile.profileUpdated"),
       });
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to update profile"),
+        title: t("common.error"),
+        description: getErrorMessage(error, t("profile.failedUpdate")),
         variant: "destructive",
       });
     },
@@ -125,14 +125,14 @@ export default function Profile() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       toast({
-        title: "Success",
-        description: "Profile picture updated successfully",
+        title: t("common.success"),
+        description: t("profile.profilePictureUpdated"),
       });
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to upload avatar"),
+        title: t("common.error"),
+        description: getErrorMessage(error, t("profile.failedAvatarUpload")),
         variant: "destructive",
       });
     },
@@ -144,14 +144,14 @@ export default function Profile() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       toast({
-        title: "Success",
-        description: "Profile picture removed successfully",
+        title: t("common.success"),
+        description: t("profile.profilePictureRemoved"),
       });
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to delete avatar"),
+        title: t("common.error"),
+        description: getErrorMessage(error, t("profile.failedAvatarDelete")),
         variant: "destructive",
       });
     },
@@ -164,14 +164,14 @@ export default function Profile() {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       queryClient.invalidateQueries({ queryKey: ["addresses"] });
       toast({
-        title: "Success",
-        description: "Address added successfully",
+        title: t("common.success"),
+        description: t("profile.addressAdded"),
       });
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to add address"),
+        title: t("common.error"),
+        description: getErrorMessage(error, t("profile.failedAddressAdd")),
         variant: "destructive",
       });
     },
@@ -184,14 +184,14 @@ export default function Profile() {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       queryClient.invalidateQueries({ queryKey: ["addresses"] });
       toast({
-        title: "Success",
-        description: "Address updated successfully",
+        title: t("common.success"),
+        description: t("profile.addressUpdated"),
       });
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to update address"),
+        title: t("common.error"),
+        description: getErrorMessage(error, t("profile.failedAddressUpdate")),
         variant: "destructive",
       });
     },
@@ -203,14 +203,14 @@ export default function Profile() {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       queryClient.invalidateQueries({ queryKey: ["addresses"] });
       toast({
-        title: "Success",
-        description: "Address deleted successfully",
+        title: t("common.success"),
+        description: t("profile.addressDeleted"),
       });
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to delete address"),
+        title: t("common.error"),
+        description: getErrorMessage(error, t("profile.failedAddressDelete")),
         variant: "destructive",
       });
     },
@@ -223,14 +223,14 @@ export default function Profile() {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       queryClient.invalidateQueries({ queryKey: ["addresses"] });
       toast({
-        title: "Success",
-        description: "Primary address updated",
+        title: t("common.success"),
+        description: t("profile.primaryAddressUpdated"),
       });
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to set primary address"),
+        title: t("common.error"),
+        description: getErrorMessage(error, t("profile.failedPrimaryAddress")),
         variant: "destructive",
       });
     },
@@ -239,13 +239,13 @@ export default function Profile() {
 
 
   if (isLoading) {
-    return <LoadingOverlay isLoading={true} message="Loading your profile..." />;
+    return <LoadingOverlay isLoading={true} message={t("profile.loadingProfile")} />;
   }
 
   if (!profile) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <p>Profile not found</p>
+        <p>{t("profile.profileNotFound")}</p>
       </div>
     );
   }
@@ -268,20 +268,20 @@ export default function Profile() {
     deleteAvatarMutation.isPending;
 
   const actionMessage =
-    addAddressMutation.isPending ? "Adding your new address..." :
-      updateAddressMutation.isPending ? "Updating your address..." :
-        deleteAddressMutation.isPending ? "Removing address..." :
-          setPrimaryMutation.isPending ? "Setting your primary address..." :
-            updateProfileMutation.isPending ? "Saving your profile changes..." :
-              uploadAvatarMutation.isPending ? "Updating your profile picture..." :
-                deleteAvatarMutation.isPending ? "Removing your profile picture..." :
-                  "Just a moment...";
+    addAddressMutation.isPending ? t("profile.addingNewAddress") :
+      updateAddressMutation.isPending ? t("profile.updatingAddress") :
+        deleteAddressMutation.isPending ? t("profile.removingAddress") :
+          setPrimaryMutation.isPending ? t("profile.settingPrimaryAddress") :
+            updateProfileMutation.isPending ? t("profile.savingProfileChanges") :
+              uploadAvatarMutation.isPending ? t("profile.updatingProfilePicture") :
+                deleteAvatarMutation.isPending ? t("profile.removingProfilePicture") :
+                  t("common.justAMoment");
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <LoadingOverlay
         isLoading={isLoading || isActionLoading}
-        message={isLoading ? "Loading your profile..." : actionMessage}
+        message={isLoading ? t("profile.loadingProfile") : actionMessage}
       />
 
       {/* Premium Compact Hero Section */}
@@ -293,16 +293,16 @@ export default function Profile() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-2">
               <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-[0.2em] mb-2">
-                <Sparkles className="h-3 w-3" /> {t("profile.dashboard", "User Dashboard")}
+                <Sparkles className="h-3 w-3" /> {t("profile.dashboard")}
               </div>
               <h1 className="text-3xl md:text-5xl font-bold font-playfair">
-                My <span className="text-[#B85C3C]">{t("profile.profile", "Profile")}</span>
+                {t("profile.my")} <span className="text-[#B85C3C]">{t("profile.profile")}</span>
               </h1>
             </div>
             <div className="flex items-center gap-2 text-white/50 text-sm font-light border-l border-[#B85C3C]/30 pl-6 hidden md:flex">
-              <Link to="/" className="hover:text-white transition-colors">Home</Link>
+              <Link to="/" className="hover:text-white transition-colors">{t("profile.breadcrumbHome")}</Link>
               <span>/</span>
-              <span className="text-white">Profile</span>
+              <span className="text-white">{t("profile.breadcrumbProfile")}</span>
             </div>
           </div>
         </div>
@@ -326,14 +326,14 @@ export default function Profile() {
             <div className="flex justify-start mb-8 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
               <TabsList className="h-14 rounded-full bg-white shadow-elevated p-1.5 border border-border/50">
                 <TabsTrigger value="account" className="rounded-full px-8 data-[state=active]:bg-[#2C1810] data-[state=active]:text-white transition-all font-bold text-xs uppercase tracking-[0.15em]">
-                  Account Settings
+                  {t("profile.accountSettings")}
                 </TabsTrigger>
                 <TabsTrigger value="events" className="rounded-full px-8 data-[state=active]:bg-[#2C1810] data-[state=active]:text-white transition-all font-bold text-xs uppercase tracking-[0.15em]">
-                  Events
+                  {t("profile.events")}
                 </TabsTrigger>
                 {hasSubscriptions && (
                   <TabsTrigger value="donations" className="rounded-full px-8 data-[state=active]:bg-[#2C1810] data-[state=active]:text-white transition-all font-bold text-xs uppercase tracking-[0.15em]">
-                    Donations
+                    {t("profile.donations")}
                   </TabsTrigger>
                 )}
               </TabsList>
@@ -398,8 +398,8 @@ export default function Profile() {
                       <Calendar className="h-5 w-5 text-[#B85C3C]" />
                     </div>
                     <div>
-                      <CardTitle className="text-xl font-playfair">Event Registrations</CardTitle>
-                      <CardDescription>View your upcoming and past sacred gatherings</CardDescription>
+                      <CardTitle className="text-xl font-playfair">{t("profile.eventRegistrations")}</CardTitle>
+                      <CardDescription>{t("profile.eventRegistrationsDesc")}</CardDescription>
                     </div>
                   </div>
                 </CardHeader>
@@ -437,13 +437,13 @@ export default function Profile() {
                             <div className="flex items-start justify-between gap-2">
                               <div>
                                 <h3 className="font-bold text-[#2C1810] line-clamp-1 group-hover:text-[#B85C3C] transition-colors">
-                                  {reg.events?.title || 'Sacred Gathering'}
+                                  {reg.events?.title || t("profile.sacredGathering")}
                                 </h3>
                                 <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                                   <Calendar className="h-3 w-3" />
                                   {reg.events?.start_date
                                     ? format(new Date(reg.events.start_date), 'PPP')
-                                    : 'Date TBD'}
+                                    : t("profile.dateTbd")}
                                 </p>
                               </div>
                             </div>
@@ -451,7 +451,7 @@ export default function Profile() {
                             <div className="flex flex-wrap items-center gap-2 mt-2">
                               {reg.status === 'cancelled' ? (
                                 <Badge variant="destructive" className="text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-sm">
-                                  CANCELLED
+                                  {t("profile.cancelled")}
                                 </Badge>
                               ) : (
                                 <Badge
@@ -461,10 +461,10 @@ export default function Profile() {
                                     }`}
                                 >
                                   {reg.payment_status === 'paid'
-                                    ? `₹${reg.amount} PAID`
+                                    ? `₹${reg.amount} ${t("profile.paid")}`
                                     : reg.payment_status === 'free'
-                                      ? 'COMPLIMENTARY'
-                                      : 'PENDING'}
+                                      ? t("profile.complimentary")
+                                      : t("profile.pending")}
                                 </Badge>
                               )}
 
@@ -472,18 +472,18 @@ export default function Profile() {
                                 <Badge variant="outline" className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-sm ${reg.refunds[0].status === 'SETTLED' ? 'bg-green-100 text-green-800' :
                                   reg.refunds[0].status === 'FAILED' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
                                   }`}>
-                                  Refund: {reg.refunds[0].status}
+                                  {t("profile.refund")}: {reg.refunds[0].status}
                                 </Badge>
                               )}
 
                               <Badge variant="secondary" className="text-[10px] font-mono bg-muted/50 text-muted-foreground">
-                                #{reg.registration_number}
+                                {t("profile.registrationNumber")}{reg.registration_number}
                               </Badge>
                             </div>
 
                             {reg.cancellationReason && (
                               <p className="text-[10px] text-muted-foreground italic mt-2 line-clamp-2">
-                                Reason: {reg.cancellationReason}
+                                {t("profile.reason")}: {reg.cancellationReason}
                               </p>
                             )}
 
@@ -497,7 +497,7 @@ export default function Profile() {
                                   navigate(`/event/${reg.event_id}`);
                                 }}
                               >
-                                Details
+                                {t("profile.details")}
                               </Button>
 
                               {reg.status === 'pending' && (
@@ -510,7 +510,7 @@ export default function Profile() {
                                     navigate(`/event/${reg.event_id}`);
                                   }}
                                 >
-                                  Complete Payment
+                                  {t("profile.completePayment")}
                                 </Button>
                               )}
 
@@ -531,7 +531,7 @@ export default function Profile() {
                                         setSelectedRegId(reg.id);
                                       }}
                                     >
-                                      Cancel
+                                      {t("profile.cancel")}
                                     </button>
                                   );
                                 }
@@ -547,15 +547,15 @@ export default function Profile() {
                       <div className="bg-white w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
                         <Calendar className="h-8 w-8 text-muted-foreground opacity-30" />
                       </div>
-                      <h3 className="text-[#2C1810] font-bold text-lg">No Registrations Found</h3>
+                      <h3 className="text-[#2C1810] font-bold text-lg">{t("profile.noRegistrations")}</h3>
                       <p className="text-muted-foreground text-sm max-w-xs mx-auto mt-1 mb-6">
-                        You haven't joined any sacred events yet. Discover upcoming spiritual gatherings.
+                        {t("profile.noRegistrationsDesc")}
                       </p>
                       <Button
                         onClick={() => navigate('/events')}
                         className="rounded-full px-8 bg-[#2C1810] hover:bg-[#B85C3C] transition-all"
                       >
-                        Explore Events
+                        {t("profile.exploreEvents")}
                       </Button>
                     </div>
                   )}
@@ -566,7 +566,7 @@ export default function Profile() {
               {totalRegistrations > LIMIT && (
                 <div className="flex items-center justify-between mt-6 px-2">
                   <div className="text-sm text-muted-foreground">
-                    Showing {(page - 1) * LIMIT + 1} to {Math.min(page * LIMIT, totalRegistrations)} of {totalRegistrations} registrations
+                    {t("profile.showing")} {(page - 1) * LIMIT + 1} {t("profile.to")} {Math.min(page * LIMIT, totalRegistrations)} {t("profile.of")} {totalRegistrations} {t("profile.events")}
                   </div>
                   <div className="flex gap-2">
                     <Button
@@ -576,7 +576,7 @@ export default function Profile() {
                       disabled={page === 1}
                       className="rounded-full"
                     >
-                      Previous
+                      {t("profile.previous")}
                     </Button>
                     <Button
                       variant="outline"
@@ -585,7 +585,7 @@ export default function Profile() {
                       disabled={page * LIMIT >= totalRegistrations}
                       className="rounded-full"
                     >
-                      Next
+                      {t("profile.next")}
                     </Button>
                   </div>
                 </div>
@@ -611,10 +611,10 @@ export default function Profile() {
         onClose={() => setSelectedRegId(null)}
         onConfirm={confirmCancelRegistration}
         isUser={true}
-        title="Cancel Registration?"
-        description="Are you sure you want to cancel your attendance? A reason is required to free up space for another seeker."
-        warningText="This action is irreversible. For paid events, refunds are processed automatically to your original payment method."
-        confirmLabel="Confirm Cancellation"
+        title={t("profile.cancelRegTitle")}
+        description={t("profile.cancelRegDesc")}
+        warningText={t("profile.cancelRegWarning")}
+        confirmLabel={t("profile.confirmCancellation")}
         isLoading={cancelRegistrationMutation.isPending}
       />
     </div>

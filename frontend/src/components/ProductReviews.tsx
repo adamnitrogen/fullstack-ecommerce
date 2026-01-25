@@ -24,7 +24,7 @@ const reviewSchema = z.object({
   title: z
     .string()
     .trim()
-    .min(5, "Title must be at least 5 characters")
+    .min(5, "Title must be at least 5 characters") // These could be localized if needed, but keeping simple for now
     .max(100, "Title must be less than 100 characters"),
   comment: z
     .string()
@@ -158,13 +158,13 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
     return (
       <div className="pt-8">
         <div className="text-center py-12 rounded-[2rem] border-2 border-dashed border-[#B85C3C]/10 bg-white/50">
-          <h3 className="font-playfair text-2xl font-bold text-[#2C1810] mb-2">No Reviews Yet</h3>
-          <p className="text-xs text-muted-foreground font-medium mb-6">Be the first to share your experience</p>
+          <h3 className="font-playfair text-2xl font-bold text-[#2C1810] mb-2">{t("products.noReviews")}</h3>
+          <p className="text-xs text-muted-foreground font-medium mb-6">{t("products.beFirst")}</p>
           <Button
             onClick={() => isAuthenticated ? setShowForm(true) : setAuthDialogOpen(true)}
             className="rounded-full px-8 py-4 text-xs font-bold bg-[#B85C3C] hover:bg-[#2C1810] shadow-lg shadow-[#B85C3C]/10 h-auto transition-all"
           >
-            Write a Review
+            {t("products.writeReview")}
           </Button>
         </div>
         <AuthPage open={authDialogOpen} onOpenChange={setAuthDialogOpen} />
@@ -196,14 +196,14 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
                   ))}
                 </div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-[#B85C3C]">
-                  Based on {reviews.length} {reviews.length === 1 ? "review" : "reviews"}
+                  {t("products.basedOn")} {reviews.length} {reviews.length === 1 ? t("products.reviewsCount_one") : t("products.reviewsCount_other")}
                 </p>
               </div>
 
               <div className="space-y-2">
                 {ratingDistribution.map(({ stars, count, percentage }) => (
                   <div key={stars} className="flex items-center gap-3">
-                    <span className="text-[9px] font-bold w-8 text-muted-foreground uppercase">{stars} Str</span>
+                    <span className="text-[9px] font-bold w-8 text-muted-foreground uppercase">{stars} {t("products.starsShort")}</span>
                     <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
                       <div
                         className="h-full bg-[#B85C3C] rounded-full transition-all duration-500"
@@ -227,7 +227,7 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
                 variant="outline"
                 className="rounded-full px-8 py-3 text-xs font-bold border-[#B85C3C]/20 text-[#B85C3C] hover:bg-[#FAF7F2] h-auto transition-all"
               >
-                Share Your Experience
+                {t("products.shareExperience")}
               </Button>
             </div>
           )}
@@ -239,8 +239,8 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
               className="space-y-6 p-8 rounded-2xl bg-[#FAF7F2] border border-[#B85C3C]/10 animate-in zoom-in-95 duration-300"
             >
               <div className="space-y-1">
-                <h3 className="text-xl font-bold text-[#2C1810] font-playfair">Write a Review</h3>
-                <p className="text-[10px] text-muted-foreground uppercase font-bold">Your feedback honors our tradition</p>
+                <h3 className="text-xl font-bold text-[#2C1810] font-playfair">{t("products.writeReview")}</h3>
+                <p className="text-[10px] text-muted-foreground uppercase font-bold">{t("products.honorsTradition")}</p>
               </div>
 
               <div className="space-y-4">
@@ -269,18 +269,18 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label htmlFor="title" className="text-[10px] font-bold uppercase tracking-widest text-[#B85C3C]">Title</label>
+                  <label htmlFor="title" className="text-[10px] font-bold uppercase tracking-widest text-[#B85C3C]">{t("contact.title")}</label>
                   <Input
                     id="title"
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    placeholder="Exceptional quality"
+                    placeholder={t("products.titlePlaceholder")}
                     className="bg-white rounded-xl border-none shadow-sm h-10 text-sm"
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-[#B85C3C]">Posting As</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-[#B85C3C]">{t("products.postingAs")}</label>
                   <div className="h-10 flex items-center px-4 bg-white/50 rounded-xl border border-dashed border-[#B85C3C]/20 text-xs font-bold text-[#2C1810]">
                     {user?.name}
                   </div>
@@ -288,12 +288,12 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="comment" className="text-[10px] font-bold uppercase tracking-widest text-[#B85C3C]">Comment</label>
+                <label htmlFor="comment" className="text-[10px] font-bold uppercase tracking-widest text-[#B85C3C]">{t("products.comment")}</label>
                 <Textarea
                   id="comment"
                   value={formData.comment}
                   onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
-                  placeholder="Share your thoughts..."
+                  placeholder={t("products.commentPlaceholder")}
                   className="bg-white rounded-xl border-none shadow-sm p-4 min-h-[100px] text-sm resize-none"
                   required
                 />
@@ -305,7 +305,7 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
                   disabled={createReviewMutation.isPending}
                   className="rounded-full px-8 py-3 text-xs font-bold bg-[#B85C3C] hover:bg-[#2C1810] h-auto shadow-md"
                 >
-                  {createReviewMutation.isPending ? "Submitting..." : "Submit Review"}
+                  {createReviewMutation.isPending ? t("products.submitting") : t("products.submitReview")}
                 </Button>
                 <Button
                   type="button"
@@ -313,7 +313,7 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
                   onClick={() => setShowForm(false)}
                   className="rounded-full px-8 py-3 text-xs font-bold text-muted-foreground h-auto"
                 >
-                  Cancel
+                  {t("products.cancel")}
                 </Button>
               </div>
             </form>
@@ -372,7 +372,7 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
                     onClick={loadMoreReviews}
                     className="text-[10px] font-bold text-[#B85C3C] hover:bg-[#FAF7F2] rounded-full px-6"
                   >
-                    Load More Reviews
+                    {t("products.loadMore")}
                   </Button>
                 </div>
               )}

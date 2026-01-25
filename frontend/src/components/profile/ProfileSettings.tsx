@@ -49,12 +49,12 @@ export function ProfileSettings() {
       setEditingPersonalInfo(false);
       toast({
         title: t("profile.updateSuccess"),
-        description: "Personal information updated successfully",
+        description: t("profile.profileUpdated"),
       });
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to update profile",
+        title: t("common.error"),
+        description: t("errors.auth.failedUpdate"),
         variant: "destructive",
       });
     }
@@ -65,15 +65,15 @@ export function ProfileSettings() {
     setEditingEmail(false);
     toast({
       title: t("profile.updateSuccess"),
-      description: "Email updated successfully",
+      description: t("profile.emailUpdateSuccess"),
     });
   };
 
   const handleSavePhone = () => {
     if (!phone || phone.trim() === "") {
       toast({
-        title: "Error",
-        description: "Phone number is required",
+        title: t("common.error"),
+        description: t("errors.auth.phoneRequired"),
         variant: "destructive",
       });
       return;
@@ -82,7 +82,7 @@ export function ProfileSettings() {
     setEditingPhone(false);
     toast({
       title: t("profile.updateSuccess"),
-      description: "Phone number updated successfully",
+      description: t("profile.phoneUpdateSuccess"),
     });
   };
 
@@ -97,8 +97,8 @@ export function ProfileSettings() {
 
         // Show success message
         toast({
-          title: "Account Deleted",
-          description: "Your account has been permanently deleted.",
+          title: t("profile.accountDeleted"),
+          description: t("profile.accountDeletedDesc"),
         });
 
         // Redirect to home page
@@ -106,8 +106,8 @@ export function ProfileSettings() {
       }
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to delete account. Please try again.",
+        title: t("common.error"),
+        description: t("errors.auth.failedDelete"),
         variant: "destructive",
       });
     }
@@ -126,14 +126,14 @@ export function ProfileSettings() {
           {/* Personal Information Section */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Personal Information</h3>
+              <h3 className="text-lg font-semibold">{t("profile.personalInfo")}</h3>
               <Button
                 variant="link"
                 size="sm"
                 className="text-primary"
                 onClick={() => setEditingPersonalInfo(!editingPersonalInfo)}
               >
-                Edit
+                {t("common.edit")}
               </Button>
             </div>
 
@@ -141,7 +141,7 @@ export function ProfileSettings() {
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input
-                    placeholder="First Name"
+                    placeholder={t("profile.firstNamePlaceholder")}
                     value={personalInfo.firstName}
                     onChange={(e) =>
                       setPersonalInfo({
@@ -152,7 +152,7 @@ export function ProfileSettings() {
                     className="bg-muted"
                   />
                   <Input
-                    placeholder="Last Name"
+                    placeholder={t("profile.lastNamePlaceholder")}
                     value={personalInfo.lastName}
                     onChange={(e) =>
                       setPersonalInfo({
@@ -165,7 +165,7 @@ export function ProfileSettings() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm">Your Gender</Label>
+                  <Label className="text-sm">{t("profile.gender")}</Label>
                   <RadioGroup
                     value={personalInfo.gender}
                     onValueChange={(value) =>
@@ -179,7 +179,7 @@ export function ProfileSettings() {
                         htmlFor="edit-male"
                         className="font-normal cursor-pointer"
                       >
-                        Male
+                        {t("profile.male")}
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -188,7 +188,7 @@ export function ProfileSettings() {
                         htmlFor="edit-female"
                         className="font-normal cursor-pointer"
                       >
-                        Female
+                        {t("profile.female")}
                       </Label>
                     </div>
                   </RadioGroup>
@@ -196,7 +196,7 @@ export function ProfileSettings() {
 
                 <div className="flex gap-2">
                   <Button onClick={handleSavePersonalInfo} size="sm">
-                    Save
+                    {t("common.save")}
                   </Button>
                   <Button
                     variant="outline"
@@ -210,7 +210,7 @@ export function ProfileSettings() {
                       setEditingPersonalInfo(false);
                     }}
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </Button>
                 </div>
               </div>
@@ -219,17 +219,17 @@ export function ProfileSettings() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="p-3 bg-muted rounded-md">
                     <p className="text-sm text-muted-foreground">
-                      {personalInfo.firstName || "First Name"}
+                      {personalInfo.firstName || t("profile.firstName")}
                     </p>
                   </div>
                   <div className="p-3 bg-muted rounded-md">
                     <p className="text-sm text-muted-foreground">
-                      {personalInfo.lastName || "Last Name"}
+                      {personalInfo.lastName || t("profile.lastName")}
                     </p>
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm">Your Gender</Label>
+                  <Label className="text-sm">{t("profile.gender")}</Label>
                   <RadioGroup
                     value={personalInfo.gender}
                     disabled
@@ -238,13 +238,13 @@ export function ProfileSettings() {
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="male" id="view-male" />
                       <Label htmlFor="view-male" className="font-normal">
-                        Male
+                        {t("profile.male")}
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="female" id="view-female" />
                       <Label htmlFor="view-female" className="font-normal">
-                        Female
+                        {t("profile.female")}
                       </Label>
                     </div>
                   </RadioGroup>
@@ -258,14 +258,14 @@ export function ProfileSettings() {
           {/* Email Section */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Email Address</h3>
+              <h3 className="text-lg font-semibold">{t("profile.email")}</h3>
               <Button
                 variant="link"
                 size="sm"
                 className="text-primary"
                 onClick={() => setEditingEmail(!editingEmail)}
               >
-                Edit
+                {t("common.edit")}
               </Button>
             </div>
 
@@ -280,7 +280,7 @@ export function ProfileSettings() {
                 />
                 <div className="flex gap-2">
                   <Button onClick={handleSaveEmail} size="sm">
-                    Save
+                    {t("common.save")}
                   </Button>
                   <Button
                     variant="outline"
@@ -290,7 +290,7 @@ export function ProfileSettings() {
                       setEditingEmail(false);
                     }}
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </Button>
                 </div>
               </div>
@@ -306,14 +306,14 @@ export function ProfileSettings() {
           {/* Phone Section */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Mobile Number</h3>
+              <h3 className="text-lg font-semibold">{t("profile.phone")}</h3>
               <Button
                 variant="link"
                 size="sm"
                 className="text-primary"
                 onClick={() => setEditingPhone(!editingPhone)}
               >
-                Edit
+                {t("common.edit")}
               </Button>
             </div>
 
@@ -328,7 +328,7 @@ export function ProfileSettings() {
                 />
                 <div className="flex gap-2">
                   <Button onClick={handleSavePhone} size="sm">
-                    Save
+                    {t("common.save")}
                   </Button>
                   <Button
                     variant="outline"
@@ -338,7 +338,7 @@ export function ProfileSettings() {
                       setEditingPhone(false);
                     }}
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </Button>
                 </div>
               </div>
@@ -361,22 +361,21 @@ export function ProfileSettings() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-destructive">
             <Trash2 className="h-5 w-5" />
-            Danger Zone
+            {t("profile.dangerZone")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <h3 className="text-lg font-semibold mb-2">Delete Account</h3>
+            <h3 className="text-lg font-semibold mb-2">{t("profile.deleteConfirm")}</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Once you delete your account, there is no going back. Please be
-              certain. This action will permanently delete all your data.
+              {t("profile.deleteAccountDesc")}
             </p>
             <Button
               variant="destructive"
               onClick={() => setDeleteDialogOpen(true)}
             >
               <Trash2 className="h-4 w-4 mr-2" />
-              Delete My Account
+              {t("profile.deleteConfirm")}
             </Button>
           </div>
         </CardContent>

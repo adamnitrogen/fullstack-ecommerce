@@ -340,7 +340,7 @@ async function applyCouponToCart(userId, guestId, couponCode) {
             success: true,
             cart: updatedCart,
             coupon: validation.coupon,
-            message: 'Coupon applied successfully'
+            message: 'success.cart.coupon_applied'
         };
     } catch (error) {
         logger.error({ err: error }, 'Error applying coupon to cart:');

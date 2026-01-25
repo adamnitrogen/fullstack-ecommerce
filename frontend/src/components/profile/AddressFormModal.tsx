@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { PhoneInput } from "@/components/ui/phone-input";
 import {
@@ -51,6 +52,7 @@ export default function AddressFormModal({
     initialData,
     availableTypes
 }: AddressFormModalProps) {
+    const { t } = useTranslation();
     const [formData, setFormData] = useState<CreateAddressDto>({
         type: 'other',
         address_line1: '',
@@ -116,7 +118,7 @@ export default function AddressFormModal({
                     }
 
                 } else {
-                    setErrors(prev => ({ ...prev, postal_code: "Invalid postal code" }));
+                    setErrors(prev => ({ ...prev, postal_code: t("errors.address.invalidPostal") }));
                 }
             } else {
                 // If not India, clear postal code error if it exists so we don't block submission
@@ -198,27 +200,27 @@ export default function AddressFormModal({
         const newErrors: Record<string, string> = {};
 
         if (!formData.address_line1.trim()) {
-            newErrors.address_line1 = 'Street address is required';
+            newErrors.address_line1 = t("errors.address.streetRequired");
         }
 
         if (!formData.city.trim()) {
-            newErrors.city = 'City is required';
+            newErrors.city = t("errors.address.cityRequired");
         }
 
         if (!formData.state.trim()) {
-            newErrors.state = 'State is required';
+            newErrors.state = t("errors.address.stateRequired");
         }
 
         if (!formData.country?.trim()) {
-            newErrors.country = 'Country is required';
+            newErrors.country = t("errors.address.countryRequired");
         }
 
         if (!formData.postal_code.trim()) {
-            newErrors.postal_code = 'Postal code is required';
+            newErrors.postal_code = t("errors.address.postalRequired");
         }
 
         if (!formData.phone || formData.phone.trim().length < 13) {
-            newErrors.phone = 'Phone number is required and must be 10 digits';
+            newErrors.phone = t("errors.address.phoneRequiredTen");
         }
 
         // If we have a validation error from the API check, keep it
@@ -251,7 +253,7 @@ export default function AddressFormModal({
             });
             onClose();
         } catch (error: unknown) {
-            setErrors({ general: getErrorMessage(error, "Failed to save address") });
+            setErrors({ general: getErrorMessage(error, t("profile.address.errorSave")) });
         } finally {
             setLoading(false);
         }
@@ -263,10 +265,10 @@ export default function AddressFormModal({
                 <div className="bg-muted/30 p-8 border-b border-border/40">
                     <DialogHeader>
                         <DialogTitle className="text-2xl font-playfair text-[#2C1810]">
-                            {initialData ? 'Refine Sanctuary' : 'Establish New Sanctuary'}
+                            {initialData ? t("profile.address.refineSanctuary") : t("profile.address.establishSanctuary")}
                         </DialogTitle>
                         <DialogDescription className="text-sm italic">
-                            {initialData ? 'Update your sacred location details' : 'Define a new path for delivery'}
+                            {initialData ? t("profile.address.refineDesc") : t("profile.address.establishDesc")}
                         </DialogDescription>
                     </DialogHeader>
                 </div>
@@ -290,7 +292,7 @@ export default function AddressFormModal({
                             {/* Type */}
                             <div className="space-y-2">
                                 <Label htmlFor="type">
-                                    Address Type <span className="text-destructive">*</span>
+                                    {t("profile.addressType")} <span className="text-destructive">*</span>
                                 </Label>
                                 <Select
                                     value={formData.type}
@@ -304,31 +306,31 @@ export default function AddressFormModal({
                                     </SelectTrigger>
                                     <SelectContent>
                                         {availableTypes.includes('home') && (
-                                            <SelectItem value="home">Home</SelectItem>
+                                            <SelectItem value="home">{t("profile.address.typeHome")}</SelectItem>
                                         )}
                                         {availableTypes.includes('work') && (
-                                            <SelectItem value="work">Work</SelectItem>
+                                            <SelectItem value="work">{t("profile.address.typeWork")}</SelectItem>
                                         )}
-                                        <SelectItem value="other">Other</SelectItem>
+                                        <SelectItem value="other">{t("profile.address.typeOther")}</SelectItem>
                                     </SelectContent>
                                 </Select>
                                 {formData.type !== 'other' && !availableTypes.includes(formData.type) && initialData && (
                                     <p className="text-xs text-muted-foreground">
-                                        Type cannot be changed for home/work addresses
+                                        {t("profile.address.typeLocked")}
                                     </p>
                                 )}
                             </div>
 
                             {/* Full Name (Label) */}
                             <div className="space-y-2">
-                                <Label htmlFor="full_name">Full Name / Label</Label>
+                                <Label htmlFor="full_name">{t("profile.address.fullNameLabel")}</Label>
                                 <Input
                                     id="full_name"
                                     value={formData.full_name}
                                     onChange={(e) =>
                                         setFormData({ ...formData, full_name: e.target.value })
                                     }
-                                    placeholder="e.g., Mom's House, Office"
+                                    placeholder={t("profile.address.fullNamePlaceholder")}
                                 />
                             </div>
                         </div>
@@ -336,7 +338,7 @@ export default function AddressFormModal({
                         {/* Phone */}
                         <div className="space-y-2">
                             <Label htmlFor="phone">
-                                Phone Number <span className="text-destructive">*</span>
+                                {t("profile.phone")} <span className="text-destructive">*</span>
                             </Label>
                             <PhoneInput
                                 id="phone"
@@ -344,7 +346,7 @@ export default function AddressFormModal({
                                 onChange={(value) =>
                                     setFormData({ ...formData, phone: value as string })
                                 }
-                                placeholder="Enter phone number"
+                                placeholder={t("profile.address.phonePlaceholder")}
                                 className={errors.phone ? 'border-destructive' : ''}
                             />
                             {errors.phone && (
@@ -355,7 +357,7 @@ export default function AddressFormModal({
                         {/* Street Address */}
                         <div className="space-y-2">
                             <Label htmlFor="address_line1">
-                                Street Address <span className="text-destructive">*</span>
+                                {t("profile.addressLine")} <span className="text-destructive">*</span>
                             </Label>
                             <Input
                                 id="address_line1"
@@ -363,7 +365,7 @@ export default function AddressFormModal({
                                 onChange={(e) =>
                                     setFormData({ ...formData, address_line1: e.target.value })
                                 }
-                                placeholder="Enter street address"
+                                placeholder={t("profile.address.streetPlaceholder")}
                                 className={errors.address_line1 ? 'border-destructive' : ''}
                             />
                             {errors.address_line1 && (
@@ -373,14 +375,14 @@ export default function AddressFormModal({
 
                         {/* Apartment */}
                         <div className="space-y-2">
-                            <Label htmlFor="address_line2">Apartment, Suite, etc.</Label>
+                            <Label htmlFor="address_line2">{t("profile.address.apartmentLabel")}</Label>
                             <Input
                                 id="address_line2"
                                 value={formData.address_line2 || ''}
                                 onChange={(e) =>
                                     setFormData({ ...formData, address_line2: e.target.value })
                                 }
-                                placeholder="Optional"
+                                placeholder={t("profile.address.optional")}
                             />
                         </div>
 
@@ -388,7 +390,7 @@ export default function AddressFormModal({
                             {/* Country */}
                             <div className="space-y-2">
                                 <Label htmlFor="country">
-                                    Country <span className="text-destructive">*</span>
+                                    {t("profile.country")} <span className="text-destructive">*</span>
                                 </Label>
                                 <Select
                                     value={formData.country}
@@ -396,7 +398,7 @@ export default function AddressFormModal({
                                     disabled={isLoadingCountries}
                                 >
                                     <SelectTrigger className={errors.country ? 'border-destructive' : ''}>
-                                        <SelectValue placeholder={isLoadingCountries ? "Loading countries..." : "Select Country"} />
+                                        <SelectValue placeholder={isLoadingCountries ? t("profile.address.loadingCountries") : t("profile.address.selectCountry")} />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {countries.map((country) => (
@@ -414,7 +416,7 @@ export default function AddressFormModal({
                             {/* State */}
                             <div className="space-y-2">
                                 <Label htmlFor="state">
-                                    State <span className="text-destructive">*</span>
+                                    {t("profile.state")} <span className="text-destructive">*</span>
                                 </Label>
                                 {currentStates.length > 0 ? (
                                     <Select
@@ -425,7 +427,7 @@ export default function AddressFormModal({
                                         disabled={!formData.country || isStatesLoading}
                                     >
                                         <SelectTrigger className={errors.state ? 'border-destructive' : ''}>
-                                            <SelectValue placeholder={isStatesLoading ? "Loading states..." : "Select State"} />
+                                            <SelectValue placeholder={isStatesLoading ? t("profile.address.loadingStates") : t("profile.address.selectState")} />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {currentStates.map((state) => (
@@ -442,7 +444,7 @@ export default function AddressFormModal({
                                         onChange={(e) =>
                                             setFormData({ ...formData, state: e.target.value })
                                         }
-                                        placeholder={!formData.country ? "Select country first" : "Enter state"}
+                                        placeholder={!formData.country ? t("profile.address.selectCountryFirst") : t("profile.address.enterState")}
                                         disabled={!formData.country}
                                         className={errors.state ? 'border-destructive' : ''}
                                     />
@@ -457,7 +459,7 @@ export default function AddressFormModal({
                             {/* Postal Code */}
                             <div className="space-y-2">
                                 <Label htmlFor="postal_code">
-                                    Postal Code <span className="text-destructive">*</span>
+                                    {t("profile.zipcode")} <span className="text-destructive">*</span>
                                 </Label>
                                 <div className="relative">
                                     <Input
@@ -466,7 +468,7 @@ export default function AddressFormModal({
                                         onChange={(e) =>
                                             setFormData({ ...formData, postal_code: e.target.value })
                                         }
-                                        placeholder="Enter postal code"
+                                        placeholder={t("profile.address.postalPlaceholder")}
                                         className={errors.postal_code ? 'border-destructive pr-8' : 'pr-8'}
                                     />
                                     {isValidatingPostalCode && (
@@ -483,7 +485,7 @@ export default function AddressFormModal({
                             {/* City */}
                             <div className="space-y-2">
                                 <Label htmlFor="city">
-                                    City <span className="text-destructive">*</span>
+                                    {t("profile.city")} <span className="text-destructive">*</span>
                                 </Label>
                                 <Input
                                     id="city"
@@ -491,7 +493,7 @@ export default function AddressFormModal({
                                     onChange={(e) =>
                                         setFormData({ ...formData, city: e.target.value })
                                     }
-                                    placeholder="Enter city"
+                                    placeholder={t("profile.address.cityPlaceholder")}
                                     className={errors.city ? 'border-destructive' : ''}
                                 />
                                 {errors.city && (
@@ -510,7 +512,7 @@ export default function AddressFormModal({
                                 }
                             />
                             <Label htmlFor="is_primary" className="cursor-pointer">
-                                Set as primary address
+                                {t("profile.address.setPrimaryAddress")}
                             </Label>
                         </div>
 
@@ -521,7 +523,7 @@ export default function AddressFormModal({
                                 onClick={onClose}
                                 className="rounded-full px-8 font-bold text-xs uppercase tracking-widest"
                             >
-                                Retreat
+                                {t("profile.address.retreat")}
                             </Button>
                             <Button
                                 type="submit"
@@ -529,7 +531,7 @@ export default function AddressFormModal({
                                 className="rounded-full bg-[#2C1810] hover:bg-[#B85C3C] text-white px-10 font-bold text-xs uppercase tracking-widest shadow-lg transition-all"
                             >
                                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                {initialData ? 'Confirm Change' : 'Establish Path'}
+                                {initialData ? t("profile.address.confirmChange") : t("profile.address.establishPath")}
                             </Button>
                         </DialogFooter>
                     </form>

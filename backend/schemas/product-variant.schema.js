@@ -15,16 +15,16 @@ const VARIANT_MODES = ['UNIT', 'SIZE'];
 const createVariantSchema = z.object({
     size_label: z
         .string()
-        .min(1, 'Size label is required')
-        .max(50, 'Size label must be 50 characters or less'),
+        .min(1, 'errors.inventory.sizeLabelRequired')
+        .max(50, 'errors.inventory.sizeLabelLong'),
     size_value: z
         .number()
-        .positive('Size value must be positive')
+        .positive('errors.inventory.sizeValuePositive')
         .optional()
         .nullable(),
     unit: z
         .enum(VARIANT_UNITS, {
-            errorMap: () => ({ message: `Unit must be one of: ${VARIANT_UNITS.join(', ')}` })
+            errorMap: () => ({ message: 'errors.inventory.unitInvalid' }) // I should probably just use a generic error or add this key
         })
         .optional()
         .nullable()
@@ -32,18 +32,18 @@ const createVariantSchema = z.object({
     description: z.string().optional().nullable(), // Required if mode is SIZE (checked in superRefine)
     mrp: z
         .number()
-        .positive('MRP must be positive'),
+        .positive('errors.inventory.mrpPositive'),
     selling_price: z
         .number()
-        .positive('Selling price must be positive'),
+        .positive('errors.inventory.pricePositive'),
     stock_quantity: z
         .number()
-        .int('Stock quantity must be an integer')
-        .min(0, 'Stock quantity cannot be negative')
+        .int('errors.inventory.stockInt')
+        .min(0, 'errors.inventory.stockNonNegative')
         .default(0),
     variant_image_url: z
         .string()
-        .url('Invalid image URL')
+        .url('errors.inventory.invalidImageUrl')
         .optional()
         .nullable(),
     is_default: z
@@ -52,15 +52,15 @@ const createVariantSchema = z.object({
     // GST/Tax Fields
     hsn_code: z
         .string()
-        .max(8, 'HSN code must be 8 characters or less')
-        .regex(/^\d{4,8}$/, 'HSN code must be 4-8 digits')
+        .max(8, 'errors.inventory.hsnLong')
+        .regex(/^\d{4,8}$/, 'errors.inventory.hsnFormat')
         .or(z.literal(''))
         .optional()
         .nullable(),
     gst_rate: z
         .number()
         .refine(val => val === undefined || val === null || [0, 5, 12, 18, 28].includes(val), {
-            message: 'GST rate must be one of: 0, 5, 12, 18, 28'
+            message: 'errors.inventory.gstInvalid'
         })
         .optional()
         .nullable(),
@@ -76,13 +76,13 @@ const createVariantSchema = z.object({
         .nullable(),
     delivery_charge: z
         .number()
-        .min(0, 'Delivery charge cannot be negative')
+        .min(0, 'errors.inventory.deliveryChargeNonNegative') // Add this key if needed
         .optional()
         .nullable()
 }).refine(
     (data) => data.selling_price <= data.mrp,
     {
-        message: 'Selling price must be less than or equal to MRP',
+        message: 'errors.inventory.priceMrpLogic',
         path: ['selling_price']
     }
 ).refine(
@@ -94,7 +94,7 @@ const createVariantSchema = z.object({
         return true;
     },
     {
-        message: 'GST rate is required when tax is applicable',
+        message: 'errors.inventory.gstRequired',
         path: ['gst_rate']
     }
 );
@@ -105,7 +105,7 @@ const createVariantSchema = z.object({
 const updateVariantSchema = z.object({
     id: z
         .string()
-        .uuid('Invalid variant ID'),
+        .uuid('errors.inventory.invalidVariantId'),
     razorpay_item_id: z
         .string()
         .optional()
@@ -157,7 +157,7 @@ const updateVariantSchema = z.object({
     gst_rate: z
         .number()
         .refine(val => val === undefined || val === null || [0, 5, 12, 18, 28].includes(val), {
-            message: 'GST rate must be one of: 0, 5, 12, 18, 28'
+            message: 'errors.inventory.gstInvalid'
         })
         .optional()
         .nullable(),
@@ -180,7 +180,7 @@ const updateVariantSchema = z.object({
         return true;
     },
     {
-        message: 'Selling price must be less than or equal to MRP',
+        message: 'errors.inventory.priceMrpLogic',
         path: ['selling_price']
     }
 );
@@ -190,14 +190,14 @@ const updateVariantSchema = z.object({
  */
 const createProductWithVariantsSchema = z.object({
     product: z.object({
-        title: z.string().min(1, 'Title is required'),
-        description: z.string().min(1, 'Description is required'),
-        category: z.string().min(1, 'Category is required'),
+        title: z.string().min(1, 'errors.inventory.titleRequired'),
+        description: z.string().min(1, 'errors.inventory.descRequired'),
+        category: z.string().min(1, 'errors.inventory.categoryRequired'),
         variant_mode: z.enum(VARIANT_MODES).default('UNIT').optional(),
-        price: z.number().min(0, 'Price must be non-negative').optional(),
-        mrp: z.number().min(0, 'MRP must be non-negative').optional(),
+        price: z.number().min(0, 'errors.inventory.priceNonNegative').optional(),
+        mrp: z.number().min(0, 'errors.inventory.mrpNonNegative').optional(),
         inventory: z.number().int().min(0).optional().default(0),
-        images: z.array(z.string().url()).min(1, 'At least one image is required'),
+        images: z.array(z.string().url()).min(1, 'errors.inventory.imageRequired'),
         tags: z.array(z.string()).optional().default([]),
         benefits: z.array(z.string()).optional().default([]),
         isReturnable: z.boolean().optional(),
@@ -225,14 +225,14 @@ const createProductWithVariantsSchema = z.object({
         if (!hasPrice) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: 'Price is required when no variants are present',
+                message: 'errors.inventory.priceRequiredNoVariants',
                 path: ['product', 'price']
             });
         }
         if (!hasMrp) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: 'MRP is required when no variants are present',
+                message: 'errors.inventory.mrpRequiredNoVariants',
                 path: ['product', 'mrp']
             });
         }
@@ -245,7 +245,7 @@ const createProductWithVariantsSchema = z.object({
                 if (!variant.description || variant.description.trim() === '') {
                     ctx.addIssue({
                         code: z.ZodIssueCode.custom,
-                        message: 'Description is required for Size-based variants',
+                        message: 'errors.inventory.descRequiredSizeVariants',
                         path: ['variants', index, 'description']
                     });
                 }
@@ -254,7 +254,7 @@ const createProductWithVariantsSchema = z.object({
                 if (!variant.size_value) {
                     ctx.addIssue({
                         code: z.ZodIssueCode.custom,
-                        message: 'Size Value is required for Unit-based variants',
+                        message: 'errors.inventory.sizeValueRequiredUnitVariants',
                         path: ['variants', index, 'size_value']
                     });
                 }
@@ -266,7 +266,7 @@ const createProductWithVariantsSchema = z.object({
     if (hasPrice && hasMrp && data.product.price > data.product.mrp) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: 'Selling price must be less than or equal to MRP',
+            message: 'errors.inventory.priceMrpLogic',
             path: ['product', 'price']
         });
     }
@@ -278,7 +278,7 @@ const createProductWithVariantsSchema = z.object({
             if (data.variants.length > 1) {
                 ctx.addIssue({
                     code: z.ZodIssueCode.custom,
-                    message: 'One variant must be marked as default',
+                    message: 'errors.inventory.defaultVariantRequired',
                     path: ['variants']
                 });
             }
@@ -326,9 +326,9 @@ const updateProductWithVariantsSchema = z.object({
  * Schema for adding to cart with variant
  */
 const addToCartWithVariantSchema = z.object({
-    product_id: z.string().uuid('Invalid product ID'),
-    variant_id: z.string().uuid('Invalid variant ID').optional().nullable(),
-    quantity: z.number().int().min(1, 'Quantity must be at least 1').default(1)
+    product_id: z.string().uuid('errors.cart.invalidProductId'),
+    variant_id: z.string().uuid('errors.cart.invalidVariantId').optional().nullable(),
+    quantity: z.number().int().min(1, 'errors.cart.quantityMin').default(1)
 });
 
 module.exports = {

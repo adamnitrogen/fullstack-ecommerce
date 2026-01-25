@@ -1,6 +1,7 @@
 import { logger } from "@/lib/logger";
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { apiClient } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -132,6 +133,7 @@ interface ReturnableItem {
 }
 
 export default function UserOrderDetail() {
+    const { t } = useTranslation();
     const { id } = useParams();
     const navigate = useNavigate();
     const [order, setOrder] = useState<OrderResponse | null>(null);
@@ -207,7 +209,7 @@ export default function UserOrderDetail() {
 
     const handleCancelOrder = async () => {
         if (!cancelReason || !cancelReason.trim()) {
-            toast.error("Please provide a reason for cancellation");
+            toast.error(t("orderDetail.cancelReasonRequired") || "Please provide a reason for cancellation");
             return;
         }
         try {
@@ -234,14 +236,14 @@ export default function UserOrderDetail() {
                 const totalFiles = [...currentFiles, ...newFiles];
 
                 if (totalFiles.length > 3) {
-                    toast.error("Maximum 3 images allowed per item");
+                    toast.error(t("orderDetail.maxImages") || "Maximum 3 images allowed per item");
                     return prev;
                 }
 
                 // Validate size (5MB limit)
                 const invalidFile = newFiles.find(f => f.size > 5 * 1024 * 1024);
                 if (invalidFile) {
-                    toast.error(`File ${invalidFile.name} exceeds 5MB limit`);
+                    toast.error(t("orderDetail.fileTooLarge", { name: invalidFile.name }) || `File ${invalidFile.name} exceeds 5MB limit`);
                     return prev;
                 }
 
@@ -271,11 +273,11 @@ export default function UserOrderDetail() {
                 const images = itemImages[item.id];
 
                 if (!reason || !reason.trim()) {
-                    toast.error("Please provide a return reason for all selected items");
+                    toast.error(t("orderDetail.returnReasonRequired") || "Please provide a return reason for all selected items");
                     return;
                 }
                 if (!images || images.length < 1) {
-                    toast.error("Please upload at least 1 image for each selected item");
+                    toast.error(t("orderDetail.minImagesRequired") || "Please upload at least 1 image for each selected item");
                     return;
                 }
             }
@@ -376,10 +378,10 @@ export default function UserOrderDetail() {
 
     if (loading) return (
         <div className="min-h-screen flex items-center justify-center">
-            <LoadingOverlay isLoading={true} message="Getting your order details..." />
+            <LoadingOverlay isLoading={true} message={t("orderDetail.loading")} />
         </div>
     );
-    if (!order) return <div className="p-8 text-center">Order not found</div>;
+    if (!order) return <div className="p-8 text-center">{t("orderDetail.notFound")}</div>;
 
     const canCancel = ['pending', 'confirmed'].includes(order.status);
 
@@ -405,7 +407,7 @@ export default function UserOrderDetail() {
                     </Button>
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight">
-                            Order #{order.order_number || order.id.substring(0, 8).toUpperCase()}
+                            {t("orderDetail.title")} #{order.order_number || order.id.substring(0, 8).toUpperCase()}
                         </h1>
                         <div className="flex items-center gap-3 mt-2 text-muted-foreground">
                             <Badge variant="secondary" className="text-sm font-normal px-3 py-1">
@@ -427,7 +429,7 @@ export default function UserOrderDetail() {
                         {/* 1. Payment Receipt (Razorpay) */}
                         {order.invoices?.find(i => i.type === 'RAZORPAY')?.public_url && (
                             <Button variant="secondary" size="sm" onClick={() => window.open(order.invoices?.find(i => i.type === 'RAZORPAY')?.public_url, '_blank')}>
-                                <FileText className="mr-2 h-4 w-4" /> Receipt
+                                <FileText className="mr-2 h-4 w-4" /> {t("orderDetail.receipt")}
                             </Button>
                         )}
 
@@ -462,7 +464,7 @@ export default function UserOrderDetail() {
                                     window.open(fullUrl, '_blank');
                                 }
                             }}>
-                                <FileText className="mr-2 h-4 w-4" /> Invoice
+                                <FileText className="mr-2 h-4 w-4" /> {t("orderDetail.invoice")}
                             </Button>
                         )}
 
@@ -471,28 +473,28 @@ export default function UserOrderDetail() {
                             <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
                                 <DialogTrigger asChild>
                                     <Button variant="destructive" size="sm">
-                                        <XCircle className="mr-2 h-4 w-4" /> Cancel Order
+                                        <XCircle className="mr-2 h-4 w-4" /> {t("orderDetail.cancelOrder")}
                                     </Button>
                                 </DialogTrigger>
                                 <DialogContent>
                                     <DialogHeader>
-                                        <DialogTitle>Cancel Order</DialogTitle>
+                                        <DialogTitle>{t("orderDetail.cancelTitle")}</DialogTitle>
                                         <DialogDescription>
-                                            Are you sure you want to cancel this order? This action cannot be undone.
+                                            {t("orderDetail.cancelDesc")}
                                         </DialogDescription>
                                     </DialogHeader>
                                     <div className="space-y-2 py-4">
-                                        <Label>Reason for cancellation <span className="text-red-500">*</span></Label>
+                                        <Label>{t("orderDetail.cancelReason")} <span className="text-red-500">*</span></Label>
                                         <Textarea
-                                            placeholder="Changed my mind, found better price, etc."
+                                            placeholder={t("orderDetail.cancelPlaceholder")}
                                             value={cancelReason}
                                             onChange={e => setCancelReason(e.target.value)}
                                         />
                                     </div>
                                     <DialogFooter>
-                                        <Button variant="outline" onClick={() => setCancelOpen(false)}>Keep Order</Button>
+                                        <Button variant="outline" onClick={() => setCancelOpen(false)}>{t("orderDetail.keepOrder")}</Button>
                                         <Button variant="destructive" onClick={handleCancelOrder} disabled={actionLoading}>
-                                            {actionLoading ? "Cancelling..." : "Confirm Cancellation"}
+                                            {actionLoading ? t("orderDetail.cancelling") : t("orderDetail.confirmCancel")}
                                         </Button>
                                     </DialogFooter>
                                 </DialogContent>
@@ -508,17 +510,17 @@ export default function UserOrderDetail() {
                                         className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-md hover:shadow-lg transition-all duration-200"
                                         onClick={fetchReturnableItems}
                                     >
-                                        <RotateCcw className="mr-2 h-4 w-4" /> Request Return
+                                        <RotateCcw className="mr-2 h-4 w-4" /> {t("orderDetail.requestReturn")}
                                     </Button>
                                 </DialogTrigger>
                                 <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col">
                                     <DialogHeader>
                                         <DialogTitle className="flex items-center gap-2 text-xl">
                                             <RotateCcw className="h-5 w-5 text-orange-500" />
-                                            Request Return
+                                            {t("orderDetail.returnTitle")}
                                         </DialogTitle>
                                         <DialogDescription>
-                                            Select the items you wish to return. Our team will review your request within 24-48 hours.
+                                            {t("orderDetail.returnDesc")}
                                         </DialogDescription>
                                     </DialogHeader>
                                     <div className="flex-1 overflow-y-auto pr-2 -mr-2 py-4 space-y-5">
@@ -526,13 +528,13 @@ export default function UserOrderDetail() {
                                         <div className="space-y-3">
                                             <Label className="text-sm font-semibold flex items-center gap-2">
                                                 <Package className="h-4 w-4 text-muted-foreground" />
-                                                Select Items to Return
+                                                {t("orderDetail.selectItems")}
                                             </Label>
                                             <div className="rounded-lg border bg-muted/30 p-1 space-y-2">
                                                 {returnableItems.length === 0 ? (
                                                     <div className="text-center py-8 text-muted-foreground">
                                                         <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                                                        <p className="text-sm">No returnable items found</p>
+                                                        <p className="text-sm">{t("orderDetail.noReturnable")}</p>
                                                     </div>
                                                 ) : (
                                                     returnableItems.map((item: ReturnableItem) => {
@@ -583,7 +585,7 @@ export default function UserOrderDetail() {
                                                                             <>
                                                                                 <span className="text-xs text-muted-foreground">•</span>
                                                                                 <span className="text-xs text-orange-600">
-                                                                                    Return by: {format(new Date(item.return_deadline), "MMM d")}
+                                                                                    {t("orderDetail.returnBy")}: {format(new Date(item.return_deadline), "MMM d")}
                                                                                 </span>
                                                                             </>
                                                                         )}
@@ -622,7 +624,7 @@ export default function UserOrderDetail() {
                                             {returnableItems.length > 0 && selectedReturnItems.length === 0 && (
                                                 <p className="text-xs text-orange-600 flex items-center gap-1">
                                                     <AlertTriangle className="h-3 w-3" />
-                                                    Please select at least one item to return
+                                                    {t("orderDetail.selectItemsRequired") || "Please select at least one item to return"}
                                                 </p>
                                             )}
                                         </div>
@@ -632,7 +634,7 @@ export default function UserOrderDetail() {
                                         {/* Dynamic Sections for Selected Items */}
                                         {selectedReturnItems.length > 0 && (
                                             <div className="space-y-4 border-t pt-4">
-                                                <Label className="text-sm font-semibold">Item Details & Condition</Label>
+                                                <Label className="text-sm font-semibold">{t("orderDetail.itemCondition")}</Label>
                                                 {selectedReturnItems.map(selectedItem => {
                                                     const itemDef = returnableItems.find(i => i.id === selectedItem.id);
                                                     if (!itemDef) return null;
@@ -641,14 +643,14 @@ export default function UserOrderDetail() {
                                                         <div key={selectedItem.id} className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-3">
                                                             <div className="font-medium text-sm flex justify-between">
                                                                 <span>{itemDef.title}</span>
-                                                                <Badge variant="outline">Qty: {selectedItem.quantity}</Badge>
+                                                                <Badge variant="outline">{t("orderDetail.qty")}: {selectedItem.quantity}</Badge>
                                                             </div>
 
                                                             {/* Reason */}
                                                             <div>
-                                                                <Label className="text-xs text-muted-foreground mb-1 block">Reason for Return *</Label>
+                                                                <Label className="text-xs text-muted-foreground mb-1 block">{t("orderDetail.returnReason")} *</Label>
                                                                 <Textarea
-                                                                    placeholder="Why are you returning this?"
+                                                                    placeholder={t("orderDetail.reasonPlaceholder")}
                                                                     value={itemReasons[selectedItem.id] || ''}
                                                                     onChange={e => setItemReasons(prev => ({ ...prev, [selectedItem.id]: e.target.value }))}
                                                                     className="text-sm min-h-[60px] resize-none bg-white"
@@ -658,7 +660,7 @@ export default function UserOrderDetail() {
                                                             {/* Images */}
                                                             <div>
                                                                 <Label className="text-xs text-muted-foreground mb-1 block">
-                                                                    Upload Images (Min 1, Max 3) *
+                                                                    {t("orderDetail.uploadImages")} *
                                                                 </Label>
                                                                 <div className="flex flex-wrap gap-2">
                                                                     {(itemImages[selectedItem.id] || []).map((file, idx) => (
@@ -679,7 +681,7 @@ export default function UserOrderDetail() {
                                                                     {(itemImages[selectedItem.id]?.length || 0) < 3 && (
                                                                         <label className="w-16 h-16 border-2 border-dashed border-gray-300 rounded flex flex-col items-center justify-center cursor-pointer hover:bg-gray-100 transition-colors">
                                                                             <Upload className="h-4 w-4 text-gray-400" />
-                                                                            <span className="text-[9px] text-gray-500 mt-1">Add</span>
+                                                                            <span className="text-[9px] text-gray-500 mt-1">{t("orderDetail.add")}</span>
                                                                             <input
                                                                                 type="file"
                                                                                 accept="image/*"
@@ -698,9 +700,9 @@ export default function UserOrderDetail() {
 
                                         {/* Global Reason Input (Optional/Summary) */}
                                         <div className="space-y-2">
-                                            <Label className="text-sm font-semibold">Additional Comments (Optional)</Label>
+                                            <Label className="text-sm font-semibold">{t("orderDetail.additionalComments")}</Label>
                                             <Textarea
-                                                placeholder="Any other feedback about this order?"
+                                                placeholder={t("orderDetail.feedbackPlaceholder")}
                                                 value={returnReason}
                                                 onChange={e => setReturnReason(e.target.value)}
                                                 className="min-h-[60px] resize-none"
@@ -709,7 +711,7 @@ export default function UserOrderDetail() {
                                     </div>
                                     <DialogFooter className="gap-2 sm:gap-0 pt-4 border-t">
                                         <Button variant="ghost" onClick={() => setReturnOpen(false)}>
-                                            Cancel
+                                            {t("auth.cancel") || "Cancel"}
                                         </Button>
                                         <Button
                                             className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
@@ -719,12 +721,12 @@ export default function UserOrderDetail() {
                                             {actionLoading ? (
                                                 <>
                                                     <span className="animate-spin mr-2">⏳</span>
-                                                    Submitting...
+                                                    {t("orderDetail.submitting")}
                                                 </>
                                             ) : (
                                                 <>
                                                     <CheckCircle className="mr-2 h-4 w-4" />
-                                                    Submit Return Request
+                                                    {t("orderDetail.submitReturn")}
                                                 </>
                                             )}
                                         </Button>
@@ -742,7 +744,7 @@ export default function UserOrderDetail() {
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <Package className="h-5 w-5" /> Order Items
+                                    <Package className="h-5 w-5" /> {t("orderDetail.items")}
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
@@ -789,7 +791,7 @@ export default function UserOrderDetail() {
                                                     </div>
                                                     <div className="flex-1">
                                                         <div className="flex items-center gap-2">
-                                                            <h4 className="font-medium">{item.product?.title || "Product"}</h4>
+                                                            <h4 className="font-medium">{item.product?.title || t("products.defaultTitle") || "Product"}</h4>
                                                             {sizeLabel && (
                                                                 <Badge variant="secondary" className="text-xs font-normal">
                                                                     {sizeLabel}
@@ -797,9 +799,9 @@ export default function UserOrderDetail() {
                                                             )}
                                                         </div>
                                                         <p className="text-sm text-muted-foreground">
-                                                            Qty: {item.quantity} × ₹{bundledUnitPrice.toFixed(2)}
+                                                            {t("orderDetail.qty")}: {item.quantity} × ₹{bundledUnitPrice.toFixed(2)}
                                                             <span className="text-xs ml-2 text-muted-foreground/80">
-                                                                ({(item.product?.price_includes_tax ?? item.product?.default_price_includes_tax ?? true) ? 'Inc. Tax' : 'Excl. Tax'})
+                                                                ({(item.product?.price_includes_tax ?? item.product?.default_price_includes_tax ?? true) ? t("products.incTax") || 'Inc. Tax' : t("products.exclTax") || 'Excl. Tax'})
                                                             </span>
                                                         </p>
                                                         {/* Base Price Display */}
@@ -808,7 +810,7 @@ export default function UserOrderDetail() {
                                                             const baseUnitPrice = gstRate > 0 ? bundledUnitPrice / (1 + gstRate / 100) : bundledUnitPrice;
                                                             return (
                                                                 <p className="text-xs text-slate-500">
-                                                                    Base Price: ₹{baseUnitPrice.toFixed(2)} (Excl. Tax)
+                                                                    {t("products.basePrice") || 'Base Price'}: ₹{baseUnitPrice.toFixed(2)} ({t("products.exclTax") || 'Excl. Tax'})
                                                                 </p>
                                                             );
                                                         })()}
@@ -851,15 +853,15 @@ export default function UserOrderDetail() {
                                         return (
                                             <>
                                                 <div className="flex justify-between">
-                                                    <span className="text-muted-foreground">Subtotal</span>
+                                                    <span className="text-muted-foreground">{t("orderDetail.subtotal")}</span>
                                                     <span>₹{subtotal.toFixed(2)}</span>
                                                 </div>
                                                 {deliveryTotal > 0 && (
                                                     <div className="flex justify-between">
                                                         <span className="text-muted-foreground flex items-center gap-1.5">
-                                                            Delivery & Handling
+                                                            {t("orderDetail.delivery")}
                                                             {refundableTotal > 0 && (
-                                                                <Badge variant="outline" className="text-[10px] h-4 font-normal text-blue-600 border-blue-200 bg-blue-50">Refundable</Badge>
+                                                                <Badge variant="outline" className="text-[10px] h-4 font-normal text-blue-600 border-blue-200 bg-blue-50">{t("orderDetail.refundable") || 'Refundable'}</Badge>
                                                             )}
                                                         </span>
                                                         <span>₹{deliveryTotal.toFixed(2)}</span>
@@ -867,7 +869,7 @@ export default function UserOrderDetail() {
                                                 )}
                                                 {(order.coupon_discount ?? 0) > 0 && (
                                                     <div className="flex justify-between text-green-600 font-medium">
-                                                        <span>Coupon Discount</span>
+                                                        <span>{t("orderDetail.discount")}</span>
                                                         <span>-₹{(order.coupon_discount ?? 0).toFixed(2)}</span>
                                                     </div>
                                                 )}
@@ -876,7 +878,7 @@ export default function UserOrderDetail() {
                                     })()}
                                     <Separator className="my-2" />
                                     <div className="flex justify-between font-bold text-lg">
-                                        <span>Total Payable</span>
+                                        <span>{t("orderDetail.total")}</span>
                                         <span>₹{(order.total_amount || 0).toFixed(2)}</span>
                                     </div>
                                 </div>
@@ -889,14 +891,14 @@ export default function UserOrderDetail() {
                                 <CardHeader className="bg-orange-50/50">
                                     <div className="flex items-center justify-between">
                                         <CardTitle className="flex items-center gap-2 text-lg text-orange-950">
-                                            <RotateCcw className="h-5 w-5 text-orange-600" /> Return Requests
+                                            <RotateCcw className="h-5 w-5 text-orange-600" /> {t("orderDetail.returns")}
                                         </CardTitle>
                                         <Badge variant="outline" className="bg-white border-orange-200 text-orange-800">
-                                            {returns.length} Request{returns.length > 1 ? 's' : ''}
+                                            {returns.length} {t("orderDetail.requestCount", { count: returns.length }) || (returns.length > 1 ? 'Requests' : 'Request')}
                                         </Badge>
                                     </div>
                                     <CardDescription className="text-orange-800/70">
-                                        Track the status of your return and refund requests.
+                                        {t("orderDetail.returnsTrackDesc") || 'Track the status of your return and refund requests.'}
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="p-0">
@@ -926,7 +928,7 @@ export default function UserOrderDetail() {
                                                             onClick={() => handleCancelReturn(ret.id)}
                                                             disabled={actionLoading}
                                                         >
-                                                            Cancel Request
+                                                            {t("orderDetail.cancelRequest") || 'Cancel Request'}
                                                         </Button>
                                                     )}
                                                 </div>
@@ -977,7 +979,7 @@ export default function UserOrderDetail() {
                                                     ))}
                                                     {(ret.status === 'approved' || ret.refund_amount > 0) && (
                                                         <div className="pt-2 mt-2 border-t border-dashed flex justify-between items-center">
-                                                            <span className="text-[11px] font-semibold text-gray-700">Refundable Amount</span>
+                                                            <span className="text-[11px] font-semibold text-gray-700">{t("orderDetail.refundableAmount") || 'Refundable Amount'}</span>
                                                             <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200 text-xs py-0">
                                                                 ₹{ret.refund_amount.toFixed(2)}
                                                             </Badge>
@@ -995,7 +997,7 @@ export default function UserOrderDetail() {
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <Clock className="h-5 w-5" /> Order Timeline
+                                    <Clock className="h-5 w-5" /> {t("orderDetail.history")}
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
@@ -1036,7 +1038,7 @@ export default function UserOrderDetail() {
                                                     <div key={index} className="ml-6 relative">
                                                         <span className="absolute -left-[1.65rem] top-1 h-3 w-3 rounded-full bg-primary border-2 border-background ring-2 ring-muted" />
                                                         <p className="font-medium text-sm capitalize flex items-center gap-2">
-                                                            <span>{(history.event_type || history.status || 'Updated').replace(/_/g, ' ')}</span>
+                                                            <span>{t(`myOrders.statuses.${history.event_type || history.status}`) || (history.event_type || history.status || 'Updated').replace(/_/g, ' ')}</span>
                                                             {(history.event_type === 'REFUND_COMPLETED' || history.event_type === 'REFUND_PARTIAL' || history.status === 'refunded' || history.status === 'partially_refunded') && order.refunds?.some(r => {
                                                                 try {
                                                                     return Math.abs(new Date(r.created_at).getTime() - new Date(history.created_at).getTime()) < 120000;
@@ -1082,7 +1084,7 @@ export default function UserOrderDetail() {
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <MapPin className="h-5 w-5" /> Shipping Address
+                                    <MapPin className="h-5 w-5" /> {t("orderDetail.shipping")}
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="text-sm">
@@ -1094,7 +1096,7 @@ export default function UserOrderDetail() {
                                         <p>{order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.postal_code}</p>
                                         <p>{order.shipping_address.country}</p>
                                         <div className="mt-2 pt-2 border-t">
-                                            <p className="text-muted-foreground">Phone: <span className="text-foreground">{order.shipping_address.phone}</span></p>
+                                            <p className="text-muted-foreground">{t("nav.phone") || 'Phone'}: <span className="text-foreground">{order.shipping_address.phone}</span></p>
                                         </div>
                                     </div>
                                 ) : (
@@ -1106,7 +1108,7 @@ export default function UserOrderDetail() {
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <MapPin className="h-5 w-5" /> Billing Address
+                                    <MapPin className="h-5 w-5" /> {t("orderDetail.billing")}
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="text-sm">
@@ -1118,7 +1120,7 @@ export default function UserOrderDetail() {
                                         <p>{order.billing_address.city}, {order.billing_address.state} {order.billing_address.postal_code}</p>
                                         <p>{order.billing_address.country}</p>
                                         <div className="mt-2 pt-2 border-t">
-                                            <p className="text-muted-foreground">Phone: <span className="text-foreground">{order.billing_address.phone}</span></p>
+                                            <p className="text-muted-foreground">{t("nav.phone") || 'Phone'}: <span className="text-foreground">{order.billing_address.phone}</span></p>
                                         </div>
                                     </div>
                                 ) : (
@@ -1130,13 +1132,13 @@ export default function UserOrderDetail() {
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <CreditCard className="h-5 w-5" /> Payment Info
+                                    <CreditCard className="h-5 w-5" /> {t("orderDetail.paymentInfo") || 'Payment Info'}
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="grid grid-cols-1 gap-2 text-sm">
                                     <div>
-                                        <span className="text-muted-foreground">Payment Status:</span>
+                                        <span className="text-muted-foreground">{t("orderDetail.status")}:</span>
                                         <Badge variant={order.payment_status === 'paid' ? 'default' :
                                             (order.payment_status === 'refunded' || order.payment_status === 'partially_refunded') ? 'destructive' :
                                                 order.payment_status === 'refund_initiated' ? 'outline' : 'secondary'}
@@ -1151,7 +1153,7 @@ export default function UserOrderDetail() {
                                     </div>
                                     {order.payment_method && (
                                         <div>
-                                            <span className="text-muted-foreground">Payment Method:</span>
+                                            <span className="text-muted-foreground">{t("orderDetail.paymentMethod")}:</span>
                                             <p className="text-sm font-medium capitalize">{order.payment_method}</p>
                                         </div>
                                     )}

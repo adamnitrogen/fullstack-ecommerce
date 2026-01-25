@@ -80,11 +80,11 @@ export default function About() {
                 <span className="text-[10px] font-bold uppercase tracking-[0.2em]">{t("about.title")}</span>
               </div>
               <h1 className="text-4xl md:text-6xl font-bold text-white font-playfair animate-in fade-in slide-in-from-bottom-8 duration-700 delay-150">
-                Our Journey of <span className="text-[#B85C3C]">Compassion</span>
+                {t("about.journeyTitlePart1")} <span className="text-[#B85C3C]">{t("about.journeyTitlePart2")}</span>
               </h1>
             </div>
             <p className="text-white/60 text-base md:text-lg max-w-md font-light leading-relaxed border-l border-[#B85C3C]/30 pl-8 hidden md:block animate-in fade-in slide-in-from-right-8 duration-1000 delay-300">
-              {t("about.subtitle")}
+              {t("about.dedicatedSubtitle")}
             </p>
           </div>
         </div>
@@ -310,11 +310,10 @@ export default function About() {
             <div className="text-center mb-16 space-y-4">
               <div className="w-16 h-1 bg-[#B85C3C] rounded-full mx-auto" />
               <h2 className="text-4xl md:text-5xl font-bold text-[#2C1810] font-playfair">
-                What Do You Think About Us?
+                {t("about.whatDoYouThink")}
               </h2>
               <p className="text-muted-foreground text-xl max-w-2xl mx-auto pt-2">
-                Your feedback helps us improve and inspires others to join our
-                cause. Share your experience with our community.
+                {t("about.feedbackSubtitle")}
               </p>
             </div>
             <div className="max-w-4xl mx-auto">

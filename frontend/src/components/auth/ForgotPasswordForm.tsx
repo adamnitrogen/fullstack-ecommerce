@@ -32,29 +32,29 @@ export function ForgotPasswordForm({
           </div>
         </div>
         <h2 className="text-lg font-semibold text-foreground mb-1">
-          Forgot Password
+          {t("auth.forgotPassword")}
         </h2>
         <p className="text-sm text-muted-foreground">
-          Enter your email or phone number to reset your password
+          {t("auth.emailPhonePlaceholder")}
         </p>
       </div>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="emailOrPhone">Email / Phone Number</Label>
+          <Label htmlFor="emailOrPhone">{t("auth.emailPhone")}</Label>
           <Input
             id="emailOrPhone"
             type="text"
             value={emailOrPhone}
             onChange={(e) => setEmailOrPhone(e.target.value)}
-            placeholder="Enter your email or phone number"
+            placeholder={t("auth.emailPhonePlaceholder")}
             required
           />
         </div>
         <Button type="submit" className="w-full" size="lg">
-          Continue
+          {t("common.next")}
         </Button>
         <Button variant="link" className="w-full" size="sm" onClick={onBack}>
-          Back to Login
+          {t("auth.backToLogin")}
         </Button>
       </form>
     </div>
