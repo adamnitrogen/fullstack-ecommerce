@@ -79,64 +79,6 @@ class ProductService {
         // Get IDs of fetched products to optimize review and config fetching
         const productIds = products.map(p => p.id);
 
-        // Parallel fetch for Reviews and Delivery Configs
-        const [reviewsResult, configsResult] = await Promise.all([
-            supabase
-                .from('reviews')
-                .select('product_id, rating')
-                .in('product_id', productIds),
-            supabase
-                .from('delivery_configs')
-                .select('*')
-                .eq('scope', 'PRODUCT')
-                .eq('is_active', true)
-                .in('product_id', productIds)
-        ]);
-
-        const { data: relevantReviews, error: reviewError } = reviewsResult;
-        const { data: deliveryConfigs, error: configError } = configsResult;
-
-        // Map Delivery Configs
-        if (!configError && deliveryConfigs) {
-            const configMap = {};
-            deliveryConfigs.forEach(c => {
-                configMap[c.product_id] = c;
-            });
-            products.forEach(p => {
-                p.delivery_config = configMap[p.id] || null;
-            });
-        }
-
-        if (!reviewError && relevantReviews && relevantReviews.length > 0) {
-            const ratingsByProduct = {};
-            relevantReviews.forEach(review => {
-                if (!ratingsByProduct[review.product_id]) {
-                    ratingsByProduct[review.product_id] = { total: 0, count: 0 };
-                }
-                ratingsByProduct[review.product_id].total += review.rating;
-                ratingsByProduct[review.product_id].count += 1;
-            });
-
-            products.forEach(product => {
-                const productRatings = ratingsByProduct[product.id];
-                if (productRatings && productRatings.count > 0) {
-                    product.rating = Number((productRatings.total / productRatings.count).toFixed(1));
-                    product.ratingCount = productRatings.count;
-                    product.reviewCount = productRatings.count;
-                } else {
-                    product.rating = product.rating || 0;
-                    product.ratingCount = 0;
-                    product.reviewCount = 0;
-                }
-            });
-        } else {
-            products.forEach(product => {
-                product.rating = product.rating || 0;
-                product.ratingCount = 0;
-                product.reviewCount = 0;
-            });
-        }
-
         // Calculate isNew
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -182,23 +124,11 @@ class ProductService {
             data.defaultVariant = null;
         }
 
-        // Fetch reviews
-        const { data: reviews, error: reviewError } = await supabase
-            .from('reviews')
-            .select('rating')
-            .eq('product_id', id);
-
-        if (!reviewError && reviews && reviews.length > 0) {
-            const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
-            const avgRating = totalRating / reviews.length;
-
-            data.rating = Number(avgRating.toFixed(1));
-            data.ratingCount = reviews.length;
-            data.reviewCount = reviews.length;
-        } else {
-            if (!data.rating) data.rating = 0;
-            data.ratingCount = 0;
-        }
+        // rating, ratingCount and reviewCount are now part of the product record
+        // No need to fetch and calculate on every request.
+        if (!data.rating) data.rating = 0;
+        if (!data.ratingCount) data.ratingCount = 0;
+        if (!data.reviewCount) data.reviewCount = 0;
 
         // Fetch Delivery Configs (Product and Variant level)
         const { data: deliveryConfigs, error: configError } = await supabase
