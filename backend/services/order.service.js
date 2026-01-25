@@ -326,15 +326,24 @@ async function getAllOrders(user, {
     status,
     payment_status,
     startDate,
-    endDate
+    endDate,
+    shallow = 'false' // Default to false (compatible with existing UI)
 }) {
+    const startTime = Date.now();
+    page = parseInt(page) || 1;
+    limit = parseInt(limit) || 12;
     const from = (page - 1) * limit;
     const to = from + limit - 1;
+
+    // PERFORMANCE: Exclude large 'items' field if shallow=true
+    const selectFields = shallow === 'true'
+        ? 'id, order_number, total_amount, status, payment_status, created_at, user_id, customer_name'
+        : 'id, order_number, total_amount, status, payment_status, created_at, user_id, customer_name, items';
 
     // Start building query
     let query = supabase
         .from('orders')
-        .select('id, order_number, total_amount, status, payment_status, created_at, user_id, items', { count: 'exact' })
+        .select(selectFields, { count: 'exact' })
         .order('created_at', { ascending: false });
 
     // Admin/Manager logic
@@ -397,7 +406,7 @@ async function getAllOrders(user, {
     const ordersWithProfiles = orders.map(order => ({
         ...order,
         user: profilesMap[order.user_id] || { name: 'Unknown', email: 'N/A' },
-        customer_name: (profilesMap[order.user_id]?.name) || order.customer_name || 'Unknown',
+        customer_name: (profilesMap[order.user_id]?.name) || (order.customer_name && order.customer_name !== 'PLACEHOLDER' ? order.customer_name : 'Guest'),
         total_amount: order.total_amount || 0,
         total: order.total_amount || 0,
         status: order.status || 'pending',
@@ -405,13 +414,22 @@ async function getAllOrders(user, {
         created_at: order.created_at
     }));
 
+    const duration = Date.now() - startTime;
+    logger.info({
+        msg: '[OrderService] getAllOrders completed',
+        count: count,
+        page: page,
+        durationMs: duration,
+        shallow: shallow
+    });
+
     return {
         data: ordersWithProfiles,
         meta: {
             page: parseInt(page),
             limit: parseInt(limit),
             total: count,
-            totalPages: Math.ceil(count / limit)
+            pages: Math.ceil(count / limit)
         }
     };
 }

@@ -46,7 +46,8 @@ export default function AdminDashboard() {
       return orderService.getAll({
         page: ordersPage,
         limit: ordersLimit,
-        all: 'true' // Request all orders as admin
+        all: 'true', // Request all orders as admin
+        shallow: 'true' // Don't fetch heavy item JSONs for the dashboard list
       });
     },
     placeholderData: keepPreviousData,
@@ -125,8 +126,8 @@ export default function AdminDashboard() {
       title: 'Active Events',
       value: stats?.activeEvents?.toString() || '0',
       icon: Calendar,
-      trend: '+0', // Placeholder
-      trendUp: true,
+      trend: stats?.newEventsCount ? `+${stats.newEventsCount} this week` : 'No new events',
+      trendUp: (stats?.newEventsCount || 0) > 0,
     },
     {
       title: 'Ongoing Events',
@@ -500,25 +501,53 @@ export default function AdminDashboard() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setOrdersPage(p => Math.max(1, p - 1))}
+                  onClick={() => {
+                    setOrdersPage(p => Math.max(1, p - 1));
+                    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                  }}
                   disabled={ordersPage === 1}
-                  className="h-8 px-3"
+                  className="h-8 w-8 p-0"
                 >
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Previous
+                  <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <span className="text-sm font-medium px-3">
-                  Page {ordersPage} of {ordersPagination.pages || ordersPagination.pages}
-                </span>
+
+                {/* Page Numbers */}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, ordersPagination.pages) }, (_, i) => {
+                    let pageNum;
+                    if (ordersPagination.pages <= 5) pageNum = i + 1;
+                    else if (ordersPage <= 3) pageNum = i + 1;
+                    else if (ordersPage >= ordersPagination.pages - 2) pageNum = ordersPagination.pages - 4 + i;
+                    else pageNum = ordersPage - 2 + i;
+
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={ordersPage === pageNum ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          setOrdersPage(pageNum);
+                          window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                        }}
+                        className={`h-8 w-8 p-0 ${ordersPage === pageNum ? "bg-[#B85C3C] hover:bg-[#B85C3C]/90" : ""}`}
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setOrdersPage(p => Math.min(ordersPagination.pages || ordersPagination.pages, p + 1))}
-                  disabled={ordersPage === (ordersPagination.pages || ordersPagination.pages)}
-                  className="h-8 px-3"
+                  onClick={() => {
+                    setOrdersPage(p => Math.min(ordersPagination.pages, p + 1));
+                    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                  }}
+                  disabled={ordersPage === ordersPagination.pages}
+                  className="h-8 w-8 p-0"
                 >
-                  Next
-                  <ChevronRight className="h-4 w-4 ml-1" />
+                  <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
             </div>

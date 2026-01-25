@@ -108,6 +108,7 @@ class AnalyticsService {
         try {
             // fetch dynamic role IDs
             const ROLES = await this._getRoleIds();
+            const startTime = Date.now();
 
             // Safe query execution pattern
             const runSafe = async (operation, fallback = null, context = '') => {
@@ -122,6 +123,7 @@ class AnalyticsService {
             };
 
             // --- BATCH 1: Core Counts (Fastest) ---
+            // Consolidate frequently requested counts
             const batch1 = await Promise.all([
                 runSafe(supabase.from(CONFIG.TABLES.PRODUCTS).select('id', { count: 'exact', head: true }), null, 'Total Products'),
                 runSafe(supabase.from(CONFIG.TABLES.ORDERS).select('id', { count: 'exact', head: true }), null, 'Total Orders'),
@@ -145,6 +147,7 @@ class AnalyticsService {
                 runSafe(supabase.from(CONFIG.TABLES.ORDERS).select('id', { count: 'exact', head: true }).gte(CONFIG.COLUMNS.CREATED_AT.ORDERS, sevenDaysAgoStr), 0, 'Orders Trend'),
                 runSafe(supabase.from(CONFIG.TABLES.PROFILES).select('id', { count: 'exact', head: true }).eq(CONFIG.COLUMNS.ROLE_ID, ROLES.CUSTOMER).gte(CONFIG.COLUMNS.CREATED_AT.PROFILES, sevenDaysAgoStr), 0, 'Customers Trend'),
                 runSafe(supabase.from(CONFIG.TABLES.DONATIONS).select('amount').eq(CONFIG.COLUMNS.PAYMENT_STATUS, 'success').gte(CONFIG.COLUMNS.CREATED_AT.DONATIONS, sevenDaysAgoStr), [], 'Donations Trend'),
+                runSafe(supabase.from(CONFIG.TABLES.EVENTS).select('id', { count: 'exact', head: true }).gte(CONFIG.COLUMNS.CREATED_AT.EVENTS, sevenDaysAgoStr), 0, 'Events Trend'),
                 this._getTotalDonationsSum(),
                 this._getCategoryStats()
             ]);
@@ -152,8 +155,9 @@ class AnalyticsService {
             const ordersTrend = batch2[0].count || 0;
             const customersTrend = batch2[1].count || 0;
             const donationsTrendData = batch2[2].data || [];
-            const totalDonationsSum = batch2[3].data || 0;
-            const categoryStats = batch2[4].data || [];
+            const eventsTrend = batch2[3].count || 0;
+            const totalDonationsSum = batch2[4].data || 0;
+            const categoryStats = batch2[5].data || [];
             const newDonationsAmount = donationsTrendData.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
 
             // --- BATCH 3: Lists & Heavy Data (Slowest) ---
@@ -168,7 +172,7 @@ class AnalyticsService {
             // Only fetch orders list if limit > 0
             if (ordersLimit > 0) {
                 listQueries[1] = runSafe(supabase.from(CONFIG.TABLES.ORDERS)
-                    .select(`id, order_number, ${CONFIG.COLUMNS.CREATED_AT.ORDERS}, ${CONFIG.COLUMNS.TOTAL_AMOUNT}, status, profiles(name)`)
+                    .select(`id, order_number, ${CONFIG.COLUMNS.CREATED_AT.ORDERS}, ${CONFIG.COLUMNS.TOTAL_AMOUNT}, status, customer_name, profiles(name)`)
                     .order(CONFIG.COLUMNS.CREATED_AT.ORDERS, { ascending: false })
                     .range(ordersOffset, ordersOffset + ordersLimit - 1), [], 'Recent Orders Data');
             } else {
@@ -201,6 +205,7 @@ class AnalyticsService {
                     newOrdersCount: ordersTrend,
                     newCustomersCount: customersTrend,
                     newDonationsAmount: newDonationsAmount,
+                    newEventsCount: eventsTrend,
                     pendingReturns: pendingReturns.count || 0
                 },
                 productCategories: categoryStats,
@@ -208,7 +213,7 @@ class AnalyticsService {
                     data: recentOrders.map(o => ({
                         id: o.id,
                         orderNumber: o.order_number,
-                        customerName: o.profiles?.name || 'Guest',
+                        customerName: o.profiles?.name || (o.customer_name && o.customer_name !== 'PLACEHOLDER' ? o.customer_name : 'Guest'),
                         amount: o.total_amount,
                         status: o.status,
                         createdAt: o.createdAt
@@ -217,7 +222,7 @@ class AnalyticsService {
                         total: recentOrdersCount,
                         page: ordersPage,
                         limit: ordersLimit,
-                        totalPages: ordersLimit > 0 ? Math.ceil(recentOrdersCount / ordersLimit) : 1
+                        pages: ordersLimit > 0 ? Math.ceil(recentOrdersCount / ordersLimit) : 1
                     }
                 },
                 upcomingEvents: enrichedUpcoming.map(e => ({
@@ -242,9 +247,11 @@ class AnalyticsService {
                 }))
             };
 
+            const duration = Date.now() - startTime;
             logger.info({
                 msg: '[AnalyticsService] Dashboard Data Generated',
                 stats: finalStats.stats,
+                durationMs: duration,
                 roleIds: ROLES
             });
 
@@ -299,22 +306,45 @@ class AnalyticsService {
     static async _enrichEventsWithRegistrations(eventsList) {
         if (!eventsList || eventsList.length === 0) return [];
 
-        return Promise.all(eventsList.map(async (event) => {
-            try {
-                const [totalRes, cancelledRes] = await Promise.all([
-                    supabase.from(CONFIG.TABLES.EVENT_REGISTRATIONS).select('id', { count: 'exact', head: true }).eq('event_id', event.id),
-                    supabase.from(CONFIG.TABLES.EVENT_REGISTRATIONS).select('id', { count: 'exact', head: true }).eq('event_id', event.id).eq('status', 'cancelled')
-                ]);
+        try {
+            const eventIds = eventsList.map(e => e.id);
 
-                return {
-                    ...event,
-                    registeredCount: totalRes.count || 0,
-                    cancelledCount: cancelledRes.count || 0
-                };
-            } catch (err) {
-                return { ...event, registeredCount: 0, cancelledCount: 0 };
+            // Fetch registration counts grouped by event_id in ONE query
+            const { data: counts, error } = await supabase.rpc('get_event_registration_stats', {
+                event_ids: eventIds
+            });
+
+            if (error) {
+                // FALLBACK: If RPC fails, use the old N+1 logic but log a warning
+                logger.warn({ err: error }, 'FALLBACK: get_event_registration_stats RPC failed, using N+1 logic');
+                return Promise.all(eventsList.map(async (event) => {
+                    const [totalRes, cancelledRes] = await Promise.all([
+                        supabase.from(CONFIG.TABLES.EVENT_REGISTRATIONS).select('id', { count: 'exact', head: true }).eq('event_id', event.id),
+                        supabase.from(CONFIG.TABLES.EVENT_REGISTRATIONS).select('id', { count: 'exact', head: true }).eq('event_id', event.id).eq('status', 'cancelled')
+                    ]);
+                    return { ...event, registeredCount: totalRes.count || 0, cancelledCount: cancelledRes.count || 0 };
+                }));
             }
-        }));
+
+            // Map counts to events
+            const countMap = (counts || []).reduce((acc, curr) => {
+                acc[curr.event_id] = {
+                    registeredCount: curr.total_count || 0,
+                    cancelledCount: curr.cancelled_count || 0
+                };
+                return acc;
+            }, {});
+
+            return eventsList.map(event => ({
+                ...event,
+                registeredCount: countMap[event.id]?.registeredCount || 0,
+                cancelledCount: countMap[event.id]?.cancelledCount || 0
+            }));
+
+        } catch (err) {
+            logger.error({ err }, 'Error in _enrichEventsWithRegistrations');
+            return eventsList.map(e => ({ ...e, registeredCount: 0, cancelledCount: 0 }));
+        }
     }
 }
 

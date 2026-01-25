@@ -27,6 +27,7 @@ export const orderService = {
         orderNumber?: string;
         startDate?: string;
         endDate?: string;
+        shallow?: string; // 'true' to exclude large JSON fields like items
     }) => {
         const { data } = await apiClient.get<{ data: Order[]; meta: { total: number; pages: number }; success: boolean }>("/orders", { params });
         return data;

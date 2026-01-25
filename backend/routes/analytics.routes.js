@@ -15,8 +15,7 @@ const isAdmin = authorizeRole('admin', 'manager');
 router.get('/dashboard', authenticateToken, isAdmin, async (req, res) => {
     try {
         const ordersPage = parseInt(req.query.ordersPage) || 1;
-        const ordersLimit = parseInt(req.query.ordersLimit) || 10;
-
+        const ordersLimit = req.query.ordersLimit !== undefined ? parseInt(req.query.ordersLimit) : 10;
         const stats = await AnalyticsService.getDashboardStats({ ordersPage, ordersLimit });
         res.json(stats);
     } catch (error) {
