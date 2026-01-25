@@ -4,6 +4,7 @@ const EventRefundService = require('./event-refund.service');
 const emailService = require('./email');
 const { refundPayment } = require('../utils/razorpay-helper');
 const { mapToFrontend } = require('./event.utils');
+const { v4: uuidv4 } = require('uuid');
 
 /**
  * Event Cancellation Service
@@ -214,14 +215,30 @@ class EventCancellationService {
     /**
      * Process single registration: refund, email, status update
      */
-    static async processSingleRegistration(registration, event, correlationId) {
+    static async processSingleRegistration(registration, event, correlationId, cancellationReason = null) {
+        // Ensure correlationId exists
+        const cid = correlationId || uuidv4();
+        const finalReason = cancellationReason || event.cancellation_reason;
+
         // 0. Idempotency check: Skip if already cancelled
         if (registration.status === 'cancelled') {
-            logger.info({ registrationId: registration.id }, 'Registration already cancelled, skipping');
+            logger.info({
+                module: 'EventCancellation',
+                operation: 'PROCESS_REGISTRATION',
+                registrationId: registration.id,
+                correlationId: cid,
+                status: 'SKIPPED_ALREADY_CANCELLED'
+            }, 'Registration already cancelled, skipping');
             return;
         }
 
-        logger.info({ registrationId: registration.id, correlationId }, 'Processing registration cancellation');
+        logger.info({
+            module: 'EventCancellation',
+            operation: 'PROCESS_REGISTRATION',
+            registrationId: registration.id,
+            correlationId: cid,
+            status: 'STARTED'
+        }, 'Processing registration cancellation');
 
         const isPaid = registration.payment_status === 'captured' || registration.payment_status === 'paid';
         let refundData = null;
@@ -236,7 +253,7 @@ class EventCancellationService {
                     registrationId: registration.id,
                     paymentId: registration.razorpay_payment_id,
                     amount: registration.amount,
-                    correlationId
+                    correlationId: cid
                 });
 
                 // Request refund from Razorpay only if not already processing
@@ -244,19 +261,34 @@ class EventCancellationService {
                     const razorpayRefund = await refundPayment(registration.razorpay_payment_id, null, {
                         registration_id: registration.id,
                         event_id: event.id,
-                        correlation_id: correlationId,
-                        reason: `Event Cancelled: ${event.cancellation_reason || 'N/A'}`
+                        correlation_id: cid,
+                        reason: finalReason || 'Cancellation'
                     });
 
                     // Update refund record
                     refundData = await EventRefundService.markProcessing(refundRecord.id, razorpayRefund.id);
-                    logger.info({ registrationId: registration.id, refundId: razorpayRefund.id }, 'Refund initiated successfully');
+                    logger.info({
+                        module: 'EventCancellation',
+                        registrationId: registration.id,
+                        refundId: razorpayRefund.id,
+                        correlationId: cid
+                    }, 'Refund initiated successfully');
                 } else {
                     refundData = refundRecord;
-                    logger.info({ registrationId: registration.id, refundStatus: refundRecord.status }, 'Refund already processing/settled');
+                    logger.info({
+                        module: 'EventCancellation',
+                        registrationId: registration.id,
+                        refundStatus: refundRecord.status,
+                        correlationId: cid
+                    }, 'Refund already processing/settled');
                 }
             } catch (refundError) {
-                logger.error({ err: refundError, registrationId: registration.id }, 'Failed to process refund for registration');
+                logger.error({
+                    module: 'EventCancellation',
+                    err: refundError,
+                    registrationId: registration.id,
+                    correlationId: cid
+                }, 'Failed to process refund for registration');
                 throw refundError;
             }
         }
@@ -266,13 +298,21 @@ class EventCancellationService {
             .from('event_registrations')
             .update({
                 status: 'cancelled',
-                cancellation_reason: event.cancellation_reason,
+                cancellation_reason: finalReason,
                 cancelled_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
             })
             .eq('id', registration.id);
 
-        if (updateError) throw updateError;
+        if (updateError) {
+            logger.error({
+                module: 'EventCancellation',
+                err: updateError,
+                registrationId: registration.id,
+                correlationId: cid
+            }, 'Failed to update registration status');
+            throw updateError;
+        }
 
         // 3. Send ONE consolidated email
         try {
@@ -284,7 +324,7 @@ class EventCancellationService {
                         title: event.title,
                         startDate: event.start_date,
                         location: event.location,
-                        cancellationReason: event.cancellation_reason
+                        cancellationReason: finalReason
                     },
                     registration: {
                         id: registration.id,
@@ -299,9 +339,18 @@ class EventCancellationService {
                 },
                 registration.user_id
             );
-            logger.info({ registrationId: registration.id }, 'Cancellation email sent');
+            logger.info({
+                module: 'EventCancellation',
+                registrationId: registration.id,
+                correlationId: cid
+            }, 'Cancellation email sent');
         } catch (emailError) {
-            logger.error({ err: emailError, registrationId: registration.id }, 'Failed to send cancellation email');
+            logger.error({
+                module: 'EventCancellation',
+                err: emailError,
+                registrationId: registration.id,
+                correlationId: cid
+            }, 'Failed to send cancellation email');
             // Don't throw for email error to allow other registrations to process
         }
     }

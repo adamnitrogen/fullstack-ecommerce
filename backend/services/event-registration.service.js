@@ -8,6 +8,7 @@ const { createInvoice } = require('../services/razorpay-invoice.service');
 const { capturePayment, voidAuthorization, refundPayment, fetchPayment } = require('../utils/razorpay-helper');
 const EventPricingService = require('./event-pricing.service');
 const EventRefundService = require('./event-refund.service');
+const EventCancellationService = require('./event-cancellation.service');
 
 // Initialize Razorpay
 const razorpay = new Razorpay({
@@ -621,17 +622,17 @@ class EventRegistrationService {
      * Cancel Registration
      */
     static async cancelRegistration(userId, registrationId, reason = 'User requested cancellation') {
-        if (!registrationId) throw new Error('Registration ID is required');
+        const correlationId = uuidv4();
 
         logger.info({
             module: 'EventRegistration',
-            operation: 'CANCEL_USER',
+            operation: 'USER_CANCEL_INIT',
             userId,
             registrationId,
-            reason
-        }, 'User initiated registration cancellation');
+            correlationId
+        }, 'User initiating registration cancellation');
 
-        // 1. Verify ownership
+        // 1. Fetch Registration with Event Data
         const { data: registration, error: fetchError } = await supabase
             .from('event_registrations')
             .select('*, events(*)')
@@ -639,101 +640,53 @@ class EventRegistrationService {
             .eq('user_id', userId)
             .single();
 
-        if (fetchError || !registration) throw new Error('Registration not found');
-        if (registration.status === 'cancelled') throw new Error('Registration is already cancelled');
+        if (fetchError || !registration) {
+            logger.warn({ registrationId, userId, correlationId }, 'Registration not found for cancellation');
+            throw new Error('Registration not found');
+        }
 
-        // 2. Deadine Check (48 hours before start)
+        if (registration.status === 'cancelled') {
+            logger.info({ registrationId, correlationId }, 'Registration already cancelled');
+            return { message: 'Registration is already cancelled' };
+        }
+
+        // 2. Deadline Check (48 hours before start)
+        // Only apply deadline check for user-initiated cancellations, not admin
+        // But this function IS for user initiated ones.
         const eventStartTime = new Date(registration.events?.start_date).getTime();
         const now = Date.now();
         const fortyEightHoursInMs = 48 * 60 * 60 * 1000;
 
         if (now > eventStartTime - fortyEightHoursInMs) {
-            logger.warn({ registrationId, eventId: registration.event_id, eventStartTime: registration.events?.start_date }, '[EventRegistration] Cancellation blocked: within 48h of event');
+            logger.warn({
+                registrationId,
+                eventId: registration.event_id,
+                eventStartTime: registration.events?.start_date,
+                correlationId
+            }, '[EventRegistration] Cancellation blocked: within 48h of event');
             throw new Error('Cancellations are only allowed up to 48 hours before the event start time.');
         }
 
-        // 3. Handle Paid Refund
-        let refundSuccessful = false;
-        let refundId = null;
-        const isPaid = registration.payment_status === 'paid' || registration.payment_status === 'captured';
+        // 3. Delegate to Shared Processing Logic
+        // This handles Refund, Status Update, and Email
+        // We await it here so the user gets immediate feedback if it fails (e.g. DB error)
+        // For email, the shared service catches errors so it won't fail the written response.
 
-        if (isPaid && registration.razorpay_payment_id) {
-            try {
-                logger.info({ registrationId, paymentId: registration.razorpay_payment_id }, '[EventRegistration] Initiating automatic refund for cancellation');
+        await EventCancellationService.processSingleRegistration(
+            registration,
+            registration.events,
+            correlationId,
+            reason
+        );
 
-                // 3.1. Create refund record
-                const refundRecord = await EventRefundService.initiateRefund({
-                    eventId: registration.event_id,
-                    userId: registration.user_id,
-                    registrationId: registrationId,
-                    paymentId: registration.razorpay_payment_id,
-                    amount: registration.amount,
-                    amount: registration.amount,
-                    correlationId: uuidv4() // Generate valid UUID for user cancellation
-                });
+        logger.info({
+            module: 'EventRegistration',
+            operation: 'USER_CANCEL_COMPLETE',
+            registrationId,
+            correlationId
+        }, 'User cancellation completed successfully');
 
-                if (refundRecord.status === 'INITIATED') {
-                    const refund = await refundPayment(registration.razorpay_payment_id, null, {
-                        reason: `User cancelled: ${reason}`,
-                        registration_id: registrationId,
-                        source: 'USER_CANCELLATION'
-                    });
-
-                    await EventRefundService.markProcessing(refundRecord.id, refund.id);
-                    refundSuccessful = true;
-                    refundId = refund.id;
-                } else {
-                    refundSuccessful = true;
-                    refundId = refundRecord.gateway_reference;
-                }
-            } catch (refundError) {
-                logger.error({ err: refundError, registrationId }, '[EventRegistration] Automatic refund failed');
-                throw new Error('Failed to process refund. Please contact support.');
-            }
-        }
-
-        // 4. Update Registration Status
-        const { error: updateError } = await supabase
-            .from('event_registrations')
-            .update({
-                status: 'cancelled',
-                payment_status: refundSuccessful ? 'refunded' : registration.payment_status,
-                cancellation_reason: reason,
-                cancelled_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', registrationId);
-
-        if (updateError) {
-            logger.error({ err: updateError, registrationId }, '[EventRegistration] Failed to update registration status after cancellation');
-            throw updateError;
-        }
-
-        // 5. Send cancellation email
-        const refundDetails = isPaid ? {
-            amount: registration.amount || 0,
-            isRefunded: refundSuccessful,
-            refundId: refundId
-        } : null;
-
-        emailService.sendEventCancellationEmail(
-            registration.email,
-            {
-                event: {
-                    id: registration.events?.id,
-                    title: registration.events?.title || 'Event',
-                    startDate: registration.events?.start_date,
-                    location: registration.events?.location,
-                    cancellationReason: reason
-                },
-                registration: { id: registration.id, registrationNumber: registration.registration_number },
-                attendeeName: registration.full_name,
-                refundDetails
-            },
-            userId
-        ).catch(err => logger.error({ err: err.message }, 'Failed to send event cancellation email'));
-
-        return { success: true, message: 'Registration cancelled successfully' };
+        return { message: 'Registration cancelled successfully' };
     }
 
     /**
