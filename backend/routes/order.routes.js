@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { authenticateToken, requireRole, checkPermission } = require('../middleware/auth.middleware');
 const {
     updateOrderStatus,
     getAllOrders,
@@ -53,8 +53,8 @@ router.get('/:id', authenticateToken, async (req, res) => {
     }
 });
 
-// Update order status - Admin/Manager Only
-router.put('/:id/status', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+// Update order status - Admin/Manager Only (Requires can_manage_orders)
+router.put('/:id/status', authenticateToken, checkPermission('can_manage_orders'), async (req, res) => {
     const { id } = req.params;
     const { status, notes } = req.body;
 

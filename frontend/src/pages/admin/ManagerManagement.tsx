@@ -170,7 +170,7 @@ export default function ManagerManagement() {
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge variant="secondary">
-                                                        {getActivePermissionsCount(manager)} of 14
+                                                        {getActivePermissionsCount(manager)} of 18
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell>

@@ -2,6 +2,7 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
+const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
 
 // Get all categories (with optional type filter)
 router.get('/', async (req, res) => {
@@ -46,10 +47,8 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
-
 // Create category - Admin/Manager only
-router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_categories'), async (req, res) => {
     try {
         const { name, type = 'product' } = req.body;
 
@@ -77,7 +76,7 @@ router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req,
 });
 
 // Update category - Admin/Manager only
-router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_categories'), async (req, res) => {
     try {
         const { name, type } = req.body;
 
@@ -110,7 +109,7 @@ router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (re
 });
 
 // Delete category - Admin/Manager only
-router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_categories'), async (req, res) => {
     try {
         const { error } = await supabase
             .from('categories')

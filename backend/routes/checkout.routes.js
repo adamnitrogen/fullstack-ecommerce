@@ -15,6 +15,7 @@ const {
     processBuyNowOrder
 } = require('../services/checkout.service');
 const { getUserCart, calculateCartTotals } = require('../services/cart.service');
+const { validateCoupon } = require('../services/coupon.service');
 const supabase = require('../config/supabase');
 
 /**
@@ -141,7 +142,6 @@ router.post('/create-payment-order', validate(createPaymentOrderSchema), request
             return res.status(401).json({ error: 'Authentication required' });
         }
 
-        const supabase = require('../config/supabase');
 
         // PHASE 3A OPTIMIZATION: Use profile from request body if provided (from summary)
         // Fallback to database fetch for backward compatibility
@@ -232,7 +232,6 @@ router.post('/create-payment-order', validate(createPaymentOrderSchema), request
         // CRITICAL FIX: Validate coupon BEFORE creating Razorpay order
         // This prevents payment-refund cycles when coupons become invalid
         if (cart.applied_coupon_code) {
-            const { validateCoupon } = require('../services/coupon.service');
 
             // Normalize items for validation (Service expects 'product' and 'variant' keys)
             const normalizedItems = cart.cart_items.map(item => ({

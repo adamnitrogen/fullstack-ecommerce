@@ -15,6 +15,7 @@ import { useLocationStore } from "@/store/locationStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ForceChangePasswordDialog } from "@/components/auth/ForceChangePasswordDialog";
+import { PermissionProtectedRoute } from "@/components/auth/PermissionProtectedRoute";
 import { ReactivationModal } from "@/components/auth/ReactivationModal";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { couponService } from "@/services/coupon.service";
@@ -301,31 +302,137 @@ const App = () => {
                 >
                   {/* Reuse same components but accessed via /manager/... */}
                   <Route index element={<AdminDashboard />} />
-                  <Route path="products" element={<ProductsManagement />} />
+                  <Route
+                    path="products"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_products">
+                        <ProductsManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
                   <Route
                     path="categories"
-                    element={<AllCategoriesManagement />}
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_categories">
+                        <AllCategoriesManagement />
+                      </PermissionProtectedRoute>
+                    }
                   />
-                  <Route path="orders" element={<OrdersManagement />} />
-                  <Route path="orders/:id" element={<OrderDetail />} />
-                  <Route path="events" element={<EventsManagement />} />
-                  <Route path="blogs" element={<BlogsManagement />} />
-                  <Route path="gallery" element={<GalleryManagement />} />
-                  <Route path="carousel" element={<CarouselManagement />} />
+                  <Route
+                    path="orders"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_orders">
+                        <OrdersManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="orders/:id"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_orders">
+                        <OrderDetail />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="events"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_events">
+                        <EventsManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="blogs"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_blogs">
+                        <BlogsManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="gallery"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_gallery">
+                        <GalleryManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="carousel"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_carousel">
+                        <CarouselManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
                   {/* Managers don't manage users/managers usually, but let RBAC handle inside components if needed */}
                   {/* UsersManagement removed from Manager routes to prevent Admin Management access */}
                   {/* ManagerManagement likely SHOULD BE HIDDEN for managers - will handle in Sidebar/Layout */}
-                  <Route path="reviews" element={<ReviewsManagement />} />
-                  <Route path="comments" element={<FlaggedCommentsManagement />} />
-                  <Route path="faqs" element={<FAQsManagement />} />
+                  <Route
+                    path="reviews"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_products">
+                        <ReviewsManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="comments"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_blogs">
+                        <FlaggedCommentsManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="faqs"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_faqs">
+                        <FAQsManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
                   <Route
                     path="contact-management"
-                    element={<ContactManagement />}
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_contact_info">
+                        <ContactManagement />
+                      </PermissionProtectedRoute>
+                    }
                   />
-                  <Route path="contact-messages" element={<ContactMessages />} />
-                  <Route path="contact-messages/:id" element={<ContactMessageDetail />} />
-                  <Route path="about-us" element={<AboutUsManagement />} />
-                  <Route path="policies" element={<PolicyManagement />} />
+                  <Route
+                    path="contact-messages"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_contact_info">
+                        <ContactMessages />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="contact-messages/:id"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_contact_info">
+                        <ContactMessageDetail />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="about-us"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_about_us">
+                        <AboutUsManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="policies"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_about_us">
+                        <PolicyManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
 
                   {/* Managers likely don't access creating managers or system settings */}
                 </Route>

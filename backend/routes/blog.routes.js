@@ -2,6 +2,8 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
+const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
+const { deletePhotoByUrl } = require('../services/photo.service');
 
 // Helper to map snake_case DB object to camelCase frontend object
 const mapToFrontend = (blog) => {
@@ -41,8 +43,6 @@ const mapToDb = (blog) => {
     return dbBlog;
 };
 
-const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
-const { deletePhotoByUrl } = require('../services/photo.service');
 
 // Get all blogs (with optional pagination and search)
 router.get('/', async (req, res) => {
@@ -107,7 +107,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create blog - Admin/Manager only
-router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_blogs'), async (req, res) => {
     try {
         const dbBlog = mapToDb(req.body);
         // Add created_at for new records
@@ -130,7 +130,7 @@ router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req,
 });
 
 // Update blog - Admin/Manager only
-router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_blogs'), async (req, res) => {
     try {
         const dbBlog = mapToDb(req.body);
 
@@ -150,7 +150,7 @@ router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (re
 });
 
 // Delete blog - Admin/Manager only
-router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_blogs'), async (req, res) => {
     try {
         // 1. Get blog to find image URL
         const { data: blog, error: fetchError } = await supabase

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const contactController = require('../controllers/contact.controller');
 const rateLimit = require('express-rate-limit');
+const { authenticateToken, authorizeRole } = require('../middleware/auth.middleware');
 
 // Rate limiting specific to contact form
 // Prevent spam: 5 requests per hour per IP
@@ -16,7 +17,6 @@ const contactLimiter = rateLimit({
     legacyHeaders: false,
 });
 
-const { authenticateToken, authorizeRole } = require('../middleware/auth.middleware');
 
 router.post('/', contactLimiter, contactController.submitContactForm);
 

@@ -40,6 +40,10 @@ const PERMISSION_LABELS = {
     can_manage_bank_details: "Bank Details",
     can_manage_about_us: "About Us",
     can_manage_newsletter: "Newsletter",
+    can_manage_reviews: "Reviews",
+    can_manage_policies: "Policies",
+    can_manage_contact_messages: "Contact Messages",
+    can_manage_coupons: "Coupons",
 };
 
 export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProps) {

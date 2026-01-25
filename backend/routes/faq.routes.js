@@ -3,7 +3,7 @@ const router = express.Router();
 const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
 
-const { authenticateToken, requireRole, optionalAuth } = require('../middleware/auth.middleware');
+const { authenticateToken, checkPermission, optionalAuth } = require('../middleware/auth.middleware');
 
 // Get all FAQs (public - only active FAQs, admin - all FAQs)
 router.get('/', optionalAuth, async (req, res) => {
@@ -76,7 +76,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create new FAQ (admin only)
-router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_faqs'), async (req, res) => {
     try {
         const { question, answer, category_id, display_order, is_active } = req.body;
 
@@ -115,7 +115,7 @@ router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req,
 });
 
 // Update FAQ (admin only)
-router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_faqs'), async (req, res) => {
     try {
         const { id } = req.params;
         const { question, answer, category_id, display_order, is_active } = req.body;
@@ -157,7 +157,7 @@ router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (re
 });
 
 // Toggle FAQ active status (admin only)
-router.patch('/:id/toggle-active', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.patch('/:id/toggle-active', authenticateToken, checkPermission('can_manage_faqs'), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -201,7 +201,7 @@ router.patch('/:id/toggle-active', authenticateToken, requireRole('admin', 'mana
 });
 
 // Delete FAQ (admin only)
-router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_faqs'), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -220,7 +220,7 @@ router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async 
 });
 
 // Reorder FAQs (admin only)
-router.put('/reorder/bulk', async (req, res) => {
+router.put('/reorder/bulk', authenticateToken, checkPermission('can_manage_faqs'), async (req, res) => {
     try {
         const { faqs } = req.body;
 

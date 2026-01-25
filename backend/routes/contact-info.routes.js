@@ -2,6 +2,7 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
+const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
 
 // Middleware to check if user is admin (reused from other routes logic if available, or just check role)
 // For now, we'll assume the frontend sends the user ID/role and we verify it, 
@@ -13,7 +14,6 @@ const supabase = require('../config/supabase');
 // I'll check how other routes handle it. `social-media.routes.js` checks `isAdmin` query param or body?
 // Let's look at `social-media.routes.js` pattern.
 
-const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
 
 // GET /api/contact-info - Fetch all contact info (public)
 router.get('/', async (req, res) => {

@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
 const EventService = require('../services/event.service');
 
 // Get all events
@@ -28,10 +29,8 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
-
 // Create event - Admin/Manager only
-router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_events'), async (req, res) => {
     try {
         const event = await EventService.createEvent(req.body);
         res.status(201).json(event);
@@ -41,7 +40,7 @@ router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req,
 });
 
 // Update event - Admin/Manager only
-router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_events'), async (req, res) => {
     try {
         const event = await EventService.updateEvent(req.params.id, req.body);
         res.json(event);
@@ -51,7 +50,7 @@ router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (re
 });
 
 // Delete event - Admin/Manager only
-router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_events'), async (req, res) => {
     try {
         await EventService.deleteEvent(req.params.id);
         res.status(204).send();

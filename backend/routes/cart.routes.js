@@ -13,6 +13,7 @@ const {
     clearCart
 } = require('../services/cart.service');
 const logger = require('../utils/logger');
+const { optionalAuth } = require('../middleware/auth.middleware');
 
 /**
  * Cart Routes
@@ -20,7 +21,6 @@ const logger = require('../utils/logger');
  * Note: All routes require authentication and use user_id from auth middleware or header
  */
 
-const { optionalAuth } = require('../middleware/auth.middleware');
 
 // Use optional authentication - guests are allowed
 router.use(optionalAuth);

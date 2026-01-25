@@ -284,11 +284,75 @@ async function invalidateAuthCache(token) {
     }
 }
 
+/**
+ * Middleware to check if user has specific module permission
+ * Admins have all permissions, Managers check manager_permissions table
+ */
+function checkPermission(permissionName) {
+    return async (req, res, next) => {
+        if (!req.user) {
+            return res.status(401).json({ error: 'Authentication required' });
+        }
+
+        // Admins can do everything
+        if (req.user.role === 'admin') {
+            return next();
+        }
+
+        if (req.user.role !== 'manager') {
+            return res.status(403).json({ error: 'Insufficient permissions' });
+        }
+
+        try {
+            // Check cache for permissions
+            const cacheKey = `perms_${req.user.id}`;
+            let permissions = await authCache.get(cacheKey);
+
+            if (!permissions) {
+                logger.debug({ userId: req.user.id }, '[AuthMiddleware] Permission cache miss, fetching from DB');
+                const { data, error } = await supabaseAdmin
+                    .from('manager_permissions')
+                    .select('*')
+                    .eq('user_id', req.user.id)
+                    .single();
+
+                if (error || !data) {
+                    logger.warn({ userId: req.user.id, err: error }, '[AuthMiddleware] Failed to fetch manager permissions');
+                    return res.status(403).json({ error: 'Manager profile or permissions not found' });
+                }
+
+                permissions = data;
+                await authCache.set(cacheKey, permissions, 60 * 1000); // Cache for 1 minute
+            }
+
+            if (!permissions.is_active) {
+                logger.warn({ userId: req.user.id }, '[AuthMiddleware] Manager account is inactive');
+                return res.status(403).json({ error: 'Manager account is currently inactive' });
+            }
+
+            if (!permissions[permissionName]) {
+                logger.warn({
+                    msg: 'Access Forbidden: Permission missing',
+                    required: permissionName,
+                    userId: req.user.id
+                });
+                return res.status(403).json({ error: `Insufficient permissions: ${permissionName} required` });
+            }
+
+            next();
+        } catch (err) {
+            logger.error({ err, userId: req.user.id }, '[AuthMiddleware] Permission check error');
+            res.status(500).json({ error: 'Failed to verify permissions' });
+        }
+    };
+}
+
 module.exports = {
     authenticateToken,
     authorizeRole,
     requireRole: authorizeRole, // Alias
     requireAuth: authenticateToken, // Alias
+    checkPermission,
     optionalAuth,
     invalidateAuthCache
 };

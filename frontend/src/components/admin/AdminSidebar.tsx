@@ -129,7 +129,7 @@ export function AdminSidebar({
       icon: Star,
       label: "Reviews",
       path: `${basePath}/reviews`,
-      show: hasPermission("can_manage_products")
+      show: hasPermission("can_manage_reviews")
     },
     {
       icon: Flag,
@@ -159,7 +159,7 @@ export function AdminSidebar({
       icon: Shield,
       label: "Policy Management",
       path: `${basePath}/policies`,
-      show: isAdmin || hasPermission("can_manage_about_us")
+      show: isAdmin || hasPermission("can_manage_policies")
     },
     {
       icon: Loader2,

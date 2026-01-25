@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
 const ProductService = require('../services/product.service');
 
 // Get all products with dynamic ratings
@@ -29,10 +30,8 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
-
 // Create product - Admin/Manager only
-router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_products'), async (req, res) => {
     try {
         const product = await ProductService.createProduct(req.body);
         res.status(201).json(product);
@@ -42,7 +41,7 @@ router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req,
 });
 
 // Update product - Admin/Manager only
-router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_products'), async (req, res) => {
     try {
         const product = await ProductService.updateProduct(req.params.id, req.body);
         res.json(product);
@@ -52,7 +51,7 @@ router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (re
 });
 
 // Delete product - Admin/Manager only
-router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_products'), async (req, res) => {
     try {
         await ProductService.deleteProduct(req.params.id);
         res.status(204).send();
