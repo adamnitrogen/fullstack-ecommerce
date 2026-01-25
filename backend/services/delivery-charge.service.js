@@ -150,7 +150,49 @@ class DeliveryChargeService {
 
         try {
             // Get delivery config - Use prefetched or fetch from DB
-            const config = prefetchedConfig || await this.getDeliveryConfig(productId, variantId);
+            let config = prefetchedConfig || await this.getDeliveryConfig(productId, variantId);
+
+            // FALLBACK FOR LEGACY DATA (Consistency with Batch Logic)
+            if (config.source === 'default' || (config.source === 'global' && !prefetchedConfig)) {
+                // Note: getDeliveryConfig returns a default config with source='default' (or 'global' via batch) if nothing found
+                // We need to check the product/variant directly here if we want true fallback.
+                // However, `calculateDeliveryCharge` args don't have the full product object.
+                // We must fetch it if we want to support this fallback here.
+                // For performance, we skip this if it's already a valid config.
+
+                // Fetch product/variant simply to check legacy columns
+                // This adds a DB call, but only for un-configured items.
+                const { data: productData } = await supabase
+                    .from('products')
+                    .select('delivery_charge, product_variants(id, delivery_charge)')
+                    .eq('id', productId)
+                    .single();
+
+                if (productData) {
+                    const variantData = variantId ? productData.product_variants.find(v => v.id === variantId) : null;
+                    const variantCharge = variantData?.delivery_charge;
+                    const productCharge = productData.delivery_charge;
+
+                    let legacyCharge = null;
+                    if (variantCharge !== undefined && variantCharge !== null) {
+                        legacyCharge = parseFloat(variantCharge);
+                    } else if (productCharge !== undefined && productCharge !== null) {
+                        legacyCharge = parseFloat(productCharge);
+                    }
+
+                    if (legacyCharge !== null && legacyCharge > 0) {
+                        config = {
+                            ...DEFAULT_CONFIG,
+                            source: 'product_legacy',
+                            calculation_type: CALCULATION_TYPES.PER_ITEM,
+                            base_delivery_charge: legacyCharge,
+                            is_taxable: true,
+                            gst_percentage: 18
+                        };
+                        log.debug('APPLY_LEGACY_DELIVERY_SINGLE', 'Applying legacy product delivery charge (Single)', { productId, legacyCharge });
+                    }
+                }
+            }
 
             let deliveryCharge = 0;
             let calculationDetails = {
@@ -294,7 +336,45 @@ class DeliveryChargeService {
 
                 const key = `${productId}-${variantId || 'null'}`;
                 // Fallback to default if not in map (defensive)
-                const config = configMap.get(key) || { ...DEFAULT_CONFIG, source: 'global' };
+                let config = configMap.get(key);
+
+                // FALLBACK FOR LEGACY DATA:
+                // If no config found (meaning it would default to global), check if the product/variant 
+                // has a direct `delivery_charge` set in the legacy columns.
+                if (!config) {
+                    const variantCharge = item.variant?.delivery_charge; // Can be 0, so check for null/undefined if that's the semantic
+                    const productCharge = item.product?.delivery_charge; // Can be 0
+
+                    // Logic: Variant overrides Product. If either exists, use it as a PER_ITEM surcharge.
+                    // note: We treat 0 as an explicit "Free" override if it's set, assuming legacy data implies intent.
+                    // But usually legacy data might be NULL if unset. 
+                    // Let's assume non-null means intent.
+
+                    let legacyCharge = null;
+                    if (variantCharge !== undefined && variantCharge !== null) {
+                        legacyCharge = parseFloat(variantCharge);
+                    } else if (productCharge !== undefined && productCharge !== null) {
+                        legacyCharge = parseFloat(productCharge);
+                    }
+
+                    if (legacyCharge !== null && legacyCharge > 0) {
+                        // Create a synthetic config for this legacy charge
+                        config = {
+                            ...DEFAULT_CONFIG,
+                            source: 'product_legacy', // Mark as product source so it is treated as Surcharge
+                            calculation_type: CALCULATION_TYPES.PER_ITEM,
+                            base_delivery_charge: legacyCharge,
+                            is_taxable: true, // Legacy assumption
+                            gst_percentage: 18 // Legacy assumption
+                        };
+
+                        log.debug('APPLY_LEGACY_DELIVERY', 'Applying legacy product delivery charge', { productId, legacyCharge });
+                    }
+                }
+
+                if (!config) {
+                    config = { ...DEFAULT_CONFIG, source: 'global' };
+                }
 
                 const isGlobal = config.source === 'global';
 
