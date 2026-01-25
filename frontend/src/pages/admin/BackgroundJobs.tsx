@@ -153,7 +153,7 @@ export default function BackgroundJobs() {
     const [selectedJob, setSelectedJob] = useState<Job | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
     const queryClient = useQueryClient();
-    const limit = 15;
+    const limit = 10;
 
     // --- Queries ---
 
