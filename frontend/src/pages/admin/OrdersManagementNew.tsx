@@ -1,5 +1,6 @@
 import { logger } from "@/lib/logger";
 import { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Order, Product, ReturnRequest } from "@/types";
@@ -70,6 +71,7 @@ interface ReturnItem {
 }
 
 export default function OrdersManagement() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -207,12 +209,12 @@ export default function OrdersManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
-      toast.success("Order status updated successfully");
+      toast.success(t("admin.orders.toasts.updateSuccess"));
       setStatusDialogOpen(false);
       setNewStatus("");
     },
     onError: () => {
-      toast.error("Failed to update order status");
+      toast.error(t("admin.orders.toasts.updateFailed"));
     },
   });
 
@@ -226,10 +228,10 @@ export default function OrdersManagement() {
         try {
           if (newStatus === 'return_approved') {
             await apiClient.post(`/returns/${activeReturnRequest.id}/approve`, {});
-            toast.success("Return approved and refund processed");
+            toast.success(t("admin.orders.toasts.returnApproved"));
           } else {
             await apiClient.post(`/returns/${activeReturnRequest.id}/reject`, { reason: "Rejected by admin" });
-            toast.success("Return rejected");
+            toast.success(t("admin.orders.toasts.returnRejected"));
           }
           queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
           setStatusDialogOpen(false);
@@ -237,7 +239,7 @@ export default function OrdersManagement() {
           setActiveReturnRequest(null);
           return;
         } catch (error: unknown) {
-          toast.error(getErrorMessage(error, "Failed to process return action"));
+          toast.error(getErrorMessage(error, t("admin.orders.toasts.returnActionFailed")));
           return;
         }
       }
@@ -264,7 +266,7 @@ export default function OrdersManagement() {
 
   const handleExport = (orders: Order[], filename: string) => {
     if (orders.length === 0) {
-      toast.error("No orders to export");
+      toast.error(t("admin.orders.export.noData", "No orders to export"));
       return;
     }
 
@@ -283,7 +285,7 @@ export default function OrdersManagement() {
     );
 
     downloadCSV(exportData, filename);
-    toast.success("Orders exported successfully");
+    toast.success(t("admin.orders.export.success", "Orders exported successfully"));
   };
 
   const getStatusBadge = (status: OrderStatus) => {
@@ -293,69 +295,69 @@ export default function OrdersManagement() {
     > = {
       // Normal Flow
       pending: {
-        label: "Pending",
+        label: t("admin.orders.status.pending"),
         variant: "outline",
         className: "bg-gray-100 text-gray-800",
       },
       confirmed: {
-        label: "Confirmed",
+        label: t("admin.orders.status.confirmed"),
         variant: "default",
         className: "bg-yellow-500 text-white",
       },
       processing: {
-        label: "Processing",
+        label: t("admin.orders.status.processing"),
         variant: "secondary",
         className: "bg-blue-400 text-white",
       },
       packed: {
-        label: "Packed",
+        label: t("admin.orders.status.packed"),
         variant: "default",
         className: "bg-blue-500 text-white",
       },
       shipped: {
-        label: "Shipped",
+        label: t("admin.orders.status.shipped"),
         variant: "default",
         className: "bg-blue-600 text-white",
       },
       out_for_delivery: {
-        label: "Out for Delivery",
+        label: t("admin.orders.status.out_for_delivery"),
         variant: "default",
         className: "bg-indigo-500 text-white",
       },
       delivered: {
-        label: "Delivered",
+        label: t("admin.orders.status.delivered"),
         variant: "default",
         className: "bg-green-500 text-white",
       },
       // Cancellation & Refund
       cancelled: {
-        label: "Cancelled",
+        label: t("admin.orders.status.cancelled"),
         variant: "destructive",
         className: "bg-red-500 text-white",
       },
       refunded: {
-        label: "Refunded",
+        label: t("admin.orders.status.refunded"),
         variant: "default",
         className: "bg-green-400 text-white",
       },
       // Return Flow
       return_requested: {
-        label: "Return Requested",
+        label: t("admin.orders.status.return_requested"),
         variant: "default",
         className: "bg-purple-400 text-white",
       },
       return_approved: {
-        label: "Return Approved",
+        label: t("admin.orders.status.return_approved"),
         variant: "default",
         className: "bg-purple-600 text-white",
       },
       return_rejected: {
-        label: "Return Rejected",
+        label: t("admin.orders.status.return_rejected"),
         variant: "destructive",
         className: "bg-red-400 text-white",
       },
       returned: {
-        label: "Returned",
+        label: t("admin.orders.status.returned"),
         variant: "default",
         className: "bg-purple-700 text-white",
       },
@@ -364,7 +366,7 @@ export default function OrdersManagement() {
     const config = statusConfig[status];
     return (
       <Badge className={config.className} variant={config.variant}>
-        {config.label}
+        {t(`admin.orders.status.${status}`, config.label)}
       </Badge>
     );
   };
@@ -398,20 +400,20 @@ export default function OrdersManagement() {
       {orders.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <ShoppingCart className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <p>No orders found</p>
+          <p>{t("admin.orders.empty")}</p>
         </div>
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Order ID</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Customer</TableHead>
-              <TableHead>Items</TableHead>
-              <TableHead>Total</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Payment</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>{t("admin.orders.table.id")}</TableHead>
+              <TableHead>{t("admin.orders.table.date")}</TableHead>
+              <TableHead>{t("admin.orders.table.customer")}</TableHead>
+              <TableHead>{t("admin.orders.table.items")}</TableHead>
+              <TableHead>{t("admin.orders.table.total")}</TableHead>
+              <TableHead>{t("admin.orders.table.status")}</TableHead>
+              <TableHead>{t("admin.orders.table.payment")}</TableHead>
+              <TableHead className="text-right">{t("admin.orders.table.actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -423,7 +425,7 @@ export default function OrdersManagement() {
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col">
-                    <span className="font-medium">{order.customer_name || "N/A"}</span>
+                    <span className="font-medium">{order.customer_name || t("admin.orders.table.guest")}</span>
                     <span className="text-xs text-muted-foreground">{order.customer_email}</span>
                   </div>
                 </TableCell>
@@ -440,7 +442,11 @@ export default function OrdersManagement() {
                           : "secondary"
                     }
                   >
-                    {(order.paymentStatus || order.payment_status || "pending").toUpperCase()}
+                    {(() => {
+                      const rawStatus = order.paymentStatus || order.payment_status || "pending";
+                      const normalized = rawStatus.toLowerCase().replace('status.', '').trim().replace(/ /g, '_');
+                      return t(`admin.orders.status.${normalized}`, rawStatus);
+                    })()}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
@@ -448,7 +454,7 @@ export default function OrdersManagement() {
                     variant="ghost"
                     size="icon"
                     onClick={() => navigate(`/admin/orders/${order.id}`)}
-                    title="View full order details"
+                    title={t("admin.orders.toasts.viewOrderDetails")}
                   >
                     <Eye className="h-4 w-4" />
                   </Button>
@@ -466,9 +472,9 @@ export default function OrdersManagement() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold">Orders Management</h2>
+          <h2 className="text-3xl font-bold">{t("admin.orders.title")}</h2>
           <p className="text-muted-foreground">
-            Manage deliverable, return, and cancellation requests
+            {t("admin.orders.subtitle")}
           </p>
         </div>
       </div>
@@ -479,7 +485,7 @@ export default function OrdersManagement() {
           <Input
             id="order-admin-search"
             name="search"
-            placeholder="Search by Order ID..."
+            placeholder={t("admin.orders.searchPlaceholder")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -489,43 +495,43 @@ export default function OrdersManagement() {
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[180px]">
             <Filter className="mr-2 h-4 w-4" />
-            <SelectValue placeholder="Filter by status" />
+            <SelectValue placeholder={t("admin.orders.filterStatus")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="all">{t("admin.orders.filterStatus")}</SelectItem>
             {/* Normal Flow */}
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="confirmed">Confirmed</SelectItem>
-            <SelectItem value="processing">Processing</SelectItem>
-            <SelectItem value="packed">Packed</SelectItem>
-            <SelectItem value="shipped">Shipped</SelectItem>
-            <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
-            <SelectItem value="delivered">Delivered</SelectItem>
+            <SelectItem value="pending">{t("admin.orders.status.pending")}</SelectItem>
+            <SelectItem value="confirmed">{t("admin.orders.status.confirmed")}</SelectItem>
+            <SelectItem value="processing">{t("admin.orders.status.processing")}</SelectItem>
+            <SelectItem value="packed">{t("admin.orders.status.packed")}</SelectItem>
+            <SelectItem value="shipped">{t("admin.orders.status.shipped")}</SelectItem>
+            <SelectItem value="out_for_delivery">{t("admin.orders.status.out_for_delivery")}</SelectItem>
+            <SelectItem value="delivered">{t("admin.orders.status.delivered")}</SelectItem>
             {/* Cancellation & Refund */}
-            <SelectItem value="cancelled">Cancelled</SelectItem>
-            <SelectItem value="refunded">Refunded</SelectItem>
+            <SelectItem value="cancelled">{t("admin.orders.status.cancelled")}</SelectItem>
+            <SelectItem value="refunded">{t("admin.orders.status.refunded")}</SelectItem>
             {/* Returns */}
-            <SelectItem value="return_requested">Return Requested</SelectItem>
-            <SelectItem value="return_approved">Return Approved</SelectItem>
-            <SelectItem value="return_rejected">Return Rejected</SelectItem>
-            <SelectItem value="returned">Returned</SelectItem>
+            <SelectItem value="return_requested">{t("admin.orders.status.return_requested")}</SelectItem>
+            <SelectItem value="return_approved">{t("admin.orders.status.return_approved")}</SelectItem>
+            <SelectItem value="return_rejected">{t("admin.orders.status.return_rejected")}</SelectItem>
+            <SelectItem value="returned">{t("admin.orders.status.returned")}</SelectItem>
           </SelectContent>
         </Select>
 
         <Select value={paymentFilter} onValueChange={setPaymentFilter}>
           <SelectTrigger className="w-[180px]">
             <CreditCard className="mr-2 h-4 w-4" />
-            <SelectValue placeholder="Payment Status" />
+            <SelectValue placeholder={t("admin.orders.filterPayment")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Payments</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="paid">Paid</SelectItem>
-            <SelectItem value="failed">Failed</SelectItem>
-            <SelectItem value="refund_initiated">Refund Initiated</SelectItem>
-            <SelectItem value="refund_in_progress">Refund In Progress</SelectItem>
-            <SelectItem value="refunded">Refunded</SelectItem>
-            <SelectItem value="partially_refunded">Partially Refunded</SelectItem>
+            <SelectItem value="all">{t("admin.orders.filterPayment")}</SelectItem>
+            <SelectItem value="pending">{t("admin.orders.status.pending")}</SelectItem>
+            <SelectItem value="paid">{t("admin.orders.status.paid")}</SelectItem>
+            <SelectItem value="failed">{t("admin.orders.status.failed")}</SelectItem>
+            <SelectItem value="refund_initiated">{t("admin.orders.status.refund_initiated")}</SelectItem>
+            <SelectItem value="refund_in_progress">{t("admin.orders.status.refund_in_progress")}</SelectItem>
+            <SelectItem value="refunded">{t("admin.orders.status.refunded")}</SelectItem>
+            <SelectItem value="partially_refunded">{t("admin.orders.status.partially_refunded")}</SelectItem>
           </SelectContent>
         </Select>
 
@@ -534,7 +540,7 @@ export default function OrdersManagement() {
           size="icon"
           onClick={() => refetch()}
           disabled={isLoading}
-          title="Refresh orders"
+          title={t("admin.orders.refresh")}
         >
           <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
         </Button>
@@ -544,18 +550,18 @@ export default function OrdersManagement() {
         <TabsList className="grid w-full grid-cols-3 max-w-3xl">
           <TabsTrigger value="deliverable" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
-            Deliverable ({deliverableOrders.length})
+            {t("admin.orders.tabs.deliverable")} ({deliverableOrders.length})
           </TabsTrigger>
           <TabsTrigger value="returns" className="flex items-center gap-2">
             <RotateCcw className="h-4 w-4" />
-            Returns ({returnOrders.length})
+            {t("admin.orders.tabs.returns")} ({returnOrders.length})
           </TabsTrigger>
           <TabsTrigger
             value="cancellations"
             className="flex items-center gap-2"
           >
             <XIcon className="h-4 w-4" />
-            Cancellations ({cancelOrders.length})
+            {t("admin.orders.tabs.cancellations")} ({cancelOrders.length})
           </TabsTrigger>
         </TabsList>
 
@@ -563,7 +569,7 @@ export default function OrdersManagement() {
           <Card>
             <CardContent className="pt-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Deliverable Orders</h3>
+                <h3 className="text-lg font-semibold">{t("admin.orders.tabs.deliverable")}</h3>
                 <Button
                   variant="outline"
                   size="sm"
@@ -572,7 +578,7 @@ export default function OrdersManagement() {
                   }
                 >
                   <Download className="h-4 w-4 mr-2" />
-                  Export
+                  {t("admin.orders.export.button")}
                 </Button>
               </div>
               <OrdersTable orders={deliverableOrders} />
@@ -624,7 +630,7 @@ export default function OrdersManagement() {
                   </Pagination>
 
                   <p className="text-sm text-muted-foreground text-center mt-2">
-                    Page {currentPage} of {totalPages} • Total: {totalOrders} orders
+                    {t("admin.orders.pagination.pageInfo", { current: currentPage, total: totalPages, count: totalOrders })}
                   </p>
                 </div>
               )}
@@ -636,7 +642,7 @@ export default function OrdersManagement() {
           <Card>
             <CardContent className="pt-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Return Requests</h3>
+                <h3 className="text-lg font-semibold">{t("admin.orders.tabs.returns")}</h3>
                 <Button
                   variant="outline"
                   size="sm"
@@ -695,7 +701,7 @@ export default function OrdersManagement() {
                   </Pagination>
 
                   <p className="text-sm text-muted-foreground text-center mt-2">
-                    Page {currentPage} of {totalPages} • Total: {totalOrders} orders
+                    {t("admin.orders.pagination.pageInfo", { current: currentPage, total: totalPages, count: totalOrders })}
                   </p>
                 </div>
               )}
@@ -707,7 +713,7 @@ export default function OrdersManagement() {
           <Card>
             <CardContent className="pt-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Cancellation Requests</h3>
+                <h3 className="text-lg font-semibold">{t("admin.orders.tabs.cancellations")}</h3>
                 <Button
                   variant="outline"
                   size="sm"
@@ -779,7 +785,7 @@ export default function OrdersManagement() {
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh]">
           <DialogHeader>
-            <DialogTitle>Order Details - {selectedOrder?.id}</DialogTitle>
+            <DialogTitle>{t("admin.orders.dialog.title")} - {selectedOrder?.id}</DialogTitle>
           </DialogHeader>
           {selectedOrder && (
             <ScrollArea className="max-h-[calc(90vh-120px)] pr-4">
@@ -787,162 +793,167 @@ export default function OrdersManagement() {
                 {/* Order Info */}
                 <div className="grid grid-cols-2 gap-4 border rounded-lg p-4">
                   <div>
-                    <Label className="text-muted-foreground">Order Date</Label>
+                    <Label className="text-muted-foreground">{t("admin.orders.dialog.date")}</Label>
                     <p className="text-sm font-medium">
                       {format(new Date(selectedOrder.createdAt || selectedOrder.created_at), "PPpp")}
                     </p>
                   </div>
                   <div>
                     <Label className="text-muted-foreground">
-                      Total Amount
+                      {t("admin.orders.dialog.amount")}
                     </Label>
                     <p className="text-sm font-semibold">
                       ₹{selectedOrder.total}
                     </p>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground">Status</Label>
-                    <div className="mt-1">
-                      {getStatusBadge(selectedOrder.status)}
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">
-                      Payment Status
-                    </Label>
-                    <div className="mt-1">
-                      <Badge
-                        variant={
-                          selectedOrder.paymentStatus === "paid"
-                            ? "default"
-                            : selectedOrder.paymentStatus === "failed"
-                              ? "destructive"
-                              : "secondary"
-                        }
-                      >
-                        {selectedOrder.paymentStatus}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Cancel Request Details */}
-                {selectedOrder.cancelReason && (
-                  <div className="border rounded-lg p-4 bg-amber-50">
-                    <h4 className="font-semibold mb-3 flex items-center gap-2">
-                      <XIcon className="h-4 w-4" />
-                      Cancellation Request
-                    </h4>
-                    <div className="space-y-2">
+                    <h4 className="font-semibold mb-2">{t("admin.orders.dialog.customerInfo")}</h4>
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <Label className="text-muted-foreground">Reason</Label>
-                        <p className="text-sm">{selectedOrder.cancelReason}</p>
+                        <Label className="text-muted-foreground">{t("common.status")}</Label>
+                        <div className="mt-1">
+                          {getStatusBadge(selectedOrder.status)}
+                        </div>
                       </div>
-                      {selectedOrder.cancelComments && (
-                        <div>
-                          <Label className="text-muted-foreground">
-                            Comments
-                          </Label>
-                          <p className="text-sm">
-                            {selectedOrder.cancelComments}
-                          </p>
+                      <div>
+                        <Label className="text-muted-foreground">
+                          Payment Status
+                        </Label>
+                        <div className="mt-1">
+                          <Badge
+                            variant={
+                              selectedOrder.paymentStatus === "paid"
+                                ? "default"
+                                : selectedOrder.paymentStatus === "failed"
+                                  ? "destructive"
+                                  : "secondary"
+                            }
+                          >
+                            {selectedOrder.paymentStatus}
+                          </Badge>
                         </div>
-                      )}
-                      {selectedOrder.cancelRequestedAt && (
-                        <div>
-                          <Label className="text-muted-foreground">
-                            Requested At
-                          </Label>
-                          <p className="text-sm">
-                            {format(
-                              new Date(selectedOrder.cancelRequestedAt),
-                              "PPpp"
-                            )}
-                          </p>
-                        </div>
-                      )}
+                      </div>
                     </div>
                   </div>
-                )}
 
-                {/* Return Request Details */}
-                {selectedOrder.returnReason && (
-                  <div className="border rounded-lg p-4 bg-purple-50">
-                    <h4 className="font-semibold mb-3 flex items-center gap-2">
-                      <RotateCcw className="h-4 w-4" />
-                      Return Request
-                    </h4>
-                    <div className="space-y-2">
-                      <div>
-                        <Label className="text-muted-foreground">Reason</Label>
-                        <p className="text-sm">{selectedOrder.returnReason}</p>
-                      </div>
-                      {selectedOrder.returnIssue && (
+                  {/* Cancel Request Details */}
+                  {selectedOrder.cancelReason && (
+                    <div className="border rounded-lg p-4 bg-amber-50">
+                      <h4 className="font-semibold mb-3 flex items-center gap-2">
+                        <XIcon className="h-4 w-4" />
+                        {t("admin.orders.dialog.cancellationRequest")}
+                      </h4>
+                      <div className="space-y-2">
                         <div>
-                          <Label className="text-muted-foreground">
-                            Issue Description
-                          </Label>
-                          <p className="text-sm">{selectedOrder.returnIssue}</p>
+                          <Label className="text-muted-foreground">{t("admin.orders.dialog.reason")}</Label>
+                          <p className="text-sm">{selectedOrder.cancelReason}</p>
                         </div>
-                      )}
-                      {selectedOrder.returnImages &&
-                        selectedOrder.returnImages.length > 0 && (
+                        {selectedOrder.cancelComments && (
                           <div>
                             <Label className="text-muted-foreground">
-                              Images ({selectedOrder.returnImages.length})
+                              {t("admin.orders.dialog.comments")}
                             </Label>
-                            <div className="grid grid-cols-3 gap-2 mt-2">
-                              {selectedOrder.returnImages.map((img: string, idx: number) => (
-                                <img
-                                  key={idx}
-                                  src={img}
-                                  alt={`Return ${idx + 1}`}
-                                  loading="lazy"
-                                  className="w-full h-24 object-cover rounded border"
-                                />
-                              ))}
-                            </div>
+                            <p className="text-sm">
+                              {selectedOrder.cancelComments}
+                            </p>
                           </div>
                         )}
-                      {selectedOrder.returnRequestedAt && (
-                        <div>
-                          <Label className="text-muted-foreground">
-                            Requested At
-                          </Label>
-                          <p className="text-sm">
-                            {format(
-                              new Date(selectedOrder.returnRequestedAt),
-                              "PPpp"
-                            )}
-                          </p>
-                        </div>
-                      )}
+                        {selectedOrder.cancelRequestedAt && (
+                          <div>
+                            <Label className="text-muted-foreground">
+                              {t("admin.orders.dialog.requestedAt")}
+                            </Label>
+                            <p className="text-sm">
+                              {format(
+                                new Date(selectedOrder.cancelRequestedAt),
+                                "PPpp"
+                              )}
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Shipping Address */}
-                <div className="border rounded-lg p-4">
-                  <Label className="text-muted-foreground">
-                    Shipping Address
-                  </Label>
-                  <div className="text-sm mt-2 space-y-1">
-                    <p>{selectedOrder.shippingAddress?.addressLine || selectedOrder.shipping_address?.addressLine}</p>
-                    <p>
-                      {selectedOrder.shippingAddress?.city || selectedOrder.shipping_address?.city},{" "}
-                      {selectedOrder.shippingAddress?.state || selectedOrder.shipping_address?.state}
-                    </p>
-                    <p>
-                      {selectedOrder.shippingAddress?.country || selectedOrder.shipping_address?.country} -{" "}
-                      {selectedOrder.shippingAddress?.pincode || selectedOrder.shipping_address?.pincode}
-                    </p>
+                  {/* Return Request Details */}
+                  {selectedOrder.returnReason && (
+                    <div className="border rounded-lg p-4 bg-purple-50">
+                      <h4 className="font-semibold mb-3 flex items-center gap-2">
+                        <RotateCcw className="h-4 w-4" />
+                        {t("admin.orders.dialog.returnRequest")}
+                      </h4>
+                      <div className="space-y-2">
+                        <div>
+                          <Label className="text-muted-foreground">{t("admin.orders.dialog.reason")}</Label>
+                          <p className="text-sm">{selectedOrder.returnReason}</p>
+                        </div>
+                        {selectedOrder.returnIssue && (
+                          <div>
+                            <Label className="text-muted-foreground">
+                              {t("admin.orders.dialog.issueDescription")}
+                            </Label>
+                            <p className="text-sm">{selectedOrder.returnIssue}</p>
+                          </div>
+                        )}
+                        {selectedOrder.returnImages &&
+                          selectedOrder.returnImages.length > 0 && (
+                            <div>
+                              <Label className="text-muted-foreground">
+                                {t("admin.orders.dialog.images", { count: selectedOrder.returnImages.length })}
+                              </Label>
+                              <div className="grid grid-cols-3 gap-2 mt-2">
+                                {selectedOrder.returnImages.map((img: string, idx: number) => (
+                                  <img
+                                    key={idx}
+                                    src={img}
+                                    alt={`Return ${idx + 1}`}
+                                    loading="lazy"
+                                    className="w-full h-24 object-cover rounded border"
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        {selectedOrder.returnRequestedAt && (
+                          <div>
+                            <Label className="text-muted-foreground">
+                              {t("admin.orders.dialog.requestedAt")}
+                            </Label>
+                            <p className="text-sm">
+                              {format(
+                                new Date(selectedOrder.returnRequestedAt),
+                                "PPpp"
+                              )}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Shipping Address */}
+                  <div className="border rounded-lg p-4">
+                    <Label className="text-muted-foreground">
+                      {t("admin.orders.dialog.shippingAddress")}
+                    </Label>
+                    <div className="text-sm mt-2 space-y-1">
+                      <p>{selectedOrder.shippingAddress?.addressLine || selectedOrder.shipping_address?.addressLine}</p>
+                      <p>
+                        {selectedOrder.shippingAddress?.city || selectedOrder.shipping_address?.city},{" "}
+                        {selectedOrder.shippingAddress?.state || selectedOrder.shipping_address?.state}
+                      </p>
+                      <p>
+                        {selectedOrder.shippingAddress?.country || selectedOrder.shipping_address?.country} -{" "}
+                        {selectedOrder.shippingAddress?.pincode || selectedOrder.shipping_address?.pincode}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
                 {/* Order Items */}
                 <div className="border rounded-lg p-4">
                   <Label className="text-muted-foreground mb-3 block">
-                    Order Items ({selectedOrder.items.length})
+                    {t("admin.orders.dialog.orderItems")} ({selectedOrder.items.length})
                   </Label>
                   <div className="space-y-3">
                     {selectedOrder.items.map((item, idx) => (
@@ -981,90 +992,110 @@ export default function OrdersManagement() {
       <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Update Order Status</DialogTitle>
+            <DialogTitle>{t("admin.orders.dialog.updateStatus")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <Label>Current Status</Label>
+              <Label>{t("admin.orders.table.status")}</Label>
               <div className="mt-2">
                 {selectedOrder && getStatusBadge(selectedOrder.status)}
               </div>
             </div>
             <div>
-              <Label htmlFor="newStatus">New Status</Label>
+              <Label htmlFor="newStatus">{t("admin.orders.dialog.selectStatus")}</Label>
               <Select
                 value={newStatus}
                 onValueChange={(value) => setNewStatus(value as OrderStatus)}
               >
                 <SelectTrigger id="newStatus">
-                  <SelectValue placeholder="Select new status" />
+                  <SelectValue placeholder={t("admin.orders.dialog.selectStatus")} />
                 </SelectTrigger>
                 <SelectContent>
                   {selectedOrder &&
                     getNextStatuses(selectedOrder.status).map((status) => (
                       <SelectItem key={status} value={status}>
-                        {getStatusBadge(status)}
+                        {t(`admin.orders.status.${status}`, status)}
                       </SelectItem>
                     ))}
                 </SelectContent>
               </Select>
               <p className="text-sm text-muted-foreground mt-2">
-                Only valid next statuses are shown based on the order flow
+                {t("admin.orders.dialog.statusFlowHint")}
               </p>
             </div>
+
             {/* Show Return Details if active */}
             {activeReturnRequest && (
               <div className="border rounded-md p-3 bg-purple-50 space-y-3">
                 <h4 className="font-medium flex items-center gap-2 text-purple-700">
-                  <RotateCcw className="h-4 w-4" /> Return Request Details
+                  <RotateCcw className="h-4 w-4" /> {t("admin.orders.dialog.returnRequest")}
                 </h4>
                 <div>
-                  <Label className="text-xs text-muted-foreground">Reason</Label>
+                  <Label className="text-xs text-muted-foreground">{t("admin.orders.dialog.reason")}</Label>
                   <p className="text-sm">{activeReturnRequest.reason}</p>
                 </div>
+                {/* Logic for return items here if needed, but keeping simple for now based on previous complexity risks */}
                 <div>
-                  <Label className="text-xs text-muted-foreground mb-1 block">Items Requested</Label>
+                  <Label className="text-xs text-muted-foreground mb-1 block">{t("admin.orders.dialog.orderItems")}</Label>
                   <div className="space-y-2 max-h-40 overflow-y-auto">
                     {activeReturnRequest.return_items?.map((item: ReturnItem, idx: number) => (
                       <div key={idx} className="flex justify-between items-center text-sm bg-white p-2 rounded border">
                         <div>
                           <p className="font-medium">{item.order_items?.title || "Item"}</p>
-                          <p className="text-xs text-muted-foreground">Price: ₹{item.order_items?.price_per_unit}</p>
+                          <p className="text-xs text-muted-foreground">{t("admin.orders.dialog.price")}: ₹{item.order_items?.price_per_unit}</p>
                         </div>
                         <div className="font-semibold">
-                          Qty: {item.quantity}
+                          {t("admin.orders.dialog.qty")}: {item.quantity}
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t mt-2">
-                  <span className="font-semibold text-sm">Est. Refund Amount</span>
+                  <span className="font-semibold text-sm">{t("admin.orders.dialog.estRefund") || "Est. Refund Amount"}</span>
                   <span className="font-bold text-purple-700">₹{activeReturnRequest.refund_amount}</span>
                 </div>
               </div>
             )}
-            {returnDetailsLoading && <div className="text-center py-2 text-xs text-muted-foreground">Loading return details...</div>}
+            {returnDetailsLoading && <div className="text-center py-2 text-xs text-muted-foreground">{t("admin.dashboard.loading")}</div>}
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setStatusDialogOpen(false);
-                setNewStatus("");
-              }}
-            >
-              Cancel
+            <Button variant="outline" onClick={() => setStatusDialogOpen(false)}>
+              {t("admin.orders.dialog.cancel")}
             </Button>
-            <Button
-              onClick={handleStatusUpdate}
-              disabled={!newStatus || updateStatusMutation.isPending}
-            >
-              {updateStatusMutation.isPending ? "Updating..." : "Update Status"}
-            </Button>
+            <div className="flex gap-2">
+              {activeReturnRequest ? (
+                <>
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      setNewStatus('return_rejected');
+                      handleStatusUpdate();
+                    }}
+                  >
+                    {t("admin.orders.status.return_rejected")}
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setNewStatus('return_approved');
+                      handleStatusUpdate();
+                    }}
+                  >
+                    {t("admin.orders.status.return_approved")}
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  onClick={handleStatusUpdate}
+                  disabled={!newStatus}
+                >
+                  {t("admin.orders.dialog.update")}
+                </Button>
+              )}
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   );
 }

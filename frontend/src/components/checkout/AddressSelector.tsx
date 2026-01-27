@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ interface AddressSelectorProps {
 }
 
 export function AddressSelector({ type, selectedAddressId, onSelect, forceEditId, onEditOpened }: AddressSelectorProps) {
+    const { t } = useTranslation();
     const queryClient = useQueryClient();
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingAddress, setEditingAddress] = useState<CheckoutAddress | null>(null);
@@ -72,11 +74,11 @@ export function AddressSelector({ type, selectedAddressId, onSelect, forceEditId
         mutationFn: addressService.createAddress,
         onSuccess: (newAddress) => {
             queryClient.invalidateQueries({ queryKey: ["addresses"] });
-            toast.success("Address added successfully");
+            toast.success(t("profile.addressAdded"));
             onSelect(newAddress);
             handleCloseDialog();
         },
-        onError: (error) => toast.error(getErrorMessage(error, "Failed to add address")),
+        onError: (error) => toast.error(getErrorMessage(error, t("profile.addressAddError"))),
     });
 
     const updateMutation = useMutation({
@@ -84,18 +86,18 @@ export function AddressSelector({ type, selectedAddressId, onSelect, forceEditId
             addressService.updateAddress(id, data),
         onSuccess: (updatedAddress) => {
             queryClient.invalidateQueries({ queryKey: ["addresses"] });
-            toast.success("Address updated successfully");
+            toast.success(t("profile.addressUpdated"));
             onSelect(updatedAddress);
             handleCloseDialog();
         },
-        onError: (error) => toast.error(getErrorMessage(error, "Failed to update address")),
+        onError: (error) => toast.error(getErrorMessage(error, t("profile.addressUpdateError"))),
     });
 
     const deleteMutation = useMutation({
         mutationFn: addressService.deleteAddress,
         onSuccess: (_, deletedId) => {
             queryClient.invalidateQueries({ queryKey: ["addresses"] });
-            toast.success("Address deleted successfully");
+            toast.success(t("profile.addressDeleted"));
             if (selectedAddressId === deletedId) {
                 const remaining = addresses.filter(a => a.id !== deletedId);
                 if (remaining.length > 0) onSelect(remaining[0]);
@@ -103,7 +105,7 @@ export function AddressSelector({ type, selectedAddressId, onSelect, forceEditId
             setDeletingId(null);
         },
         onError: () => {
-            toast.error("Failed to delete address");
+            toast.error(t("profile.addressDeleteError"));
             setDeletingId(null);
         },
     });
@@ -139,10 +141,10 @@ export function AddressSelector({ type, selectedAddressId, onSelect, forceEditId
     const isMutationLoading = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
     const mutationMessage =
-        createMutation.isPending ? "Creating new address..." :
-            updateMutation.isPending ? "Updating address..." :
-                deleteMutation.isPending ? "Deleting address..." :
-                    "Loading addresses...";
+        createMutation.isPending ? t("profile.creatingAddress") :
+            updateMutation.isPending ? t("profile.updatingAddress") :
+                deleteMutation.isPending ? t("profile.deletingAddress") :
+                    t("profile.loadingAddresses");
 
     return (
         <div className="space-y-4 relative">
@@ -175,7 +177,7 @@ export function AddressSelector({ type, selectedAddressId, onSelect, forceEditId
                                         <div className="flex items-center gap-2">
                                             <span className="font-bold text-base text-[#2C1810]">{address.full_name}</span>
                                             {address.is_primary && (
-                                                <Badge variant="default" className="h-5 px-1.5 text-[10px] bg-[#2C1810] hover:bg-[#2C1810]/90">Primary</Badge>
+                                                <Badge variant="default" className="h-5 px-1.5 text-[10px] bg-[#2C1810] hover:bg-[#2C1810]/90">{t("profile.primary")}</Badge>
                                             )}
                                             <Badge variant="outline" className="h-5 px-1.5 text-[10px] capitalize border-[#2C1810]/20 text-[#2C1810]"> {address.type}</Badge>
                                         </div>
@@ -185,7 +187,7 @@ export function AddressSelector({ type, selectedAddressId, onSelect, forceEditId
                                         <p>{address.address_line1}{address.address_line2 && `, ${address.address_line2}`}</p>
                                         <p>{address.city}, {address.state} - {address.postal_code}</p>
                                         <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-foreground/70">
-                                            Phone: <span className="text-foreground">{address.phone}</span>
+                                            {t("profile.phoneLabel")} <span className="text-foreground">{address.phone}</span>
                                         </p>
                                     </div>
                                 </div>
@@ -220,7 +222,7 @@ export function AddressSelector({ type, selectedAddressId, onSelect, forceEditId
                         onClick={() => setDialogOpen(true)}
                     >
                         <Plus className="h-4 w-4 mr-2" />
-                        Add Address
+                        {t("profile.addAddress")}
                     </Button>
                 </div>
             </RadioGroup>
@@ -236,13 +238,13 @@ export function AddressSelector({ type, selectedAddressId, onSelect, forceEditId
             <AlertDialog open={!!deletingId} onOpenChange={() => setDeletingId(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Address</AlertDialogTitle>
+                        <AlertDialogTitle>{t("profile.deleteAddress")}</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Are you sure you want to delete this address? This action cannot be undone.
+                            {t("profile.deleteAddressConfirm")}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={() => {
                                 if (deletingId) {
@@ -251,7 +253,7 @@ export function AddressSelector({ type, selectedAddressId, onSelect, forceEditId
                             }}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                            Delete
+                            {t("profile.delete")}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

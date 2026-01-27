@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogContent,
@@ -44,6 +45,7 @@ export function FAQDialog({
   faq,
   categories,
 }: FAQDialogProps) {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState<{
     question: string;
     answer: string;
@@ -93,12 +95,12 @@ export function FAQDialog({
       <DialogContent className="sm:max-w-3xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="text-2xl">
-            {faq ? "Edit FAQ" : "Add New FAQ"}
+            {faq ? t("admin.faqs.dialog.editTitle") : t("admin.faqs.dialog.addTitle")}
           </DialogTitle>
           <DialogDescription>
             {faq
-              ? "Update frequently asked question and answer"
-              : "Add a new frequently asked question"}
+              ? t("admin.faqs.dialog.editSubtitle")
+              : t("admin.faqs.dialog.addSubtitle")}
           </DialogDescription>
         </DialogHeader>
 
@@ -107,11 +109,11 @@ export function FAQDialog({
             <div className="space-y-6 py-2">
               {/* Category Selection */}
               <div className="space-y-4 border rounded-lg p-4">
-                <h3 className="text-base font-semibold">Category</h3>
+                <h3 className="text-base font-semibold">{t("admin.faqs.dialog.categoryTitle")}</h3>
 
                 <div className="space-y-2">
                   <Label htmlFor="category">
-                    FAQ Category <span className="text-destructive">*</span>
+                    {t("admin.faqs.dialog.categoryLabel")} <span className="text-destructive">*</span>
                   </Label>
                   <Select
                     value={formData.category_id}
@@ -120,7 +122,7 @@ export function FAQDialog({
                     }
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select a category" />
+                      <SelectValue placeholder={t("admin.faqs.dialog.selectCategory")} />
                     </SelectTrigger>
                     <SelectContent>
                       {categories.map((cat) => (
@@ -135,11 +137,11 @@ export function FAQDialog({
 
               {/* Question & Answer */}
               <div className="space-y-4 border rounded-lg p-4">
-                <h3 className="text-base font-semibold">FAQ Content</h3>
+                <h3 className="text-base font-semibold">{t("admin.faqs.dialog.contentTitle")}</h3>
 
                 <div className="space-y-2">
                   <Label htmlFor="question">
-                    Question <span className="text-destructive">*</span>
+                    {t("admin.faqs.dialog.questionLabel")} <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     id="question"
@@ -147,14 +149,14 @@ export function FAQDialog({
                     onChange={(e) =>
                       setFormData({ ...formData, question: e.target.value })
                     }
-                    placeholder="Enter the FAQ question"
+                    placeholder={t("admin.faqs.dialog.questionPlaceholder")}
                     required
                   />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="answer">
-                    Answer <span className="text-destructive">*</span>
+                    {t("admin.faqs.dialog.answerLabel")} <span className="text-destructive">*</span>
                   </Label>
                   <Textarea
                     id="answer"
@@ -162,30 +164,30 @@ export function FAQDialog({
                     onChange={(e) =>
                       setFormData({ ...formData, answer: e.target.value })
                     }
-                    placeholder="Enter the detailed answer"
+                    placeholder={t("admin.faqs.dialog.answerPlaceholder")}
                     rows={8}
                     required
                     className="resize-none"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Provide a clear and comprehensive answer to help users.
+                    {t("admin.faqs.dialog.answerHint")}
                   </p>
                 </div>
               </div>
 
               {/* Visibility Settings */}
               <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
-                <h3 className="text-base font-semibold">Visibility Settings</h3>
+                <h3 className="text-base font-semibold">{t("admin.faqs.dialog.visibilityTitle")}</h3>
 
                 <div className="flex items-center justify-between p-4 border rounded-lg bg-background">
                   <div className="space-y-0.5">
                     <Label htmlFor="isActive" className="text-base">
-                      Active Status
+                      {t("admin.faqs.dialog.activeStatusLabel")}
                     </Label>
                     <p className="text-sm text-muted-foreground">
                       {formData.is_active
-                        ? "This FAQ will be visible on the website"
-                        : "This FAQ will be hidden from the website"}
+                        ? t("admin.faqs.dialog.visibleHint")
+                        : t("admin.faqs.dialog.hiddenHint")}
                     </p>
                   </div>
                   <Switch
@@ -206,9 +208,9 @@ export function FAQDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              {t("admin.faqs.dialog.cancel")}
             </Button>
-            <Button type="submit">{faq ? "Update FAQ" : "Create FAQ"}</Button>
+            <Button type="submit">{faq ? t("admin.faqs.dialog.updateButton") : t("admin.faqs.dialog.createButton")}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

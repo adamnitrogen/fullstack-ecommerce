@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { aboutService } from "@/services/about.service";
 import { AboutCard } from "@/types";
 import { useToast } from "@/hooks/use-toast";
@@ -47,6 +48,7 @@ export default function AboutCardDialog({
   onOpenChange,
   card,
 }: AboutCardDialogProps) {
+  const { t } = useTranslation();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [icon, setIcon] = useState("Target");
@@ -74,13 +76,13 @@ export default function AboutCardDialog({
       aboutService.createCard(newCard),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["aboutUs"] });
-      toast({ title: "Card added successfully" });
+      toast({ title: t("admin.about.toasts.deleteCard") });
       onOpenChange(false);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Failed to add card",
-        description: getErrorMessage(error, "Failed to add card"),
+        title: t("admin.about.toasts.deleteCardError"),
+        description: getErrorMessage(error, t("admin.about.toasts.deleteCardError")),
         variant: "destructive",
       });
     },
@@ -96,13 +98,13 @@ export default function AboutCardDialog({
     }) => aboutService.updateCard(id, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["aboutUs"] });
-      toast({ title: "Card updated successfully" });
+      toast({ title: t("admin.about.toasts.deleteCard") });
       onOpenChange(false);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Failed to update card",
-        description: getErrorMessage(error, "Failed to update card"),
+        title: t("admin.about.toasts.deleteCardError"),
+        description: getErrorMessage(error, t("admin.about.toasts.deleteCardError")),
         variant: "destructive",
       });
     },
@@ -113,8 +115,8 @@ export default function AboutCardDialog({
 
     if (!title.trim() || !description.trim()) {
       toast({
-        title: "Error",
-        description: "Please fill in all required fields",
+        title: t("common.error"),
+        description: t("auth.fillAllFields"),
         variant: "destructive",
       });
       return;
@@ -139,7 +141,9 @@ export default function AboutCardDialog({
       <DialogContent className="sm:max-w-4xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="text-2xl">
-            {card ? "Edit Card" : "Add New Card"}
+            {card
+              ? t("admin.about.dialog.editTitle", { type: t("admin.about.dialog.types.card") })
+              : t("admin.about.dialog.addTitle", { type: t("admin.about.dialog.types.card") })}
           </DialogTitle>
         </DialogHeader>
 
@@ -147,30 +151,30 @@ export default function AboutCardDialog({
           <form onSubmit={handleSubmit} className="space-y-6 py-2">
             {/* Basic Information */}
             <div className="space-y-4 border rounded-lg p-4">
-              <h3 className="text-base font-semibold">Card Details</h3>
+              <h3 className="text-base font-semibold">{t("admin.about.dialog.types.card")}</h3>
 
               <div className="space-y-2">
                 <Label htmlFor="title">
-                  Title <span className="text-destructive">*</span>
+                  {t("admin.about.dialog.card.title")} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g., Our Mission"
+                  placeholder={t("admin.about.dialog.card.titlePlaceholder")}
                   required
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="description">
-                  Description <span className="text-destructive">*</span>
+                  {t("admin.about.dialog.card.desc")} <span className="text-destructive">*</span>
                 </Label>
                 <Textarea
                   id="description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Enter card description..."
+                  placeholder={t("admin.about.dialog.card.descPlaceholder")}
                   rows={4}
                   required
                 />
@@ -179,10 +183,10 @@ export default function AboutCardDialog({
 
             {/* Display Settings */}
             <div className="space-y-4 border rounded-lg p-4">
-              <h3 className="text-base font-semibold">Display Settings</h3>
+              <h3 className="text-base font-semibold">{t("admin.about.dialog.displaySettings")}</h3>
 
               <div className="space-y-2">
-                <Label htmlFor="icon">Icon</Label>
+                <Label htmlFor="icon">{t("admin.about.dialog.card.icon")}</Label>
                 <Select value={icon} onValueChange={setIcon}>
                   <SelectTrigger id="icon">
                     <SelectValue />
@@ -198,7 +202,7 @@ export default function AboutCardDialog({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="order">Display Order</Label>
+                <Label htmlFor="order">{t("admin.about.dialog.displayOrder")}</Label>
                 <Input
                   id="order"
                   type="number"
@@ -215,18 +219,18 @@ export default function AboutCardDialog({
                 variant="outline"
                 onClick={() => onOpenChange(false)}
               >
-                Cancel
+                {t("admin.about.dialog.cancel")}
               </Button>
               <Button
                 type="submit"
                 disabled={addMutation.isPending || updateMutation.isPending}
               >
-                {card ? "Update" : "Add"} Card
+                {card ? t("common.update") : t("common.add")} {t("admin.about.dialog.types.card")}
               </Button>
             </DialogFooter>
           </form>
         </ScrollArea>
       </DialogContent>
-    </Dialog>
+    </Dialog >
   );
 }

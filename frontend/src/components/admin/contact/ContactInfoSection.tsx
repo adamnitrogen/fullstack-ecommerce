@@ -12,6 +12,7 @@ import { ContactPhone, ContactEmail, ContactAddress, contactInfoService } from "
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage, getFriendlyTitle } from "@/lib/errorUtils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 interface ContactInfoSectionProps {
   phones: ContactPhone[];
@@ -24,6 +25,7 @@ export function ContactInfoSection({
   emails,
   address,
 }: ContactInfoSectionProps) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [newPhone, setNewPhone] = useState({ number: "", label: "" });
   const [newEmail, setNewEmail] = useState({ email: "", label: "" });
@@ -37,12 +39,12 @@ export function ContactInfoSection({
       queryClient.invalidateQueries({ queryKey: ["contact-info"] });
       queryClient.invalidateQueries({ queryKey: ["contact-info-public"] });
       setNewPhone({ number: "", label: "" });
-      toast({ title: "Success", description: "Phone number added" });
+      toast({ title: t("common.success"), description: t("admin.phone.addNew") }); // Simplified message
     },
     onError: (error: unknown) => {
       toast({
-        title: getFriendlyTitle(error, "Notice"),
-        description: getErrorMessage(error, "Failed to add phone"),
+        title: getFriendlyTitle(error, t("common.error")),
+        description: getErrorMessage(error, t("admin.phone.addError")),
         variant: "destructive",
       });
     },
@@ -57,8 +59,8 @@ export function ContactInfoSection({
     },
     onError: (error: unknown) => {
       toast({
-        title: getFriendlyTitle(error, "Notice"),
-        description: getErrorMessage(error, "Failed to update phone"),
+        title: getFriendlyTitle(error, t("common.error")),
+        description: getErrorMessage(error, t("admin.phone.updateError")),
         variant: "destructive",
       });
     },
@@ -69,12 +71,12 @@ export function ContactInfoSection({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contact-info"] });
       queryClient.invalidateQueries({ queryKey: ["contact-info-public"] });
-      toast({ title: "Success", description: "Phone number removed" });
+      toast({ title: t("common.success"), description: t("admin.phone.deleteConfirm") }); // Reusing key contextually
     },
     onError: (error: unknown) => {
       toast({
-        title: getFriendlyTitle(error, "Notice"),
-        description: getErrorMessage(error, "Failed to remove phone"),
+        title: getFriendlyTitle(error, t("common.error")),
+        description: getErrorMessage(error, t("admin.phone.removeError")),
         variant: "destructive",
       });
     },
@@ -82,7 +84,7 @@ export function ContactInfoSection({
 
   const handleAddPhone = () => {
     if (!newPhone.number) {
-      toast({ title: "Check your info", description: "Please enter a phone number", variant: "destructive" });
+      toast({ title: t("admin.checkInfo"), description: t("admin.enterPhone"), variant: "destructive" });
       return;
     }
     addPhoneMutation.mutate({
@@ -101,12 +103,12 @@ export function ContactInfoSection({
       queryClient.invalidateQueries({ queryKey: ["contact-info"] });
       queryClient.invalidateQueries({ queryKey: ["contact-info-public"] });
       setNewEmail({ email: "", label: "" });
-      toast({ title: "Success", description: "Email address added" });
+      toast({ title: t("common.success"), description: t("admin.email.addNew") });
     },
     onError: (error: unknown) => {
       toast({
-        title: getFriendlyTitle(error, "Notice"),
-        description: getErrorMessage(error, "Failed to add email"),
+        title: getFriendlyTitle(error, t("common.error")),
+        description: getErrorMessage(error, t("admin.email.addError")),
         variant: "destructive",
       });
     },
@@ -121,8 +123,8 @@ export function ContactInfoSection({
     },
     onError: (error: unknown) => {
       toast({
-        title: getFriendlyTitle(error, "Notice"),
-        description: getErrorMessage(error, "Failed to update email"),
+        title: getFriendlyTitle(error, t("common.error")),
+        description: getErrorMessage(error, t("admin.email.updateError")),
         variant: "destructive",
       });
     },
@@ -132,13 +134,12 @@ export function ContactInfoSection({
     mutationFn: contactInfoService.deleteEmail,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contact-info"] });
-      queryClient.invalidateQueries({ queryKey: ["contact-info-public"] });
-      toast({ title: "Success", description: "Email address removed" });
+      toast({ title: t("common.success"), description: t("admin.email.removed") });
     },
     onError: (error: unknown) => {
       toast({
-        title: getFriendlyTitle(error, "Notice"),
-        description: getErrorMessage(error, "Failed to remove email"),
+        title: getFriendlyTitle(error, t("common.error")),
+        description: getErrorMessage(error, t("admin.email.removeError")),
         variant: "destructive",
       });
     },
@@ -146,7 +147,7 @@ export function ContactInfoSection({
 
   const handleAddEmail = () => {
     if (!newEmail.email) {
-      toast({ title: "Check your info", description: "Please enter an email address", variant: "destructive" });
+      toast({ title: t("admin.checkInfo"), description: t("admin.enterEmail"), variant: "destructive" });
       return;
     }
     addEmailMutation.mutate({
@@ -165,12 +166,12 @@ export function ContactInfoSection({
       queryClient.invalidateQueries({ queryKey: ["contact-info"] });
       queryClient.invalidateQueries({ queryKey: ["contact-info-public"] });
       setIsEditingAddress(false);
-      toast({ title: "Success", description: "Address updated" });
+      toast({ title: t("common.success"), description: t("admin.address.save") });
     },
     onError: (error: unknown) => {
       toast({
-        title: getFriendlyTitle(error, "Notice"),
-        description: getErrorMessage(error, "Failed to update address"),
+        title: getFriendlyTitle(error, t("common.error")),
+        description: getErrorMessage(error, t("admin.address.updateError")),
         variant: "destructive",
       });
     },
@@ -182,7 +183,7 @@ export function ContactInfoSection({
 
   // Helper to format address for display
   const formatAddress = (addr: ContactAddress) => {
-    if (!addr) return "No address set";
+    if (!addr) return t("admin.address.noAddress");
     const parts = [
       addr.address_line1,
       addr.address_line2,
@@ -201,37 +202,37 @@ export function ContactInfoSection({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Phone className="h-5 w-5" />
-            Phone Numbers
+            {t("admin.phone.title")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
-            <h4 className="font-semibold">Add New Phone Number</h4>
+            <h4 className="font-semibold">{t("admin.phone.addNew")}</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Phone Number *</Label>
+                <Label>{t("admin.phone.number")} *</Label>
                 <PhoneInput
                   value={newPhone.number}
                   onChange={(value) =>
                     setNewPhone({ ...newPhone, number: value as string })
                   }
-                  placeholder="Enter phone number"
+                  placeholder={t("admin.phone.placeholder")}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Label (Optional)</Label>
+                <Label>{t("admin.phone.label")}</Label>
                 <Input
                   value={newPhone.label}
                   onChange={(e) =>
                     setNewPhone({ ...newPhone, label: e.target.value })
                   }
-                  placeholder="e.g., Main Office"
+                  placeholder={t("admin.phone.labelPlaceholder")}
                 />
               </div>
             </div>
             <Button onClick={handleAddPhone} size="sm" disabled={addPhoneMutation.isPending}>
               {addPhoneMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
-              Add Phone
+              {t("admin.phone.add")}
             </Button>
           </div>
 
@@ -261,7 +262,7 @@ export function ContactInfoSection({
                     )}
                     {phone.is_primary && (
                       <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded">
-                        Primary
+                        {t("common.primary")}
                       </span>
                     )}
                   </div>
@@ -270,7 +271,7 @@ export function ContactInfoSection({
                   variant="destructive"
                   size="sm"
                   onClick={async () => {
-                    if (!confirm("Delete this phone number?")) return;
+                    if (!confirm(t("admin.phone.deleteConfirm"))) return;
 
                     // If deleting primary and there are others, make another one primary first
                     if (phone.is_primary && phones.length > 1) {
@@ -281,7 +282,7 @@ export function ContactInfoSection({
                             id: nextPrimary.id,
                             data: { is_primary: true }
                           });
-                          toast({ title: "Info", description: "Primary status transferred to next number" });
+                          toast({ title: t("admin.info"), description: t("admin.phone.transferPrimary") });
                         } catch (error) {
                           logger.error("Failed to transfer primary status", error);
                           // Continue with deletion anyway? Or stop?
@@ -306,38 +307,38 @@ export function ContactInfoSection({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Mail className="h-5 w-5" />
-            Email Addresses
+            {t("admin.email.title")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
-            <h4 className="font-semibold">Add New Email Address</h4>
+            <h4 className="font-semibold">{t("admin.email.addNew")}</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Email Address *</Label>
+                <Label>{t("admin.email.address")} *</Label>
                 <Input
                   type="email"
                   value={newEmail.email}
                   onChange={(e) =>
                     setNewEmail({ ...newEmail, email: e.target.value })
                   }
-                  placeholder="email@example.com"
+                  placeholder={t("admin.email.placeholder")}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Label (Optional)</Label>
+                <Label>{t("admin.email.label")}</Label>
                 <Input
                   value={newEmail.label}
                   onChange={(e) =>
                     setNewEmail({ ...newEmail, label: e.target.value })
                   }
-                  placeholder="e.g., General Inquiries"
+                  placeholder={t("admin.email.labelPlaceholder")}
                 />
               </div>
             </div>
             <Button onClick={handleAddEmail} size="sm" disabled={addEmailMutation.isPending}>
               {addEmailMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
-              Add Email
+              {t("admin.email.add")}
             </Button>
           </div>
 
@@ -367,7 +368,7 @@ export function ContactInfoSection({
                     )}
                     {email.is_primary && (
                       <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded">
-                        Primary
+                        {t("common.primary")}
                       </span>
                     )}
                   </div>
@@ -376,7 +377,7 @@ export function ContactInfoSection({
                   variant="destructive"
                   size="sm"
                   onClick={async () => {
-                    if (!confirm("Delete this email?")) return;
+                    if (!confirm(t("admin.email.deleteConfirm"))) return;
 
                     // If deleting primary and there are others, make another one primary first
                     if (email.is_primary && emails.length > 1) {
@@ -387,7 +388,7 @@ export function ContactInfoSection({
                             id: nextPrimary.id,
                             data: { is_primary: true }
                           });
-                          toast({ title: "Info", description: "Primary status transferred to next email" });
+                          toast({ title: t("common.info"), description: t("admin.email.transferPrimary") });
                         } catch (error) {
                           logger.error("Failed to transfer primary status", error);
                         }
@@ -410,7 +411,7 @@ export function ContactInfoSection({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MapPin className="h-5 w-5" />
-            Permanent Address
+            {t("admin.address.title")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -419,36 +420,36 @@ export function ContactInfoSection({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="address-line1">Address Line 1</Label>
+                    <Label htmlFor="address-line1">{t("admin.address.line1")}</Label>
                     <Input id="address-line1" name="address-line1" value={editAddress?.address_line1 || ''} onChange={e => setEditAddress({ ...editAddress, address_line1: e.target.value })} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="address-line2">Address Line 2</Label>
+                    <Label htmlFor="address-line2">{t("admin.address.line2")}</Label>
                     <Input id="address-line2" name="address-line2" value={editAddress?.address_line2 || ''} onChange={e => setEditAddress({ ...editAddress, address_line2: e.target.value })} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="city">City</Label>
+                    <Label htmlFor="city">{t("admin.address.city")}</Label>
                     <Input id="city" name="city" value={editAddress?.city || ''} onChange={e => setEditAddress({ ...editAddress, city: e.target.value })} />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="state">State</Label>
+                      <Label htmlFor="state">{t("admin.address.state")}</Label>
                       <Input id="state" name="state" value={editAddress?.state || ''} onChange={e => setEditAddress({ ...editAddress, state: e.target.value })} />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="pincode">Pincode</Label>
+                      <Label htmlFor="pincode">{t("admin.address.pincode")}</Label>
                       <Input id="pincode" name="pincode" value={editAddress?.pincode || ''} onChange={e => setEditAddress({ ...editAddress, pincode: e.target.value })} />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="country">Country</Label>
-                    <Input id="country" name="country" value={editAddress?.country || 'India'} onChange={e => setEditAddress({ ...editAddress, country: e.target.value })} />
+                    <Label htmlFor="country">{t("admin.address.country")}</Label>
+                    <Input id="country" name="country" value={editAddress?.country || t("admin.address.india")} onChange={e => setEditAddress({ ...editAddress, country: e.target.value })} />
                   </div>
                 </div>
 
                 {/* Map Preview */}
                 <div className="space-y-2">
-                  <Label>Map Preview</Label>
+                  <Label>{t("admin.address.mapPreview")}</Label>
                   <div className="border rounded-lg overflow-hidden h-[300px] bg-muted relative">
                     <iframe
                       width="100%"
@@ -464,25 +465,25 @@ export function ContactInfoSection({
                           editAddress?.country,
                         ]
                           .filter(Boolean)
-                          .join(", ") || "Vrindavan, Mathura"
+                          .join(", ") || t("admin.address.mapFallback")
                       )}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
-                      title="Map Preview"
+                      title={t("admin.address.mapPreview")}
                     ></iframe>
                   </div>
                   <p className="text-[10px] text-muted-foreground italic">
-                    Preview updates as you type (unsaved changes)
+                    {t("admin.address.previewNote")}
                   </p>
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="google-maps-link">Google Maps Link (for external redirection)</Label>
-                  <Input id="google-maps-link" name="google-maps-link" value={editAddress?.google_maps_link || ''} onChange={e => setEditAddress({ ...editAddress, google_maps_link: e.target.value })} placeholder="https://maps.google.com/..." />
+                  <Label htmlFor="google-maps-link">{t("admin.address.googleMapsLink")}</Label>
+                  <Input id="google-maps-link" name="google-maps-link" value={editAddress?.google_maps_link || ''} onChange={e => setEditAddress({ ...editAddress, google_maps_link: e.target.value })} placeholder={t("admin.address.linkPlaceholder")} />
                 </div>
               </div>
               <div className="flex gap-2">
                 <Button onClick={handleUpdateAddress} size="sm" disabled={updateAddressMutation.isPending}>
                   {updateAddressMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                  Save Address
+                  {t("admin.address.save")}
                 </Button>
                 <Button
                   variant="outline"
@@ -492,7 +493,7 @@ export function ContactInfoSection({
                   }}
                   size="sm"
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
               </div>
             </>
@@ -502,7 +503,7 @@ export function ContactInfoSection({
                 <p className="whitespace-pre-wrap font-medium">{formatAddress(address)}</p>
                 {address?.google_maps_link && (
                   <a href={address.google_maps_link} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline mt-2 block">
-                    View on Google Maps
+                    {t("admin.address.viewOnMaps")}
                   </a>
                 )}
               </div>
@@ -511,12 +512,12 @@ export function ContactInfoSection({
                 onClick={() => setIsEditingAddress(true)}
                 size="sm"
               >
-                Edit Address
+                {t("admin.address.edit")}
               </Button>
             </>
           )}
         </CardContent>
       </Card>
-    </div>
+    </div >
   );
 }

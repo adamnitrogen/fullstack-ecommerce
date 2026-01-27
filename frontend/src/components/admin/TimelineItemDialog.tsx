@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { aboutService } from "@/services/about.service";
 import { TimelineItem } from "@/types";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +29,7 @@ export default function TimelineItemDialog({
   onOpenChange,
   item,
 }: TimelineItemDialogProps) {
+  const { t } = useTranslation();
   const [month, setMonth] = useState("");
   const [year, setYear] = useState("");
   const [title, setTitle] = useState("");
@@ -58,7 +60,7 @@ export default function TimelineItemDialog({
       aboutService.createTimeline(newItem),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["aboutUs"] });
-      toast({ title: "Timeline item added successfully" });
+      toast({ title: t("admin.about.toasts.deleteTimeline") });
       onOpenChange(false);
     },
   });
@@ -73,7 +75,7 @@ export default function TimelineItemDialog({
     }) => aboutService.updateTimeline(id, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["aboutUs"] });
-      toast({ title: "Timeline item updated successfully" });
+      toast({ title: t("admin.about.toasts.deleteTimeline") });
       onOpenChange(false);
     },
   });
@@ -83,8 +85,8 @@ export default function TimelineItemDialog({
 
     if (!month.trim() || !year.trim() || !title.trim() || !description.trim()) {
       toast({
-        title: "Error",
-        description: "Please fill in all required fields",
+        title: t("common.error"),
+        description: t("auth.fillAllFields"),
         variant: "destructive",
       });
       return;
@@ -110,7 +112,9 @@ export default function TimelineItemDialog({
       <DialogContent className="sm:max-w-4xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="text-2xl">
-            {item ? "Edit Timeline Item" : "Add New Timeline Item"}
+            {item
+              ? t("admin.about.dialog.editTitle", { type: t("admin.about.dialog.types.timeline") })
+              : t("admin.about.dialog.addTitle", { type: t("admin.about.dialog.types.timeline") })}
           </DialogTitle>
         </DialogHeader>
 
@@ -118,31 +122,31 @@ export default function TimelineItemDialog({
           <form onSubmit={handleSubmit} className="space-y-6 py-2">
             {/* Timeline Information */}
             <div className="space-y-4 border rounded-lg p-4">
-              <h3 className="text-base font-semibold">Timeline Details</h3>
+              <h3 className="text-base font-semibold">{t("admin.about.dialog.types.timeline")}</h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="month">
-                    Month <span className="text-destructive">*</span>
+                    {t("admin.about.dialog.timeline.month")} <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     id="month"
                     value={month}
                     onChange={(e) => setMonth(e.target.value)}
-                    placeholder="e.g., January"
+                    placeholder={t("admin.about.dialog.timeline.monthPlaceholder")}
                     required
                   />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="year">
-                    Year <span className="text-destructive">*</span>
+                    {t("admin.about.dialog.timeline.year")} <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     id="year"
                     value={year}
                     onChange={(e) => setYear(e.target.value)}
-                    placeholder="e.g., 2015"
+                    placeholder={t("admin.about.dialog.timeline.yearPlaceholder")}
                     required
                   />
                 </div>
@@ -150,26 +154,26 @@ export default function TimelineItemDialog({
 
               <div className="space-y-2">
                 <Label htmlFor="title">
-                  Title <span className="text-destructive">*</span>
+                  {t("admin.about.dialog.timeline.title")} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g., Foundation"
+                  placeholder={t("admin.about.dialog.timeline.titlePlaceholder")}
                   required
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="description">
-                  Description <span className="text-destructive">*</span>
+                  {t("admin.about.dialog.timeline.desc")} <span className="text-destructive">*</span>
                 </Label>
                 <Textarea
                   id="description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Enter timeline description..."
+                  placeholder={t("admin.about.dialog.timeline.descPlaceholder")}
                   rows={3}
                   required
                 />
@@ -178,10 +182,10 @@ export default function TimelineItemDialog({
 
             {/* Display Settings */}
             <div className="space-y-4 border rounded-lg p-4">
-              <h3 className="text-base font-semibold">Display Settings</h3>
+              <h3 className="text-base font-semibold">{t("admin.about.dialog.displaySettings")}</h3>
 
               <div className="space-y-2">
-                <Label htmlFor="order">Display Order</Label>
+                <Label htmlFor="order">{t("admin.about.dialog.displayOrder")}</Label>
                 <Input
                   id="order"
                   type="number"
@@ -198,13 +202,13 @@ export default function TimelineItemDialog({
                 variant="outline"
                 onClick={() => onOpenChange(false)}
               >
-                Cancel
+                {t("admin.about.dialog.cancel")}
               </Button>
               <Button
                 type="submit"
                 disabled={addMutation.isPending || updateMutation.isPending}
               >
-                {item ? "Update" : "Add"} Timeline Item
+                {item ? t("common.update") : t("common.add")} {t("admin.about.dialog.types.timeline")}
               </Button>
             </DialogFooter>
           </form>

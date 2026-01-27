@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +29,7 @@ const passwordRequirements: PasswordRequirement[] = [
 export default function ResetPassword() {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
+    const { t } = useTranslation();
     const token = searchParams.get('token');
 
     const [status, setStatus] = useState<'loading' | 'valid' | 'invalid' | 'success' | 'submitting'>('loading');
@@ -41,7 +43,7 @@ export default function ResetPassword() {
     useEffect(() => {
         if (!token) {
             setStatus('invalid');
-            setMessage('Invalid reset link. No token provided.');
+            setMessage(t('resetPassword.invalidLink'));
             return;
         }
 
@@ -53,11 +55,11 @@ export default function ResetPassword() {
                     setEmail(result.email);
                 } else {
                     setStatus('invalid');
-                    setMessage('Invalid or expired reset link.');
+                    setMessage(t('resetPassword.invalidOrExpired'));
                 }
             } catch (error: unknown) {
                 setStatus('invalid');
-                setMessage(getErrorMessage(error, 'Invalid or expired reset link.'));
+                setMessage(getErrorMessage(error, t('resetPassword.invalidOrExpired')));
             }
         };
 
@@ -69,8 +71,8 @@ export default function ResetPassword() {
 
         if (!PASSWORD_REGEX.test(password)) {
             toast({
-                title: 'Invalid Password',
-                description: 'Please ensure your password meets all requirements.',
+                title: t('resetPassword.passwordInvalidTitle'),
+                description: t('resetPassword.passwordInvalidDesc'),
                 variant: 'destructive',
             });
             return;
@@ -78,8 +80,8 @@ export default function ResetPassword() {
 
         if (password !== confirmPassword) {
             toast({
-                title: 'Passwords Do Not Match',
-                description: 'Please ensure both passwords are the same.',
+                title: t('resetPassword.mismatchTitle'),
+                description: t('resetPassword.mismatchDesc'),
                 variant: 'destructive',
             });
             return;
@@ -92,16 +94,18 @@ export default function ResetPassword() {
             if (result.success) {
                 setStatus('success');
                 setMessage(result.message);
+                setMessage(result.message);
                 toast({
-                    title: 'Password Reset Successful',
-                    description: 'You can now log in with your new password.',
+                    title: t('resetPassword.successToastTitle'),
+                    description: t('resetPassword.successToastDesc'),
                 });
             }
         } catch (error: unknown) {
             setStatus('valid'); // Allow retry
+            setStatus('valid'); // Allow retry
             toast({
-                title: 'Reset Failed',
-                description: getErrorMessage(error, 'Failed to reset password. Please try again.'),
+                title: t('resetPassword.failedToastTitle'),
+                description: getErrorMessage(error, t('resetPassword.failedToastDesc')),
                 variant: 'destructive',
             });
         }
@@ -146,14 +150,14 @@ export default function ResetPassword() {
                         )}
                     </div>
                     <CardTitle className="text-2xl">
-                        {status === 'loading' && 'Verifying Link...'}
-                        {(status === 'valid' || status === 'submitting') && 'Reset Password'}
-                        {status === 'success' && 'Password Reset!'}
-                        {status === 'invalid' && 'Link Invalid'}
+                        {status === 'loading' && t('resetPassword.loadingTitle')}
+                        {(status === 'valid' || status === 'submitting') && t('resetPassword.validTitle')}
+                        {status === 'success' && t('resetPassword.successTitle')}
+                        {status === 'invalid' && t('resetPassword.invalidTitle')}
                     </CardTitle>
                     <CardDescription className="text-base mt-2">
-                        {status === 'loading' && 'Please wait while we verify your reset link...'}
-                        {(status === 'valid' || status === 'submitting') && `Enter a new password for ${email}`}
+                        {status === 'loading' && t('resetPassword.loadingDesc')}
+                        {(status === 'valid' || status === 'submitting') && t('resetPassword.validDesc', { email })}
                         {status === 'success' && message}
                         {status === 'invalid' && message}
                     </CardDescription>
@@ -162,14 +166,14 @@ export default function ResetPassword() {
                     {(status === 'valid' || status === 'submitting') && (
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div className="space-y-2">
-                                <Label htmlFor="password">New Password</Label>
+                                <Label htmlFor="password">{t('resetPassword.newPassword')}</Label>
                                 <div className="relative">
                                     <Input
                                         id="password"
                                         type={showPassword ? 'text' : 'password'}
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        placeholder="Enter new password"
+                                        placeholder={t('resetPassword.placeholderNew')}
                                         required
                                         disabled={status === 'submitting'}
                                     />
@@ -190,10 +194,10 @@ export default function ResetPassword() {
                                         <div
                                             key={index}
                                             className={`flex items-center gap-2 text-xs ${password.length === 0
-                                                    ? 'text-muted-foreground'
-                                                    : req.test(password)
-                                                        ? 'text-green-600'
-                                                        : 'text-red-500'
+                                                ? 'text-muted-foreground'
+                                                : req.test(password)
+                                                    ? 'text-green-600'
+                                                    : 'text-red-500'
                                                 }`}
                                         >
                                             {password.length > 0 && (
@@ -210,14 +214,14 @@ export default function ResetPassword() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                                <Label htmlFor="confirmPassword">{t('resetPassword.confirmPassword')}</Label>
                                 <div className="relative">
                                     <Input
                                         id="confirmPassword"
                                         type={showConfirmPassword ? 'text' : 'password'}
                                         value={confirmPassword}
                                         onChange={(e) => setConfirmPassword(e.target.value)}
-                                        placeholder="Confirm new password"
+                                        placeholder={t('resetPassword.placeholderConfirm')}
                                         required
                                         disabled={status === 'submitting'}
                                     />
@@ -233,7 +237,7 @@ export default function ResetPassword() {
                                 </div>
                                 {confirmPassword.length > 0 && (
                                     <p className={`text-xs ${doPasswordsMatch ? 'text-green-600' : 'text-red-500'}`}>
-                                        {doPasswordsMatch ? '✓ Passwords match' : '✗ Passwords do not match'}
+                                        {doPasswordsMatch ? t('resetPassword.matchSuccess') : t('resetPassword.matchError')}
                                     </p>
                                 )}
                             </div>
@@ -246,10 +250,10 @@ export default function ResetPassword() {
                                 {status === 'submitting' ? (
                                     <>
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Resetting Password...
+                                        {t('resetPassword.submittingButton')}
                                     </>
                                 ) : (
-                                    'Reset Password'
+                                    t('resetPassword.submitButton')
                                 )}
                             </Button>
                         </form>
@@ -257,17 +261,17 @@ export default function ResetPassword() {
 
                     {status === 'success' && (
                         <Button onClick={handleGoToLogin} className="w-full">
-                            Continue to Login
+                            {t('resetPassword.continueLogin')}
                         </Button>
                     )}
 
                     {status === 'invalid' && (
                         <div className="space-y-3">
                             <Button onClick={handleGoToLogin} variant="outline" className="w-full">
-                                Go to Homepage
+                                {t('resetPassword.goHome')}
                             </Button>
                             <p className="text-sm text-center text-muted-foreground">
-                                Need a new reset link? Use "Forgot Password" from the login page.
+                                {t('resetPassword.needNewLink')}
                             </p>
                         </div>
                     )}

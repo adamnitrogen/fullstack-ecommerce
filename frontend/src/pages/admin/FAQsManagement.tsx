@@ -1,5 +1,6 @@
 import { logger } from "@/lib/logger";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Card,
@@ -49,6 +50,7 @@ import { categoryService, type Category } from "@/services/category.service";
 const ITEMS_PER_PAGE = 10;
 
 export default function FAQsManagement() {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [faqDialogOpen, setFaqDialogOpen] = useState(false);
@@ -67,8 +69,8 @@ export default function FAQsManagement() {
       } catch (error) {
         logger.error('Error loading admin FAQs:', error);
         toast({
-          title: "Error Loading FAQs",
-          description: getErrorMessage(error, "Unable to load FAQs from the database. Please check your connection and try again."),
+          title: t("admin.faqs.messages.errorLoad"),
+          description: getErrorMessage(error, t("admin.faqs.messages.errorLoadDetail")),
           variant: "destructive",
         });
         throw error;
@@ -149,8 +151,8 @@ export default function FAQsManagement() {
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to save FAQ"),
+        title: t("common.error"),
+        description: getErrorMessage(error, t("admin.faqs.messages.errorSave")),
         variant: "destructive",
       });
     },
@@ -164,16 +166,16 @@ export default function FAQsManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-faqs"] });
       toast({
-        title: "Success",
-        description: "FAQ deleted successfully",
+        title: t("common.success"),
+        description: t("admin.faqs.toasts.deleteSuccess"),
       });
       setDeleteDialogOpen(false);
       setSelectedFaq(null);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to delete FAQ"),
+        title: t("common.error"),
+        description: getErrorMessage(error, t("admin.faqs.messages.errorDelete")),
         variant: "destructive",
       });
     },
@@ -186,14 +188,14 @@ export default function FAQsManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-faqs"] });
       toast({
-        title: "Success",
-        description: "FAQ status updated successfully",
+        title: t("common.success"),
+        description: t("admin.faqs.messages.statusUpdated"),
       });
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to update FAQ status"),
+        title: t("common.error"),
+        description: getErrorMessage(error, t("admin.faqs.messages.errorStatusUpdate")),
         variant: "destructive",
       });
     },
@@ -222,8 +224,8 @@ export default function FAQsManagement() {
     const exportData = faqs.map((faq) => flattenObject(faq as unknown as Record<string, unknown>));
     downloadCSV(exportData, "faqs");
     toast({
-      title: "Success",
-      description: "FAQs exported successfully",
+      title: t("common.success"),
+      description: t("admin.faqs.messages.exported"),
     });
   };
 
@@ -231,14 +233,14 @@ export default function FAQsManagement() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">FAQ Management</h1>
+          <h1 className="text-3xl font-bold">{t("admin.faqs.title")}</h1>
           <p className="text-muted-foreground">
-            Manage frequently asked questions and categories
+            {t("admin.faqs.subtitle")}
           </p>
         </div>
         <Button onClick={handleAddFaq}>
           <Plus className="mr-2 h-4 w-4" />
-          Add FAQ
+          {t("admin.faqs.add")}
         </Button>
       </div>
 
@@ -246,7 +248,7 @@ export default function FAQsManagement() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <HelpCircle className="h-5 w-5" />
-            FAQs
+            {t("admin.faqs.listTitle")}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -258,7 +260,7 @@ export default function FAQsManagement() {
                 <Input
                   id="faq-search"
                   name="search"
-                  placeholder="Search FAQs..."
+                  placeholder={t("admin.faqs.search")}
                   value={searchQuery}
                   onChange={(e) => handleSearchChange(e.target.value)}
                   className="pl-9"
@@ -269,10 +271,10 @@ export default function FAQsManagement() {
                 onValueChange={handleCategoryChange}
               >
                 <SelectTrigger className="w-full sm:w-[200px]">
-                  <SelectValue placeholder="All Categories" />
+                  <SelectValue placeholder={t("admin.faqs.allCategories")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="all">{t("admin.faqs.allCategories")}</SelectItem>
                   {categories.map((cat) => (
                     <SelectItem key={cat.id} value={cat.id}>
                       {cat.name}
@@ -282,29 +284,29 @@ export default function FAQsManagement() {
               </Select>
               <Button variant="outline" onClick={handleExport}>
                 <Download className="mr-2 h-4 w-4" />
-                Export
+                {t("admin.orders.export.button")}
               </Button>
             </div>
 
             {/* Table */}
             {isLoading ? (
               <div className="text-center py-8 text-muted-foreground">
-                Loading FAQs...
+                {t("admin.dashboard.loading")}
               </div>
             ) : faqs.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No FAQs found. Add your first FAQ to get started.
+                {t("admin.orders.empty")}
               </div>
             ) : (
               <div className="border rounded-lg">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Question</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead>{t("admin.faqs.table.question")}</TableHead>
+                      <TableHead>{t("admin.faqs.table.category")}</TableHead>
+                      <TableHead>{t("admin.faqs.table.status")}</TableHead>
+                      <TableHead>{t("admin.faqs.table.created")}</TableHead>
+                      <TableHead className="text-right">{t("admin.faqs.table.actions")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -321,13 +323,13 @@ export default function FAQsManagement() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="secondary">{faq.category.name}</Badge>
+                          <Badge variant="secondary">{t(`admin.faqs.categories.${faq.category.name.toLowerCase()}`, faq.category.name)}</Badge>
                         </TableCell>
                         <TableCell>
                           <Badge
                             variant={faq.is_active ? "default" : "secondary"}
                           >
-                            {faq.is_active ? "Active" : "Inactive"}
+                            {faq.is_active ? t("admin.faqs.table.active") : t("admin.faqs.table.inactive")}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -339,7 +341,6 @@ export default function FAQsManagement() {
                               variant="ghost"
                               size="icon"
                               onClick={() => handleToggleActive(faq)}
-                              title={faq.is_active ? "Hide FAQ" : "Show FAQ"}
                             >
                               {faq.is_active ? (
                                 <EyeOff className="h-4 w-4" />
@@ -374,13 +375,17 @@ export default function FAQsManagement() {
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
               <div className="text-sm text-muted-foreground">
                 <p>
-                  Showing {filteredFaqs.length > 0 ? startIndex + 1 : 0} to{" "}
-                  {Math.min(endIndex, filteredFaqs.length)} of {filteredFaqs.length} FAQ
-                  {filteredFaqs.length !== 1 ? "s" : ""}
+                  {t("admin.faqs.pagination.showing", {
+                    start: filteredFaqs.length > 0 ? startIndex + 1 : 0,
+                    end: Math.min(endIndex, filteredFaqs.length),
+                    total: filteredFaqs.length
+                  })}
                 </p>
                 <p className="mt-1">
-                  Active: {filteredFaqs.filter((f) => f.is_active).length} | Inactive:{" "}
-                  {filteredFaqs.filter((f) => !f.is_active).length}
+                  {t("admin.faqs.stats.summary", {
+                    active: filteredFaqs.filter((f) => f.is_active).length,
+                    inactive: filteredFaqs.filter((f) => !f.is_active).length
+                  })}
                 </p>
               </div>
 
@@ -395,7 +400,7 @@ export default function FAQsManagement() {
                     disabled={currentPage === 1}
                   >
                     <ChevronLeft className="h-4 w-4" />
-                    Previous
+                    {t("admin.faqs.pagination.previous")}
                   </Button>
                   <div className="flex items-center gap-1">
                     {Array.from({ length: totalPages }, (_, i) => i + 1).map(
@@ -420,7 +425,7 @@ export default function FAQsManagement() {
                     }
                     disabled={currentPage === totalPages}
                   >
-                    Next
+                    {t("admin.faqs.pagination.next")}
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
@@ -442,8 +447,8 @@ export default function FAQsManagement() {
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         onConfirm={() => selectedFaq && deleteMutation.mutate(selectedFaq.id)}
-        title="Delete FAQ"
-        description={`Are you sure you want to delete "${selectedFaq?.question}"? This action cannot be undone.`}
+        title={t("admin.faqs.delete.title")}
+        description={t("admin.faqs.delete.description")}
       />
     </div>
   );

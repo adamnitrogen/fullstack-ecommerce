@@ -1,16 +1,18 @@
 const policyService = require('../services/policy.service');
 const logger = require('../utils/logger');
 
+const MESSAGES = require('../config/messages');
+
 exports.uploadPolicy = async (req, res, next) => {
     try {
         if (!req.file) {
-            return res.status(400).json({ error: 'No file uploaded' });
+            return res.status(400).json({ error: MESSAGES.ERRORS.NO_FILE_UPLOADED });
         }
         const { policyType, title } = req.body;
 
         // Basic validation
         if (!['privacy', 'terms', 'shipping-refund'].includes(policyType)) {
-            return res.status(400).json({ error: 'Invalid policy type' });
+            return res.status(400).json({ error: MESSAGES.ERRORS.INVALID_POLICY_TYPE });
         }
 
         let policyTitle = title;
@@ -34,7 +36,7 @@ exports.uploadPolicy = async (req, res, next) => {
         );
 
         res.status(201).json({
-            message: 'Policy uploaded successfully',
+            message: MESSAGES.SUCCESS.POLICY_UPLOADED,
             policy: {
                 policyType: policy.policy_type,
                 version: policy.version,
@@ -54,13 +56,13 @@ exports.getPublicPolicy = async (req, res, next) => {
         const { policyType } = req.params;
 
         if (!['privacy', 'terms', 'shipping-refund'].includes(policyType)) {
-            return res.status(400).json({ error: 'Invalid policy type' });
+            return res.status(400).json({ error: MESSAGES.ERRORS.INVALID_POLICY_TYPE });
         }
 
         const policy = await policyService.getActivePolicy(policyType);
 
         if (!policy) {
-            return res.status(404).json({ error: 'Policy not found' });
+            return res.status(404).json({ error: MESSAGES.ERRORS.POLICY_NOT_FOUND });
         }
 
         res.json({
@@ -81,13 +83,13 @@ exports.getPolicyVersion = async (req, res, next) => {
         const { policyType } = req.params;
 
         if (!['privacy', 'terms', 'shipping-refund'].includes(policyType)) {
-            return res.status(400).json({ error: 'Invalid policy type' });
+            return res.status(400).json({ error: MESSAGES.ERRORS.INVALID_POLICY_TYPE });
         }
 
         const policy = await policyService.getActivePolicy(policyType);
 
         if (!policy) {
-            return res.status(404).json({ error: 'Policy not found' });
+            return res.status(404).json({ error: MESSAGES.ERRORS.POLICY_NOT_FOUND });
         }
 
         res.json({ version: policy.version });

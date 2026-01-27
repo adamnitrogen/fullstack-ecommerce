@@ -15,11 +15,13 @@ const { TaxEngine } = require('./tax-engine.service');
 const { PricingCalculator } = require('./pricing-calculator.service');
 const { FinancialEventLogger } = require('./financial-event-logger.service');
 const { DeliveryChargeService } = require('./delivery-charge.service');
-const { logStatusHistory, ORDER_STATUS } = require('./history.service');
+const { logStatusHistory } = require('./history.service');
 const { validateCoupon } = require('./coupon.service');
 const { RazorpayInvoiceService } = require('./razorpay-invoice.service');
 const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
 const { wrapRazorpayWithTimeout } = require('../utils/razorpay-timeout');
+const { ORDER_STATUS, PAYMENT_STATUS, RAZORPAY_STATUS } = require('../config/constants');
+const MESSAGES = require('../config/messages');
 
 // Create module-specific logger
 const log = createModuleLogger('CheckoutService');
@@ -60,7 +62,7 @@ const createBuyNowVirtualCart = async (userId, guestId, buyNowData) => {
         .single();
 
     if (!product) {
-        const error = new Error('Product not found or no longer available');
+        const error = new Error(MESSAGES.CHECKOUT.PRODUCT_NOT_FOUND);
         error.status = 404;
         throw error;
     }
@@ -73,8 +75,9 @@ const createBuyNowVirtualCart = async (userId, guestId, buyNowData) => {
             .eq('id', variantId)
             .single();
         variant = v;
+        variant = v;
         if (!variant) {
-            const error = new Error('Selected variant not found or no longer available');
+            const error = new Error(MESSAGES.CHECKOUT.VARIANT_NOT_FOUND);
             error.status = 404;
             throw error;
         }
@@ -88,7 +91,7 @@ const createBuyNowVirtualCart = async (userId, guestId, buyNowData) => {
     }]);
 
     if (!stockCheck.available) {
-        const error = new Error(stockCheck.message || 'Product is out of stock');
+        const error = new Error(MESSAGES.CHECKOUT.INSUFFICIENT_STOCK);
         error.status = 400;
         error.stockInfo = stockCheck;
         throw error;
@@ -433,7 +436,7 @@ const createRazorpayInvoice = async (amount, receipt, customer, lineItems, total
         // When the user pays that `order_id`, the Invoice status updates to Paid.
 
         let finalInvoice = invoice;
-        if (invoice.status === 'draft') {
+        if (invoice.status === RAZORPAY_STATUS.DRAFT) {
             finalInvoice = await razorpay.invoices.issue(invoice.id);
         }
 
@@ -468,7 +471,7 @@ const createRazorpayInvoice = async (amount, receipt, customer, lineItems, total
         }, '[Checkout] Razorpay invoice creation failed');
 
         // Throw a friendly error with a code for the middleware to map
-        const friendlyError = new Error('We encountered an issue with the payment gateway. Please try again in a moment.');
+        const friendlyError = new Error(MESSAGES.CHECKOUT.GATEWAY_ERROR);
         friendlyError.code = 'RAZORPAY_ERROR';
         friendlyError.statusCode = 502; // Bad Gateway as it's a third-party issue
         throw friendlyError;
@@ -479,7 +482,7 @@ const createRazorpayInvoice = async (amount, receipt, customer, lineItems, total
 const verifyRazorpayPayment = (orderId, paymentId, signature) => {
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
     if (!keySecret) {
-        throw new Error('RAZORPAY_KEY_SECRET is not defined in environment variables');
+        throw new Error(MESSAGES.CHECKOUT.SYSTEM_ERROR);
     }
 
     const body = orderId + '|' + paymentId;
@@ -594,7 +597,7 @@ const createOrder = async (userId, checkoutData, cart) => {
 
     if (shippingError || !shippingAddrData) {
         logger.error({ err: shipping_address_id, shippingError }, 'Shipping address not found:');
-        throw new Error(`Shipping address not found: ${shipping_address_id}`);
+        throw new Error(MESSAGES.CHECKOUT.SHIPPING_ADDRESS_NOT_FOUND);
     }
 
     // Flatten shipping address phone
@@ -611,7 +614,7 @@ const createOrder = async (userId, checkoutData, cart) => {
 
     if (billingError || !billingAddrData) {
         logger.error({ err: billing_address_id, billingError }, 'Billing address not found:');
-        throw new Error(`Billing address not found: ${billing_address_id}`);
+        throw new Error(MESSAGES.CHECKOUT.BILLING_ADDRESS_NOT_FOUND);
     }
 
     // Flatten billing address phone
@@ -650,8 +653,8 @@ const createOrder = async (userId, checkoutData, cart) => {
         // Refund Metadata: Will be re-calculated based on item snapshots
         is_delivery_refundable: true,
         delivery_tax_type: 'GST', // System default for now
-        status: 'pending', // Orders start as pending until admin/manager confirms
-        payment_status: 'paid',
+        status: ORDER_STATUS.PENDING, // Orders start as pending until admin/manager confirms
+        payment_status: PAYMENT_STATUS.PAID,
         notes: notes || null,
         // Tax summary - Include Delivery logic
         total_taxable_amount: (taxResult?.summary.total_taxable_amount || 0) + (totals.deliveryCharge || 0),
@@ -795,7 +798,7 @@ const createOrder = async (userId, checkoutData, cart) => {
 
     if (rpcError) {
         logger.error({ err: rpcError }, '[Checkout] Transactional order creation failed:');
-        throw new Error(`Order creation failed: ${rpcError.message}`);
+        throw new Error(MESSAGES.CHECKOUT.ORDER_CREATION_FAILED);
     }
 
     logger.info({
@@ -840,7 +843,7 @@ const createOrder = async (userId, checkoutData, cart) => {
 
     // Generate Invoice immediately for paid orders (if verified)
     // CRITICAL: Invoice generation is MANDATORY for paid orders (GST compliance)
-    if (order.status === 'confirmed' || checkoutData.payment_status === 'paid') {
+    if (order.status === ORDER_STATUS.CONFIRMED || checkoutData.payment_status === PAYMENT_STATUS.PAID) {
         // OPTIMIZATION: If we already have an invoice ID from the checkout flow (Invoice A),
         // reuse it instead of creating a new one (Invoice B) which would be unpaid.
         if (checkoutData.invoice_id) {
@@ -875,7 +878,7 @@ const createOrder = async (userId, checkoutData, cart) => {
                 });
             } else {
                 // CRITICAL: Invoice fetch/issue failed - this is a blocking error
-                throw new Error('Failed to fetch/issue Razorpay invoice - order cannot proceed without invoice');
+                throw new Error(MESSAGES.CHECKOUT.RAZORPAY_ERROR);
             }
         } else {
             // Fallback: Create new invoice if one doesn't exist
@@ -902,7 +905,7 @@ const createOrder = async (userId, checkoutData, cart) => {
     // NOTE: 'ORDER_PLACED' is handled by the creation RPC or system trigger, so we avoid duplicating it here.
     try {
 
-        if (checkoutData.payment_status === 'paid') {
+        if (checkoutData.payment_status === PAYMENT_STATUS.PAID) {
             await logStatusHistory(order.id, 'PAYMENT_SUCCESS', userId, `Payment verified (ID: ${razorpay_payment_id || payment_id || 'N/A'})`, 'SYSTEM');
             // User requested that orders NOT be auto-confirmed by system. Leaving status as 'pending'.
         }
@@ -1029,7 +1032,7 @@ const handleWebhookEvent = async (payload) => {
             if (dbPayment) {
                 // Update payment status
                 await updatePaymentRecord(dbPayment.id, {
-                    status: 'captured',
+                    status: PAYMENT_STATUS.CAPTURED,
                     razorpay_payment_id: payment.id,
                     method: payment.method,
                     updated_at: new Date().toISOString()
@@ -1039,7 +1042,7 @@ const handleWebhookEvent = async (payload) => {
                 if (dbPayment.order_id) {
                     await supabase
                         .from('orders')
-                        .update({ payment_status: 'paid', status: 'confirmed' })
+                        .update({ payment_status: PAYMENT_STATUS.PAID, status: ORDER_STATUS.CONFIRMED })
                         .eq('id', dbPayment.order_id);
 
                     // Log history for confirmation
@@ -1069,7 +1072,7 @@ const handleWebhookEvent = async (payload) => {
 
             if (dbPayment) {
                 await updatePaymentRecord(dbPayment.id, {
-                    status: 'failed',
+                    status: PAYMENT_STATUS.FAILED,
                     error_description: payment.error_description || 'Payment Failed via Webhook',
                     updated_at: new Date().toISOString()
                 });
@@ -1102,7 +1105,7 @@ const handleWebhookEvent = async (payload) => {
 
             if (dbPayment) {
                 await updatePaymentRecord(dbPayment.id, {
-                    status: 'refunded', // or partial_refunded
+                    status: PAYMENT_STATUS.REFUNDED, // or partial_refunded
                     refund_id: refund.id,
                     refund_status: refund.status,
                     updated_at: new Date().toISOString()
@@ -1111,7 +1114,7 @@ const handleWebhookEvent = async (payload) => {
                 if (dbPayment.order_id) {
                     await supabase
                         .from('orders')
-                        .update({ payment_status: 'refunded', status: 'refunded' })
+                        .update({ payment_status: PAYMENT_STATUS.REFUNDED, status: ORDER_STATUS.REFUNDED })
                         .eq('id', dbPayment.order_id);
 
                     // Add timeline entry for refund completion
@@ -1142,20 +1145,14 @@ const processRefund = async (paymentId, amount = null) => {
         logger.info(`[Refund] Starting refund process for payment_id: ${paymentId}`);
 
         // Get payment record
-        const { data: payment, error } = await supabase
+        const { data: payment, error: fetchError } = await supabase
             .from('payments')
             .select('*')
             .eq('id', paymentId)
             .single();
 
-        if (error) {
-            logger.error(`[Refund] Database error finding payment:`, error);
-            throw new Error(`Payment record not found: ${error.message}`);
-        }
-
-        if (!payment) {
-            logger.error(`[Refund] Payment record not found for id: ${paymentId}`);
-            throw new Error('Payment record not found');
+        if (fetchError || !payment) {
+            throw new Error(MESSAGES.CHECKOUT.PAYMENT_RECORD_NOT_FOUND);
         }
 
         logger.info(`[Refund] Found payment record:`, {
@@ -1169,7 +1166,7 @@ const processRefund = async (paymentId, amount = null) => {
         // Validate Razorpay payment ID exists
         if (!payment.razorpay_payment_id) {
             logger.error(`[Refund] No razorpay_payment_id found on payment record. Razorpay refund cannot be processed.`);
-            throw new Error('No Razorpay payment ID found - refund cannot be processed. Payment may not have been captured.');
+            throw new Error(MESSAGES.CHECKOUT.REFUND_FAILED_NO_ID);
         }
 
         // Only process refund if payment was actually captured
@@ -1193,7 +1190,7 @@ const processRefund = async (paymentId, amount = null) => {
 
         // Update DB - only update status (refund details already logged above)
         await updatePaymentRecord(paymentId, {
-            status: 'refunded'
+            status: PAYMENT_STATUS.REFUNDED
         });
 
         return refund;
@@ -1275,7 +1272,7 @@ async function processPaymentAndOrder(userId, {
                 }, 'S2S Payment Fetched');
 
                 // Check 1: Is payment successful?
-                if (payment.status !== 'captured' && payment.status !== 'authorized') {
+                if (payment.status !== RAZORPAY_STATUS.CAPTURED && payment.status !== RAZORPAY_STATUS.AUTHORIZED) {
                     throw new Error(`Payment status is ${payment.status} (not captured)`);
                 }
 
@@ -1335,7 +1332,7 @@ async function processPaymentAndOrder(userId, {
                                 difference: Math.abs(paymentAmount - expectedAmount)
                             }, 'CRITICAL: Payment amount mismatch - manual review required');
 
-                            throw new Error('Payment amount mismatch detected. Please contact support.');
+                            throw new Error(MESSAGES.CHECKOUT.PAYMENT_MISMATCH);
                         }
 
                         logger.warn({
@@ -1356,7 +1353,7 @@ async function processPaymentAndOrder(userId, {
                             });
                         }
 
-                        const refundError = new Error('Payment verification failed and your amount has been refunded. Please try again.');
+                        const refundError = new Error(MESSAGES.CHECKOUT.PAYMENT_REFUNDED_FAILURE);
                         refundError.status = 400;
                         throw refundError;
                     } else {
@@ -1382,11 +1379,11 @@ async function processPaymentAndOrder(userId, {
                 // Update payment as failed
                 if (payment_id) {
                     await updatePaymentRecord(payment_id, {
-                        status: 'failed',
+                        status: PAYMENT_STATUS.FAILED,
                         error_description: s2sError.message || 'Invalid payment signature'
                     });
                 }
-                const error = new Error('Invalid payment signature and verification failed.');
+                const error = new Error(MESSAGES.CHECKOUT.SIGNATURE_INVALID);
                 error.status = 400;
                 throw error;
             }
@@ -1399,7 +1396,7 @@ async function processPaymentAndOrder(userId, {
             await updatePaymentRecord(payment_id, {
                 razorpay_payment_id,
                 razorpay_signature,
-                status: 'captured' // It is already captured!
+                status: PAYMENT_STATUS.CAPTURED // It is already captured!
             });
         }
 
@@ -1421,7 +1418,7 @@ async function processPaymentAndOrder(userId, {
                 await updatePaymentRecord(payment_id, {
                     razorpay_payment_id,
                     razorpay_signature,
-                    status: 'captured' // Mock payments are auto-captured
+                    status: PAYMENT_STATUS.CAPTURED // Mock payments are auto-captured
                 });
             } catch (error) {
                 logger.info('Mock payment record not found, proceeding without it');
@@ -1441,7 +1438,7 @@ async function processPaymentAndOrder(userId, {
 
             if (existingPayment) {
                 // CRITICAL: Validate payment status before recovery
-                if (existingPayment.status === 'captured' || existingPayment.status === 'paid') {
+                if (existingPayment.status === PAYMENT_STATUS.CAPTURED || existingPayment.status === PAYMENT_STATUS.PAID) {
                     payment_id = existingPayment.id;
                     // Check for persisted receipt ID
                     if (existingPayment.metadata?.receipt) {
@@ -1512,7 +1509,7 @@ async function processPaymentAndOrder(userId, {
                 billing_address_id,
                 payment_id,
                 notes,
-                payment_status: 'paid',
+                payment_status: PAYMENT_STATUS.PAID,
                 razorpay_payment_id,
                 orderNumber: preGeneratedOrderNumber, // Use the pre-generated number from Razorpay receipt
                 invoice_id: (payment_id && !isMockPayment) ?
@@ -1674,7 +1671,7 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
 
         } catch (s2sError) {
             log.error({ err: s2sError }, 'Buy Now S2S Verification Failed.');
-            const error = new Error('Payment verification failed. Please contact support if money was deducted.');
+            const error = new Error(MESSAGES.CHECKOUT.VERIFICATION_FAILED);
             error.status = 400;
             throw error;
         }
@@ -1794,7 +1791,7 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
 
             // Throw user-friendly error based on refund status
             if (refundSuccess) {
-                const userError = new Error('Order creation failed but your payment has been refunded automatically. The amount will be credited to your account within 5-7 business days.');
+                const userError = new Error(MESSAGES.CHECKOUT.ORDER_CREATION_FAILED_REFUNDED);
                 userError.status = 500;
                 throw userError;
             } else {

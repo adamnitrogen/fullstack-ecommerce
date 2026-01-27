@@ -7,8 +7,11 @@ import { Mail, User, Clock, MessageSquare, ExternalLink } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { getDateLocale } from '@/utils/dateLocale';
 
 export default function ContactMessages() {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const { data: messages = [], isLoading } = useQuery({
         queryKey: ['admin-contact-messages'],
@@ -18,13 +21,13 @@ export default function ContactMessages() {
     const getStatusBadge = (status: string) => {
         switch (status) {
             case 'NEW':
-                return <Badge variant="destructive">New</Badge>;
+                return <Badge variant="destructive">{t("admin.messages.status.new")}</Badge>;
             case 'READ':
-                return <Badge variant="secondary">Read</Badge>;
+                return <Badge variant="secondary">{t("admin.messages.status.read")}</Badge>;
             case 'REPLIED':
-                return <Badge variant="default" className="bg-green-500">Replied</Badge>;
+                return <Badge variant="default" className="bg-green-500">{t("admin.messages.status.replied")}</Badge>;
             case 'ARCHIVED':
-                return <Badge variant="outline">Archived</Badge>;
+                return <Badge variant="outline">{t("admin.messages.status.archived")}</Badge>;
             default:
                 return <Badge variant="outline">{status}</Badge>;
         }
@@ -41,8 +44,8 @@ export default function ContactMessages() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-3xl font-bold font-playfair text-[#2C1810]">Contact Messages</h1>
-                <p className="text-muted-foreground">Manage user inquiries and feedback</p>
+                <h1 className="text-3xl font-bold font-playfair text-[#2C1810]">{t("admin.messages.title")}</h1>
+                <p className="text-muted-foreground">{t("admin.messages.subtitle")}</p>
             </div>
 
             <div className="grid gap-4">
@@ -50,7 +53,7 @@ export default function ContactMessages() {
                     <Card>
                         <CardContent className="flex flex-col items-center justify-center p-12 text-center">
                             <MessageSquare className="h-12 w-12 text-muted-foreground mb-4 opacity-20" />
-                            <p className="text-lg font-medium text-muted-foreground">No messages found</p>
+                            <p className="text-lg font-medium text-muted-foreground">{t("admin.messages.empty")}</p>
                         </CardContent>
                     </Card>
                 ) : (
@@ -71,7 +74,7 @@ export default function ContactMessages() {
                                             </div>
                                             <div className="flex items-center gap-1">
                                                 <Clock className="h-4 w-4" />
-                                                <span>{formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}</span>
+                                                <span>{formatDistanceToNow(new Date(msg.created_at), { addSuffix: true, locale: getDateLocale() })}</span>
                                             </div>
                                         </div>
 
@@ -83,7 +86,7 @@ export default function ContactMessages() {
                                     <div className="flex items-center gap-2 self-end md:self-center">
                                         <Button variant="outline" size="sm" className="rounded-full border-[#B85C3C] text-[#B85C3C] hover:bg-[#B85C3C] hover:text-white">
                                             <ExternalLink className="h-4 w-4 mr-2" />
-                                            View Detail
+                                            {t("admin.messages.viewDetail")}
                                         </Button>
                                     </div>
                                 </div>

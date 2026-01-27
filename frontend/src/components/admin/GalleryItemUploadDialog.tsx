@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
     Dialog,
@@ -29,6 +30,7 @@ export function GalleryItemUploadDialog({
     onOpenChange,
     folderId,
 }: GalleryItemUploadDialogProps) {
+    const { t } = useTranslation();
     const queryClient = useQueryClient();
     const [formData, setFormData] = useState<{
         title: string;
@@ -47,7 +49,7 @@ export function GalleryItemUploadDialog({
     const mutation = useMutation({
         mutationFn: async () => {
             if (formData.images.length === 0) {
-                throw new Error("Please upload at least one image");
+                throw new Error(t("admin.gallery.toasts.requiredImage"));
             }
 
             const uploadPromises = formData.images.map(async (image, index) => {
@@ -89,7 +91,7 @@ export function GalleryItemUploadDialog({
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["gallery-items"] });
             queryClient.invalidateQueries({ queryKey: ["gallery-folders"] });
-            toast.success("Images uploaded successfully");
+            toast.success(t("admin.gallery.toasts.uploadSuccess"));
             onOpenChange(false);
             // Reset form
             setFormData({
@@ -101,7 +103,7 @@ export function GalleryItemUploadDialog({
             });
         },
         onError: (error: unknown) => {
-            toast.error(getErrorMessage(error, "Failed to upload images"));
+            toast.error(getErrorMessage(error, t("admin.gallery.toasts.uploadError")));
         },
     });
 
@@ -114,9 +116,9 @@ export function GalleryItemUploadDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Upload Images</DialogTitle>
+                    <DialogTitle>{t("admin.gallery.dialog.uploadItems")}</DialogTitle>
                     <DialogDescription>
-                        Add new images to this gallery folder. You can select multiple images.
+                        {t("admin.gallery.dialog.uploadItemsDesc")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -124,7 +126,7 @@ export function GalleryItemUploadDialog({
                     {/* Image Upload */}
                     <div className="space-y-2">
                         <Label>
-                            Images <span className="text-destructive">*</span>
+                            {t("admin.gallery.images")} <span className="text-destructive">*</span>
                         </Label>
                         <ImageUpload
                             images={formData.images}
@@ -137,64 +139,64 @@ export function GalleryItemUploadDialog({
                     {/* Common Metadata */}
                     <div className="space-y-4 border-t pt-4">
                         <h4 className="text-sm font-medium text-muted-foreground">
-                            Metadata (Applied to all images)
+                            {t("admin.gallery.dialog.metadata")}
                         </h4>
 
                         {/* Title - Only show for single image or as a prefix? Let's hide for bulk to avoid confusion or keep optional */}
                         {formData.images.length <= 1 && (
                             <div className="space-y-2">
-                                <Label htmlFor="title">Title (Optional)</Label>
+                                <Label htmlFor="title">{t("common.title")} ({t("common.optional")})</Label>
                                 <Input
                                     id="title"
                                     value={formData.title}
                                     onChange={(e) =>
                                         setFormData({ ...formData, title: e.target.value })
                                     }
-                                    placeholder="Enter image title"
+                                    placeholder={t("common.titlePlaceholder")}
                                 />
                             </div>
                         )}
 
                         {/* Tags */}
                         <div className="space-y-2">
-                            <Label htmlFor="tags">Tags (Optional)</Label>
+                            <Label htmlFor="tags">{t("admin.gallery.dialog.tags")} ({t("common.optional")})</Label>
                             <Input
                                 id="tags"
                                 value={formData.tags}
                                 onChange={(e) =>
                                     setFormData({ ...formData, tags: e.target.value })
                                 }
-                                placeholder="nature, cow, festival (comma separated)"
+                                placeholder="nature, cow, festival"
                             />
                             <p className="text-xs text-muted-foreground">
-                                Separate tags with commas
+                                {t("admin.gallery.dialog.tagsHelp")}
                             </p>
                         </div>
 
                         {/* Description */}
                         <div className="space-y-2">
-                            <Label htmlFor="description">Description (Optional)</Label>
+                            <Label htmlFor="description">{t("admin.gallery.dialog.description")} ({t("common.optional")})</Label>
                             <Textarea
                                 id="description"
                                 value={formData.description}
                                 onChange={(e) =>
                                     setFormData({ ...formData, description: e.target.value })
                                 }
-                                placeholder="Enter description for these images"
+                                placeholder={t("admin.gallery.dialog.descPlaceholder")}
                                 rows={3}
                             />
                         </div>
 
                         {/* Location */}
                         <div className="space-y-2">
-                            <Label htmlFor="location">Location (Optional)</Label>
+                            <Label htmlFor="location">{t("admin.gallery.dialog.location")} ({t("common.optional")})</Label>
                             <Input
                                 id="location"
                                 value={formData.location}
                                 onChange={(e) =>
                                     setFormData({ ...formData, location: e.target.value })
                                 }
-                                placeholder="e.g., Goshala, Main Farm"
+                                placeholder="e.g., Goshala"
                             />
                         </div>
                     </div>
@@ -206,18 +208,18 @@ export function GalleryItemUploadDialog({
                             variant="outline"
                             onClick={() => onOpenChange(false)}
                         >
-                            Cancel
+                            {t("common.cancel")}
                         </Button>
                         <Button
                             type="submit"
                             disabled={mutation.isPending || formData.images.length === 0}
                         >
                             {mutation.isPending ? (
-                                "Uploading..."
+                                t("common.uploading")
                             ) : (
                                 <>
                                     <Upload className="h-4 w-4 mr-2" />
-                                    Upload {formData.images.length > 0 ? `${formData.images.length} Images` : "Images"}
+                                    {t("admin.gallery.uploadImages")} {formData.images.length > 0 ? `(${formData.images.length})` : ""}
                                 </>
                             )}
                         </Button>

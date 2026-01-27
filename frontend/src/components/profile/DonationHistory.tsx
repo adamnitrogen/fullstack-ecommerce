@@ -150,14 +150,14 @@ export function DonationHistory() {
                     id={donation.id}
                     date={donation.date}
                     total={donation.amount}
-                    idLabel="Donation ID"
-                    dateLabel="Donated"
-                    detailsLabel="Campaign"
+                    idLabel={t("donate.history.donationId")}
+                    dateLabel={t("donate.history.donated")}
+                    detailsLabel={t("donate.history.campaign")}
                     badge={{
                       label:
                         donation.type === "monthly"
                           ? t("donate.monthly")
-                          : t("donate.oneTime"),
+                          : t("oneTime"),
                       color:
                         donation.type === "monthly"
                           ? "bg-blue-500"
@@ -185,12 +185,14 @@ export function DonationHistory() {
               {totalPages > 1 && (
                 <div className="flex items-center justify-between mt-6 pt-4 border-t">
                   <div className="text-sm text-muted-foreground">
-                    Showing {(currentPage - 1) * DONATIONS_PER_PAGE + 1} to{" "}
-                    {Math.min(
-                      currentPage * DONATIONS_PER_PAGE,
-                      mockDonations.length
-                    )}{" "}
-                    of {mockDonations.length} donations
+                    {t("donate.history.showing", {
+                      start: (currentPage - 1) * DONATIONS_PER_PAGE + 1,
+                      end: Math.min(
+                        currentPage * DONATIONS_PER_PAGE,
+                        mockDonations.length
+                      ),
+                      total: mockDonations.length,
+                    })}
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
@@ -202,7 +204,7 @@ export function DonationHistory() {
                       disabled={currentPage === 1}
                     >
                       <ChevronLeft className="h-4 w-4" />
-                      Previous
+                      {t("common.previous")}
                     </Button>
                     <div className="flex items-center gap-1">
                       {Array.from({ length: totalPages }, (_, i) => i + 1).map(
@@ -229,7 +231,7 @@ export function DonationHistory() {
                       }
                       disabled={currentPage === totalPages}
                     >
-                      Next
+                      {t("common.next")}
                       <ChevronRight className="h-4 w-4" />
                     </Button>
                   </div>

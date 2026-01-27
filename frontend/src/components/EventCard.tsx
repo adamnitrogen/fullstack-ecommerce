@@ -13,6 +13,7 @@ import {
 import { Tag } from "@/components/ui/Tag";
 import { Event } from "@/types";
 import { format } from "date-fns";
+import { hi, enUS } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
 interface EventCardProps {
@@ -28,8 +29,9 @@ export const EventCard = ({
   showCapacityWarning = true,
   className = "",
 }: EventCardProps) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const currentLocale = i18n.language === "hi" ? hi : enUS;
 
   const isCompleted = event.status === "completed";
   const displayAddress = event.location?.address || event.contactAddress;
@@ -96,7 +98,7 @@ export const EventCard = ({
         <div className="flex items-center gap-2 mb-3">
           <div className="h-1 w-8 bg-[#B85C3C] rounded-full" />
           <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#B85C3C]">
-            {event.registrationAmount === 0 ? "Complimentary" : "Sacred Offering"}
+            {event.registrationAmount === 0 ? t("events.complimentary") : t("events.sacredOffering")}
           </span>
         </div>
         <CardTitle className="text-2xl font-playfair font-bold text-[#2C1810] group-hover:text-[#B85C3C] transition-colors duration-300">
@@ -113,7 +115,7 @@ export const EventCard = ({
             </div>
             <div className="flex flex-col">
               <span className="text-sm font-bold text-[#2C1810]">
-                {event.startDate ? format(new Date(event.startDate), "PPP") : "TBA"}
+                {event.startDate ? format(new Date(event.startDate), "PPP", { locale: currentLocale }) : t("common.dateNA")}
               </span>
               {event.startTime && (
                 <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">

@@ -3,9 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { X, Cookie, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 export function CookieConsent() {
   const [showBanner, setShowBanner] = useState(false);
+  const { t } = useTranslation();
 
   useEffect(() => {
     // Check if user has already made a choice
@@ -46,10 +48,10 @@ export function CookieConsent() {
               <div>
                 <h3 className="text-xl font-bold flex items-center gap-2 text-foreground">
                   <ShieldCheck className="h-5 w-5 text-green-600" />
-                  We Value Your Privacy
+                  {t('common.privacyTitle')}
                 </h3>
                 <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-                  We use cookies to enhance your browsing experience, secure our website, and analyze our traffic.
+                  {t('common.cookieConsent')}
                   <br className="hidden sm:block" />
                   <strong>Essential cookies</strong> are always active to ensure the website functions securely (e.g., authentication, shopping cart).
                 </p>
@@ -69,7 +71,7 @@ export function CookieConsent() {
                 className="text-primary hover:underline text-sm font-medium transition-colors"
                 onClick={() => setShowBanner(false)} // Close banner when navigating to policy
               >
-                Read our Privacy Policy
+                {t('common.learnMore')}
               </Link>
 
               <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
@@ -78,13 +80,13 @@ export function CookieConsent() {
                   variant="outline"
                   className="w-full sm:w-auto font-medium"
                 >
-                  Decline Non-Essential
+                  {t('common.decline')}
                 </Button>
                 <Button
                   onClick={handleAccept}
                   className="w-full sm:w-auto bg-[#B85C3C] hover:bg-[#9A4A2C] text-white font-bold shadow-lg shadow-[#B85C3C]/20"
                 >
-                  Accept All Cookies
+                  {t('common.accept')}
                 </Button>
               </div>
             </div>

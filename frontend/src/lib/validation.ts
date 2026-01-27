@@ -1,4 +1,5 @@
 // Centralized validation utility for consistent form validation across the application
+import { ValidationMessages } from "@/constants/messages/ValidationMessages";
 
 export interface ValidationError {
   [key: string]: string | undefined;
@@ -13,10 +14,10 @@ export const validators = {
       value === "" ||
       (Array.isArray(value) && value.length === 0)
     ) {
-      return `${fieldName} is required`;
+      return ValidationMessages.REQUIRED;
     }
     if (typeof value === "string" && value.trim() === "") {
-      return `${fieldName} is required`;
+      return ValidationMessages.REQUIRED;
     }
     return null;
   },
@@ -25,7 +26,7 @@ export const validators = {
     if (!value) return null;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(value)) {
-      return "Please enter a valid email address";
+      return ValidationMessages.EMAIL_INVALID;
     }
     return null;
   },
@@ -44,7 +45,7 @@ export const validators = {
       return null; // Valid with 091 country code
     }
 
-    return "Please enter a valid 10-digit phone number";
+    return ValidationMessages.PHONE_TEN_DIGIT;
   },
 
   phoneWithCountryCode: (value: string): string | null => {
@@ -55,7 +56,7 @@ export const validators = {
       return null;
     }
 
-    return "Please enter a valid phone number with country code (e.g., +91 9876543210)";
+    return ValidationMessages.PHONE_COUNTRY_CODE;
   },
 
   minLength: (
@@ -65,7 +66,7 @@ export const validators = {
   ): string | null => {
     if (!value) return null;
     if (value.length < min) {
-      return `${fieldName} must be at least ${min} characters`;
+      return ValidationMessages.MIN_LENGTH;
     }
     return null;
   },
@@ -77,7 +78,7 @@ export const validators = {
   ): string | null => {
     if (!value) return null;
     if (value.length > max) {
-      return `${fieldName} must not exceed ${max} characters`;
+      return ValidationMessages.MAX_LENGTH;
     }
     return null;
   },
@@ -89,7 +90,7 @@ export const validators = {
   ): string | null => {
     if (value === null || value === undefined) return null;
     if (value < min) {
-      return `${fieldName} must be at least ${min}`;
+      return ValidationMessages.MIN_VALUE;
     }
     return null;
   },
@@ -101,7 +102,7 @@ export const validators = {
   ): string | null => {
     if (value === null || value === undefined) return null;
     if (value > max) {
-      return `${fieldName} must not exceed ${max}`;
+      return ValidationMessages.MAX_VALUE;
     }
     return null;
   },
@@ -112,7 +113,7 @@ export const validators = {
       new URL(value);
       return null;
     } catch {
-      return "Please enter a valid URL (e.g., https://example.com)";
+      return ValidationMessages.URL_INVALID;
     }
   },
 
@@ -120,7 +121,7 @@ export const validators = {
     if (!value) return null;
     const pincodeRegex = /^\d{6}$/;
     if (!pincodeRegex.test(value)) {
-      return "Please enter a valid 6-digit pincode";
+      return ValidationMessages.PINCODE_INVALID;
     }
     return null;
   },
@@ -128,19 +129,19 @@ export const validators = {
   password: (value: string): string | null => {
     if (!value) return null;
     if (value.length < 8) {
-      return "Password must be at least 8 characters long";
+      return ValidationMessages.PASSWORD_MIN_LENGTH;
     }
     if (!/[A-Z]/.test(value)) {
-      return "Password must contain at least one uppercase letter";
+      return ValidationMessages.PASSWORD_UPPERCASE;
     }
     if (!/[a-z]/.test(value)) {
-      return "Password must contain at least one lowercase letter";
+      return ValidationMessages.PASSWORD_LOWERCASE;
     }
     if (!/[0-9]/.test(value)) {
-      return "Password must contain at least one number";
+      return ValidationMessages.PASSWORD_NUMBER;
     }
     if (!/[^a-zA-Z0-9]/.test(value)) {
-      return "Password must contain at least one special character";
+      return ValidationMessages.PASSWORD_SPECIAL;
     }
     return null;
   },
@@ -148,7 +149,7 @@ export const validators = {
   confirmPassword: (value: string, originalPassword: string): string | null => {
     if (!value) return null;
     if (value !== originalPassword) {
-      return "Passwords do not match";
+      return ValidationMessages.PASSWORDS_DO_NOT_MATCH;
     }
     return null;
   },
@@ -160,7 +161,7 @@ export const validators = {
     if (!value) return null;
     const alphanumericRegex = /^[a-zA-Z0-9\s]+$/;
     if (!alphanumericRegex.test(value)) {
-      return `${fieldName} should only contain letters and numbers`;
+      return ValidationMessages.ALPHANUMERIC_ONLY;
     }
     return null;
   },
@@ -169,7 +170,7 @@ export const validators = {
     if (!value) return null;
     const numericRegex = /^\d+$/;
     if (!numericRegex.test(value)) {
-      return `${fieldName} should only contain numbers`;
+      return ValidationMessages.NUMERIC_ONLY;
     }
     return null;
   },
@@ -178,7 +179,7 @@ export const validators = {
     if (!value) return null;
     const date = new Date(value);
     if (isNaN(date.getTime())) {
-      return "Please enter a valid date";
+      return ValidationMessages.DATE_INVALID;
     }
     return null;
   },
@@ -190,7 +191,7 @@ export const validators = {
     today.setHours(0, 0, 0, 0);
 
     if (date < today) {
-      return "Date must be in the future";
+      return ValidationMessages.DATE_FUTURE;
     }
     return null;
   },
@@ -202,7 +203,7 @@ export const validators = {
     today.setHours(23, 59, 59, 999);
 
     if (date > today) {
-      return "Date must be in the past";
+      return ValidationMessages.DATE_PAST;
     }
     return null;
   },

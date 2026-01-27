@@ -1,5 +1,6 @@
 import { logger } from "@/lib/logger";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "react-i18next";
 import {
     Card,
     CardContent,
@@ -26,6 +27,7 @@ interface DeleteAccountSectionProps {
 }
 
 export default function DeleteAccountSection({ onDelete }: DeleteAccountSectionProps) {
+    const { t } = useTranslation();
     const [loading, setLoading] = useState(false);
 
     const handleDelete = async () => {
@@ -42,46 +44,46 @@ export default function DeleteAccountSection({ onDelete }: DeleteAccountSectionP
     return (
         <Card className="border-destructive/50">
             <CardHeader>
-                <CardTitle className="text-destructive">Delete Account</CardTitle>
+                <CardTitle className="text-destructive">{t("profile.deleteAccount.title")}</CardTitle>
                 <CardDescription>
-                    Permanently delete your account and all associated data
+                    {t("profile.deleteAccount.desc")}
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="bg-destructive/10 border border-destructive/50 rounded-lg p-4 space-y-2">
                     <div className="flex items-center gap-2 text-destructive font-medium">
                         <AlertTriangle className="h-5 w-5" />
-                        <span>Warning: This action cannot be undone</span>
+                        <span>{t("profile.deleteAccount.warning")}</span>
                     </div>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-7">
-                        <li>• Personal profile and login details</li>
-                        <li>• Saved addresses and payment methods</li>
-                        <li>• Shopping cart and wishlist items</li>
+                        <li>• {t("profile.deleteAccount.dataList.login")}</li>
+                        <li>• {t("profile.deleteAccount.dataList.addresses")}</li>
+                        <li>• {t("profile.deleteAccount.dataList.cart")}</li>
                     </ul>
                 </div>
 
                 <AlertDialog>
                     <AlertDialogTrigger asChild>
                         <Button variant="destructive" className="w-full md:w-auto">
-                            Delete My Account
+                            {t("profile.deleteAccount.button")}
                         </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                         <AlertDialogHeader>
-                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                            <AlertDialogTitle>{t("profile.deleteAccount.confirmTitle")}</AlertDialogTitle>
                             <AlertDialogDescription>
-                                This will permanently delete your account. Your comments and reviews will remain visible, but you will lose access to your account and all personal data will be removed.
+                                {t("profile.deleteAccount.confirmDesc")}
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogCancel>{t("profile.deleteAccount.confirmCancel")}</AlertDialogCancel>
                             <AlertDialogAction
                                 onClick={handleDelete}
                                 disabled={loading}
                                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                             >
                                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Yes, Delete My Account
+                                {t("profile.deleteAccount.confirmDelete")}
                             </AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>

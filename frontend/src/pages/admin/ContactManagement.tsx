@@ -22,8 +22,10 @@ import { contactSettingsStorage } from "@/lib/contactSettings";
 import { ContactSettings } from "@/types/contact";
 import { contactInfoService } from "@/services/contact-info.service";
 import { bankDetailsService } from "@/services/bank-details.service";
+import { useTranslation } from "react-i18next";
 
 export default function ContactManagement() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState("social");
   const queryClient = useQueryClient();
 
@@ -63,7 +65,7 @@ export default function ContactManagement() {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        <p className="ml-2 text-muted-foreground">Loading contact information...</p>
+        <p className="ml-2 text-muted-foreground">{t("admin.loading.info")}</p>
       </div>
     );
   }
@@ -72,9 +74,9 @@ export default function ContactManagement() {
   if (activeTab === "contact" && contactInfoError) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-center">
-        <p className="text-destructive mb-2">Failed to load contact information</p>
+        <p className="text-destructive mb-2">{t("admin.errors.loadInfo")}</p>
         <Button variant="outline" onClick={() => window.location.reload()}>
-          Retry
+          {t("admin.retry")}
         </Button>
       </div>
     );
@@ -85,7 +87,7 @@ export default function ContactManagement() {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        <p className="ml-2 text-muted-foreground">Loading settings...</p>
+        <p className="ml-2 text-muted-foreground">{t("admin.loading.settings")}</p>
       </div>
     );
   }
@@ -93,9 +95,9 @@ export default function ContactManagement() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Contact Management</h1>
+        <h1 className="text-3xl font-bold">{t("admin.management")}</h1>
         <p className="text-muted-foreground">
-          Manage contact information, social media, and communication settings
+          {t("admin.managementSubtitle")}
         </p>
       </div>
 
@@ -103,23 +105,23 @@ export default function ContactManagement() {
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="social" className="gap-2">
             <Globe className="h-4 w-4" />
-            <span className="hidden sm:inline">Social Media</span>
+            <span className="hidden sm:inline">{t("admin.tabs.social")}</span>
           </TabsTrigger>
           <TabsTrigger value="contact" className="gap-2">
             <Phone className="h-4 w-4" />
-            <span className="hidden sm:inline">Contact Info</span>
+            <span className="hidden sm:inline">{t("admin.tabs.info")}</span>
           </TabsTrigger>
           <TabsTrigger value="hours" className="gap-2">
             <Clock className="h-4 w-4" />
-            <span className="hidden sm:inline">Office Hours</span>
+            <span className="hidden sm:inline">{t("admin.tabs.hours")}</span>
           </TabsTrigger>
           <TabsTrigger value="newsletter" className="gap-2">
             <Send className="h-4 w-4" />
-            <span className="hidden sm:inline">Newsletter</span>
+            <span className="hidden sm:inline">{t("admin.tabs.newsletter")}</span>
           </TabsTrigger>
           <TabsTrigger value="bank" className="gap-2">
             <Building2 className="h-4 w-4" />
-            <span className="hidden sm:inline">Bank Details</span>
+            <span className="hidden sm:inline">{t("admin.tabs.bank")}</span>
           </TabsTrigger>
         </TabsList>
 

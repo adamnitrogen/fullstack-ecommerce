@@ -3,6 +3,7 @@ import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/authStore";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard,
   Package,
@@ -47,6 +48,7 @@ export function AdminSidebar({
   onCollapse,
   onPin,
 }: AdminSidebarProps) {
+  const { t } = useTranslation();
   const logout = useAuthStore((state) => state.logout);
   const navigate = useNavigate();
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
@@ -73,103 +75,103 @@ export function AdminSidebar({
   const allMenuItems = [
     {
       icon: LayoutDashboard,
-      label: "Dashboard",
+      label: t("admin.sidebar.dashboard"),
       path: `${basePath}`,
       show: true // Always show dashboard
     },
     {
       icon: Package,
-      label: "Products",
+      label: t("admin.sidebar.products"),
       path: `${basePath}/products`,
       show: hasPermission("can_manage_products")
     },
     {
       icon: Folder,
-      label: "Categories",
+      label: t("admin.sidebar.categories"),
       path: `${basePath}/categories`,
       show: hasPermission("can_manage_categories")
     },
     {
       icon: Calendar,
-      label: "Events",
+      label: t("admin.sidebar.events"),
       path: `${basePath}/events`,
       show: hasPermission("can_manage_events")
     },
     {
       icon: FileText,
-      label: "Blogs",
+      label: t("admin.sidebar.blogs"),
       path: `${basePath}/blogs`,
       show: hasPermission("can_manage_blogs")
     },
     {
       icon: Image,
-      label: "Gallery",
+      label: t("admin.sidebar.gallery"),
       path: `${basePath}/gallery`,
       show: hasPermission("can_manage_gallery")
     },
     {
       icon: Image,
-      label: "Carousel",
+      label: t("admin.sidebar.carousel"),
       path: `${basePath}/carousel`,
       show: hasPermission("can_manage_carousel")
     },
     {
       icon: ShoppingCart,
-      label: "Orders",
+      label: t("admin.sidebar.orders"),
       path: `${basePath}/orders`,
       show: hasPermission("can_manage_orders")
     },
     {
       icon: Users,
-      label: "Managers",
+      label: t("admin.sidebar.managers"),
       path: `${basePath}/managers`,
       show: isAdmin // Only admins can manage managers
     },
     {
       icon: Star,
-      label: "Reviews",
+      label: t("admin.sidebar.reviews"),
       path: `${basePath}/reviews`,
       show: hasPermission("can_manage_reviews")
     },
     {
       icon: Flag,
-      label: "Moderation",
+      label: t("admin.sidebar.moderation"),
       path: `${basePath}/comments`,
       show: hasPermission("can_manage_blogs"),
     },
     {
       icon: HelpCircle,
-      label: "FAQs",
+      label: t("admin.sidebar.faqs"),
       path: `${basePath}/faqs`,
       show: hasPermission("can_manage_faqs")
     },
     {
       icon: Contact,
-      label: "Contact Info",
+      label: t("admin.sidebar.contactInfo"),
       path: `${basePath}/contact-management`,
       show: hasPermission("can_manage_contact_info") || hasPermission("can_manage_social_media") || hasPermission("can_manage_bank_details") || hasPermission("can_manage_newsletter")
     },
     {
       icon: Info,
-      label: "About Us",
+      label: t("admin.sidebar.aboutUs"),
       path: `${basePath}/about-us`,
       show: hasPermission("can_manage_about_us")
     },
     {
       icon: Shield,
-      label: "Policy Management",
+      label: t("admin.sidebar.policies"),
       path: `${basePath}/policies`,
       show: isAdmin || hasPermission("can_manage_policies")
     },
     {
       icon: Loader2,
-      label: "Background Jobs",
+      label: t("admin.sidebar.jobs"),
       path: `${basePath}/jobs`,
       show: isAdmin // Only admins can view jobs
     },
     {
       icon: Settings,
-      label: "Settings",
+      label: t("admin.sidebar.settings"),
       path: `${basePath}/settings`,
       show: isAdmin // Only admins can manage global settings
     },
@@ -199,7 +201,7 @@ export function AdminSidebar({
           <div className="flex h-16 items-center justify-between border-b px-3">
             <div className="flex items-center gap-2 overflow-hidden">
               <span className="text-2xl transition-transform hover:scale-110 duration-200">🐄</span>
-              {isEffectivelyExpanded && <span className="font-bold truncate animate-in fade-in duration-300">{isManager ? "Manager" : "Admin"} Panel</span>}
+              {isEffectivelyExpanded && <span className="font-bold truncate animate-in fade-in duration-300">{isManager ? t("admin.managerPanel") : t("admin.adminPanel")}</span>}
             </div>
 
             <div className="flex items-center gap-1">
@@ -208,7 +210,7 @@ export function AdminSidebar({
                 size="icon"
                 onClick={onPin}
                 className={`hidden md:flex hover:bg-muted ${isPinned ? "text-primary" : "text-muted-foreground"}`}
-                title={isPinned ? "Unpin Sidebar" : "Pin Sidebar"}
+                title={isPinned ? t("admin.unpinSidebar") : t("admin.pinSidebar")}
               >
                 <Shield className={`h-4 w-4 transition-transform duration-200 ${isPinned ? "rotate-0 scale-110" : "-rotate-45"}`} />
               </Button>
@@ -271,10 +273,10 @@ export function AdminSidebar({
               className={`w-full ${!isEffectivelyExpanded ? "justify-center px-2" : "justify-start gap-3 px-3"
                 }`}
               onClick={handleLogout}
-              title={!isEffectivelyExpanded ? "Logout" : undefined}
+              title={!isEffectivelyExpanded ? t("nav.logout") : undefined}
             >
               <LogOut className="h-5 w-5 flex-shrink-0" />
-              {isEffectivelyExpanded && <span>Logout</span>}
+              {isEffectivelyExpanded && <span>{t("nav.logout")}</span>}
             </Button>
           </div>
         </div>

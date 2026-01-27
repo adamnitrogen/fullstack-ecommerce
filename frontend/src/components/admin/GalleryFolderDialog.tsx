@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogContent,
@@ -37,6 +38,7 @@ export function GalleryFolderDialog({
   folder,
   onSave,
 }: GalleryFolderDialogProps) {
+  const { t } = useTranslation();
   // Fetch categories
   const { data: categories = [] } = useQuery({
     queryKey: ["categories", "gallery"],
@@ -88,12 +90,12 @@ export function GalleryFolderDialog({
     e.preventDefault();
 
     if (!formData.name?.trim()) {
-      alert("Folder name is required");
+      alert(t("admin.gallery.toasts.requiredName"));
       return;
     }
 
     if (!formData.slug?.trim()) {
-      alert("Folder slug is required");
+      alert(t("admin.gallery.toasts.requiredSlug"));
       return;
     }
 
@@ -108,12 +110,12 @@ export function GalleryFolderDialog({
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl font-semibold">
-            {folder ? "Edit Folder" : "Create New Folder"}
+            {folder ? t("admin.gallery.dialog.editFolder") : t("admin.gallery.dialog.createFolder")}
           </DialogTitle>
           <DialogDescription>
             {folder
-              ? "Update the folder details below"
-              : "Create a new gallery folder to organize images and videos"}
+              ? t("admin.gallery.dialog.editFolderDesc")
+              : t("admin.gallery.dialog.createFolderDesc")}
           </DialogDescription>
         </DialogHeader>
 
@@ -121,20 +123,20 @@ export function GalleryFolderDialog({
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">
-                Folder Name <span className="text-red-600">*</span>
+                {t("admin.gallery.dialog.folderName")} <span className="text-red-600">*</span>
               </Label>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => handleNameChange(e.target.value)}
-                placeholder="e.g., Summer Festival 2024, Goshala Photos"
+                placeholder={t("admin.gallery.dialog.folderNamePlaceholder")}
                 required
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="slug">
-                URL Slug <span className="text-red-600">*</span>
+                {t("admin.gallery.dialog.urlSlug")} <span className="text-red-600">*</span>
               </Label>
               <Input
                 id="slug"
@@ -146,12 +148,12 @@ export function GalleryFolderDialog({
                 required
               />
               <p className="text-xs text-muted-foreground">
-                URL-friendly identifier (auto-generated from name)
+                {t("admin.gallery.dialog.urlSlugHelp")}
               </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="folder_type">Folder Type</Label>
+              <Label htmlFor="folder_type">{t("admin.gallery.dialog.folderType")}</Label>
               <Select
                 value={formData.folder_type}
                 onValueChange={(value) =>
@@ -159,7 +161,7 @@ export function GalleryFolderDialog({
                 }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a category" />
+                  <SelectValue placeholder={t("admin.gallery.dialog.selectCategory")} />
                 </SelectTrigger>
                 <SelectContent>
                   {categories.length > 0 ? (
@@ -169,28 +171,28 @@ export function GalleryFolderDialog({
                       </SelectItem>
                     ))
                   ) : (
-                    <SelectItem value="general">General</SelectItem>
+                    <SelectItem value="general">{t("common.general")}</SelectItem>
                   )}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Description (Optional)</Label>
+              <Label htmlFor="description">{t("admin.gallery.dialog.description")}</Label>
               <Textarea
                 id="description"
                 value={formData.description || ""}
                 onChange={(e) =>
                   setFormData({ ...formData, description: e.target.value })
                 }
-                placeholder="Add a brief description for this folder"
+                placeholder={t("admin.gallery.dialog.descPlaceholder")}
                 rows={3}
                 className="resize-none"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="order_index">Display Order</Label>
+              <Label htmlFor="order_index">{t("admin.gallery.dialog.displayOrder")}</Label>
               <Input
                 id="order_index"
                 type="number"
@@ -204,12 +206,12 @@ export function GalleryFolderDialog({
                 placeholder="0"
               />
               <p className="text-xs text-muted-foreground">
-                Lower numbers appear first
+                {t("admin.gallery.dialog.displayOrderHelp")}
               </p>
             </div>
 
             <div className="flex items-center justify-between">
-              <Label htmlFor="is_active">Active</Label>
+              <Label htmlFor="is_active">{t("admin.gallery.dialog.active")}</Label>
               <Switch
                 id="is_active"
                 checked={formData.is_active}
@@ -221,9 +223,9 @@ export function GalleryFolderDialog({
 
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label htmlFor="is_hidden">Hide from Gallery</Label>
+                <Label htmlFor="is_hidden">{t("admin.gallery.dialog.hideFromGallery")}</Label>
                 <p className="text-xs text-muted-foreground">
-                  Folder will be accessible via direct link but not listed in gallery
+                  {t("admin.gallery.dialog.hideHelp")}
                 </p>
               </div>
               <Switch
@@ -242,10 +244,10 @@ export function GalleryFolderDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit">
-              {folder ? "Update Folder" : "Create Folder"}
+              {folder ? t("admin.gallery.dialog.editFolder") : t("admin.gallery.dialog.createFolder")}
             </Button>
           </DialogFooter>
         </form>

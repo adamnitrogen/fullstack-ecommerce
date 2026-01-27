@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { commentService } from "@/services/comment.service";
 import { CommentItem } from "./CommentItem";
 import { Comment } from "@/types/comment";
@@ -37,6 +38,7 @@ const CommentSkeleton = () => (
 
 export const CommentList = ({ blogId }: CommentListProps) => {
     const queryClient = useQueryClient();
+    const { t } = useTranslation();
     const [sortBy, setSortBy] = useState("newest");
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const LIMIT = 10; // Number of root comments per page
@@ -70,11 +72,11 @@ export const CommentList = ({ blogId }: CommentListProps) => {
             commentService.createComment({ blogId, content, parentId }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['comments', blogId] });
-            toast({ title: "Reply posted successfully" });
+            toast({ title: t("comments.replySuccess") });
         },
         onError: (error: unknown) => {
             toast({
-                title: "Failed to post reply",
+                title: t("comments.replyFailed"),
                 description: getErrorMessage(error, "Unknown error"),
                 variant: "destructive"
             });
@@ -86,11 +88,11 @@ export const CommentList = ({ blogId }: CommentListProps) => {
             commentService.updateComment(id, { content }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['comments', blogId] });
-            toast({ title: "Comment updated" });
+            toast({ title: t("comments.editSuccess") });
         },
         onError: (error: unknown) => {
             toast({
-                title: "Failed to update comment",
+                title: t("comments.editFailed"),
                 description: getErrorMessage(error, "Unknown error"),
                 variant: "destructive"
             });
@@ -101,12 +103,12 @@ export const CommentList = ({ blogId }: CommentListProps) => {
         mutationFn: (id: string) => commentService.deleteComment(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['comments', blogId] });
-            toast({ title: "Comment deleted" });
+            toast({ title: t("comments.deleteSuccess") });
             setDeleteId(null);
         },
         onError: (error: unknown) => {
             toast({
-                title: "Failed to delete comment",
+                title: t("comments.deleteFailed"),
                 description: getErrorMessage(error, "Unknown error"),
                 variant: "destructive"
             });
@@ -117,11 +119,11 @@ export const CommentList = ({ blogId }: CommentListProps) => {
         mutationFn: ({ id, reason, details }: { id: string; reason: string; details: string }) =>
             commentService.flagComment(id, { reason, details }),
         onSuccess: () => {
-            toast({ title: "Comment reported", description: "Thank you for helping keep our community safe." });
+            toast({ title: t("comments.reportSuccess"), description: t("comments.reportSuccessMsg") });
         },
         onError: (error: unknown) => {
             toast({
-                title: "Failed to report comment",
+                title: t("comments.reportFailed"),
                 description: getErrorMessage(error, "Unknown error"),
                 variant: "destructive"
             });
@@ -169,7 +171,7 @@ export const CommentList = ({ blogId }: CommentListProps) => {
     if (isError) {
         return (
             <div className="text-center py-12 text-destructive bg-destructive/5 rounded-xl border border-destructive/10">
-                <p>Failed to load comments. Please try again later.</p>
+                <p>{t("comments.loadFailed")}</p>
             </div>
         );
     }
@@ -183,16 +185,16 @@ export const CommentList = ({ blogId }: CommentListProps) => {
             <div className="flex justify-between items-center pb-2 border-b">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
                     <MessageSquare className="h-5 w-5 text-primary" />
-                    {totalComments} Comments
+                    {t("comments.count", { count: totalComments })}
                 </h3>
                 <Select value={sortBy} onValueChange={setSortBy}>
                     <SelectTrigger className="w-[180px] bg-background">
-                        <SelectValue placeholder="Sort by" />
+                        <SelectValue placeholder={t("comments.sortBy")} />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="newest">Newest First</SelectItem>
-                        <SelectItem value="oldest">Oldest First</SelectItem>
-                        <SelectItem value="most-replies">Most Replies</SelectItem>
+                        <SelectItem value="newest">{t("comments.sortNewest")}</SelectItem>
+                        <SelectItem value="oldest">{t("comments.sortOldest")}</SelectItem>
+                        <SelectItem value="most-replies">{t("comments.sortMostReplies")}</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
@@ -202,8 +204,8 @@ export const CommentList = ({ blogId }: CommentListProps) => {
                 {allComments.length === 0 ? (
                     <div className="text-center py-12 bg-muted/10 rounded-xl border border-dashed text-muted-foreground">
                         <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                        <p className="text-lg font-medium">No comments yet</p>
-                        <p className="text-sm">Be the first to share your thoughts!</p>
+                        <p className="text-lg font-medium">{t("comments.noComments")}</p>
+                        <p className="text-sm">{t("comments.beFirst")}</p>
                     </div>
                 ) : (
                     <div className="space-y-8">
@@ -233,11 +235,11 @@ export const CommentList = ({ blogId }: CommentListProps) => {
                         {isFetchingNextPage ? (
                             <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Loading...
+                                {t("comments.loading")}
                             </>
                         ) : (
                             <>
-                                Load More Comments
+                                {t("comments.loadMore")}
                                 <ChevronDown className="ml-2 h-4 w-4" />
                             </>
                         )}
@@ -248,8 +250,8 @@ export const CommentList = ({ blogId }: CommentListProps) => {
             <DeleteConfirmDialog
                 open={!!deleteId}
                 onOpenChange={(open) => !open && setDeleteId(null)}
-                title="Delete Comment"
-                description="Are you sure you want to delete this comment? This action cannot be undone."
+                title={t("comments.deleteTitle")}
+                description={t("comments.deleteDesc")}
                 onConfirm={confirmDelete}
                 isLoading={deleteMutation.isPending}
             />

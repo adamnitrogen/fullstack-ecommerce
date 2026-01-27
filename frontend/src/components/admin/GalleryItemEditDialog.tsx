@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
     Dialog,
@@ -27,6 +28,7 @@ export function GalleryItemEditDialog({
     onOpenChange,
     item,
 }: GalleryItemEditDialogProps) {
+    const { t } = useTranslation();
     const queryClient = useQueryClient();
     const [formData, setFormData] = useState<{
         title: string;
@@ -70,11 +72,11 @@ export function GalleryItemEditDialog({
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["gallery-items"] });
-            toast.success("Image details updated");
+            toast.success(t("admin.gallery.toasts.imageUpdated"));
             onOpenChange(false);
         },
         onError: (error: unknown) => {
-            toast.error(getErrorMessage(error, "Failed to update image"));
+            toast.error(getErrorMessage(error, t("admin.gallery.toasts.updateImageError")));
         },
     });
 
@@ -89,9 +91,9 @@ export function GalleryItemEditDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Edit Image Details</DialogTitle>
+                    <DialogTitle>{t("admin.gallery.dialog.editItem")}</DialogTitle>
                     <DialogDescription>
-                        Update the details for this image.
+                        {t("admin.gallery.dialog.editItemDesc")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -100,7 +102,7 @@ export function GalleryItemEditDialog({
                     <div className="flex justify-center">
                         <img
                             src={item.thumbnail_url || item.image_url}
-                            alt="Preview"
+                            alt={t("admin.gallery.dialog.preview")}
                             loading="lazy"
                             className="h-48 object-contain rounded-md border"
                         />
@@ -109,57 +111,57 @@ export function GalleryItemEditDialog({
                     <div className="space-y-4">
                         {/* Title */}
                         <div className="space-y-2">
-                            <Label htmlFor="edit-title">Title</Label>
+                            <Label htmlFor="edit-title">{t("common.title")}</Label>
                             <Input
                                 id="edit-title"
                                 value={formData.title}
                                 onChange={(e) =>
                                     setFormData({ ...formData, title: e.target.value })
                                 }
-                                placeholder="Image title"
+                                placeholder={t("admin.gallery.dialog.itemTitlePlaceholder")}
                             />
                         </div>
 
                         {/* Tags */}
                         <div className="space-y-2">
-                            <Label htmlFor="edit-tags">Tags</Label>
+                            <Label htmlFor="edit-tags">{t("admin.gallery.dialog.tags")}</Label>
                             <Input
                                 id="edit-tags"
                                 value={formData.tags}
                                 onChange={(e) =>
                                     setFormData({ ...formData, tags: e.target.value })
                                 }
-                                placeholder="nature, cow, festival (comma separated)"
+                                placeholder={t("admin.gallery.dialog.itemTagsPlaceholder")}
                             />
                             <p className="text-xs text-muted-foreground">
-                                Separate tags with commas
+                                {t("admin.gallery.dialog.tagsHelp")}
                             </p>
                         </div>
 
                         {/* Description */}
                         <div className="space-y-2">
-                            <Label htmlFor="edit-description">Description</Label>
+                            <Label htmlFor="edit-description">{t("admin.gallery.dialog.description")}</Label>
                             <Textarea
                                 id="edit-description"
                                 value={formData.description}
                                 onChange={(e) =>
                                     setFormData({ ...formData, description: e.target.value })
                                 }
-                                placeholder="Image description"
+                                placeholder={t("admin.gallery.dialog.itemDescPlaceholder")}
                                 rows={3}
                             />
                         </div>
 
                         {/* Location */}
                         <div className="space-y-2">
-                            <Label htmlFor="edit-location">Location</Label>
+                            <Label htmlFor="edit-location">{t("admin.gallery.dialog.location")}</Label>
                             <Input
                                 id="edit-location"
                                 value={formData.location}
                                 onChange={(e) =>
                                     setFormData({ ...formData, location: e.target.value })
                                 }
-                                placeholder="e.g., Goshala"
+                                placeholder={t("admin.gallery.dialog.itemLocationPlaceholder")}
                             />
                         </div>
                     </div>
@@ -171,18 +173,18 @@ export function GalleryItemEditDialog({
                             variant="outline"
                             onClick={() => onOpenChange(false)}
                         >
-                            Cancel
+                            {t("common.cancel")}
                         </Button>
                         <Button
                             type="submit"
                             disabled={mutation.isPending}
                         >
                             {mutation.isPending ? (
-                                "Saving..."
+                                t("common.saving")
                             ) : (
                                 <>
                                     <Save className="h-4 w-4 mr-2" />
-                                    Save Changes
+                                    {t("common.saveChanges")}
                                 </>
                             )}
                         </Button>

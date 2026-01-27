@@ -183,8 +183,8 @@ export function TaxBreakdown({
                     {items && items.length > 0 && (
                         <div className="border rounded-md overflow-hidden text-xs shadow-sm">
                             <div className="bg-muted/50 px-3 py-2 font-medium flex justify-between items-center border-b">
-                                <span>{role === 'admin' ? 'Itemized Breakdown' : 'Product Details'}</span>
-                                {role === 'admin' && <span className="text-[9px] text-muted-foreground uppercase bg-white px-1 rounded border">Audit Log</span>}
+                                <span>{role === 'admin' ? t("tax.itemizedBreakdown") : 'Product Details'}</span>
+                                {role === 'admin' && <span className="text-[9px] text-muted-foreground uppercase bg-white px-1 rounded border">{t("tax.auditLog")}</span>}
                             </div>
                             <div className="divide-y max-h-[250px] overflow-y-auto bg-white">
                                 {items.map((item, idx) => {
@@ -213,7 +213,7 @@ export function TaxBreakdown({
                                                 </div>
                                             </div>
                                             <div className="flex justify-between items-center text-[10px] bg-muted/20 px-2 py-1 rounded mt-1">
-                                                <span className="text-muted-foreground">Net Value</span>
+                                                <span className="text-muted-foreground">{t("tax.netValue")}</span>
                                                 <span className="font-mono">{formatAmount(itemTaxable)}</span>
                                             </div>
                                         </div>
@@ -233,7 +233,7 @@ export function TaxBreakdown({
                                             </div>
                                         </div>
                                         <div className="flex justify-between items-center text-[10px] bg-white/50 px-2 py-1 rounded mt-1 border border-amber-200">
-                                            <span className="text-muted-foreground">Taxable Value</span>
+                                            <span className="text-muted-foreground">{t("tax.taxableValue")}</span>
                                             <span className="font-mono">{formatAmount(deliveryCharge)}</span>
                                         </div>
                                     </div>

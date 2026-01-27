@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Loader2, ShieldCheck, Zap } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { donationService } from "@/services/donation.service";
 import { bankDetailsService } from "@/services/bank-details.service";
 
 const QrCodeDisplay = () => {
+    const { t } = useTranslation();
     const { data, isLoading, error } = useQuery({
         queryKey: ['donationQrCode'],
         queryFn: donationService.getQrCode,
@@ -22,7 +24,7 @@ const QrCodeDisplay = () => {
     if (error || !data?.qr_code_url) {
         return (
             <div className="w-48 h-48 flex items-center justify-center bg-muted/50 text-muted-foreground text-xs text-center p-4 rounded-xl border border-dashed border-border">
-                QR Code unavailable at the moment
+                {t("donation.anonymous.qrUnavailable")}
             </div>
         );
     }
@@ -33,7 +35,7 @@ const QrCodeDisplay = () => {
             <div className="relative bg-white p-2 rounded-xl">
                 <img
                     src={data.qr_code_url}
-                    alt="Donate QR Code"
+                    alt={t("donation.anonymous.qrAlt")}
                     className="w-48 h-48 object-contain rounded-lg"
                 />
             </div>
@@ -42,6 +44,7 @@ const QrCodeDisplay = () => {
 };
 
 const UpiIdDisplay = () => {
+    const { t } = useTranslation();
     const { data: bankDetails, isLoading } = useQuery({
         queryKey: ['bankDetails'],
         queryFn: () => bankDetailsService.getAll(),
@@ -64,7 +67,7 @@ const UpiIdDisplay = () => {
     return (
         <div className="w-full bg-background/50 backdrop-blur-sm rounded-lg p-3 border border-border/50 text-center">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
-                UPI ID
+                {t("donation.anonymous.upiId")}
             </p>
             <p className="font-mono text-sm select-all cursor-pointer hover:text-primary transition-colors">
                 {upiId}
@@ -74,6 +77,7 @@ const UpiIdDisplay = () => {
 };
 
 export const AnonymousDonation = () => {
+    const { t } = useTranslation();
     return (
         <div className="space-y-6 animate-in slide-in-from-right-4 duration-700 delay-200">
             <Card className="bg-gradient-to-br from-primary/5 via-primary/10 to-accent/5 border-primary/20 shadow-lg overflow-hidden relative">
@@ -82,10 +86,10 @@ export const AnonymousDonation = () => {
                 <CardHeader className="text-center pb-2 relative z-10">
                     <CardTitle className="text-xl font-playfair flex items-center justify-center gap-2">
                         <Zap className="w-5 h-5 text-amber-500 fill-amber-500" />
-                        Anonymous Donation
+                        {t("donation.anonymous.title")}
                     </CardTitle>
                     <p className="text-sm text-balance text-muted-foreground">
-                        Instant anonymous transfer via UPI
+                        {t("donation.anonymous.subtitle")}
                     </p>
                 </CardHeader>
 
@@ -94,10 +98,10 @@ export const AnonymousDonation = () => {
 
                     <div className="text-center space-y-2 max-w-xs">
                         <p className="text-sm font-medium text-foreground">
-                            Scan with GPay, PhonePe, or Paytm
+                            {t("donation.anonymous.scanPrompt")}
                         </p>
                         <p className="text-xs text-muted-foreground/80">
-                            Your kindness reaches us instantly. No forms, just impact.
+                            {t("donation.anonymous.impactMsg")}
                         </p>
                     </div>
 
@@ -109,24 +113,24 @@ export const AnonymousDonation = () => {
                 <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
                         <ShieldCheck className="w-4 h-4 text-primary" />
-                        Why Donate Anonymously?
+                        {t("donation.anonymous.whyTitle")}
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="text-sm text-muted-foreground space-y-2.5">
                     <div className="flex gap-2.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-primary/60 mt-1.5 shrink-0" />
-                        <p>Skip filling out long details forms</p>
+                        <p>{t("donation.anonymous.skipForms")}</p>
                     </div>
                     <div className="flex gap-2.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-primary/60 mt-1.5 shrink-0" />
-                        <p>Immediate 100% direct transfer via UPI</p>
+                        <p>{t("donation.anonymous.directTransfer")}</p>
                     </div>
                     <div className="flex gap-2.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-primary/60 mt-1.5 shrink-0" />
-                        <p>Complete privacy of your identity</p>
+                        <p>{t("donation.anonymous.privacyMsg")}</p>
                     </div>
                     <p className="text-xs text-muted-foreground/60 italic pt-1 pl-4 border-l-2 border-primary/20">
-                        Note: Tax receipts are not automatically generated for anonymous donations.
+                        {t("donation.anonymous.taxNotice")}
                     </p>
                 </CardContent>
             </Card>

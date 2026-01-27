@@ -1,5 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { commentService } from "@/services/comment.service";
 import { ModerationLog } from "@/types/comment";
 import {
@@ -18,6 +19,7 @@ interface ModerationHistoryViewerProps {
 }
 
 export const ModerationHistoryViewer = ({ commentId }: ModerationHistoryViewerProps) => {
+    const { t } = useTranslation();
     const { data: history, isLoading, isError } = useQuery({
         queryKey: ['moderation-history', commentId],
         queryFn: () => commentService.getModerationHistory(commentId),
@@ -28,11 +30,11 @@ export const ModerationHistoryViewer = ({ commentId }: ModerationHistoryViewerPr
     }
 
     if (isError) {
-        return <div className="text-destructive p-4 text-sm">Failed to load history</div>;
+        return <div className="text-destructive p-4 text-sm">{t("comments.admin.historyTitle")} {t("comments.failedToLoad")}</div>;
     }
 
     if (!history || history.length === 0) {
-        return <div className="text-muted-foreground p-4 text-sm">No moderation history found.</div>;
+        return <div className="text-muted-foreground p-4 text-sm">{t("comments.admin.noHistory")}</div>;
     }
 
     return (
@@ -40,10 +42,10 @@ export const ModerationHistoryViewer = ({ commentId }: ModerationHistoryViewerPr
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead className="w-[140px]">Date</TableHead>
-                        <TableHead>Action</TableHead>
-                        <TableHead>Performed By</TableHead>
-                        <TableHead>Details</TableHead>
+                        <TableHead className="w-[140px]">{t("comments.admin.date")}</TableHead>
+                        <TableHead>{t("comments.admin.action")}</TableHead>
+                        <TableHead>{t("comments.admin.performedBy")}</TableHead>
+                        <TableHead>{t("comments.admin.details")}</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -64,7 +66,7 @@ export const ModerationHistoryViewer = ({ commentId }: ModerationHistoryViewerPr
                             <TableCell className="text-xs text-muted-foreground">
                                 {log.reason && (
                                     <div className="mb-1">
-                                        <span className="font-semibold">Reason:</span> {log.reason}
+                                        <span className="font-semibold">{t("comments.reason")}:</span> {log.reason}
                                     </div>
                                 )}
                                 {log.metadata && (

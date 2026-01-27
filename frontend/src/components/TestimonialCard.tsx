@@ -1,5 +1,6 @@
 import { Testimonial } from "@/types";
 import { UserAvatar } from "./TestimonialModal";
+import { useTranslation } from "react-i18next";
 
 interface TestimonialCardProps {
   testimonial: Testimonial;
@@ -30,6 +31,7 @@ export function TestimonialCard({
   testimonial,
   onClick,
 }: TestimonialCardProps) {
+  const { t } = useTranslation();
   return (
     <div
       className="flex-shrink-0 w-full bg-[#FAF7F2] p-8 rounded-[2rem] border border-transparent hover:border-[#B85C3C]/20 hover:bg-white hover:shadow-elevated transition-all duration-500 cursor-pointer flex flex-col group h-full"
@@ -60,7 +62,7 @@ export function TestimonialCard({
       </p>
 
       <div className="mt-6 pt-4 border-t border-[#2C1810]/5 flex items-center gap-2 text-[10px] font-bold text-[#B85C3C] tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
-        READ STORY
+        {t("index.testimonials.readStory")}
       </div>
     </div>
   );

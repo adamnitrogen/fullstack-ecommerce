@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 
 interface LoadingOverlayProps {
     isLoading: boolean;
@@ -16,9 +17,12 @@ interface LoadingOverlayProps {
  */
 export function LoadingOverlay({
     isLoading,
-    message = "Just a moment...",
+    message,
     className
 }: LoadingOverlayProps) {
+    const { t } = useTranslation();
+    const displayMessage = message || t("common.loading");
+
     if (!isLoading) return null;
 
     const content = (
@@ -30,7 +34,7 @@ export function LoadingOverlay({
         >
             <div className="flex flex-col items-center gap-4 p-8 rounded-2xl bg-white shadow-[0_20px_50px_rgba(184,92,60,0.1)] border border-[#B85C3C]/10 animate-in zoom-in-95 duration-300">
                 <Loader2 className="h-10 w-10 animate-spin text-[#B85C3C] stroke-[2]" />
-                <p className="text-base font-semibold text-[#2C1810] tracking-tight">{message}</p>
+                <p className="text-base font-semibold text-[#2C1810] tracking-tight">{displayMessage}</p>
             </div>
         </div>
     );
@@ -44,9 +48,12 @@ export function LoadingOverlay({
  */
 export function LoadingOverlayRelative({
     isLoading,
-    message = "Just a moment...",
+    message,
     className
 }: LoadingOverlayProps) {
+    const { t } = useTranslation();
+    const displayMessage = message || t("common.loading");
+
     if (!isLoading) return null;
 
     return (
@@ -58,7 +65,7 @@ export function LoadingOverlayRelative({
         >
             <div className="flex flex-col items-center gap-3">
                 <Loader2 className="h-8 w-8 animate-spin text-primary opacity-80" />
-                <p className="text-sm font-medium text-muted-foreground">{message}</p>
+                <p className="text-sm font-medium text-muted-foreground">{displayMessage}</p>
             </div>
         </div>
     );

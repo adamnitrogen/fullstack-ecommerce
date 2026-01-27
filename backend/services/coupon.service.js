@@ -16,6 +16,8 @@ const activeCouponsCache = {
     ttl: 5 * 60 * 1000 // 5 minutes
 };
 
+const MESSAGES = require('../config/messages');
+
 /**
  * Get priority weight for a coupon type
  * VARIANT (4) > PRODUCT (3) > CATEGORY (2) > CART (1) > FREE_DELIVERY (0)
@@ -107,7 +109,7 @@ async function getCachedCoupon(code) {
 async function validateCoupon(code, userId, cartItems, cartTotal, forceLive = false) {
     try {
         if (!code || typeof code !== 'string') {
-            return { valid: false, error: 'Coupon code is required' };
+            return { valid: false, error: MESSAGES.ERRORS.COUPON_REQUIRED };
         }
 
         const cacheKey = code.toUpperCase();
@@ -134,7 +136,7 @@ async function validateCoupon(code, userId, cartItems, cartTotal, forceLive = fa
                 .single();
 
             if (error || !data) {
-                return { valid: false, error: 'Invalid coupon code' };
+                return { valid: false, error: MESSAGES.ERRORS.INVALID_COUPON };
             }
             coupon = data;
 
@@ -162,7 +164,7 @@ async function validateCoupon(code, userId, cartItems, cartTotal, forceLive = fa
 
         // Check if coupon is active
         if (!coupon.is_active) {
-            return { valid: false, error: 'This coupon is no longer active' };
+            return { valid: false, error: MESSAGES.ERRORS.COUPON_INACTIVE };
         }
 
         // Check expiry date
@@ -171,16 +173,16 @@ async function validateCoupon(code, userId, cartItems, cartTotal, forceLive = fa
         const validUntil = new Date(coupon.valid_until);
 
         if (currentDate < validFrom) {
-            return { valid: false, error: 'This coupon is not yet valid' };
+            return { valid: false, error: MESSAGES.ERRORS.COUPON_NOT_STARTED };
         }
 
         if (currentDate > validUntil) {
-            return { valid: false, error: 'This coupon has expired' };
+            return { valid: false, error: MESSAGES.ERRORS.COUPON_EXPIRED };
         }
 
         // Check usage limit
         if (coupon.usage_limit !== null && coupon.usage_count >= coupon.usage_limit) {
-            return { valid: false, error: 'This coupon has reached its usage limit' };
+            return { valid: false, error: MESSAGES.ERRORS.COUPON_LIMIT_REACHED };
         }
 
         // Check minimum purchase amount (except for free_delivery)
@@ -196,7 +198,7 @@ async function validateCoupon(code, userId, cartItems, cartTotal, forceLive = fa
             // Check if the specific variant is in the cart
             const hasVariant = cartItems.some(item => item.variant_id && item.variant_id === coupon.target_id);
             if (!hasVariant) {
-                return { valid: false, error: 'This coupon is only valid for a specific variant not in your cart' };
+                return { valid: false, error: MESSAGES.ERRORS.COUPON_VARIANT_MISMATCH };
             }
         }
 
@@ -204,7 +206,7 @@ async function validateCoupon(code, userId, cartItems, cartTotal, forceLive = fa
             // Check if the specific product is in the cart
             const hasProduct = cartItems.some(item => item.product_id === coupon.target_id);
             if (!hasProduct) {
-                return { valid: false, error: 'This coupon is only valid for a specific product not in your cart' };
+                return { valid: false, error: MESSAGES.ERRORS.COUPON_PRODUCT_MISMATCH };
             }
         }
 

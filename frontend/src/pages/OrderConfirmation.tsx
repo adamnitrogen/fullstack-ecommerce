@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useLocation, useNavigate, useParams, Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle2, Package, Home, ArrowRight } from "lucide-react";
@@ -9,6 +10,7 @@ export default function OrderConfirmation() {
     const { id } = useParams();
     const location = useLocation();
     const navigate = useNavigate();
+    const { t } = useTranslation();
     const order = location.state?.order;
 
     useEffect(() => {
@@ -55,8 +57,8 @@ export default function OrderConfirmation() {
         return (
             <div className="min-h-screen flex items-center justify-center">
                 <div className="text-center">
-                    <h2 className="text-2xl font-bold mb-4">Order not found</h2>
-                    <Button onClick={() => navigate("/")}>Go Home</Button>
+                    <h2 className="text-2xl font-bold mb-4">{t("orderConfirmation.notFound")}</h2>
+                    <Button onClick={() => navigate("/")}>{t("orderConfirmation.goHome")}</Button>
                 </div>
             </div>
         );
@@ -69,13 +71,13 @@ export default function OrderConfirmation() {
                     <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 text-green-600 mb-4">
                         <CheckCircle2 className="h-10 w-10" />
                     </div>
-                    <h1 className="text-4xl font-bold text-foreground">Order Confirmed!</h1>
+                    <h1 className="text-4xl font-bold text-foreground">{t("orderConfirmation.confirmedTitle")}</h1>
                     <p className="text-muted-foreground text-lg">
-                        Thank you for your purchase. Your order has been placed successfully.
+                        {t("orderConfirmation.confirmedDesc")}
                     </p>
                     {order?.order_number && (
                         <div className="inline-block bg-background px-4 py-2 rounded-lg border border-border shadow-sm">
-                            <span className="text-sm text-muted-foreground mr-2">Order ID:</span>
+                            <span className="text-sm text-muted-foreground mr-2">{t("orderConfirmation.orderId")}:</span>
                             <span className="font-mono font-medium">{order.order_number}</span>
                         </div>
                     )}
@@ -83,7 +85,7 @@ export default function OrderConfirmation() {
 
                 <Card className="border-t-4 border-t-primary">
                     <CardHeader>
-                        <CardTitle>What happens next?</CardTitle>
+                        <CardTitle>{t("orderConfirmation.whatNext")}</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div className="flex gap-4">
@@ -91,9 +93,9 @@ export default function OrderConfirmation() {
                                 <Package className="h-6 w-6 text-primary" />
                             </div>
                             <div>
-                                <h3 className="font-medium mb-1">Order Processing</h3>
+                                <h3 className="font-medium mb-1">{t("orderConfirmation.processingTitle")}</h3>
                                 <p className="text-sm text-muted-foreground">
-                                    We've received your order and will begin processing it shortly. You'll receive an email confirmation with details.
+                                    {t("orderConfirmation.processingDesc")}
                                 </p>
                             </div>
                         </div>
@@ -103,9 +105,9 @@ export default function OrderConfirmation() {
                                 <Home className="h-6 w-6 text-primary" />
                             </div>
                             <div>
-                                <h3 className="font-medium mb-1">Delivery</h3>
+                                <h3 className="font-medium mb-1">{t("orderConfirmation.deliveryTitle")}</h3>
                                 <p className="text-sm text-muted-foreground">
-                                    Your items will be carefully packed and shipped to your address. We'll notify you when it's on the way.
+                                    {t("orderConfirmation.deliveryDesc")}
                                 </p>
                             </div>
                         </div>
@@ -116,12 +118,12 @@ export default function OrderConfirmation() {
                     <Button asChild variant="outline" className="h-12 px-8">
                         <Link to="/">
                             <Home className="mr-2 h-4 w-4" />
-                            Return Home
+                            {t("orderConfirmation.returnHome")}
                         </Link>
                     </Button>
                     <Button asChild className="h-12 px-8">
                         <Link to="/my-orders">
-                            View My Orders
+                            {t("orderConfirmation.viewOrders")}
                             <ArrowRight className="ml-2 h-4 w-4" />
                         </Link>
                     </Button>

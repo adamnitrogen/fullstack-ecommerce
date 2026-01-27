@@ -9,6 +9,7 @@ const sharp = require('sharp');
 const { v4: uuidv4 } = require('uuid');
 const { getUserAddresses } = require('../services/address.service');
 const phoneValidator = require('../utils/phone-validator');
+const { getFriendlyMessage, getI18nKey } = require('../utils/error-messages');
 
 // Configure multer for memory storage (we'll process before uploading)
 const upload = multer({
@@ -49,7 +50,7 @@ router.get('/', authenticateToken, async (req, res) => {
         if (profileError) throw profileError;
 
         if (!profile) {
-            return res.status(404).json({ error: 'Profile not found' });
+            return res.status(404).json({ error: getI18nKey('PROFILE_NOT_FOUND') });
         }
 
         // Get the latest phone number from phone_numbers table
@@ -103,7 +104,8 @@ router.get('/', authenticateToken, async (req, res) => {
         });
     } catch (error) {
         logger.error({ err: error }, 'Error fetching profile:');
-        res.status(500).json({ error: 'Failed to fetch profile' });
+        const friendlyMessage = getFriendlyMessage(error);
+        res.status(500).json({ error: friendlyMessage });
     }
 });
 
@@ -119,11 +121,11 @@ router.put('/', authenticateToken, async (req, res) => {
 
         // Validation
         if (!firstName || firstName.trim().length === 0) {
-            return res.status(400).json({ error: 'First name is required' });
+            return res.status(400).json({ error: getI18nKey('FIRST_NAME_REQUIRED') });
         }
 
         if (gender && !['male', 'female', 'other', 'prefer_not_to_say'].includes(gender)) {
-            return res.status(400).json({ error: 'Invalid gender value' });
+            return res.status(400).json({ error: getI18nKey('INVALID_GENDER') });
         }
 
         // Phone validation (basic format)
@@ -133,7 +135,7 @@ router.put('/', authenticateToken, async (req, res) => {
             const phoneRegex = /^\+?[0-9]{10,15}$/;
 
             if (!phoneRegex.test(sanitizedPhone)) {
-                return res.status(400).json({ error: 'Invalid phone number format' });
+                return res.status(400).json({ error: getI18nKey('INVALID_PHONE') });
             }
 
             // Abstract API validation
@@ -191,7 +193,7 @@ router.put('/', authenticateToken, async (req, res) => {
         if (error) throw error;
 
         res.json({
-            message: 'Profile updated successfully',
+            message: getI18nKey('PROFILE_UPDATED'),
             profile: {
                 firstName: data.first_name,
                 lastName: data.last_name,
@@ -201,7 +203,8 @@ router.put('/', authenticateToken, async (req, res) => {
         });
     } catch (error) {
         logger.error({ err: error }, 'Error updating profile:');
-        res.status(500).json({ error: 'Failed to update profile' });
+        const friendlyMessage = getFriendlyMessage(error);
+        res.status(500).json({ error: friendlyMessage });
     }
 });
 
@@ -214,7 +217,7 @@ router.post('/avatar', authenticateToken, upload.single('avatar'), async (req, r
         const userId = req.user.userId;
 
         if (!req.file) {
-            return res.status(400).json({ error: 'No image file provided' });
+            return res.status(400).json({ error: getI18nKey('NO_IMAGE') });
         }
 
         // Process image: resize, optimize, convert to JPEG
@@ -269,12 +272,13 @@ router.post('/avatar', authenticateToken, upload.single('avatar'), async (req, r
         if (updateError) throw updateError;
 
         res.json({
-            message: 'Avatar uploaded successfully',
+            message: getI18nKey('AVATAR_UPLOADED'),
             avatarUrl: publicUrl
         });
     } catch (error) {
         logger.error({ err: error }, 'Error uploading avatar:');
-        res.status(500).json({ error: 'Failed to upload avatar' });
+        const friendlyMessage = getFriendlyMessage(error);
+        res.status(500).json({ error: friendlyMessage });
     }
 });
 
@@ -296,7 +300,7 @@ router.delete('/avatar', authenticateToken, async (req, res) => {
         if (profileError) throw profileError;
 
         if (!profile || !profile.avatar_url) {
-            return res.status(404).json({ error: 'No avatar found to delete' });
+            return res.status(404).json({ error: getI18nKey('NO_AVATAR_TO_DELETE') });
         }
 
         // Extract filename from URL
@@ -318,10 +322,11 @@ router.delete('/avatar', authenticateToken, async (req, res) => {
 
         if (updateError) throw updateError;
 
-        res.json({ message: 'Avatar deleted successfully' });
+        res.json({ message: getI18nKey('AVATAR_DELETED') });
     } catch (error) {
         logger.error({ err: error }, 'Error deleting avatar:');
-        res.status(500).json({ error: 'Failed to delete avatar' });
+        const friendlyMessage = getFriendlyMessage(error);
+        res.status(500).json({ error: friendlyMessage });
     }
 });
 
@@ -398,12 +403,13 @@ router.post('/delete-account', authenticateToken, async (req, res) => {
         res.clearCookie('refresh_token');
 
         res.json({
-            message: 'Account deleted successfully',
+            message: getI18nKey('ACCOUNT_DELETED'),
             note: 'All your personal data has been removed. Your public contributions (comments, reviews) will remain visible with your name for community integrity.'
         });
     } catch (error) {
         logger.error({ err: error }, 'Error deleting account:');
-        res.status(500).json({ error: 'Failed to delete account' });
+        const friendlyMessage = getFriendlyMessage(error);
+        res.status(500).json({ error: friendlyMessage });
     }
 });
 
@@ -438,10 +444,11 @@ router.post('/change-password', authenticateToken, async (req, res) => {
             // Don't fail request as password *was* changed
         }
 
-        res.json({ message: 'Password updated successfully' });
+        res.json({ message: getI18nKey('PASSWORD_UPDATED') });
     } catch (error) {
         logger.error({ err: error }, 'Error changing password:');
-        res.status(500).json({ error: 'Failed to update password' });
+        const friendlyMessage = getFriendlyMessage(error);
+        res.status(500).json({ error: friendlyMessage });
     }
 });
 

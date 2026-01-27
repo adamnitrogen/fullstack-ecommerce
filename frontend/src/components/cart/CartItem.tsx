@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Minus, Plus, Trash2, RotateCcw, Package, Star, Heart, Truck, Tag } from "lucide-react";
 import { CartItem as CartItemType } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ interface CartItemProps {
 }
 
 const CartItemComponent = ({ item, updateQuantity, removeItem, isLoading, isCalculating, isFreeDelivery }: CartItemProps) => {
+    const { t } = useTranslation();
     const { product, quantity, variant, sizeLabel, variantId } = item;
 
     // Use variant pricing if available, otherwise fall back to product pricing
@@ -52,7 +54,7 @@ const CartItemComponent = ({ item, updateQuantity, removeItem, isLoading, isCalc
                     <div className="flex flex-col items-center gap-3">
                         <div className="h-8 w-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
                         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary animate-pulse">
-                            Syncing
+                            {t("products.syncing")}
                         </span>
                     </div>
                 </div>
@@ -94,12 +96,12 @@ const CartItemComponent = ({ item, updateQuantity, removeItem, isLoading, isCalc
                             {isOutOfStock ? (
                                 <span className="text-[9px] font-black uppercase text-destructive flex items-center gap-1.5 ml-1">
                                     <div className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse" />
-                                    Out of Stock
+                                    {t("products.outOfStock")}
                                 </span>
                             ) : (
                                 <span className="text-[9px] font-black uppercase text-[#059669] flex items-center gap-1.5 ml-1 bg-[#ECFDF5] px-2 py-1 rounded-md">
                                     <div className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
-                                    In Stock
+                                    {t("products.inStock")}
                                 </span>
                             )}
                         </div>
@@ -115,12 +117,12 @@ const CartItemComponent = ({ item, updateQuantity, removeItem, isLoading, isCalc
                             {((product as any).is_returnable !== undefined ? (product as any).is_returnable : product.isReturnable) ? (
                                 <div className="flex items-center gap-1.5 text-muted-foreground/80">
                                     <RotateCcw className="w-3.5 h-3.5 text-emerald-500" />
-                                    <span className="text-[10px] font-medium">{(product as any).return_days ?? product.returnDays ?? 7}d Return</span>
+                                    <span className="text-[10px] font-medium">{t("products.daysReturnShort", { count: (product as any).return_days ?? product.returnDays ?? 7 })}</span>
                                 </div>
                             ) : (
                                 <div className="flex items-center gap-1.5 text-muted-foreground/60">
                                     <Package className="w-3.5 h-3.5" />
-                                    <span className="text-[10px] font-medium">No Returns</span>
+                                    <span className="text-[10px] font-medium">{t("products.noReturns")}</span>
                                 </div>
                             )}
 
@@ -129,20 +131,20 @@ const CartItemComponent = ({ item, updateQuantity, removeItem, isLoading, isCalc
                                     <div className="flex items-center gap-1.5 font-black text-[10px] uppercase tracking-wider text-[#9A3412] bg-[#FFF7ED] px-2.5 py-1 rounded-full border border-[#FDBA74]">
                                         <Truck className="w-3 h-3" />
                                         <span>
-                                            +₹{((item.delivery_charge ?? 0) + (item.delivery_gst ?? 0)).toFixed(2)} Surcharge
+                                            +₹{((item.delivery_charge ?? 0) + (item.delivery_gst ?? 0)).toFixed(2)} {t("products.surcharge")}
                                         </span>
                                     </div>
                                     {item.delivery_meta && (
                                         <div className="flex flex-col pl-1 space-y-0.5">
                                             <span className="text-[10px] text-muted-foreground/70 font-bold italic leading-tight">
-                                                {item.delivery_meta.calculation_type === 'PER_ITEM' && `(₹${item.delivery_meta.base_charge} / item)`}
-                                                {item.delivery_meta.calculation_type === 'PER_PACKAGE' && `(₹${item.delivery_meta.base_charge} / package)`}
-                                                {item.delivery_meta.calculation_type === 'WEIGHT_BASED' && `(Heavy Item Surcharge)`}
-                                                {item.delivery_meta.calculation_type === 'FLAT_PER_ORDER' && `(Flat Product Charge)`}
+                                                {item.delivery_meta.calculation_type === 'PER_ITEM' && `(₹${item.delivery_meta.base_charge} / ${t("products.perItem")})`}
+                                                {item.delivery_meta.calculation_type === 'PER_PACKAGE' && `(₹${item.delivery_meta.base_charge} / ${t("products.perPackage")})`}
+                                                {item.delivery_meta.calculation_type === 'WEIGHT_BASED' && `(${t("products.heavyItemSurcharge")})`}
+                                                {item.delivery_meta.calculation_type === 'FLAT_PER_ORDER' && `(${t("products.flatProductCharge")})`}
                                             </span>
                                             {(item.delivery_gst ?? 0) > 0 && (
                                                 <span className="text-[9px] text-muted-foreground/50 font-medium">
-                                                    (Includes ₹{(item.delivery_gst ?? 0).toFixed(2)} GST)
+                                                    ({t("products.includes")} ₹{(item.delivery_gst ?? 0).toFixed(2)} GST)
                                                 </span>
                                             )}
                                         </div>
@@ -153,7 +155,7 @@ const CartItemComponent = ({ item, updateQuantity, removeItem, isLoading, isCalc
                             {(item.coupon_discount ?? 0) > 0 && (
                                 <div className="flex items-center gap-1.5 px-2 py-0.5 bg-primary/5 rounded-md text-[10px] font-black text-primary border border-primary/20">
                                     <Tag className="w-3 h-3" />
-                                    <span>-₹{(item.coupon_discount || 0).toFixed(2)} Saved</span>
+                                    <span>-₹{(item.coupon_discount || 0).toFixed(2)} {t("products.saved")}</span>
                                 </div>
                             )}
                         </div>
@@ -184,11 +186,11 @@ const CartItemComponent = ({ item, updateQuantity, removeItem, isLoading, isCalc
                         {isTaxApplicable && (
                             <div className="flex flex-col">
                                 <span className="text-[10px] text-muted-foreground/60 font-medium">
-                                    {priceIncludesTax ? "Inclusive of all taxes" : "Exclusive of taxes"}
+                                    {priceIncludesTax ? t("products.inclusiveTax") : t("products.exclusiveTaxShort")}
                                 </span>
                                 {gstRate > 0 && (
                                     <span className="text-[9px] text-muted-foreground/40 font-bold italic">
-                                        ({priceIncludesTax ? "Includes" : "+"} ₹{itemTaxAmount.toFixed(2)} {gstRate}% GST)
+                                        ({priceIncludesTax ? t("products.includes") : "+"} ₹{itemTaxAmount.toFixed(2)} {gstRate}% GST)
                                     </span>
                                 )}
                             </div>

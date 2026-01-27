@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { useTranslation } from "react-i18next";
 import type { ProductVariant } from "@/types";
 
 interface VariantSelectorProps {
@@ -19,6 +20,7 @@ export function VariantSelector({
     onSelect,
     className,
 }: VariantSelectorProps) {
+    const { t } = useTranslation();
     if (!variants || variants.length === 0) {
         return null;
     }
@@ -47,11 +49,11 @@ export function VariantSelector({
         stockQuantity: number
     ): { label: string; className: string } | null {
         if (stockQuantity === 0) {
-            return { label: "Out of Stock", className: "bg-red-100 text-red-700" };
+            return { label: t("variants.outOfStock", "Out of Stock"), className: "bg-red-100 text-red-700" };
         }
         if (stockQuantity < 10) {
             return {
-                label: `Only ${stockQuantity} left`,
+                label: t("variants.unitsLeft", { count: stockQuantity, defaultValue: `Only ${stockQuantity} left` }),
                 className: "bg-amber-100 text-amber-700",
             };
         }
@@ -62,7 +64,7 @@ export function VariantSelector({
         <div className={cn("space-y-3", className)}>
             <div className="flex items-center gap-2">
                 <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                    Select Size
+                    {t("variants.selectSize", "Select Size")}
                 </span>
             </div>
 
@@ -100,7 +102,7 @@ export function VariantSelector({
                                 <Badge
                                     className="absolute -top-2 -right-2 text-[8px] px-1.5 py-0.5 bg-[#D4AF37] text-white border-none"
                                 >
-                                    Best Value
+                                    {t("variants.bestValue", "Best Value")}
                                 </Badge>
                             )}
 
@@ -126,13 +128,13 @@ export function VariantSelector({
                                 )}
                             >
                                 ₹{variant.selling_price}
-                                {variant.price_includes_tax === false && <span className="text-[9px] ml-0.5 opacity-80">+ Tax</span>}
+                                {variant.price_includes_tax === false && <span className="text-[9px] ml-0.5 opacity-80">{t("variants.taxPlus", "+ Tax")}</span>}
                             </span>
 
                             {/* Discount Indicator */}
                             {discount > 0 && !isOutOfStock && (
                                 <span className="text-[10px] text-green-600 font-medium">
-                                    {discount}% off
+                                    {discount}{t("variants.off", "% off")}
                                 </span>
                             )}
 
@@ -152,7 +154,7 @@ export function VariantSelector({
                             {isOutOfStock && (
                                 <span className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-xl">
                                     <span className="text-[10px] text-red-600 font-medium">
-                                        Sold Out
+                                        {t("variants.soldOut", "Sold Out")}
                                     </span>
                                 </span>
                             )}
@@ -179,7 +181,7 @@ export function VariantSelector({
                                 </span>
                                 {discount > 0 && (
                                     <span className="text-green-600 font-medium">
-                                        (Save ₹{selected.mrp - selected.selling_price})
+                                        ({t("variants.save", "Save")} ₹{selected.mrp - selected.selling_price})
                                     </span>
                                 )}
                             </>

@@ -78,13 +78,14 @@ router.put('/:id/status', authenticateToken, checkPermission('can_manage_orders'
 
     logger.debug({ orderId: id }, 'DB update successful, processing side effects');
 
+    const messageKey = refundInitiated ? 'ORDER_STATUS_UPDATED_REFUND' : 'ORDER_STATUS_UPDATED';
+
     res.json({
         success: true,
         order,
         refundInitiated: refundInitiated || false,
-        message: refundInitiated
-            ? `Order status updated to ${status}. Refund has been initiated.`
-            : `Order status updated to ${status}`
+        message: getI18nKey(messageKey),
+        params: { status } // For frontend interpolation
     });
 });
 
@@ -100,13 +101,13 @@ router.post('/:id/cancel', authenticateToken, async (req, res) => {
     try {
         const result = await cancelOrder(id, userId, reason, userEmail, userName);
 
+        const messageKey = result.refundInitiated ? 'ORDER_CANCELLED_REFUND' : 'ORDER_CANCELLED';
+
         res.json({
             success: true,
             order: result.order,
             refundInitiated: result.refundInitiated || false,
-            message: result.refundInitiated
-                ? 'Order cancelled successfully. Refund has been initiated to your original payment method.'
-                : 'Order cancelled successfully'
+            message: getI18nKey(messageKey)
         });
 
     } catch (error) {
@@ -127,7 +128,7 @@ router.post('/:id/return', authenticateToken, async (req, res) => {
         res.json({
             success: true,
             order: order,
-            message: 'Return request submitted successfully'
+            message: getI18nKey('RETURN_REQUESTED')
         });
 
     } catch (error) {

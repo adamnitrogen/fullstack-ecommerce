@@ -21,8 +21,10 @@ import { useToast } from "@/hooks/use-toast";
 import { NewsletterSubscriberDialog } from "./NewsletterSubscriberDialog";
 import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
 import { getErrorMessage } from "@/lib/errorUtils";
+import { useTranslation } from "react-i18next";
 
 export function NewsletterSection() {
+  const { t } = useTranslation();
   const [subscriberDialogOpen, setSubscriberDialogOpen] = useState(false);
   const [editingSubscriber, setEditingSubscriber] = useState<NewsletterSubscriber | null>(null);
   const [deleteItem, setDeleteItem] = useState<{ id: string; email: string } | null>(null);
@@ -56,13 +58,13 @@ export function NewsletterSection() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["newsletter-subscribers"] });
       queryClient.invalidateQueries({ queryKey: ["newsletter-stats"] });
-      toast({ title: "Subscriber deleted successfully" });
+      toast({ title: t("admin.newsletter.subscriberDeleted") });
       setDeleteItem(null);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Failed to delete subscriber",
-        description: getErrorMessage(error, "Failed to delete subscriber"),
+        title: t("admin.newsletter.deleteError"),
+        description: getErrorMessage(error, t("admin.newsletter.deleteError")),
         variant: "destructive",
       });
     },
@@ -75,12 +77,12 @@ export function NewsletterSection() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["newsletter-subscribers"] });
       queryClient.invalidateQueries({ queryKey: ["newsletter-stats"] });
-      toast({ title: "Subscriber status updated" });
+      toast({ title: t("admin.newsletter.statusUpdated") });
     },
     onError: (error: unknown) => {
       toast({
-        title: "Failed to update status",
-        description: getErrorMessage(error, "Failed to update status"),
+        title: t("admin.newsletter.statusUpdateError"),
+        description: getErrorMessage(error, t("admin.newsletter.statusUpdateError")),
         variant: "destructive",
       });
     },
@@ -91,13 +93,13 @@ export function NewsletterSection() {
     mutationFn: (data: Partial<NewsletterConfig>) => newsletterService.updateConfig(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["newsletter-config"] });
-      toast({ title: "Newsletter configuration updated successfully" });
+      toast({ title: t("admin.newsletter.configUpdated") });
       setConfigEdit(false);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Failed to update configuration",
-        description: getErrorMessage(error, "Failed to update configuration"),
+        title: t("admin.newsletter.configUpdateError"),
+        description: getErrorMessage(error, t("admin.newsletter.configUpdateError")),
         variant: "destructive",
       });
     },
@@ -106,8 +108,8 @@ export function NewsletterSection() {
   const handleSaveConfig = () => {
     if (!configData?.sender_name || !configData?.sender_email) {
       toast({
-        title: "Error",
-        description: "Sender name and email are required",
+        title: t("common.error"),
+        description: t("admin.newsletter.requiredFields"),
         variant: "destructive",
       });
       return;
@@ -135,8 +137,8 @@ export function NewsletterSection() {
         open={!!deleteItem}
         onOpenChange={(open) => !open && setDeleteItem(null)}
         onConfirm={() => deleteItem && deleteMutation.mutate(deleteItem.id)}
-        title="Delete Subscriber"
-        description={`Are you sure you want to delete ${deleteItem?.email}? This action cannot be undone.`}
+        title={t("admin.newsletter.deleteSubscriber")}
+        description={t("admin.newsletter.deleteConfirm", { email: deleteItem?.email })}
       />
 
       <div className="space-y-6">
@@ -144,7 +146,7 @@ export function NewsletterSection() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Subscribers</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("admin.newsletter.total")}</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -153,7 +155,7 @@ export function NewsletterSection() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("admin.newsletter.active")}</CardTitle>
               <UserCheck className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
@@ -162,7 +164,7 @@ export function NewsletterSection() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Inactive</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("admin.newsletter.inactive")}</CardTitle>
               <UserX className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -178,14 +180,14 @@ export function NewsletterSection() {
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <Send className="h-5 w-5" />
-                  Newsletter Configuration
+                  {t("admin.newsletter.title")}
                 </CardTitle>
-                <CardDescription>Manage newsletter sender details and footer text</CardDescription>
+                <CardDescription>{t("admin.newsletter.subtitle")}</CardDescription>
               </div>
               {!configEdit && (
                 <Button onClick={handleEditConfig} variant="outline" size="sm">
                   <Pencil className="h-4 w-4 mr-2" />
-                  Edit
+                  {t("common.edit")}
                 </Button>
               )}
             </div>
@@ -195,20 +197,20 @@ export function NewsletterSection() {
               <>
                 <div className="space-y-2">
                   <Label>
-                    Sender Name <span className="text-destructive">*</span>
+                    {t("admin.newsletter.senderName")} <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     value={configData.sender_name}
                     onChange={(e) =>
                       setConfigData({ ...configData, sender_name: e.target.value })
                     }
-                    placeholder="e.g., Gau Gyaan Newsletter"
+                    placeholder={t("admin.newsletter.senderNamePlaceholder")}
                   />
                 </div>
 
                 <div className="space-y-2">
                   <Label>
-                    Sender Email <span className="text-destructive">*</span>
+                    {t("admin.newsletter.senderEmail")} <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     type="email"
@@ -216,50 +218,54 @@ export function NewsletterSection() {
                     onChange={(e) =>
                       setConfigData({ ...configData, sender_email: e.target.value })
                     }
-                    placeholder="newsletter@example.com"
+                    placeholder={t("admin.newsletter.senderEmailPlaceholder")}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Footer Text (Optional)</Label>
+                  <Label>{t("admin.newsletter.footerText")}</Label>
                   <Textarea
                     value={configData.footer_text || ""}
                     onChange={(e) =>
                       setConfigData({ ...configData, footer_text: e.target.value })
                     }
                     rows={3}
-                    placeholder="This text will appear at the bottom of newsletter emails"
+                    maxLength={300}
+                    placeholder={t("admin.newsletter.footerPlaceholder")}
                   />
+                  <div className="flex justify-end text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1">
+                    {(configData.footer_text || "").length}/300 {t("common.characters")}
+                  </div>
                 </div>
 
                 <div className="flex gap-2">
                   <Button onClick={handleSaveConfig} disabled={updateConfigMutation.isPending}>
-                    Save Configuration
+                    {t("admin.newsletter.saveConfig")}
                   </Button>
                   <Button variant="outline" onClick={() => setConfigEdit(false)}>
-                    Cancel
+                    {t("common.cancel")}
                   </Button>
                 </div>
               </>
             ) : config ? (
               <div className="space-y-3">
                 <div>
-                  <p className="text-sm text-muted-foreground">Sender Name</p>
+                  <p className="text-sm text-muted-foreground">{t("admin.newsletter.senderName")}</p>
                   <p className="font-medium">{config.sender_name}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Sender Email</p>
+                  <p className="text-sm text-muted-foreground">{t("admin.newsletter.senderEmail")}</p>
                   <p className="font-medium">{config.sender_email}</p>
                 </div>
                 {config.footer_text && (
                   <div>
-                    <p className="text-sm text-muted-foreground">Footer Text</p>
+                    <p className="text-sm text-muted-foreground">{t("admin.newsletter.footerText")}</p>
                     <p className="text-sm">{config.footer_text}</p>
                   </div>
                 )}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Loading configuration...</p>
+              <p className="text-sm text-muted-foreground">{t("admin.loading.newsletterConfig")}</p>
             )}
           </CardContent>
         </Card>
@@ -269,8 +275,8 @@ export function NewsletterSection() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Newsletter Subscribers</CardTitle>
-                <CardDescription>Manage your newsletter subscriber list</CardDescription>
+                <CardTitle>{t("admin.newsletter.subscribersTitle")}</CardTitle>
+                <CardDescription>{t("admin.newsletter.subscribersSubtitle")}</CardDescription>
               </div>
               <Button
                 onClick={() => {
@@ -279,26 +285,26 @@ export function NewsletterSection() {
                 }}
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Add Subscriber
+                {t("admin.newsletter.addSubscriber")}
               </Button>
             </div>
           </CardHeader>
           <CardContent>
             {subscribersLoading ? (
-              <p className="text-center text-muted-foreground py-8">Loading subscribers...</p>
+              <p className="text-center text-muted-foreground py-8">{t("admin.newsletter.loading")}</p>
             ) : subscribers.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">
-                No subscribers yet. Add your first subscriber to get started.
+                {t("admin.newsletter.empty")}
               </p>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Subscribed Date</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{t("admin.newsletter.table.email")}</TableHead>
+                    <TableHead>{t("admin.newsletter.table.name")}</TableHead>
+                    <TableHead>{t("admin.newsletter.table.status")}</TableHead>
+                    <TableHead>{t("admin.newsletter.table.date")}</TableHead>
+                    <TableHead className="text-right">{t("common.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -318,7 +324,7 @@ export function NewsletterSection() {
                             }
                           />
                           <Badge variant={subscriber.is_active ? "default" : "secondary"}>
-                            {subscriber.is_active ? "Active" : "Inactive"}
+                            {subscriber.is_active ? t("admin.newsletter.activeStatus") : t("admin.newsletter.inactiveStatus")}
                           </Badge>
                         </div>
                       </TableCell>

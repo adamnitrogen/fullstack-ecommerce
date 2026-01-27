@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { aboutService } from "@/services/about.service";
 import { TeamMember } from "@/types";
 import { useToast } from "@/hooks/use-toast";
@@ -29,6 +30,7 @@ export default function TeamMemberDialog({
   onOpenChange,
   member,
 }: TeamMemberDialogProps) {
+  const { t } = useTranslation();
   const [name, setName] = useState("");
   const [role, setRole] = useState("");
   const [bio, setBio] = useState("");
@@ -71,7 +73,7 @@ export default function TeamMemberDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["aboutUs"] });
-      toast({ title: "Team member added successfully" });
+      toast({ title: t("admin.about.toasts.deleteTeam") });
       onOpenChange(false);
     },
   });
@@ -96,7 +98,7 @@ export default function TeamMemberDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["aboutUs"] });
-      toast({ title: "Team member updated successfully" });
+      toast({ title: t("admin.about.toasts.deleteTeam") });
       onOpenChange(false);
     },
   });
@@ -106,8 +108,8 @@ export default function TeamMemberDialog({
 
     if (!name.trim() || !role.trim() || !bio.trim() || !image) {
       toast({
-        title: "Error",
-        description: "Please fill in all required fields",
+        title: t("common.error"),
+        description: t("auth.fillAllFields"),
         variant: "destructive",
       });
       return;
@@ -138,7 +140,9 @@ export default function TeamMemberDialog({
       <DialogContent className="sm:max-w-4xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="text-2xl">
-            {member ? "Edit Team Member" : "Add New Team Member"}
+            {member
+              ? t("admin.about.dialog.editTitle", { type: t("admin.about.dialog.types.team") })
+              : t("admin.about.dialog.addTitle", { type: t("admin.about.dialog.types.team") })}
           </DialogTitle>
         </DialogHeader>
 
@@ -146,43 +150,43 @@ export default function TeamMemberDialog({
           <form onSubmit={handleSubmit} className="space-y-6 py-2">
             {/* Basic Information */}
             <div className="space-y-4 border rounded-lg p-4">
-              <h3 className="text-base font-semibold">Member Details</h3>
+              <h3 className="text-base font-semibold">{t("admin.about.dialog.types.team")}</h3>
 
               <div className="space-y-2">
                 <Label htmlFor="name">
-                  Name <span className="text-destructive">*</span>
+                  {t("admin.about.dialog.team.name")} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g., Dr. Rajesh Kumar"
+                  placeholder={t("admin.about.dialog.team.namePlaceholder")}
                   required
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="role">
-                  Role <span className="text-destructive">*</span>
+                  {t("admin.about.dialog.team.role")} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="role"
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
-                  placeholder="e.g., Founder & CEO"
+                  placeholder={t("admin.about.dialog.team.rolePlaceholder")}
                   required
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="bio">
-                  Bio <span className="text-destructive">*</span>
+                  {t("admin.about.dialog.team.bio")} <span className="text-destructive">*</span>
                 </Label>
                 <Textarea
                   id="bio"
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
-                  placeholder="Enter team member bio..."
+                  placeholder={t("admin.about.dialog.team.bioPlaceholder")}
                   rows={3}
                   required
                 />
@@ -192,12 +196,12 @@ export default function TeamMemberDialog({
             {/* Photo & Display */}
             <div className="space-y-4 border rounded-lg p-4">
               <h3 className="text-base font-semibold">
-                Photo & Display Settings
+                {t("admin.about.dialog.displaySettings")}
               </h3>
 
               <div className="space-y-2">
                 <Label htmlFor="image">
-                  Profile Photo <span className="text-destructive">*</span>
+                  {t("admin.about.dialog.team.image")} <span className="text-destructive">*</span>
                 </Label>
                 <ProfileImageCropper
                   image={image}
@@ -205,12 +209,12 @@ export default function TeamMemberDialog({
                   onClear={() => setImage("")}
                 />
                 <p className="text-sm text-muted-foreground">
-                  Upload a professional photo. You can crop and adjust the image to focus on the face.
+                  {t("admin.about.dialog.team.imageHelp")}
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="order">Display Order</Label>
+                <Label htmlFor="order">{t("admin.about.dialog.displayOrder")}</Label>
                 <Input
                   id="order"
                   type="number"
@@ -227,13 +231,13 @@ export default function TeamMemberDialog({
                 variant="outline"
                 onClick={() => onOpenChange(false)}
               >
-                Cancel
+                {t("admin.about.dialog.cancel")}
               </Button>
               <Button
                 type="submit"
                 disabled={addMutation.isPending || updateMutation.isPending}
               >
-                {member ? "Update" : "Add"} Team Member
+                {member ? t("common.update") : t("common.add")} {t("admin.about.dialog.types.team")}
               </Button>
             </DialogFooter>
           </form>

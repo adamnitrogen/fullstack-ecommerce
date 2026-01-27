@@ -15,6 +15,7 @@ import { Plus, Trash2, Save, X, Building2 } from "lucide-react";
 import { bankDetailsService, type BankDetails } from "@/services/bank-details.service";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errorUtils";
+import { useTranslation } from "react-i18next";
 
 interface BankDetailsSectionProps {
   bankDetails: BankDetails[];
@@ -25,6 +26,7 @@ export function BankDetailsSection({
   bankDetails,
   onRefresh,
 }: BankDetailsSectionProps) {
+  const { t } = useTranslation();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<BankDetails>>({});
   const [isAdding, setIsAdding] = useState(false);
@@ -38,12 +40,12 @@ export function BankDetailsSection({
     mutationFn: (data: Partial<BankDetails>) => bankDetailsService.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bank-details"] });
-      toast.success("Bank details added");
+      toast.success(t("admin.bank.added"));
       setNewDetails({ type: "general" });
       setIsAdding(false);
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, "Failed to add bank details"));
+      toast.error(getErrorMessage(error, t("admin.bank.addError")));
     },
   });
 
@@ -53,12 +55,12 @@ export function BankDetailsSection({
       bankDetailsService.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bank-details"] });
-      toast.success("Bank details updated");
+      toast.success(t("admin.bank.updated"));
       setEditingId(null);
       setEditData({});
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, "Failed to update bank details"));
+      toast.error(getErrorMessage(error, t("admin.bank.updateError")));
     },
   });
 
@@ -67,10 +69,10 @@ export function BankDetailsSection({
     mutationFn: (id: string) => bankDetailsService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bank-details"] });
-      toast.success("Bank details deleted");
+      toast.success(t("admin.bank.deleted"));
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, "Failed to delete bank details"));
+      toast.error(getErrorMessage(error, t("admin.bank.deleteError")));
     },
   });
 
@@ -88,23 +90,23 @@ export function BankDetailsSection({
 
     // Validate required fields with specific messages
     if (!trimmedDetails.account_name) {
-      toast.error("Account Name is required");
+      toast.error(t("admin.bank.nameRequired"));
       return;
     }
     if (!trimmedDetails.account_number) {
-      toast.error("Account Number is required");
+      toast.error(t("admin.bank.numberRequired"));
       return;
     }
     if (!trimmedDetails.ifsc_code) {
-      toast.error("IFSC Code is required");
+      toast.error(t("admin.bank.ifscRequired"));
       return;
     }
     if (!trimmedDetails.bank_name) {
-      toast.error("Bank Name is required");
+      toast.error(t("admin.bank.bankNameRequired"));
       return;
     }
     if (!trimmedDetails.type) {
-      toast.error("Account Type is required");
+      toast.error(t("admin.bank.typeRequired"));
       return;
     }
 
@@ -114,7 +116,7 @@ export function BankDetailsSection({
     );
 
     if (typeExists) {
-      toast.error(`A ${trimmedDetails.type} account already exists. Only one account per type is allowed.`);
+      toast.error(t("admin.bank.alreadyExists", { type: t(`admin.bank.${trimmedDetails.type}`) }));
       return;
     }
 
@@ -128,7 +130,7 @@ export function BankDetailsSection({
       !editData.ifsc_code ||
       !editData.bank_name
     ) {
-      toast.error("Please fill in all required fields");
+      toast.error(t("admin.bank.allFieldsRequired"));
       return;
     }
 
@@ -136,7 +138,7 @@ export function BankDetailsSection({
   };
 
   const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this bank account?")) {
+    if (confirm(t("admin.bank.deleteConfirm"))) {
       deleteMutation.mutate(id);
     }
   };
@@ -152,22 +154,22 @@ export function BankDetailsSection({
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Building2 className="h-5 w-5" />
-            Bank Details
+            {t("admin.bank.title")}
           </CardTitle>
           <Button onClick={() => setIsAdding(true)} size="sm">
             <Plus className="h-4 w-4 mr-2" />
-            Add Bank Account
+            {t("admin.bank.add")}
           </Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {isAdding && (
           <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
-            <h4 className="font-semibold">Add New Bank Details</h4>
+            <h4 className="font-semibold">{t("admin.bank.addNew")}</h4>
 
             <div className="space-y-2">
               <Label>
-                Account Type <span className="text-destructive">*</span>
+                {t("admin.bank.accountType")} <span className="text-destructive">*</span>
               </Label>
               <Select
                 value={newDetails.type}
@@ -186,24 +188,24 @@ export function BankDetailsSection({
                     value="general"
                     disabled={bankDetails.some(b => b.type === 'general' && b.is_active)}
                   >
-                    General {bankDetails.some(b => b.type === 'general' && b.is_active) && '✓ Already exists'}
+                    {t("admin.bank.general")} {bankDetails.some(b => b.type === 'general' && b.is_active) && `✓ ${t("admin.bank.alreadyExistsSymbol")}`}
                   </SelectItem>
                   <SelectItem
                     value="donation"
                     disabled={bankDetails.some(b => b.type === 'donation' && b.is_active)}
                   >
-                    Donation (Footer) {bankDetails.some(b => b.type === 'donation' && b.is_active) && '✓ Already exists'}
+                    {t("admin.bank.donation")} {bankDetails.some(b => b.type === 'donation' && b.is_active) && `✓ ${t("admin.bank.alreadyExistsSymbol")}`}
                   </SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-sm text-muted-foreground">
                 {newDetails.type === "donation"
-                  ? "Will be displayed in the footer"
-                  : "Internal use account"}
+                  ? t("admin.bank.typeNoteDonation")
+                  : t("admin.bank.typeNoteGeneral")}
               </p>
               {bankDetails.some(b => b.type === newDetails.type && b.is_active) && (
                 <p className="text-xs text-destructive">
-                  ⚠️ A {newDetails.type} account already exists. Only one account per type is allowed.
+                  ⚠️ {t("admin.bank.alreadyExists", { type: t(`admin.bank.${newDetails.type}`) })}
                 </p>
               )}
             </div>
@@ -211,7 +213,7 @@ export function BankDetailsSection({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>
-                  Account Name <span className="text-destructive">*</span>
+                  {t("admin.bank.accountName")} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   value={newDetails.account_name || ""}
@@ -221,12 +223,12 @@ export function BankDetailsSection({
                       account_name: e.target.value,
                     })
                   }
-                  placeholder="Account holder name"
+                  placeholder={t("admin.bank.accountNamePlaceholder")}
                 />
               </div>
               <div className="space-y-2">
                 <Label>
-                  Account Number <span className="text-destructive">*</span>
+                  {t("admin.bank.accountNumber")} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   value={newDetails.account_number || ""}
@@ -236,7 +238,7 @@ export function BankDetailsSection({
                       account_number: e.target.value,
                     })
                   }
-                  placeholder="1234567890"
+                  placeholder={t("admin.bank.accountNumberPlaceholder")}
                 />
               </div>
             </div>
@@ -244,49 +246,49 @@ export function BankDetailsSection({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>
-                  IFSC Code <span className="text-destructive">*</span>
+                  {t("admin.bank.ifscCode")} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   value={newDetails.ifsc_code || ""}
                   onChange={(e) =>
                     setNewDetails({ ...newDetails, ifsc_code: e.target.value })
                   }
-                  placeholder="BANK0001234"
+                  placeholder={t("admin.bank.ifscPlaceholder")}
                 />
               </div>
               <div className="space-y-2">
                 <Label>
-                  Bank Name <span className="text-destructive">*</span>
+                  {t("admin.bank.bankName")} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   value={newDetails.bank_name || ""}
                   onChange={(e) =>
                     setNewDetails({ ...newDetails, bank_name: e.target.value })
                   }
-                  placeholder="Bank name"
+                  placeholder={t("admin.bank.bankNamePlaceholder")}
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Branch Name (Optional)</Label>
+                <Label>{t("admin.bank.branchName")}</Label>
                 <Input
                   value={newDetails.branch_name || ""}
                   onChange={(e) =>
                     setNewDetails({ ...newDetails, branch_name: e.target.value })
                   }
-                  placeholder="Branch name"
+                  placeholder={t("admin.bank.branchPlaceholder")}
                 />
               </div>
               <div className="space-y-2">
-                <Label>UPI ID (Optional)</Label>
+                <Label>{t("admin.bank.upiId")}</Label>
                 <Input
                   value={newDetails.upi_id || ""}
                   onChange={(e) =>
                     setNewDetails({ ...newDetails, upi_id: e.target.value })
                   }
-                  placeholder="example@upi"
+                  placeholder={t("admin.bank.upiPlaceholder")}
                 />
               </div>
             </div>
@@ -294,7 +296,7 @@ export function BankDetailsSection({
             <div className="flex gap-2">
               <Button onClick={handleAdd} size="sm" disabled={createMutation.isPending}>
                 <Save className="h-4 w-4 mr-2" />
-                {createMutation.isPending ? "Saving..." : "Save"}
+                {createMutation.isPending ? t("admin.bank.saving") : t("admin.bank.save")}
               </Button>
               <Button
                 variant="outline"
@@ -305,7 +307,7 @@ export function BankDetailsSection({
                 size="sm"
               >
                 <X className="h-4 w-4 mr-2" />
-                Cancel
+                {t("common.cancel")}
               </Button>
             </div>
           </div>
@@ -313,7 +315,7 @@ export function BankDetailsSection({
 
         {bankDetails.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
-            No bank details added yet. Click "Add Bank Account" to get started.
+            {t("admin.bank.empty")}
           </p>
         ) : (
           <div className="space-y-4">
@@ -334,7 +336,7 @@ export function BankDetailsSection({
                             : "bg-blue-100 text-blue-700"
                             }`}
                         >
-                          {detail.type === "donation" ? "Donation" : "General"}
+                          {detail.type === "donation" ? t("admin.bank.donation") : t("admin.bank.general")}
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground">
@@ -351,7 +353,7 @@ export function BankDetailsSection({
                           size="sm"
                           onClick={() => startEdit(detail)}
                         >
-                          Edit
+                          {t("common.edit")}
                         </Button>
                         <Button
                           variant="destructive"
@@ -370,7 +372,7 @@ export function BankDetailsSection({
                   <div className="space-y-4 pt-2 border-t">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label>Account Name</Label>
+                        <Label>{t("admin.bank.accountName")}</Label>
                         <Input
                           value={editData.account_name || ""}
                           onChange={(e) =>
@@ -382,7 +384,7 @@ export function BankDetailsSection({
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Account Number</Label>
+                        <Label>{t("admin.bank.accountNumber")}</Label>
                         <Input
                           value={editData.account_number || ""}
                           onChange={(e) =>
@@ -394,7 +396,7 @@ export function BankDetailsSection({
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>IFSC Code</Label>
+                        <Label>{t("admin.bank.ifscCode")}</Label>
                         <Input
                           value={editData.ifsc_code || ""}
                           onChange={(e) =>
@@ -406,7 +408,7 @@ export function BankDetailsSection({
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Bank Name</Label>
+                        <Label>{t("admin.bank.bankName")}</Label>
                         <Input
                           value={editData.bank_name || ""}
                           onChange={(e) =>
@@ -418,7 +420,7 @@ export function BankDetailsSection({
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Branch Name</Label>
+                        <Label>{t("admin.bank.branchName")}</Label>
                         <Input
                           value={editData.branch_name || ""}
                           onChange={(e) =>
@@ -430,7 +432,7 @@ export function BankDetailsSection({
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>UPI ID</Label>
+                        <Label>{t("admin.bank.upiId")}</Label>
                         <Input
                           value={editData.upi_id || ""}
                           onChange={(e) =>
@@ -443,7 +445,7 @@ export function BankDetailsSection({
                     <div className="flex gap-2">
                       <Button onClick={() => handleUpdate(detail.id)} size="sm" disabled={updateMutation.isPending}>
                         <Save className="h-4 w-4 mr-2" />
-                        {updateMutation.isPending ? "Saving..." : "Save Changes"}
+                        {updateMutation.isPending ? t("admin.bank.saving") : t("admin.bank.update")}
                       </Button>
                       <Button
                         variant="outline"
@@ -453,23 +455,23 @@ export function BankDetailsSection({
                         }}
                         size="sm"
                       >
-                        Cancel
+                        {t("common.cancel")}
                       </Button>
                     </div>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div>
-                      <p className="text-muted-foreground">Account Number</p>
+                      <p className="text-muted-foreground">{t("admin.bank.accountNumber")}</p>
                       <p className="font-mono">{detail.account_number}</p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground">IFSC Code</p>
+                      <p className="text-muted-foreground">{t("admin.bank.ifscCode")}</p>
                       <p className="font-mono">{detail.ifsc_code}</p>
                     </div>
                     {detail.upi_id && (
                       <div>
-                        <p className="text-muted-foreground">UPI ID</p>
+                        <p className="text-muted-foreground">{t("admin.bank.upiId")}</p>
                         <p className="font-mono">{detail.upi_id}</p>
                       </div>
                     )}

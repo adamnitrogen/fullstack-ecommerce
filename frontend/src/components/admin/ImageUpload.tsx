@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Upload, X, Plus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { toast } from '@/hooks/use-toast';
 import { UploadType } from '@/services/upload.service';
 
@@ -13,6 +14,7 @@ interface ImageUploadProps {
 }
 
 export function ImageUpload({ images, onChange, maxImages = 5, type = 'product', folder }: ImageUploadProps) {
+  const { t } = useTranslation();
   const [isDragging, setIsDragging] = useState(false);
   const [previews, setPreviews] = useState<string[]>([]);
 
@@ -67,8 +69,8 @@ export function ImageUpload({ images, onChange, maxImages = 5, type = 'product',
 
     if (validFiles.length < filesToProcess.length) {
       toast({
-        title: "Warning",
-        description: "Some files were skipped because they are not images.",
+        title: t("common.warning"),
+        description: t("common.upload.skipNonImages"),
         variant: "destructive",
       });
     }
@@ -79,8 +81,8 @@ export function ImageUpload({ images, onChange, maxImages = 5, type = 'product',
 
     if (files.length > remainingSlots) {
       toast({
-        title: "Warning",
-        description: `Maximum ${maxImages} images allowed. Only first ${remainingSlots} were processed.`,
+        title: t("common.warning"),
+        description: t("common.upload.maxReached", { max: maxImages, count: remainingSlots }),
         variant: "destructive",
       });
     }
@@ -129,7 +131,7 @@ export function ImageUpload({ images, onChange, maxImages = 5, type = 'product',
               </Button>
               {index === 0 && (
                 <div className="absolute bottom-2 left-2 bg-primary text-primary-foreground text-xs px-2 py-1 rounded">
-                  Primary
+                  {t("common.primary")}
                 </div>
               )}
             </div>
@@ -150,7 +152,7 @@ export function ImageUpload({ images, onChange, maxImages = 5, type = 'product',
         >
           <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
           <p className="text-sm text-muted-foreground mb-4">
-            Drag and drop images here, or click to select
+            {t("common.upload.dragDrop")}
           </p>
           <input
             type="file"
@@ -164,12 +166,12 @@ export function ImageUpload({ images, onChange, maxImages = 5, type = 'product',
             <Button type="button" variant="outline" asChild>
               <span>
                 <Plus className="h-4 w-4 mr-2" />
-                Select Images ({images.length}/{maxImages})
+                {t("common.upload.selectImages", { count: images.length, max: maxImages })}
               </span>
             </Button>
           </label>
           <p className="text-xs text-muted-foreground mt-2">
-            Maximum {maxImages} images. First image will be the primary image.
+            {t("common.upload.maxImagesInfo", { max: maxImages })}
           </p>
         </div>
       )}

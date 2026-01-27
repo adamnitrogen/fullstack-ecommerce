@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -27,6 +28,7 @@ import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errorUtils";
 
 export default function GalleryManagement() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [selectedFolder, setSelectedFolder] = useState<GalleryFolder | null>(null);
   const [folderDialogOpen, setFolderDialogOpen] = useState(false);
@@ -74,12 +76,12 @@ export default function GalleryManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["gallery-folders"] });
-      toast.success(editingFolder ? "Folder updated" : "Folder created");
+      toast.success(editingFolder ? t("admin.gallery.toasts.folderUpdated") : t("admin.gallery.toasts.folderCreated"));
       setFolderDialogOpen(false);
       setEditingFolder(null);
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, "Failed to save folder"));
+      toast.error(getErrorMessage(error, t("admin.gallery.toasts.saveFolderError")));
     },
   });
 
@@ -88,10 +90,10 @@ export default function GalleryManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["gallery-folders"] });
       setSelectedFolder(null);
-      toast.success("Folder deleted");
+      toast.success(t("admin.gallery.toasts.folderDeleted"));
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, "Failed to delete folder"));
+      toast.error(getErrorMessage(error, t("admin.gallery.toasts.deleteFolderError")));
     },
   });
 
@@ -100,7 +102,7 @@ export default function GalleryManagement() {
       galleryFolderService.update(id, { is_active }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["gallery-folders"] });
-      toast.success("Folder status updated");
+      toast.success(t("admin.gallery.toasts.folderStatus"));
     },
   });
 
@@ -109,10 +111,10 @@ export default function GalleryManagement() {
     mutationFn: galleryItemService.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["gallery-items"] });
-      toast.success("Image deleted");
+      toast.success(t("admin.gallery.toasts.imageDeleted"));
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, "Failed to delete image"));
+      toast.error(getErrorMessage(error, t("admin.gallery.toasts.deleteImageError")));
     },
   });
 
@@ -121,10 +123,10 @@ export default function GalleryManagement() {
     mutationFn: galleryVideoService.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["gallery-videos"] });
-      toast.success("Video deleted");
+      toast.success(t("admin.gallery.toasts.videoDeleted"));
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, "Failed to delete video"));
+      toast.error(getErrorMessage(error, t("admin.gallery.toasts.deleteVideoError")));
     },
   });
 
@@ -158,7 +160,7 @@ export default function GalleryManagement() {
   const handleDeleteFolder = (folder: GalleryFolder) => {
     if (
       confirm(
-        `Delete "${folder.name}"? This will also delete all images and videos in this folder.`
+        t("admin.gallery.deleteFolder", { name: folder.name })
       )
     ) {
       deleteFolderMutation.mutate(folder.id);
@@ -166,13 +168,13 @@ export default function GalleryManagement() {
   };
 
   const handleDeleteItem = (item: GalleryItem) => {
-    if (confirm("Delete this image?")) {
+    if (confirm(t("admin.gallery.deleteImage"))) {
       deleteItemMutation.mutate(item.id);
     }
   };
 
   const handleDeleteVideo = (video: GalleryVideo) => {
-    if (confirm("Delete this video?")) {
+    if (confirm(t("admin.gallery.deleteVideo"))) {
       deleteVideoMutation.mutate(video.id);
     }
   };
@@ -180,7 +182,7 @@ export default function GalleryManagement() {
   if (isLoading) {
     return (
       <div className="p-8">
-        <p className="text-muted-foreground">Loading gallery...</p>
+        <p className="text-muted-foreground">{t("admin.gallery.loading")}</p>
       </div>
     );
   }
@@ -189,9 +191,9 @@ export default function GalleryManagement() {
     <div className="p-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Gallery Management</h1>
+          <h1 className="text-3xl font-bold">{t("admin.gallery.title")}</h1>
           <p className="text-muted-foreground">
-            Manage gallery folders, images, and YouTube videos
+            {t("admin.gallery.subtitle")}
           </p>
         </div>
       </div>
@@ -200,15 +202,15 @@ export default function GalleryManagement() {
         <TabsList>
           <TabsTrigger value="folders">
             <FolderOpen className="h-4 w-4 mr-2" />
-            Folders ({folders.length})
+            {t("admin.gallery.folders")} ({folders.length})
           </TabsTrigger>
           <TabsTrigger value="images" disabled={!selectedFolder}>
             <ImageIcon className="h-4 w-4 mr-2" />
-            Images ({items.length})
+            {t("admin.gallery.images")} ({items.length})
           </TabsTrigger>
           <TabsTrigger value="videos" disabled={!selectedFolder}>
             <Video className="h-4 w-4 mr-2" />
-            Videos ({videos.length})
+            {t("admin.gallery.videos")} ({videos.length})
           </TabsTrigger>
         </TabsList>
 
@@ -217,8 +219,8 @@ export default function GalleryManagement() {
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">
               {selectedFolder
-                ? `Folder: ${selectedFolder.name}`
-                : "All Folders"}
+                ? `${t("admin.gallery.folder")}: ${selectedFolder.name}`
+                : t("admin.gallery.allFolders")}
             </h2>
             <Button
               onClick={() => {
@@ -227,7 +229,7 @@ export default function GalleryManagement() {
               }}
             >
               <Plus className="h-4 w-4 mr-2" />
-              New Folder
+              {t("admin.gallery.newFolder")}
             </Button>
           </div>
 
@@ -249,9 +251,11 @@ export default function GalleryManagement() {
                         <Badge
                           variant={folder.is_active ? "default" : "secondary"}
                         >
-                          {folder.is_active ? "Active" : "Inactive"}
+                          {folder.is_active ? t("common.active") : t("common.inactive")}
                         </Badge>
-                        <Badge variant="outline">{folder.folder_type}</Badge>
+                        <Badge variant="outline">
+                          {folder.folder_type.toLowerCase() === 'general' ? t("common.general") : folder.folder_type}
+                        </Badge>
                       </div>
                     </div>
                   </div>
@@ -318,7 +322,7 @@ export default function GalleryManagement() {
           {folders.length === 0 && (
             <div className="text-center py-12 bg-muted/30 rounded-lg">
               <p className="text-muted-foreground">
-                No folders yet. Create one to get started.
+                {t("admin.gallery.noFolders")}
               </p>
             </div>
           )}
@@ -328,11 +332,11 @@ export default function GalleryManagement() {
         <TabsContent value="images" className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">
-              Images in {selectedFolder?.name}
+              {t("admin.gallery.images")} {t("common.in")} {selectedFolder?.name}
             </h2>
             <Button onClick={() => setUploadDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Upload Images
+              {t("admin.gallery.uploadImages")}
             </Button>
           </div>
 
@@ -345,7 +349,7 @@ export default function GalleryManagement() {
                     <div className="relative">
                       <img
                         src={item.thumbnail_url || item.image_url}
-                        alt={item.title || "Gallery image"}
+                        alt={item.title || t("admin.gallery.dialog.preview")}
                         loading="lazy"
                         className="w-full h-40 object-cover rounded-md mb-2"
                       />
@@ -432,7 +436,7 @@ export default function GalleryManagement() {
           {items.length === 0 && (
             <div className="text-center py-12 bg-muted/30 rounded-lg">
               <p className="text-muted-foreground">
-                No images in this folder yet.
+                {t("admin.gallery.noImagesInFolder")}
               </p>
             </div>
           )}
@@ -442,7 +446,7 @@ export default function GalleryManagement() {
         <TabsContent value="videos" className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">
-              Videos in {selectedFolder?.name}
+              {t("admin.gallery.videos")} {t("common.in")} {selectedFolder?.name}
             </h2>
             <Button
               onClick={() => {
@@ -451,7 +455,7 @@ export default function GalleryManagement() {
               }}
             >
               <Plus className="h-4 w-4 mr-2" />
-              Add YouTube Video
+              {t("admin.gallery.addVideo")}
             </Button>
           </div>
 
@@ -502,7 +506,7 @@ export default function GalleryManagement() {
           {videos.length === 0 && (
             <div className="text-center py-12 bg-muted/30 rounded-lg">
               <p className="text-muted-foreground">
-                No videos in this folder yet.
+                {t("admin.gallery.noVideosInFolder")}
               </p>
             </div>
           )}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ import { useAuthStore } from "@/store/authStore";
 import { userService } from "@/services/user.service";
 
 export default function UsersManagement() {
+  const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -53,8 +55,8 @@ export default function UsersManagement() {
   const handleExport = () => {
     if (filteredUsers.length === 0) {
       toast({
-        title: "No data to export",
-        description: "There are no admins to export.",
+        title: t("common.noData"),
+        description: t("admin.users.noDataDesc"),
         variant: "destructive",
       });
       return;
@@ -72,8 +74,8 @@ export default function UsersManagement() {
 
     downloadCSV(exportData, "admins");
     toast({
-      title: "Export successful",
-      description: "Admins data has been downloaded.",
+      title: t("common.exportSuccess"),
+      description: t("admin.users.exportDesc"),
     });
   };
 
@@ -81,19 +83,19 @@ export default function UsersManagement() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Admin Management</h1>
+          <h1 className="text-3xl font-bold">{t("admin.users.title")}</h1>
           <p className="text-muted-foreground">
-            Manage admin users and their permissions
+            {t("admin.users.subtitle")}
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" />
-            Export CSV
+            {t("common.exportCSV")}
           </Button>
           <Button onClick={handleAddNewAdmin}>
             <Plus className="h-4 w-4 mr-2" />
-            Add Admin
+            {t("admin.users.addAdmin")}
           </Button>
         </div>
       </div>
@@ -104,7 +106,7 @@ export default function UsersManagement() {
           <Input
             id="user-search"
             name="search"
-            placeholder="Search by name, email, or phone..."
+            placeholder={t("admin.users.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -116,18 +118,18 @@ export default function UsersManagement() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Phone</TableHead>
-              <TableHead>Addresses</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>{t("profile.personalInfo.name")}</TableHead>
+              <TableHead>{t("profile.personalInfo.email")}</TableHead>
+              <TableHead>{t("profile.personalInfo.phone")}</TableHead>
+              <TableHead>{t("profile.address.title")}</TableHead>
+              <TableHead>{t("common.status")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center py-8">
-                  Loading admins...
+                  {t("admin.users.loading")}
                 </TableCell>
               </TableRow>
             ) : filteredUsers.length === 0 ? (
@@ -136,7 +138,7 @@ export default function UsersManagement() {
                   colSpan={5}
                   className="text-center py-8 text-muted-foreground"
                 >
-                  No admins found. Add your first admin to get started.
+                  {t("admin.users.noUsersFound")}
                 </TableCell>
               </TableRow>
             ) : (
@@ -145,17 +147,17 @@ export default function UsersManagement() {
                 const isActive = user.isActive ?? true;
 
                 // Determine status
-                let statusText = "Active";
+                let statusText = t("admin.users.status.active");
                 let statusClass = "bg-green-500";
                 let statusVariant: "default" | "secondary" | "destructive" =
                   "default";
 
                 if (isDeleted) {
-                  statusText = "Deleted";
+                  statusText = t("admin.users.status.deleted");
                   statusClass = "bg-red-500";
                   statusVariant = "destructive";
                 } else if (!isActive) {
-                  statusText = "Inactive";
+                  statusText = t("admin.users.status.inactive");
                   statusClass = "bg-gray-400";
                   statusVariant = "secondary";
                 }
@@ -165,7 +167,7 @@ export default function UsersManagement() {
                     <TableCell className="font-medium">{user.name}</TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>{user.phone || "-"}</TableCell>
-                    <TableCell>{user.addresses.length} address(es)</TableCell>
+                    <TableCell>{t("admin.users.addresses", { count: user.addresses.length })}</TableCell>
                     <TableCell>
                       <Badge variant={statusVariant} className={statusClass}>
                         {statusText}

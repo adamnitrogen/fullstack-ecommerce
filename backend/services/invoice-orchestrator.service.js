@@ -12,14 +12,9 @@ const RazorpayInvoiceService = require('./razorpay-invoice.service');
 const InternalInvoiceService = require('./internal-invoice.service');
 const { FinancialEventLogger } = require('./financial-event-logger.service');
 const emailService = require('./email');
+const { INVOICE_STATUS, ORDER_INVOICE_STATUS } = require('../config/constants');
 
 const log = createModuleLogger('InvoiceOrchestrator');
-
-const INVOICE_STATUS = {
-    PENDING: 'PENDING',
-    GENERATED: 'GENERATED',
-    FAILED: 'FAILED'
-};
 
 class InvoiceOrchestrator {
 
@@ -48,14 +43,14 @@ class InvoiceOrchestrator {
                     invoice_number: invoice.invoiceNumber,
                     provider_id: invoice.invoiceId,
                     public_url: invoice.invoiceUrl,
-                    status: 'GENERATED'
+                    status: INVOICE_STATUS.GENERATED
                 });
 
                 // NOTE: We do NOT set invoice_url here anymore.
                 // invoice_url is reserved for the Internal GST Invoice (generated at delivery).
                 // Razorpay receipts are accessed via the invoices array (type='RAZORPAY').
                 await supabase.from('orders').update({
-                    invoice_status: 'receipt_generated'
+                    invoice_status: ORDER_INVOICE_STATUS.RECEIPT_GENERATED
                 }).eq('id', order.id);
 
                 log.operationSuccess('GENERATE_RAZORPAY_INVOICE', { invoiceId: invoice.invoiceId });
@@ -66,7 +61,7 @@ class InvoiceOrchestrator {
 
         } catch (error) {
             log.operationError('GENERATE_RAZORPAY_INVOICE', error);
-            await supabase.from('orders').update({ invoice_status: 'failed' }).eq('id', order.id); // Track failure on order broadly
+            await supabase.from('orders').update({ invoice_status: ORDER_INVOICE_STATUS.FAILED }).eq('id', order.id); // Track failure on order broadly
             return { success: false, error: error.message };
         }
     }
@@ -106,7 +101,7 @@ class InvoiceOrchestrator {
                 await supabase.from('orders').update({
                     invoice_id: result.invoiceId,
                     invoice_number: result.invoiceNumber,
-                    invoice_status: 'generated',
+                    invoice_status: ORDER_INVOICE_STATUS.GENERATED,
                     invoice_generated_at: new Date().toISOString(),
                     invoice_url: invoiceUrl
                 }).eq('id', orderId);
@@ -134,7 +129,7 @@ class InvoiceOrchestrator {
             const { data: failedOrders, error } = await supabase
                 .from('orders')
                 .select('id, order_number, invoice_status')
-                .eq('invoice_status', 'failed')
+                .eq('invoice_status', ORDER_INVOICE_STATUS.FAILED)
                 .limit(limit);
 
             if (error) throw error;
@@ -174,7 +169,7 @@ class InvoiceOrchestrator {
 
             const stats = {
                 orders: (orderStats || []).reduce((acc, curr) => {
-                    const status = curr.invoice_status || 'pending';
+                    const status = curr.invoice_status || ORDER_INVOICE_STATUS.PENDING;
                     acc[status] = (acc[status] || 0) + 1;
                     return acc;
                 }, {}),
@@ -325,7 +320,7 @@ class InvoiceOrchestrator {
                         .from('invoices')
                         .update({
                             file_path: null,
-                            status: 'EXPIRED',
+                            status: INVOICE_STATUS.EXPIRED,
                             // Keep public_url? Probably invalid now if it pointed to this file
                             // But usually public_url handled by route.
                             // If we delete the file, the route will fail anyway.

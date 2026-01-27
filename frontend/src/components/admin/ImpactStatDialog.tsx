@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { aboutService } from "@/services/about.service";
 import { ImpactStat } from "@/types";
 import { useToast } from "@/hooks/use-toast";
@@ -46,6 +47,7 @@ export default function ImpactStatDialog({
   onOpenChange,
   stat,
 }: ImpactStatDialogProps) {
+  const { t } = useTranslation();
   const [value, setValue] = useState("");
   const [label, setLabel] = useState("");
   const [icon, setIcon] = useState("TrendingUp");
@@ -73,13 +75,13 @@ export default function ImpactStatDialog({
       aboutService.createStat(newStat),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["aboutUs"] });
-      toast({ title: "Impact stat added successfully" });
+      toast({ title: t("admin.about.toasts.deleteStat") });
       onOpenChange(false);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Failed to add impact stat",
-        description: getErrorMessage(error, "Failed to add impact stat"),
+        title: t("admin.about.toasts.deleteStatError"),
+        description: getErrorMessage(error, t("admin.about.toasts.deleteStatError")),
         variant: "destructive",
       });
     },
@@ -95,13 +97,13 @@ export default function ImpactStatDialog({
     }) => aboutService.updateStat(id, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["aboutUs"] });
-      toast({ title: "Impact stat updated successfully" });
+      toast({ title: t("admin.about.toasts.deleteStat") });
       onOpenChange(false);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Failed to update impact stat",
-        description: getErrorMessage(error, "Failed to update impact stat"),
+        title: t("admin.about.toasts.deleteStatError"),
+        description: getErrorMessage(error, t("admin.about.toasts.deleteStatError")),
         variant: "destructive",
       });
     },
@@ -112,8 +114,8 @@ export default function ImpactStatDialog({
 
     if (!value.trim() || !label.trim()) {
       toast({
-        title: "Error",
-        description: "Please fill in all required fields",
+        title: t("common.error"),
+        description: t("auth.fillAllFields"),
         variant: "destructive",
       });
       return;
@@ -138,7 +140,9 @@ export default function ImpactStatDialog({
       <DialogContent className="sm:max-w-4xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="text-2xl">
-            {stat ? "Edit Impact Statistic" : "Add New Impact Statistic"}
+            {stat
+              ? t("admin.about.dialog.editTitle", { type: t("admin.about.dialog.types.impact") })
+              : t("admin.about.dialog.addTitle", { type: t("admin.about.dialog.types.impact") })}
           </DialogTitle>
         </DialogHeader>
 
@@ -146,30 +150,30 @@ export default function ImpactStatDialog({
           <form onSubmit={handleSubmit} className="space-y-6 py-2">
             {/* Statistic Information */}
             <div className="space-y-4 border rounded-lg p-4">
-              <h3 className="text-base font-semibold">Statistic Details</h3>
+              <h3 className="text-base font-semibold">{t("admin.about.dialog.types.impact")}</h3>
 
               <div className="space-y-2">
                 <Label htmlFor="value">
-                  Value <span className="text-destructive">*</span>
+                  {t("admin.about.dialog.impact.value")} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="value"
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
-                  placeholder="e.g., 500+ or ₹1Cr+"
+                  placeholder={t("admin.about.dialog.impact.valuePlaceholder")}
                   required
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="label">
-                  Label <span className="text-destructive">*</span>
+                  {t("admin.about.dialog.impact.label")} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="label"
                   value={label}
                   onChange={(e) => setLabel(e.target.value)}
-                  placeholder="e.g., Cows Rescued"
+                  placeholder={t("admin.about.dialog.impact.labelPlaceholder")}
                   required
                 />
               </div>
@@ -177,10 +181,10 @@ export default function ImpactStatDialog({
 
             {/* Display Settings */}
             <div className="space-y-4 border rounded-lg p-4">
-              <h3 className="text-base font-semibold">Display Settings</h3>
+              <h3 className="text-base font-semibold">{t("admin.about.dialog.displaySettings")}</h3>
 
               <div className="space-y-2">
-                <Label htmlFor="icon">Icon</Label>
+                <Label htmlFor="icon">{t("admin.about.dialog.impact.icon")}</Label>
                 <Select value={icon} onValueChange={setIcon}>
                   <SelectTrigger id="icon">
                     <SelectValue />
@@ -196,7 +200,7 @@ export default function ImpactStatDialog({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="order">Display Order (1-4)</Label>
+                <Label htmlFor="order">{t("admin.about.dialog.displayOrder")}</Label>
                 <Input
                   id="order"
                   type="number"
@@ -214,13 +218,13 @@ export default function ImpactStatDialog({
                 variant="outline"
                 onClick={() => onOpenChange(false)}
               >
-                Cancel
+                {t("admin.about.dialog.cancel")}
               </Button>
               <Button
                 type="submit"
                 disabled={createMutation.isPending || updateMutation.isPending}
               >
-                {stat ? "Update" : "Add"} Statistic
+                {stat ? t("common.update") : t("common.add")} {t("admin.about.dialog.types.impact")}
               </Button>
             </DialogFooter>
           </form>

@@ -4,8 +4,9 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { ApiErrorResponse } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { getGuestId } from '@/lib/guestId';
+import { CONFIG } from "@/config";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+const API_BASE_URL = CONFIG.API_BASE_URL;
 
 interface CustomAxiosConfig extends InternalAxiosRequestConfig {
     metadata?: {

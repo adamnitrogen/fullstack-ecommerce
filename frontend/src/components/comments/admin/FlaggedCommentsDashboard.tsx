@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { commentService } from "@/services/comment.service";
 import { Comment } from "@/types/comment";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ import { toast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from 'date-fns';
 
 export const FlaggedCommentsDashboard = () => {
+    const { t } = useTranslation();
     const queryClient = useQueryClient();
     const [page, setPage] = useState(1);
     const [statusFilter, setStatusFilter] = useState<string>("active");
@@ -36,7 +38,7 @@ export const FlaggedCommentsDashboard = () => {
         mutationFn: (id: string) => commentService.approveComment(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['flagged-comments'] });
-            toast({ title: "Comment approved" });
+            toast({ title: t("comments.admin.approvedSuccess") });
         }
     });
 
@@ -44,7 +46,7 @@ export const FlaggedCommentsDashboard = () => {
         mutationFn: (id: string) => commentService.hideComment(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['flagged-comments'] });
-            toast({ title: "Comment hidden" });
+            toast({ title: t("comments.admin.hiddenSuccess") });
         }
     });
 
@@ -52,7 +54,7 @@ export const FlaggedCommentsDashboard = () => {
         mutationFn: (id: string) => commentService.deleteComment(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['flagged-comments'] });
-            toast({ title: "Comment deleted" });
+            toast({ title: t("comments.deleteSuccess") });
         }
     });
 
@@ -61,7 +63,7 @@ export const FlaggedCommentsDashboard = () => {
     }
 
     if (isError) {
-        return <div className="text-destructive p-8">Failed to load flagged comments</div>;
+        return <div className="text-destructive p-8">{t("comments.failedToLoad")}</div>;
     }
 
     const comments = data?.comments || [];
@@ -69,15 +71,15 @@ export const FlaggedCommentsDashboard = () => {
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">Moderation Dashboard</h2>
+                <h2 className="text-2xl font-bold">{t("comments.moderationDashboard")}</h2>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                     <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Filter by status" />
+                        <SelectValue placeholder={t("comments.admin.filterByStatus")} />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="hidden">Hidden</SelectItem>
-                        <SelectItem value="deleted">Deleted</SelectItem>
+                        <SelectItem value="active">{t("comments.active")}</SelectItem>
+                        <SelectItem value="hidden">{t("comments.hidden")}</SelectItem>
+                        <SelectItem value="deleted">{t("comments.deleted")}</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
@@ -86,19 +88,19 @@ export const FlaggedCommentsDashboard = () => {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>User</TableHead>
-                            <TableHead className="w-[40%]">Content</TableHead>
-                            <TableHead>Flags</TableHead>
-                            <TableHead>Reason</TableHead>
-                            <TableHead>Posted</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
+                            <TableHead>{t("comments.user")}</TableHead>
+                            <TableHead className="w-[40%]">{t("comments.content")}</TableHead>
+                            <TableHead>{t("comments.flags")}</TableHead>
+                            <TableHead>{t("comments.reason")}</TableHead>
+                            <TableHead>{t("comments.posted")}</TableHead>
+                            <TableHead className="text-right">{t("comments.actions")}</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {comments.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                                    No flagged comments found.
+                                    {t("comments.admin.noFlaggedFound")}
                                 </TableCell>
                             </TableRow>
                         ) : (
@@ -129,7 +131,7 @@ export const FlaggedCommentsDashboard = () => {
                                             variant="outline"
                                             className="text-green-600 hover:text-green-700 hover:bg-green-50"
                                             onClick={() => approveMutation.mutate(comment.id)}
-                                            title="Approve (Unflag)"
+                                            title={t("comments.admin.approve")}
                                         >
                                             <Check className="h-4 w-4" />
                                         </Button>
@@ -138,7 +140,7 @@ export const FlaggedCommentsDashboard = () => {
                                             variant="outline"
                                             className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"
                                             onClick={() => hideMutation.mutate(comment.id)}
-                                            title="Hide"
+                                            title={t("comments.admin.hide")}
                                         >
                                             <EyeOff className="h-4 w-4" />
                                         </Button>
@@ -147,7 +149,7 @@ export const FlaggedCommentsDashboard = () => {
                                             variant="outline"
                                             className="text-red-600 hover:text-red-700 hover:bg-red-50"
                                             onClick={() => deleteMutation.mutate(comment.id)}
-                                            title="Delete"
+                                            title={t("comments.delete")}
                                         >
                                             <Trash2 className="h-4 w-4" />
                                         </Button>

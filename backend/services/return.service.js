@@ -8,6 +8,7 @@ const { DeliveryChargeService } = require('./delivery-charge.service');
 const emailService = require('./email');
 const { createModuleLogger } = require('../utils/logging-standards');
 const orderService = require('./order.service');
+const MESSAGES = require('../config/messages');
 
 const log = createModuleLogger('ReturnService');
 const { logStatusHistory } = require('./history.service');
@@ -32,7 +33,7 @@ const getReturnableItems = async (orderId, userId) => {
         .eq('user_id', userId)
         .single();
 
-    if (orderError || !order) throw new Error('Order not found or access denied');
+    if (orderError || !order) throw new Error(MESSAGES.RETURN.ORDER_NOT_FOUND);
     const allowedStatuses = [
         'delivered',
         'return_requested',
@@ -300,7 +301,7 @@ const processReturnApproval = async (returnId, adminId) => {
         .eq('id', returnId)
         .single();
 
-    if (fetchError || !returnRequest) throw new Error('Return request not found');
+    if (fetchError || !returnRequest) throw new Error(MESSAGES.RETURN.REQUEST_NOT_FOUND);
     if (returnRequest.status !== 'requested') {
         throw new Error(`Return request cannot be approved from ${returnRequest.status} state`);
     }
@@ -399,7 +400,7 @@ const cancelReturnRequest = async (returnId, userId) => {
         .eq('user_id', userId)
         .single();
 
-    if (fetchError || !returnRequest) throw new Error('Return request not found');
+    if (fetchError || !returnRequest) throw new Error(MESSAGES.RETURN.REQUEST_NOT_FOUND);
 
     // 2. Cancellation Check
     // Customers can only cancel if it's in 'requested' status.
@@ -433,7 +434,7 @@ const updateReturnStatus = async (returnId, status, adminId, notes = '') => {
         .eq('id', returnId)
         .single();
 
-    if (fetchError || !returnRequest) throw new Error('Return request not found');
+    if (fetchError || !returnRequest) throw new Error(MESSAGES.RETURN.REQUEST_NOT_FOUND);
 
     // 2. Validate Transition Logic
     const validStatuses = ['approved', 'pickup_scheduled', 'picked_up', 'item_returned', 'cancelled', 'completed'];
@@ -489,7 +490,7 @@ const updateReturnItemStatus = async (returnItemId, status, adminId, notes = '')
         .eq('id', returnItemId)
         .single();
 
-    if (fetchError || !item) throw new Error('Return item not found');
+    if (fetchError || !item) throw new Error(MESSAGES.RETURN.ITEM_NOT_FOUND);
 
     const oldStatus = item.status;
     if (oldStatus === status) return { success: true };
@@ -583,7 +584,7 @@ const handleItemRefund = async (item, adminId) => {
         .limit(1)
         .single();
 
-    if (!payment?.razorpay_payment_id) throw new Error('Payment ID not found');
+    if (!payment?.razorpay_payment_id) throw new Error(MESSAGES.RETURN.PAYMENT_ID_NOT_FOUND);
 
     // 3. Initiate Razorpay Refund
     log.info('RAZORPAY_REFUND_INIT', `Refunding ₹${refundAmount} for item ${item.id}`, { paymentId: payment.razorpay_payment_id });

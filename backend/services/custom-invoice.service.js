@@ -3,7 +3,9 @@ const path = require('path');
 const puppeteer = require('puppeteer');
 const handlebars = require('handlebars');
 const supabase = require('../config/supabase');
+
 const logger = require('../utils/logger');
+const MESSAGES = require('../config/messages');
 const { createModuleLogger } = require('../utils/logging-standards');
 
 const log = createModuleLogger('CustomInvoiceService');
@@ -36,11 +38,11 @@ class CustomInvoiceService {
                 .eq('id', orderId)
                 .single();
 
-            if (fetchError || !order) throw new Error('Order not found');
+            if (fetchError || !order) throw new Error(MESSAGES.INVOICE.ORDER_NOT_FOUND);
 
             // 2. Validate Status
             if (order.status !== 'delivered') {
-                throw new Error('Invoices can only be generated for delivered orders');
+                throw new Error(MESSAGES.INVOICE.DELIVERED_ONLY);
             }
 
             // 3. Determine Invoice Title

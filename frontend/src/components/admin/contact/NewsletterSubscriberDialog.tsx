@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { newsletterService, NewsletterSubscriber } from "@/services/newsletter.service";
-import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
+import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import {
     Dialog,
     DialogContent,
@@ -29,7 +30,7 @@ export function NewsletterSubscriberDialog({
     const [email, setEmail] = useState("");
     const [name, setName] = useState("");
 
-    const { toast } = useToast();
+    const { t } = useTranslation();
     const queryClient = useQueryClient();
 
     useEffect(() => {
@@ -48,15 +49,11 @@ export function NewsletterSubscriberDialog({
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["newsletter-subscribers"] });
             queryClient.invalidateQueries({ queryKey: ["newsletter-stats"] });
-            toast({ title: "Subscriber added successfully" });
+            toast.success(t("admin.newsletter.subscriberAdded"));
             onOpenChange(false);
         },
         onError: (error: unknown) => {
-            toast({
-                title: "Failed to add subscriber",
-                description: getErrorMessage(error, "Failed to add subscriber"),
-                variant: "destructive",
-            });
+            toast.error(getErrorMessage(error, t("admin.newsletter.addError")));
         },
     });
 
@@ -66,15 +63,11 @@ export function NewsletterSubscriberDialog({
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["newsletter-subscribers"] });
             queryClient.invalidateQueries({ queryKey: ["newsletter-stats"] });
-            toast({ title: "Subscriber updated successfully" });
+            toast.success(t("admin.newsletter.subscriberUpdated"));
             onOpenChange(false);
         },
         onError: (error: unknown) => {
-            toast({
-                title: "Failed to update subscriber",
-                description: getErrorMessage(error, "Failed to update subscriber"),
-                variant: "destructive",
-            });
+            toast.error(getErrorMessage(error, t("admin.newsletter.updateError")));
         },
     });
 
@@ -82,11 +75,7 @@ export function NewsletterSubscriberDialog({
         e.preventDefault();
 
         if (!email.trim()) {
-            toast({
-                title: "Error",
-                description: "Email is required",
-                variant: "destructive",
-            });
+            toast.error(t("admin.newsletter.dialog.emailRequired"));
             return;
         }
 
@@ -107,19 +96,19 @@ export function NewsletterSubscriberDialog({
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>
-                        {subscriber ? "Edit Subscriber" : "Add New Subscriber"}
+                        {subscriber ? t("admin.newsletter.dialog.editTitle") : t("admin.newsletter.dialog.addTitle")}
                     </DialogTitle>
                     <DialogDescription>
                         {subscriber
-                            ? "Update the subscriber's information"
-                            : "Add a new newsletter subscriber"}
+                            ? t("admin.newsletter.dialog.editDesc")
+                            : t("admin.newsletter.dialog.addDesc")}
                     </DialogDescription>
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-4 py-4">
                     <div className="space-y-2">
                         <Label htmlFor="email">
-                            Email <span className="text-destructive">*</span>
+                            {t("admin.newsletter.dialog.email")} <span className="text-destructive">*</span>
                         </Label>
                         <Input
                             id="email"
@@ -132,13 +121,13 @@ export function NewsletterSubscriberDialog({
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="name">Name (Optional)</Label>
+                        <Label htmlFor="name">{t("admin.newsletter.dialog.name")}</Label>
                         <Input
                             id="name"
                             type="text"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
-                            placeholder="John Doe"
+                            placeholder={t("contact.namePlaceholder")}
                         />
                     </div>
 
@@ -148,13 +137,13 @@ export function NewsletterSubscriberDialog({
                             variant="outline"
                             onClick={() => onOpenChange(false)}
                         >
-                            Cancel
+                            {t("common.cancel")}
                         </Button>
                         <Button
                             type="submit"
                             disabled={createMutation.isPending || updateMutation.isPending}
                         >
-                            {subscriber ? "Update" : "Add"} Subscriber
+                            {subscriber ? t("admin.newsletter.dialog.updateBtn") : t("admin.newsletter.dialog.addBtn")}
                         </Button>
                     </DialogFooter>
                 </form>

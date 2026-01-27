@@ -1,6 +1,7 @@
 import { Facebook, Twitter, Linkedin, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from 'react-i18next';
 
 interface SocialShareProps {
   url: string;
@@ -11,6 +12,7 @@ interface SocialShareProps {
 
 export function SocialShare({ url, title, description, className = '' }: SocialShareProps) {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const fullUrl = url.startsWith('http') ? url : `${window.location.origin}${url}`;
   const encodedUrl = encodeURIComponent(fullUrl);
   const encodedTitle = encodeURIComponent(title);
@@ -49,7 +51,7 @@ export function SocialShare({ url, title, description, className = '' }: SocialS
 
   return (
     <div className={`space-y-3 ${className}`}>
-      <h3 className="text-sm font-medium text-foreground">Share this article</h3>
+      <h3 className="text-sm font-medium text-foreground">{t('products.shareArticle')}</h3>
       <div className="flex flex-wrap gap-2">
         <Button
           variant="outline"
@@ -60,7 +62,7 @@ export function SocialShare({ url, title, description, className = '' }: SocialS
           <Facebook className="h-4 w-4" />
           <span className="hidden sm:inline">Facebook</span>
         </Button>
-        
+
         <Button
           variant="outline"
           size="sm"
@@ -70,7 +72,7 @@ export function SocialShare({ url, title, description, className = '' }: SocialS
           <Twitter className="h-4 w-4" />
           <span className="hidden sm:inline">Twitter</span>
         </Button>
-        
+
         <Button
           variant="outline"
           size="sm"
@@ -80,7 +82,7 @@ export function SocialShare({ url, title, description, className = '' }: SocialS
           <Linkedin className="h-4 w-4" />
           <span className="hidden sm:inline">LinkedIn</span>
         </Button>
-        
+
         <Button
           variant="outline"
           size="sm"

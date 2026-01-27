@@ -173,14 +173,14 @@ export const HeroCarousel = () => {
           <button
             onClick={handlePrev}
             className="absolute left-4 top-1/2 -translate-y-1/2 z-30 p-2 rounded-full bg-black/20 text-white backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all hover:bg-black/40 hidden md:flex"
-            aria-label="Previous slide"
+            aria-label={t("hero.aria.previous", "Previous slide")}
           >
             <ChevronLeft className="h-8 w-8" />
           </button>
           <button
             onClick={handleNext}
             className="absolute right-4 top-1/2 -translate-y-1/2 z-30 p-2 rounded-full bg-black/20 text-white backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all hover:bg-black/40 hidden md:flex"
-            aria-label="Next slide"
+            aria-label={t("hero.aria.next", "Next slide")}
           >
             <ChevronRight className="h-8 w-8" />
           </button>
@@ -197,7 +197,7 @@ export const HeroCarousel = () => {
               ? "bg-white w-8"
               : "bg-white/50 hover:bg-white/75"
               }`}
-            aria-label={`Go to slide ${index + 1}`}
+            aria-label={t("hero.aria.goToSlide", { index: index + 1, defaultValue: `Go to slide ${index + 1}` })}
           />
         ))}
       </div>

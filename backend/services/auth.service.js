@@ -8,6 +8,7 @@ const { createClient } = require('@supabase/supabase-js');
 const phoneValidator = require('../utils/phone-validator');
 const emailService = require('./email');
 const { invalidateAuthCache } = require('../middleware/auth.middleware');
+const MESSAGES = require('../config/messages');
 
 
 // Encryption Keys (should be in env, but generating for now or using secret)
@@ -47,7 +48,7 @@ class AuthService {
             .single();
 
         if (error || !profile) {
-            throw new Error('User not found');
+            throw new Error(MESSAGES.AUTH.USER_NOT_FOUND);
         }
 
         return {
@@ -91,8 +92,8 @@ class AuthService {
             const { data: { user }, error } = await supabaseAdmin.auth.getUser(accessToken);
 
             if (error || !user) {
-                logger.error({ err: error }, '[AuthService] Supabase token validation failed in syncSession');
-                const err = new Error('Invalid session token');
+                logger.error({ err: error }, '[AuthService] session_validation_failed');
+                const err = new Error(MESSAGES.AUTH.INVALID_SESSION);
                 err.status = 401;
                 throw err;
             }
@@ -106,7 +107,7 @@ class AuthService {
 
             if (profileError && profileError.code === '42703') {
                 // FALLBACK: If welcome_sent column is missing, retry without it
-                logger.warn({ userId: user.id }, '[AuthService] welcome_sent column missing, falling back to safe select');
+                logger.warn({ userId: user.id }, '[AuthService] welcome_sent_column_missing_fallback');
                 const fallback = await supabaseAdmin
                     .from('profiles')
                     .select('is_deleted, deletion_status, scheduled_deletion_at, auth_provider')
@@ -117,13 +118,13 @@ class AuthService {
             }
 
             if (profileError && profileError.code !== 'PGRST116') {
-                logger.error({ err: profileError, userId: user.id }, '[AuthService] Error looking up profile in syncSession');
+                logger.error({ err: profileError, userId: user.id }, '[AuthService] profile_lookup_failed');
                 throw profileError;
             }
 
             if (!profile) {
                 // Profile missing! If it's an OAuth user, create it.
-                logger.info({ userId: user.id }, '[AuthService] Profile missing for user, creating new profile');
+                logger.info({ userId: user.id }, '[AuthService] profile_missing_initial_creation');
 
                 const { data: roleData } = await supabaseAdmin
                     .from('roles')
@@ -153,8 +154,8 @@ class AuthService {
                     });
 
                 if (createError) {
-                    logger.error({ err: createError, userId: user.id }, '[AuthService] Failed to create profile during sync');
-                    const err = new Error('Failed to initialize user profile');
+                    logger.error({ err: createError, userId: user.id }, '[AuthService] profile_creation_failed');
+                    const err = new Error(MESSAGES.AUTH.PROFILE_INIT_FAILED);
                     err.status = 500;
                     throw err;
                 }
@@ -171,7 +172,7 @@ class AuthService {
                 const needsWelcomeEmail = profile.welcome_sent === false && !profile.is_deleted;
 
                 if (needsInitialGoogleSync || needsWelcomeEmail) {
-                    logger.info({ userId: user.id, needsInitialGoogleSync, needsWelcomeEmail }, '[AuthService] Profile needs sync or welcome email');
+                    logger.info({ userId: user.id, needsInitialGoogleSync, needsWelcomeEmail }, '[AuthService] profile_sync_required');
 
                     const name = user.user_metadata?.full_name || user.user_metadata?.name || 'User';
                     const nameParts = name.trim().split(' ');
@@ -195,7 +196,7 @@ class AuthService {
                     this.triggerWelcomeEmail(user, null, 'catch_up');
                 } else if (profile?.is_deleted || profile?.deletion_status === 'DELETION_IN_PROGRESS') {
                     // ... (rest of the reactivation logic)
-                    logger.info({ userId: user.id }, '[AuthService] Reactivating deleted profile during sync');
+                    logger.info({ userId: user.id }, '[AuthService] profile_reactivation_sync');
 
                     // Reactivate the profile
                     const { error: reactivateError } = await supabaseAdmin
@@ -211,8 +212,8 @@ class AuthService {
                         .eq('id', user.id);
 
                     if (reactivateError) {
-                        logger.error({ err: reactivateError, userId: user.id }, '[AuthService] Failed to reactivate profile');
-                        const err = new Error('Failed to reactivate account');
+                        logger.error({ err: reactivateError, userId: user.id }, '[AuthService] reactivation_failed');
+                        const err = new Error(MESSAGES.AUTH.REACTIVATION_FAILED);
                         err.status = 500;
                         throw err;
                     }
@@ -229,9 +230,9 @@ class AuthService {
                         .eq('user_id', user.id)
                         .in('status', ['PENDING', 'IN_PROGRESS'])
                         .then(({ error }) => {
-                            if (error) logger.warn({ err: error, userId: user.id }, '[AuthService] Failed to cancel deletion jobs in background');
+                            if (error) logger.warn({ err: error, userId: user.id }, '[AuthService] deletion_job_cancellation_failed');
                         })
-                        .catch(err => logger.warn({ err, userId: user.id }, '[AuthService] Error in background deletion job cancellation'));
+                        .catch(err => logger.warn({ err, userId: user.id }, '[AuthService] deletion_job_cancellation_error'));
                 }
             }
 
@@ -239,20 +240,20 @@ class AuthService {
             if (guestId) {
                 try {
                     await CartService.mergeGuestCart(user.id, guestId);
-                    logger.info({ userId: user.id }, '[AuthService] Guest cart merged during syncSession');
+                    logger.info({ userId: user.id }, '[AuthService] guest_cart_merged');
                 } catch (err) {
-                    logger.error({ err }, 'Cart merge failed during syncSession');
+                    logger.error({ err }, '[AuthService] guest_cart_merge_failed');
                     // Continue anyway, don't block login
                 }
             }
 
-            logger.info({ userId: user.id }, '[AuthService] syncSession nearly complete, fetching final profile');
+            logger.info({ userId: user.id }, '[AuthService] sync_session_finalizing');
             // Return full user profile for consistency
             return await this.getUserProfile(user.id);
         } catch (error) {
             if (error.status) throw error;
-            logger.error({ err: error }, '[AuthService] Unexpected error in syncSession');
-            const err = new Error(error.message || 'Session synchronization failed');
+            logger.error({ err: error }, '[AuthService] unexpected_sync_error');
+            const err = new Error(error.message || MESSAGES.AUTH.SYNC_FAILED);
             err.status = 500;
             throw err;
         }
@@ -271,7 +272,7 @@ class AuthService {
                 .single();
 
             if (profileError) {
-                logger.warn({ err: profileError, userId: user.id, source }, '[AuthService] Profile lookup failed in triggerWelcomeEmail');
+                logger.warn({ err: profileError, userId: user.id, source }, '[AuthService] trigger_welcome_lookup_failed');
                 // If the column doesn't exist yet, we don't want to crash. 
                 // But we also don't want to spam if it's a real error.
                 if (profileError.code !== '42703') {
@@ -284,16 +285,16 @@ class AuthService {
                 // If undefined, either the user is missing or the column is missing (migration not run).
                 // In either case, we should skip to avoid spam or errors.
                 if (profile?.welcome_sent === true) {
-                    logger.info({ userId: user.id, source }, '[AuthService] Welcome email already sent, skipping');
+                    logger.info({ userId: user.id, source }, '[AuthService] welcome_email_already_sent');
                 } else {
-                    logger.info({ userId: user.id, source }, '[AuthService] Welcome email skipped (already sent or tracking column missing)');
+                    logger.info({ userId: user.id, source }, '[AuthService] welcome_email_skipped_tracking_missing');
                 }
                 return;
             }
 
             const finalName = name || profile?.name || user.user_metadata?.full_name || user.user_metadata?.name || 'User';
 
-            logger.info({ userId: user.id, email: user.email, name: finalName, source }, '[AuthService] Triggering welcome email');
+            logger.info({ userId: user.id, email: user.email, name: finalName, source }, '[AuthService] trigger_welcome_init');
 
             // Send email
             await emailService.sendRegistrationEmail(user.email, { name: finalName, email: user.email });
@@ -305,17 +306,17 @@ class AuthService {
                 .eq('id', user.id);
 
             if (updateError) {
-                logger.error({ err: updateError, userId: user.id }, '[AuthService] Failed to update welcome_sent flag after sending email');
+                logger.error({ err: updateError, userId: user.id }, '[AuthService] welcome_sent_flag_update_failed');
             }
         } catch (eErr) {
-            logger.error({ err: eErr, userId: user.id, source }, '[AuthService] Error in triggerWelcomeEmail');
+            logger.error({ err: eErr, userId: user.id, source }, '[AuthService] trigger_welcome_error');
         }
     }
 
     /**
      * Validate Credentials & Send OTP (Step 1 of Login)
      */
-    static async validateCredentials(email, password, guestId) {
+    static async validateCredentials(email, password, guestId, lang = 'en') {
         // Create a temporary client to validate credentials without tainting the global instance
         const tempClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
             auth: {
@@ -341,23 +342,23 @@ class AuthService {
         const { data: { user, session } = {}, error: authError } = authResponse;
 
         if (profileError || !profile) {
-            return { success: false, error: 'errors.auth.account_not_found', status: 404 };
+            return { success: false, error: MESSAGES.AUTH.ACCOUNT_NOT_FOUND, status: 404 };
         }
 
         if (profile.is_deleted) {
             return {
                 success: false,
-                error: 'errors.auth.account_deleted',
+                error: MESSAGES.AUTH.ACCOUNT_DELETED,
                 status: 403
             };
         }
 
         if (profile.is_blocked) {
-            return { success: false, error: 'errors.auth.account_blocked', status: 403 };
+            return { success: false, error: MESSAGES.ERRORS.AUTH_ACCOUNT_BLOCKED, status: 403 };
         }
 
         if (authError || !session) {
-            return { success: false, error: 'errors.auth.invalid_password', status: 401 };
+            return { success: false, error: MESSAGES.ERRORS.AUTH_INVALID_PASSWORD, status: 401 };
         }
 
         // Encrypt tokens
@@ -369,7 +370,7 @@ class AuthService {
 
         // Send OTP with encrypted tokens as metadata
         // Pass guestId in metadata so it can be retrieved during verification
-        return await sendOTP(email, { tokens: encryptedTokens, guestId });
+        return await sendOTP(email, { tokens: encryptedTokens, guestId }, lang);
     }
 
     /**
@@ -389,7 +390,7 @@ class AuthService {
         // 2. Extract Encrypted Tokens
         const encryptedTokens = otpResult.metadata?.tokens;
         if (!encryptedTokens) {
-            throw new Error('Session expired or invalid. Please login again.');
+            throw new Error(MESSAGES.AUTH.SESSION_EXPIRED_OR_INVALID);
         }
 
         // 3. Decrypt Tokens
@@ -398,7 +399,7 @@ class AuthService {
             tokens = decryptTokens(encryptedTokens);
         } catch (err) {
             logger.error({ err }, 'Token decryption failed');
-            throw new Error('Failed to restore session. Please login again.');
+            throw new Error(MESSAGES.AUTH.RESTORE_SESSION_FAILED);
         }
 
         // 4. Get User Profile
@@ -409,7 +410,7 @@ class AuthService {
             .single();
 
         if (profileError || !profile) {
-            throw new Error('User profile not found');
+            throw new Error(MESSAGES.AUTH.USER_NOT_FOUND);
         }
 
         // 5. Merge Guest Cart if guestId provided (AWAITED to prevent race conditions during checkout redirect)
@@ -441,7 +442,7 @@ class AuthService {
     /**
      * Register User
      */
-    static async registerUser({ email, password, name, phone, isOtpVerified }) {
+    static async registerUser({ email, password, name, phone, isOtpVerified, lang = 'en' }) {
         logger.info({ email, name, phone }, 'Registration Request Received');
         const { data: existingProfile } = await supabaseAdmin
             .from('profiles')
@@ -452,7 +453,7 @@ class AuthService {
 
         if (existingProfile) {
             if (existingProfile.is_deleted) {
-                const error = new Error('errors.auth.account_deleted');
+                const error = new Error(MESSAGES.AUTH.ACCOUNT_DELETED);
                 error.status = 403;
                 throw error;
             }
@@ -518,7 +519,7 @@ class AuthService {
 
         if (profileError) {
             await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-            throw new Error('Failed to create/update profile');
+            throw new Error(MESSAGES.AUTH.PROFILE_CREATE_FAILED);
         }
 
         // 4. Verification Token
@@ -541,7 +542,7 @@ class AuthService {
             name,
             email,
             verificationLink
-        }, authData.user.id).catch(err =>
+        }, { userId: authData.user.id, lang }).catch(err =>
             logger.error({ err }, 'Failed to send confirmation email')
         );
 
@@ -558,7 +559,7 @@ class AuthService {
      * Verify Email Token
      */
     static async verifyEmail(token) {
-        if (!token) throw new Error('Verification token required');
+        if (!token) throw new Error(MESSAGES.AUTH.VERIFICATION_TOKEN_REQUIRED);
 
         let { data: profile, error: findError } = await supabaseAdmin
             .from('profiles')
@@ -578,13 +579,13 @@ class AuthService {
         }
 
         if (findError || !profile) {
-            const error = new Error('Invalid or expired verification link');
+            const error = new Error(MESSAGES.AUTH.INVALID_VERIFICATION_LINK);
             error.status = 400;
             throw error;
         }
 
         if (new Date(profile.email_verification_expires) < new Date()) {
-            const error = new Error('Verification link has expired. Please request a new one.');
+            const error = new Error(MESSAGES.AUTH.VERIFICATION_LINK_EXPIRED);
             error.status = 400;
             throw error;
         }
@@ -629,7 +630,7 @@ class AuthService {
     static async refreshToken(oldRefreshToken) {
         if (!oldRefreshToken) {
             // WHY: No refresh token = user never logged in or cookies were cleared
-            const error = new Error('Refresh token required');
+            const error = new Error(MESSAGES.AUTH.REFRESH_TOKEN_REQUIRED);
             error.status = 401;
             throw error;
         }
@@ -639,7 +640,7 @@ class AuthService {
         if (error || !session) {
             // WHY: Refresh token expired or revoked - user must re-login
             logger.warn({ err: error?.message }, '[AuthService] Supabase refreshSession failed');
-            const err = new Error(error?.message || 'Invalid or expired refresh token');
+            const err = new Error(error?.message || MESSAGES.AUTH.INVALID_REFRESH_TOKEN);
             err.status = error?.status || 401;
             throw err;
         }
@@ -679,7 +680,7 @@ class AuthService {
      * Generates a reset token and sends email
      * Returns true always (security: don't reveal if email exists)
      */
-    static async requestPasswordReset(email) {
+    static async requestPasswordReset(email, lang = 'en') {
         // Find user by email
         const { data: profile, error: findError } = await supabaseAdmin
             .from('profiles')
@@ -689,19 +690,19 @@ class AuthService {
 
         // Security: Always return success to prevent email enumeration
         if (findError || !profile) {
-            const error = new Error('Account does not exist with this email ID');
+            const error = new Error(MESSAGES.AUTH.EMAIL_NOT_FOUND);
             error.status = 404;
             throw error;
         }
 
         if (profile.is_deleted) {
-            const error = new Error('This account has been deleted. Please create a new account.');
+            const error = new Error(MESSAGES.AUTH.ACCOUNT_DELETED_RETRY);
             error.status = 403;
             throw error;
         }
 
         if (profile.is_blocked) {
-            const error = new Error('Account is blocked. Please contact support.');
+            const error = new Error(MESSAGES.AUTH.ACCOUNT_BLOCKED_CONTACT);
             error.status = 403;
             throw error;
         }
@@ -721,19 +722,19 @@ class AuthService {
 
         if (updateError) {
             logger.error({ err: updateError }, 'Failed to store password reset token');
-            throw new Error('Failed to initiate password reset');
+            throw new Error(MESSAGES.AUTH.PASSWORD_RESET_INIT_FAILED);
         }
 
         // Send reset email
         const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
 
         // Don't await - send async
-        emailService.sendPasswordResetEmail(profile.email, resetLink).catch(err =>
+        emailService.sendPasswordResetEmail(profile.email, resetLink, lang).catch(err =>
             logger.error({ err }, 'Failed to send password reset email')
         );
 
         logger.info({ userId: profile.id }, 'Password reset token generated');
-        return { success: true, message: 'If an account exists, a reset email will be sent.' };
+        return { success: true, message: MESSAGES.AUTH.RESET_EMAIL_SENT_IF_EXISTS };
     }
 
     /**
@@ -742,7 +743,7 @@ class AuthService {
      */
     static async validateResetToken(token) {
         if (!token) {
-            const error = new Error('Reset token required');
+            const error = new Error(MESSAGES.AUTH.PASSWORD_RESET_TOKEN_REQUIRED);
             error.status = 400;
             throw error;
         }
@@ -754,13 +755,13 @@ class AuthService {
             .single();
 
         if (findError || !profile) {
-            const error = new Error('Invalid or expired reset link');
+            const error = new Error(MESSAGES.AUTH.INVALID_RESET_LINK);
             error.status = 400;
             throw error;
         }
 
         if (new Date(profile.password_reset_expires) < new Date()) {
-            const error = new Error('Reset link has expired. Please request a new one.');
+            const error = new Error(MESSAGES.AUTH.RESET_LINK_EXPIRED);
             error.status = 400;
             throw error;
         }
@@ -782,25 +783,25 @@ class AuthService {
             .single();
 
         if (findError || !profile) {
-            const error = new Error('Invalid or expired reset link');
+            const error = new Error(MESSAGES.AUTH.INVALID_RESET_LINK);
             error.status = 400;
             throw error;
         }
 
         if (profile.is_deleted) {
-            const error = new Error('This account has been deleted.');
+            const error = new Error(MESSAGES.AUTH.ACCOUNT_DELETED);
             error.status = 403;
             throw error;
         }
 
         if (profile.is_blocked) {
-            const error = new Error('Account is blocked. Please contact support.');
+            const error = new Error(MESSAGES.AUTH.ACCOUNT_BLOCKED_CONTACT);
             error.status = 403;
             throw error;
         }
 
         if (new Date(profile.password_reset_expires) < new Date()) {
-            const error = new Error('Reset link has expired. Please request a new one.');
+            const error = new Error(MESSAGES.AUTH.RESET_LINK_EXPIRED);
             error.status = 400;
             throw error;
         }
@@ -813,7 +814,7 @@ class AuthService {
 
         if (authError) {
             logger.error({ err: authError }, 'Failed to update password in auth');
-            throw new Error('Failed to reset password');
+            throw new Error(MESSAGES.AUTH.RESET_PASSWORD_FAILED);
         }
 
         // Clear token and update auth_provider to LOCAL
@@ -842,7 +843,7 @@ class AuthService {
         logger.info({ userId: profile.id, wasGoogleUser: profile.auth_provider === 'GOOGLE' },
             'Password reset completed successfully');
 
-        return { success: true, message: 'Password reset successful. Please log in with your new password.' };
+        return { success: true, message: MESSAGES.SUCCESS.PASSWORD_RESET_SUCCESS };
     }
 
     /**
@@ -858,20 +859,20 @@ class AuthService {
             .single();
 
         if (findError || !profile) {
-            const error = new Error('User not found');
+            const error = new Error(MESSAGES.AUTH.USER_NOT_FOUND);
             error.status = 404;
             throw error;
         }
 
         // Only allow for Google auth users with unverified email
         if (profile.auth_provider !== 'GOOGLE') {
-            const error = new Error('Email verification is only available for Google sign-in accounts');
+            const error = new Error(MESSAGES.ERRORS.GOOGLE_ONLY_VERIFICATION);
             error.status = 400;
             throw error;
         }
 
         if (profile.email_verified) {
-            const error = new Error('Email is already verified');
+            const error = new Error(MESSAGES.AUTH.EMAIL_ALREADY_VERIFIED);
             error.status = 400;
             throw error;
         }
@@ -903,7 +904,7 @@ class AuthService {
         }, profile.id);
 
         logger.info({ userId: profile.id }, 'Verification email sent to Google user');
-        return { success: true, message: 'Verification email sent. Link valid for 24 hours.' };
+        return { success: true, message: MESSAGES.SUCCESS.VERIFICATION_EMAIL_SENT };
     }
 
     /**
@@ -921,13 +922,13 @@ class AuthService {
         if (error || !profile) {
             // Be vague for security, or specific if user wants UX over security enumeration
             // Given the requirement is UX, we'll suggest creating an account
-            const err = new Error('Account not found with this email');
+            const err = new Error(MESSAGES.AUTH.EMAIL_NOT_FOUND);
             err.status = 404;
             throw err;
         }
 
         if (profile.is_deleted) {
-            const err = new Error('Account deleted. Please create a new account.');
+            const err = new Error(MESSAGES.AUTH.ACCOUNT_DELETED_RETRY);
             err.status = 403;
             throw err;
         }
@@ -936,7 +937,7 @@ class AuthService {
             // For Google users, use the specific Google verification flow if needed,
             // or tell them to Login with Google.
             // Usually Google users are auto-verified.
-            const err = new Error('This account uses Google Sign-In. Please log in with Google.');
+            const err = new Error(MESSAGES.AUTH.GOOGLE_SIGNIN_REQUIRED);
             err.status = 400;
             throw err;
         }
@@ -945,13 +946,13 @@ class AuthService {
         const { data: { user }, error: userError } = await supabaseAdmin.auth.admin.getUserById(profile.id);
 
         if (userError || !user) {
-            const err = new Error('User data not found');
+            const err = new Error(MESSAGES.AUTH.USER_DATA_NOT_FOUND);
             err.status = 404;
             throw err;
         }
 
         if (user.email_confirmed_at) {
-            const err = new Error('Email is already verified. Please log in.');
+            const err = new Error(MESSAGES.AUTH.EMAIL_ALREADY_VERIFIED_LOGIN);
             err.status = 400;
             throw err; // This is the key change for the user request
         }
@@ -970,7 +971,7 @@ class AuthService {
             throw new Error(resendError.message);
         }
 
-        return { success: true, message: 'Confirmation email sent' };
+        return { success: true, message: MESSAGES.SUCCESS.CONFIRMATION_EMAIL_SENT };
     }
 }
 

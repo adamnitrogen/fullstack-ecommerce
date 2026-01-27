@@ -1,5 +1,7 @@
 const supabase = require('../config/supabase');
+
 const logger = require('../utils/logger');
+const MESSAGES = require('../config/messages');
 
 class CommentService {
     /**
@@ -196,17 +198,17 @@ class CommentService {
             logger.error({ err: fetchError, commentId }, 'Service: Error fetching comment for update');
             throw fetchError;
         }
-        if (!comment) throw new Error('Comment not found');
+        if (!comment) throw new Error(MESSAGES.COMMENT.NOT_FOUND);
 
         if (comment.user_id !== userId) {
             logger.warn({ commentId, userId, ownerId: comment.user_id }, 'Service: Unauthorized update attempt');
-            throw new Error('Unauthorized: You can only edit your own comments');
+            throw new Error(MESSAGES.COMMENT.UNAUTHORIZED);
         }
 
         const minutesSincePost = (new Date() - new Date(comment.created_at)) / 60000;
         if (minutesSincePost > 60) {
             logger.warn({ commentId, minutesSincePost }, 'Service: Update time limit exceeded');
-            throw new Error('Edit time limit exceeded (60 minutes)');
+            throw new Error(MESSAGES.COMMENT.EDIT_TIME_LIMIT);
         }
 
         const { data, error } = await supabase
@@ -243,14 +245,14 @@ class CommentService {
             logger.error({ err: fetchError, commentId }, 'Service: Error fetching comment for deletion');
             throw fetchError;
         }
-        if (!comment) throw new Error('Comment not found');
+        if (!comment) throw new Error(MESSAGES.COMMENT.NOT_FOUND);
 
         const isOwner = comment.user_id === userId;
         const isAdmin = ['admin', 'manager'].includes(userRole);
 
         if (!isOwner && !isAdmin) {
             logger.warn({ commentId, userId, userRole }, 'Service: Unauthorized deletion attempt');
-            throw new Error('Unauthorized');
+            throw new Error(MESSAGES.COMMENT.UNAUTHORIZED);
         }
 
         // Use service role client (supabase) to avoid RLS issues in triggers
@@ -312,7 +314,7 @@ class CommentService {
         if (error) {
             if (error.code === '23505') { // Unique violation
                 logger.warn({ commentId, userId }, 'Service: User already flagged this comment');
-                throw new Error('You have already flagged this comment');
+                throw new Error(MESSAGES.COMMENT.ALREADY_FLAGGED);
             }
             logger.error({ err: error, commentId, userId }, 'Service: Error flagging comment');
             throw error;

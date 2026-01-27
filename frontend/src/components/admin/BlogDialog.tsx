@@ -1,5 +1,7 @@
 import { logger } from "@/lib/logger";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { toast } from "@/hooks/use-toast";
 import {
   Dialog,
   DialogContent,
@@ -33,6 +35,7 @@ export function BlogDialog({
   blog,
   onSave,
 }: BlogDialogProps) {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState<Partial<Blog> & { imageFile?: File }>({
     title: "",
     excerpt: "",
@@ -73,20 +76,27 @@ export function BlogDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate required fields
     if (
       !formData.title?.trim() ||
       !formData.author?.trim() ||
       !formData.excerpt?.trim() ||
       !formData.content?.trim()
     ) {
-      alert("Please fill in all required fields");
+      toast({
+        title: t("common.error"),
+        description: t("admin.blogs.toasts.requiredFields"),
+        variant: "destructive",
+      });
       return;
     }
 
     // Check for either existing image or new image file
     if (!formData.image?.trim() && !formData.imageFile) {
-      alert("Please upload a blog image");
+      toast({
+        title: t("common.error"),
+        description: t("admin.blogs.toasts.uploadImage"),
+        variant: "destructive",
+      });
       return;
     }
 
@@ -132,12 +142,12 @@ export function BlogDialog({
       <DialogContent className="sm:max-w-4xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="text-2xl font-semibold">
-            {blog ? "Edit Blog Post" : "Add New Blog Post"}
+            {blog ? t("admin.blogs.dialog.editTitle") : t("admin.blogs.dialog.addTitle")}
           </DialogTitle>
           <DialogDescription>
             {blog
-              ? "Update blog post content and metadata"
-              : "Create a new blog post"}
+              ? t("admin.blogs.dialog.editDesc")
+              : t("admin.blogs.dialog.addDesc")}
           </DialogDescription>
         </DialogHeader>
 
@@ -147,10 +157,10 @@ export function BlogDialog({
             <div className="space-y-3 border rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-gray-900">
-                  Blog Image
+                  {t("admin.blogs.dialog.image")}
                 </h3>
                 <span className="text-xs text-red-600">
-                  * Required - Upload exactly 1 image
+                  {t("admin.blogs.dialog.imageRequired")}
                 </span>
               </div>
               <ImageUpload
@@ -179,12 +189,12 @@ export function BlogDialog({
             {/* Basic Information */}
             <div className="space-y-4 border rounded-lg p-4">
               <h3 className="text-sm font-semibold text-gray-900 mb-3">
-                Basic Information
+                {t("admin.blogs.dialog.basicInfo")}
               </h3>
 
               <div className="space-y-2">
                 <Label htmlFor="title">
-                  Blog Title <span className="text-red-600">*</span>
+                  {t("admin.blogs.dialog.blogTitle")} <span className="text-red-600">*</span>
                 </Label>
                 <Input
                   id="title"
@@ -192,14 +202,14 @@ export function BlogDialog({
                   onChange={(e) =>
                     setFormData({ ...formData, title: e.target.value })
                   }
-                  placeholder="Enter blog title"
+                  placeholder={t("admin.blogs.dialog.blogTitlePlaceholder")}
                   required
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="author">
-                  Author Name <span className="text-red-600">*</span>
+                  {t("admin.blogs.dialog.authorName")} <span className="text-red-600">*</span>
                 </Label>
                 <Input
                   id="author"
@@ -207,14 +217,14 @@ export function BlogDialog({
                   onChange={(e) =>
                     setFormData({ ...formData, author: e.target.value })
                   }
-                  placeholder="Enter author name"
+                  placeholder={t("admin.blogs.dialog.authorPlaceholder")}
                   required
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="excerpt">
-                  Excerpt <span className="text-red-600">*</span>
+                  {t("admin.blogs.dialog.excerpt")} <span className="text-red-600">*</span>
                 </Label>
                 <Textarea
                   id="excerpt"
@@ -222,26 +232,32 @@ export function BlogDialog({
                   onChange={(e) =>
                     setFormData({ ...formData, excerpt: e.target.value })
                   }
-                  placeholder="Brief summary of the blog post (2-3 sentences)"
+                  placeholder={t("admin.blogs.dialog.excerptHelp")}
                   rows={3}
+                  maxLength={200}
                   required
                   className="resize-none"
                 />
-                <p className="text-xs text-muted-foreground">
-                  This will be shown in blog listings and previews
-                </p>
+                <div className="flex justify-between items-center mt-1">
+                  <p className="text-xs text-muted-foreground">
+                    {t("admin.blogs.dialog.excerptListing")}
+                  </p>
+                  <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">
+                    {formData.excerpt?.length || 0}/200 {t("common.characters")}
+                  </span>
+                </div>
               </div>
             </div>
 
             {/* Blog Content */}
             <div className="space-y-4 border rounded-lg p-4">
               <h3 className="text-sm font-semibold text-gray-900 mb-3">
-                Blog Content
+                {t("admin.blogs.dialog.blogContent")}
               </h3>
 
               <div className="space-y-2">
                 <Label htmlFor="content">
-                  Content <span className="text-red-600">*</span>
+                  {t("admin.blogs.dialog.content")} <span className="text-red-600">*</span>
                 </Label>
                 <Textarea
                   id="content"
@@ -249,25 +265,25 @@ export function BlogDialog({
                   onChange={(e) =>
                     setFormData({ ...formData, content: e.target.value })
                   }
-                  placeholder="Write your blog content here..."
+                  placeholder={t("admin.blogs.dialog.contentPlaceholder")}
                   rows={12}
                   required
                   className="resize-none font-mono text-sm"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Write the full blog content in plain text
+                  {t("admin.blogs.dialog.contentHelp")}
                 </p>
               </div>
             </div>
 
             {/* Tags */}
             <div className="space-y-4 border rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">Tags</h3>
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">{t("admin.blogs.dialog.tags")}</h3>
 
               <div className="space-y-3">
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Add a tag"
+                    placeholder={t("admin.blogs.dialog.addTag")}
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
                     onKeyPress={(e) => {
@@ -314,7 +330,7 @@ export function BlogDialog({
             {/* Publish Settings */}
             <div className="space-y-4 border rounded-lg p-4">
               <h3 className="text-sm font-semibold text-gray-900 mb-3">
-                Publish Settings
+                {t("admin.blogs.dialog.publishSettings")}
               </h3>
 
               <div className="flex items-center space-x-3">
@@ -330,26 +346,26 @@ export function BlogDialog({
                     htmlFor="published"
                     className="text-sm font-medium leading-none cursor-pointer"
                   >
-                    Publish immediately
+                    {t("admin.blogs.dialog.publishImmediately")}
                   </Label>
                   <p className="text-xs text-muted-foreground">
                     {formData.published
-                      ? "This blog post will be visible to all users immediately"
-                      : "Save as draft - you can publish it later"}
+                      ? t("admin.blogs.dialog.publishedHelp")
+                      : t("admin.blogs.dialog.draftHelp")}
                   </p>
                 </div>
               </div>
 
               <div className="text-xs text-muted-foreground pt-2 border-t">
                 <p>
-                  <strong>Post Date:</strong>{" "}
+                  <strong>{t("admin.blogs.dialog.postDate")}:</strong>{" "}
                   {blog?.date
-                    ? new Date(blog.date).toLocaleDateString("en-US", {
+                    ? new Date(blog.date).toLocaleDateString(undefined, {
                       year: "numeric",
                       month: "long",
                       day: "numeric",
                     })
-                    : "Will be set to current date when created"}
+                    : t("admin.blogs.dialog.postDateCreated")}
                 </p>
               </div>
             </div>
@@ -360,10 +376,10 @@ export function BlogDialog({
                 variant="outline"
                 onClick={() => onOpenChange(false)}
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button type="submit">
-                {blog ? "Update Blog Post" : "Create Blog Post"}
+                {blog ? t("admin.blogs.dialog.editTitle") : t("admin.blogs.dialog.addTitle")}
               </Button>
             </DialogFooter>
           </form>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +35,7 @@ export function CarouselSlideDialog({
   onOpenChange,
   slide,
 }: CarouselSlideDialogProps) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState<{
@@ -75,8 +77,8 @@ export function CarouselSlideDialog({
 
   const mutation = useMutation({
     mutationFn: async () => {
-      if (!formData.image) {
-        throw new Error("Image is required");
+      if (!formData.image && !formData.imageFile) {
+        throw new Error(t("admin.carousel.toasts.imageRequired"));
       }
 
       let imageUrl = formData.image;
@@ -104,13 +106,13 @@ export function CarouselSlideDialog({
       queryClient.invalidateQueries({ queryKey: ["carousel-slides-admin"] });
       toast.success(
         slide
-          ? "Carousel slide updated successfully"
-          : "Carousel slide created successfully"
+          ? t("admin.carousel.toasts.updateSuccess")
+          : t("admin.carousel.toasts.createSuccess")
       );
       onOpenChange(false);
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Failed to save carousel slide");
+      toast.error(error.message || t("admin.carousel.toasts.saveError"));
     },
   });
 
@@ -124,12 +126,12 @@ export function CarouselSlideDialog({
       <DialogContent className="sm:max-w-2xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>
-            {slide ? "Edit Carousel Slide" : "Add New Carousel Slide"}
+            {slide ? t("admin.carousel.dialog.editTitle") : t("admin.carousel.dialog.addTitle")}
           </DialogTitle>
           <DialogDescription>
             {slide
-              ? "Update carousel slide image and optional text content"
-              : "Add a new slide to the hero carousel with image and optional text"}
+              ? t("admin.carousel.dialog.descriptionEdit")
+              : t("admin.carousel.dialog.descriptionAdd")}
           </DialogDescription>
         </DialogHeader>
 
@@ -138,10 +140,10 @@ export function CarouselSlideDialog({
             {/* Image Upload */}
             <div className="space-y-2">
               <Label htmlFor="image">
-                Carousel Image <span className="text-destructive">*</span>
+                {t("admin.carousel.dialog.image")} <span className="text-destructive">*</span>
               </Label>
               <p className="text-xs text-muted-foreground">
-                Recommended size: 1920x600px for best results
+                {t("admin.carousel.dialog.imageHint")}
               </p>
               <ImageUpload
                 images={formData.imageFile ? [formData.imageFile] : (formData.image ? [formData.image] : [])}
@@ -161,18 +163,17 @@ export function CarouselSlideDialog({
             {/* Content Section */}
             <div className="space-y-4 border rounded-lg p-4">
               <div className="space-y-1">
-                <h4 className="text-sm font-medium">Slide Content</h4>
+                <h4 className="text-sm font-medium">{t("admin.carousel.dialog.contentSub")}</h4>
                 <p className="text-xs text-muted-foreground">
-                  If no title or subtitle is provided, buttons will move to
-                  bottom center
+                  {t("admin.carousel.dialog.contentHint")}
                 </p>
               </div>
 
               {/* Title (Optional) */}
               <div className="space-y-2">
                 <Label htmlFor="title">
-                  Title{" "}
-                  <span className="text-muted-foreground">(Optional)</span>
+                  {t("admin.carousel.dialog.titlePrompt")}{" "}
+                  <span className="text-muted-foreground">({t("common.optional")})</span>
                 </Label>
                 <Input
                   id="title"
@@ -187,8 +188,8 @@ export function CarouselSlideDialog({
               {/* Subtitle (Optional) */}
               <div className="space-y-2">
                 <Label htmlFor="subtitle">
-                  Subtitle{" "}
-                  <span className="text-muted-foreground">(Optional)</span>
+                  {t("admin.carousel.dialog.subtitlePrompt")}{" "}
+                  <span className="text-muted-foreground">({t("common.optional")})</span>
                 </Label>
                 <Textarea
                   id="subtitle"
@@ -207,15 +208,15 @@ export function CarouselSlideDialog({
 
             {/* Display Settings */}
             <div className="space-y-4 border rounded-lg p-4">
-              <h4 className="text-sm font-medium">Display Settings</h4>
+              <h4 className="text-sm font-medium">{t("admin.carousel.dialog.displaySettings")}</h4>
 
               {/* Order */}
               <div className="space-y-2">
                 <Label htmlFor="order">
-                  Display Order <span className="text-destructive">*</span>
+                  {t("admin.carousel.dialog.displayOrder")} <span className="text-destructive">*</span>
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  Lower numbers appear first in the carousel
+                  {t("admin.carousel.dialog.displayOrderHint")}
                 </p>
                 <Input
                   id="order"
@@ -235,9 +236,9 @@ export function CarouselSlideDialog({
               {/* Active Status */}
               <div className="flex items-center justify-between pt-2">
                 <div className="space-y-0.5">
-                  <Label htmlFor="isActive">Active Status</Label>
+                  <Label htmlFor="isActive">{t("admin.carousel.dialog.activeStatus")}</Label>
                   <p className="text-xs text-muted-foreground">
-                    Only active slides will be shown in the carousel
+                    {t("admin.carousel.dialog.activeStatusHint")}
                   </p>
                 </div>
                 <Switch
@@ -259,18 +260,18 @@ export function CarouselSlideDialog({
             onClick={() => onOpenChange(false)}
             disabled={mutation.isPending}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             type="submit"
             onClick={handleSubmit}
-            disabled={mutation.isPending || !formData.image}
+            disabled={mutation.isPending || (!formData.image && !formData.imageFile)}
           >
             {mutation.isPending
-              ? "Saving..."
+              ? (slide ? t("admin.carousel.dialog.updating") : t("admin.carousel.dialog.creating"))
               : slide
-                ? "Update Slide"
-                : "Create Slide"}
+                ? t("admin.carousel.dialog.update")
+                : t("admin.carousel.dialog.create")}
           </Button>
         </DialogFooter>
       </DialogContent>

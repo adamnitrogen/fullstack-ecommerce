@@ -1,5 +1,6 @@
 import { logger } from "@/lib/logger";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ import {
 import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
 
 export default function BlogsManagement() {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const limit = 10;
@@ -89,18 +91,18 @@ export default function BlogsManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-blogs"] });
       toast({
-        title: "Success",
+        title: t("common.success"),
         description: selectedBlog
-          ? "Blog updated successfully"
-          : "Blog created successfully",
+          ? t("admin.blogs.toasts.updateSuccess")
+          : t("admin.blogs.toasts.createSuccess"),
       });
       setBlogDialogOpen(false);
       setSelectedBlog(null);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to save blog"),
+        title: t("common.error"),
+        description: getErrorMessage(error, t("admin.blogs.toasts.saveError")),
         variant: "destructive",
       });
     },
@@ -130,16 +132,16 @@ export default function BlogsManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-blogs"] });
       toast({
-        title: "Success",
-        description: "Blog deleted successfully",
+        title: t("common.success"),
+        description: t("admin.blogs.toasts.deleteSuccess"),
       });
       setDeleteDialogOpen(false);
       setSelectedBlog(null);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to delete blog"),
+        title: t("common.error"),
+        description: getErrorMessage(error, t("admin.blogs.toasts.deleteError")),
         variant: "destructive",
       });
     },
@@ -159,14 +161,14 @@ export default function BlogsManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-blogs"] });
       toast({
-        title: "Success",
-        description: "Blog status updated successfully",
+        title: t("common.success"),
+        description: t("admin.blogs.toasts.statusSuccess"),
       });
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to update blog status"),
+        title: t("common.error"),
+        description: getErrorMessage(error, t("admin.blogs.toasts.statusError")),
         variant: "destructive",
       });
     },
@@ -207,9 +209,9 @@ export default function BlogsManagement() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight">Blogs Management</h2>
+        <h2 className="text-3xl font-bold tracking-tight">{t("admin.blogs.title")}</h2>
         <p className="text-muted-foreground">
-          Create and manage blog posts and articles
+          {t("admin.blogs.subtitle")}
         </p>
       </div>
 
@@ -218,7 +220,7 @@ export default function BlogsManagement() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              All Blogs ({blogs.length})
+              {t("admin.blogs.allBlogs", { count: blogs.length })}
             </CardTitle>
             <div className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1 sm:w-64">
@@ -226,7 +228,7 @@ export default function BlogsManagement() {
                 <Input
                   id="blog-admin-search"
                   name="search"
-                  placeholder="Search blogs..."
+                  placeholder={t("admin.blogs.searchPlaceholder")}
                   value={searchQuery}
                   onChange={handleSearchChange}
                   className="pl-9"
@@ -234,29 +236,29 @@ export default function BlogsManagement() {
               </div>
               <Button onClick={handleAddBlog}>
                 <Plus className="h-4 w-4 mr-2" />
-                Add Blog
+                {t("admin.blogs.add")}
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="text-center py-12">Loading blog posts...</div>
+            <div className="text-center py-12">{t("admin.blogs.loading")}</div>
           ) : blogs.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No blogs found</p>
+              <p>{t("admin.blogs.noFound")}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Blog Post</TableHead>
-                    <TableHead>Author</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{t("admin.blogs.table.post")}</TableHead>
+                    <TableHead>{t("admin.blogs.table.author")}</TableHead>
+                    <TableHead>{t("admin.blogs.table.date")}</TableHead>
+                    <TableHead>{t("admin.blogs.table.status")}</TableHead>
+                    <TableHead className="text-right">{t("admin.blogs.table.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -290,7 +292,7 @@ export default function BlogsManagement() {
                         <Badge
                           variant={blog.published ? "default" : "secondary"}
                         >
-                          {blog.published ? "Published" : "Draft"}
+                          {blog.published ? t("admin.blogs.status.published") : t("admin.blogs.status.draft")}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -299,7 +301,7 @@ export default function BlogsManagement() {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleTogglePublish(blog)}
-                            title={blog.published ? "Unpublish" : "Publish"}
+                            title={blog.published ? t("admin.blogs.actions.unpublish") : t("admin.blogs.actions.publish")}
                           >
                             {blog.published ? (
                               <EyeOff className="h-4 w-4" />
@@ -376,7 +378,7 @@ export default function BlogsManagement() {
             </PaginationContent>
           </Pagination>
           <p className="text-sm text-muted-foreground">
-            Page {page} of {totalPages}
+            {t("admin.blogs.pagination", { current: page, total: totalPages })}
           </p>
         </div>
       )}
@@ -391,8 +393,8 @@ export default function BlogsManagement() {
       <DeleteConfirmDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
-        title="Delete Blog"
-        description={`Are you sure you want to delete "${selectedBlog?.title}"? This action cannot be undone.`}
+        title={t("admin.blogs.delete.title")}
+        description={t("admin.blogs.delete.desc", { title: selectedBlog?.title })}
         onConfirm={handleConfirmDelete}
       />
 
@@ -400,10 +402,10 @@ export default function BlogsManagement() {
         isLoading={blogMutation.isPending || deleteMutation.isPending || togglePublishMutation.isPending}
         message={
           blogMutation.isPending
-            ? (selectedBlog ? "Updating blog..." : "Creating blog...")
+            ? (selectedBlog ? t("admin.blogs.loading") : t("admin.blogs.loading"))
             : deleteMutation.isPending
-              ? "Deleting blog..."
-              : "Updating status..."
+              ? t("admin.blogs.loading")
+              : t("admin.blogs.loading")
         }
       />
     </div>

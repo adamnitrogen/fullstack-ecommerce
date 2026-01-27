@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Upload, RotateCcw, Check } from 'lucide-react';
+import { useTranslation } from "react-i18next";
 
 interface ProfileImageCropperProps {
     image: string | File | null;
@@ -75,6 +76,7 @@ async function getCroppedImg(
 }
 
 export function ProfileImageCropper({ image, onChange, onClear }: ProfileImageCropperProps) {
+    const { t } = useTranslation();
     const [imageSrc, setImageSrc] = useState<string | null>(null);
     const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
@@ -147,7 +149,7 @@ export function ProfileImageCropper({ image, onChange, onClear }: ProfileImageCr
                     <div className="flex flex-col items-center justify-center">
                         <Upload className="h-12 w-12 text-muted-foreground mb-4" />
                         <p className="text-sm text-muted-foreground mb-4">
-                            Upload a profile picture
+                            {t("admin.about.cropper.uploadText")}
                         </p>
                         <input
                             type="file"
@@ -158,7 +160,7 @@ export function ProfileImageCropper({ image, onChange, onClear }: ProfileImageCr
                         />
                         <label htmlFor="profile-image-upload">
                             <Button type="button" variant="outline" asChild>
-                                <span>Select Image</span>
+                                <span>{t("admin.about.cropper.selectImage")}</span>
                             </Button>
                         </label>
                     </div>
@@ -187,7 +189,7 @@ export function ProfileImageCropper({ image, onChange, onClear }: ProfileImageCr
                 <div className="space-y-4 p-4 border rounded-lg">
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                            <Label>Zoom</Label>
+                            <Label>{t("admin.about.cropper.zoom")}</Label>
                             <span className="text-sm text-muted-foreground">{zoom.toFixed(1)}x</span>
                         </div>
                         <Slider
@@ -208,7 +210,7 @@ export function ProfileImageCropper({ image, onChange, onClear }: ProfileImageCr
                             onClick={handleReset}
                         >
                             <RotateCcw className="h-4 w-4 mr-2" />
-                            Reset
+                            {t("admin.about.cropper.reset")}
                         </Button>
                         <Button
                             type="button"
@@ -218,7 +220,7 @@ export function ProfileImageCropper({ image, onChange, onClear }: ProfileImageCr
                             className="flex-1"
                         >
                             <Check className="h-4 w-4 mr-2" />
-                            Apply Crop
+                            {t("admin.about.cropper.applyCrop")}
                         </Button>
                     </div>
                 </div>
@@ -247,7 +249,7 @@ export function ProfileImageCropper({ image, onChange, onClear }: ProfileImageCr
                 />
                 <label htmlFor="profile-image-change" className="flex-1">
                     <Button type="button" variant="outline" size="sm" className="w-full" asChild>
-                        <span>Change Photo</span>
+                        <span>{t("admin.about.cropper.changePhoto")}</span>
                     </Button>
                 </label>
                 <Button
@@ -256,7 +258,7 @@ export function ProfileImageCropper({ image, onChange, onClear }: ProfileImageCr
                     size="sm"
                     onClick={handleRecrop}
                 >
-                    Adjust Crop
+                    {t("admin.about.cropper.adjustCrop")}
                 </Button>
                 {onClear && (
                     <Button
@@ -265,7 +267,7 @@ export function ProfileImageCropper({ image, onChange, onClear }: ProfileImageCr
                         size="sm"
                         onClick={onClear}
                     >
-                        Remove
+                        {t("admin.about.cropper.remove")}
                     </Button>
                 )}
             </div>

@@ -12,6 +12,10 @@ import { FcGoogle } from "react-icons/fc";
 import { validateCredentials, verifyLoginOtp } from "@/lib/services/auth.service";
 import { useAuthStore } from "@/store/authStore";
 import { getErrorMessage, getFriendlyTitle } from "@/lib/errorUtils";
+import { AuthMessages } from "@/constants/messages/AuthMessages";
+import { ValidationMessages } from "@/constants/messages/ValidationMessages";
+import { CommonMessages } from "@/constants/messages/CommonMessages";
+import { ErrorMessages } from "@/constants/messages/ErrorMessages";
 
 interface LoginFormProps {
   emailOrPhone?: string;
@@ -46,7 +50,7 @@ export function LoginForm({
   const [errors, setErrors] = useState<ValidationError>({});
 
   const validateEmailOrPhone = (value: string): string | null => {
-    const requiredError = validators.required(value, t("auth.emailPhone"));
+    const requiredError = validators.required(value);
     if (requiredError) return requiredError;
 
     const emailError = validators.email(value);
@@ -56,7 +60,7 @@ export function LoginForm({
       return null;
     }
 
-    return t("errors.auth.invalidEmailPhone");
+    return ErrorMessages.AUTH_INVALID_EMAIL_PHONE;
   };
 
   const handleEmailOrPhoneChange = (value: string) => {
@@ -77,7 +81,7 @@ export function LoginForm({
 
     if (showOtp) {
       if (!otp || otp.length < 6) {
-        newErrors.otp = t("errors.auth.invalidOtp");
+        newErrors.otp = ErrorMessages.AUTH_INVALID_OTP;
         isValid = false;
       }
     } else if (!showPasswordField) {
@@ -88,8 +92,8 @@ export function LoginForm({
       }
     } else {
       const passwordError =
-        validators.required(password, t("auth.password")) ||
-        validators.minLength(password, 6, t("auth.password"));
+        validators.required(password) ||
+        validators.minLength(password, 6);
       if (passwordError) {
         newErrors.password = passwordError;
         isValid = false;
@@ -100,8 +104,8 @@ export function LoginForm({
 
     if (!isValid) {
       toast({
-        title: t("errors.auth.checkInfo"),
-        description: t("errors.auth.fixErrors"),
+        title: t(ErrorMessages.AUTH_CHECK_INFO),
+        description: t(ErrorMessages.AUTH_FIX_ERRORS),
         variant: "destructive",
       });
       return;
@@ -112,12 +116,12 @@ export function LoginForm({
       if (showOtp) {
         const user = await verifyLoginOtp(emailOrPhone, otp);
         login(user);
-        toast({ title: t("auth.loginSuccessful"), description: t("auth.welcomeBackUser", { name: user.name }) });
+        toast({ title: t(AuthMessages.LOGIN_SUCCESSFUL), description: t(AuthMessages.WELCOME_BACK_USER, { name: user.name }) });
         if (onPasswordSubmit) onPasswordSubmit("otp_verified_placeholder");
       } else if (showPasswordField) {
         const res = await validateCredentials(emailOrPhone, password);
         if (res.success) {
-          toast({ title: t("auth.verificationRequired"), description: t("auth.otpSentEmail") });
+          toast({ title: t(AuthMessages.VERIFICATION_REQUIRED), description: t(AuthMessages.OTP_SENT_EMAIL) });
           setShowOtp(true);
         }
       } else {
@@ -125,8 +129,8 @@ export function LoginForm({
       }
     } catch (error: unknown) {
       toast({
-        title: getFriendlyTitle(error, t("errors.auth.notice")),
-        description: getErrorMessage(error, t("errors.auth.errorOccurred")),
+        title: getFriendlyTitle(error, t),
+        description: getErrorMessage(error, t),
         variant: "destructive"
       });
     } finally {
@@ -143,7 +147,7 @@ export function LoginForm({
           className="absolute top-4 left-4 flex items-center gap-1.5 text-[#2C1810]/60 hover:text-[#B85C3C] transition-colors text-sm font-medium"
         >
           <ArrowLeft size={16} />
-          {t("common.back")}
+          {t(CommonMessages.BACK)}
         </button>
       )}
 
@@ -155,9 +159,9 @@ export function LoginForm({
           </div>
         </div>
         <h2 className="text-2xl font-bold text-[#2C1810] font-playfair mb-1">
-          {t("auth.welcomeBack")}
+          {t(AuthMessages.WELCOME_BACK)}
         </h2>
-        <p className="text-sm text-[#2C1810]/60">{t("auth.journeySubtitle")}</p>
+        <p className="text-sm text-[#2C1810]/60">{t(AuthMessages.JOURNEY_SUBTITLE)}</p>
       </div>
 
       {/* Form */}
@@ -166,32 +170,32 @@ export function LoginForm({
           <>
             <div className="space-y-2">
               <Label htmlFor="emailOrPhone" className="text-xs font-bold uppercase tracking-wider text-[#2C1810]">
-                {t("auth.emailPhone")} <span className="text-[#B85C3C]">*</span>
+                {t(AuthMessages.EMAIL_PHONE)} <span className="text-[#B85C3C]">*</span>
               </Label>
               <Input
                 id="emailOrPhone"
                 type="text"
                 value={emailOrPhone}
                 onChange={(e) => handleEmailOrPhoneChange(e.target.value)}
-                placeholder={t("auth.emailPhonePlaceholder")}
+                placeholder={t(AuthMessages.EMAIL_PHONE_PLACEHOLDER)}
                 disabled={showPasswordField}
                 className={`h-12 rounded-xl border-2 bg-[#FAF7F2] focus:bg-white transition-colors ${errors.emailOrPhone ? "border-red-500" : "border-[#B85C3C]/10 focus:border-[#B85C3C]"}`}
               />
-              <FormError error={errors.emailOrPhone} />
+              <FormError error={errors.emailOrPhone ? t(errors.emailOrPhone) : undefined} />
             </div>
 
             {showPasswordField && (
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <Label htmlFor="password" className="text-xs font-bold uppercase tracking-wider text-[#2C1810]">
-                    {t("auth.password")} <span className="text-[#B85C3C]">*</span>
+                    {t(AuthMessages.PASSWORD)} <span className="text-[#B85C3C]">*</span>
                   </Label>
                   <button
                     type="button"
                     className="text-xs text-[#B85C3C] hover:text-[#2C1810] font-medium transition-colors"
                     onClick={onForgotPassword}
                   >
-                    {t("auth.forgotPassword")}
+                    {t(AuthMessages.FORGOT_PASSWORD)}
                   </button>
                 </div>
                 <Input
@@ -199,10 +203,10 @@ export function LoginForm({
                   type="password"
                   value={password}
                   onChange={(e) => handlePasswordChange(e.target.value)}
-                  placeholder={t("auth.passwordPlaceholder")}
+                  placeholder={t(AuthMessages.PASSWORD_PLACEHOLDER)}
                   className={`h-12 rounded-xl border-2 bg-[#FAF7F2] focus:bg-white transition-colors ${errors.password ? "border-red-500" : "border-[#B85C3C]/10 focus:border-[#B85C3C]"}`}
                 />
-                <FormError error={errors.password} />
+                <FormError error={errors.password ? t(errors.password) : undefined} />
               </div>
             )}
           </>
@@ -213,14 +217,14 @@ export function LoginForm({
               <div className="w-12 h-12 bg-[#B85C3C]/10 rounded-full flex items-center justify-center mx-auto mb-3">
                 <span className="text-2xl">🔐</span>
               </div>
-              <h3 className="font-bold text-[#2C1810] text-lg">{t("auth.enterOtpTitle")}</h3>
+              <h3 className="font-bold text-[#2C1810] text-lg">{t(AuthMessages.ENTER_OTP_TITLE)}</h3>
               <p className="text-sm text-[#2C1810]/60 mt-1">
-                {t("auth.otpSentTo")} <span className="font-medium text-[#B85C3C]">{emailOrPhone}</span>
+                {t(AuthMessages.OTP_SENT_TO)} <span className="font-medium text-[#B85C3C]">{emailOrPhone}</span>
               </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="otp" className="text-xs font-bold uppercase tracking-wider text-[#2C1810]">
-                {t("auth.otpCode")} <span className="text-[#B85C3C]">*</span>
+                {t(AuthMessages.OTP_CODE)} <span className="text-[#B85C3C]">*</span>
               </Label>
               <Input
                 id="otp"
@@ -235,26 +239,26 @@ export function LoginForm({
                 maxLength={6}
                 className={`h-14 rounded-xl border-2 bg-[#FAF7F2] focus:bg-white text-center text-2xl font-bold tracking-[0.5em] transition-colors ${errors.otp ? "border-red-500" : "border-[#B85C3C]/10 focus:border-[#B85C3C]"}`}
               />
-              <FormError error={errors.otp} />
+              <FormError error={errors.otp ? t(errors.otp) : undefined} />
             </div>
             <button
               type="button"
               className="text-sm text-[#B85C3C] hover:text-[#2C1810] font-medium transition-colors w-full text-center"
               onClick={() => setShowOtp(false)}
             >
-              ← {t("auth.backToLogin")}
+              ← {t(AuthMessages.BACK_TO_LOGIN)}
             </button>
           </div>
         )}
 
         <p className="text-[10px] text-[#2C1810]/50 text-center leading-relaxed">
-          {t("auth.termsAgree")}{" "}
+          {t(AuthMessages.TERMS_AGREE)}{" "}
           <button
             type="button"
             className="text-[#B85C3C] hover:underline font-medium"
             onClick={() => window.open("/terms-and-conditions", "_blank")}
           >
-            {t("auth.termsOfUse")}
+            {t(AuthMessages.TERMS_OF_USE)}
           </button>{" "}
           and{" "}
           <button
@@ -262,7 +266,7 @@ export function LoginForm({
             className="text-[#B85C3C] hover:underline font-medium"
             onClick={() => window.open("/privacy-policy", "_blank")}
           >
-            {t("auth.privacyPolicy")}
+            {t(AuthMessages.PRIVACY_POLICY)}
           </button>
           .
         </p>
@@ -273,7 +277,7 @@ export function LoginForm({
           size="lg"
           disabled={isLoading}
         >
-          {isLoading ? t("auth.signingIn") : (showOtp ? t("auth.verifyLogin") : (showPasswordField ? t("auth.signIn") : t("common.next")))}
+          {isLoading ? t(AuthMessages.SIGNING_IN) : (showOtp ? t(AuthMessages.VERIFY_LOGIN) : (showPasswordField ? t(AuthMessages.SIGN_IN) : t(CommonMessages.NEXT)))}
         </Button>
       </form>
 
@@ -284,7 +288,7 @@ export function LoginForm({
             <span className="w-full border-t border-[#B85C3C]/10" />
           </div>
           <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
-            <span className="bg-white px-3 text-[#2C1810]/40 font-medium">{t("auth.orContinueWith")}</span>
+            <span className="bg-white px-3 text-[#2C1810]/40 font-medium">{t(AuthMessages.OR_CONTINUE_WITH)}</span>
           </div>
         </div>
       )}
@@ -299,26 +303,26 @@ export function LoginForm({
           onClick={onGoogleSignIn}
         >
           <FcGoogle className="h-5 w-5" />
-          <span className="font-medium">{t("auth.googleContinue")}</span>
+          <span className="font-medium">{t(AuthMessages.GOOGLE_CONTINUE)}</span>
         </Button>
       )}
 
       {/* Switch to Register */}
       <p className="text-center mt-6 text-sm text-[#2C1810]/60">
-        {t("auth.dontHaveAccount")}{" "}
+        {t(AuthMessages.DONT_HAVE_ACCOUNT)}{" "}
         <button
           type="button"
           className="text-[#B85C3C] hover:text-[#2C1810] font-bold transition-colors"
           onClick={onSwitchToRegister}
         >
-          {t("auth.registerHere")}
+          {t(AuthMessages.REGISTER_HERE)}
         </button>
       </p>
 
       {/* Social Media Links */}
       <div className="mt-8 pt-6 border-t border-[#B85C3C]/10">
         <p className="text-center text-[10px] text-[#2C1810]/40 uppercase tracking-wider font-medium mb-3">
-          {t("nav.followUs")}
+          {t(CommonMessages.FOLLOW_US)}
         </p>
         <div className="flex justify-center gap-2">
           <button className="w-9 h-9 rounded-full bg-[#FAF7F2] flex items-center justify-center text-[#2C1810]/50 hover:bg-[#B85C3C] hover:text-white transition-all">

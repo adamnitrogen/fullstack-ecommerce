@@ -36,7 +36,7 @@ import { blogService } from "@/services/blog.service";
 const POSTS_PER_PAGE = 6;
 
 export default function Blog() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -99,14 +99,14 @@ export default function Blog() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background relative">
-        <LoadingOverlay message="Curating Latest Stories..." isLoading={true} />
+        <LoadingOverlay message={t("blog.curating")} isLoading={true} />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <LoadingOverlay message="Curating Latest Stories..." isLoading={isLoading} />
+      <LoadingOverlay message={t("blog.curating")} isLoading={isLoading} />
 
       {/* Premium Compact Hero Section */}
       <section className="bg-[#2C1810] text-white py-12 md:py-16 relative overflow-hidden shadow-2xl">
@@ -117,10 +117,10 @@ export default function Blog() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-2">
               <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-[0.2em] mb-2">
-                <Sparkles className="h-3 w-3" /> Wisdom & Stories
+                <Sparkles className="h-3 w-3" /> {t("blog.wisdom")}
               </div>
               <h1 className="text-3xl md:text-5xl font-bold font-playfair">
-                {t("blog.title")} <span className="text-[#B85C3C]">Journal</span>
+                {t("blog.title")} <span className="text-[#B85C3C]">{t("blog.journal")}</span>
               </h1>
             </div>
             <p className="text-white/50 text-sm md:text-base max-w-md font-light border-l border-[#B85C3C]/30 pl-6 hidden md:block">
@@ -136,7 +136,7 @@ export default function Blog() {
           <div className="flex flex-col lg:flex-row gap-6 items-end">
             {/* Search */}
             <div className="w-full lg:flex-1 space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Search Articles</label>
+              <label htmlFor="blog-search" className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">{t("blog.searchArticles")}</label>
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#B85C3C]" />
                 <Input
@@ -153,7 +153,7 @@ export default function Blog() {
 
             {/* Category Filters */}
             <div className="w-full lg:w-auto space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Categories</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">{t("blog.categories")}</label>
               <div className="flex flex-wrap gap-2">
                 {categories.map((category) => (
                   <Button
@@ -178,7 +178,7 @@ export default function Blog() {
           <section className="mb-20">
             <div className="flex items-center gap-4 mb-8">
               <h2 className="text-2xl font-bold font-playfair text-[#2C1810]">
-                Featured <span className="text-[#B85C3C]">Highlights</span>
+                {t("blog.featuredHighlightsPart1")} <span className="text-[#B85C3C]">{t("blog.featuredHighlightsPart2")}</span>
               </h2>
               <div className="h-[1px] flex-1 bg-border/50" />
             </div>
@@ -220,11 +220,11 @@ export default function Blog() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <Clock className="h-4 w-4 text-[#B85C3C]" />
-                                  <span>{format(new Date(post.date), "MMM dd, yyyy")}</span>
+                                  <span>{new Date(post.date).toLocaleDateString(i18n.language, { month: 'short', day: '2-digit', year: 'numeric' })}</span>
                                 </div>
                               </div>
                               <div className="hidden md:flex items-center gap-2 text-[#B85C3C] font-bold text-sm uppercase tracking-widest group/btn">
-                                Read Article <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
+                                {t("blog.readArticle")} <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
                               </div>
                             </div>
                           </div>
@@ -246,7 +246,7 @@ export default function Blog() {
         <section className="animate-fade-in">
           <div className="flex items-center gap-4 mb-12">
             <h2 className="text-2xl font-bold font-playfair text-[#2C1810]">
-              Latest <span className="text-[#B85C3C]">Articles</span>
+              {t("blog.latestArticlesPart1")} <span className="text-[#B85C3C]">{t("blog.latestArticlesPart2")}</span>
             </h2>
             <div className="h-[1px] flex-1 bg-border/50" />
           </div>
@@ -276,7 +276,7 @@ export default function Blog() {
                         <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-[0.2em] text-[#B85C3C]">
                           <span className="flex items-center gap-1.5">
                             <Clock className="h-3 w-3" />
-                            {format(new Date(post.date), "MMM dd, yyyy")}
+                            {new Date(post.date).toLocaleDateString(i18n.language, { month: 'short', day: '2-digit', year: 'numeric' })}
                           </span>
                         </div>
                         <CardTitle className="text-xl font-bold font-playfair text-[#2C1810] line-clamp-2 leading-tight group-hover:text-[#B85C3C] transition-colors">
@@ -353,7 +353,7 @@ export default function Blog() {
               <div className="mb-6 inline-flex p-6 rounded-full bg-muted/50">
                 <BookOpen className="h-12 w-12 text-muted-foreground/50" />
               </div>
-              <p className="text-2xl font-bold text-[#2C1810] mb-2">No Articles Found</p>
+              <p className="text-2xl font-bold text-[#2C1810] mb-2">{t("blog.noArticlesFound")}</p>
               <p className="text-muted-foreground mb-8 max-w-xs mx-auto">
                 {t("blog.noPosts")}
               </p>
@@ -366,7 +366,7 @@ export default function Blog() {
                   setCurrentPage(1);
                 }}
               >
-                View All Stories
+                {t("blog.viewAllStories")}
               </Button>
             </div>
           )}

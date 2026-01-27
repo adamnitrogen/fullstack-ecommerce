@@ -327,7 +327,7 @@ export default function Gallery() {
             >
               <iframe
                 src={`https://www.youtube.com/embed/${selectedVideo}?autoplay=1`}
-                title="YouTube video player"
+                title={t("gallery.videoPlayer")}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
                 className="w-full h-full rounded-lg"

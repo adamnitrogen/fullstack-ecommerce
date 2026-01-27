@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,7 @@ import { categoryService, Category } from "@/services/category.service";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function EventCategoriesManagement() {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -59,10 +61,10 @@ export default function EventCategoriesManagement() {
       queryClient.invalidateQueries({ queryKey: ["admin-event-categories"] });
       queryClient.invalidateQueries({ queryKey: ["admin-events"] });
       toast({
-        title: "Success",
+        title: t("common.success"),
         description: selectedCategory
-          ? "Event category updated successfully"
-          : "Event category created successfully",
+          ? t("admin.events.categories.toasts.updated")
+          : t("admin.events.categories.toasts.created"),
       });
       setCategoryDialogOpen(false);
       setSelectedCategory(null);
@@ -79,8 +81,8 @@ export default function EventCategoriesManagement() {
       queryClient.invalidateQueries({ queryKey: ["admin-event-categories"] });
       queryClient.invalidateQueries({ queryKey: ["admin-events"] });
       toast({
-        title: "Success",
-        description: "Event category deleted successfully",
+        title: t("common.success"),
+        description: t("admin.events.categories.toasts.deleted"),
       });
       setDeleteDialogOpen(false);
       setSelectedCategory(null);
@@ -107,8 +109,8 @@ export default function EventCategoriesManagement() {
   const handleSaveCategory = () => {
     if (!categoryName.trim()) {
       toast({
-        title: "Error",
-        description: "Category name is required",
+        title: t("common.error"),
+        description: t("admin.events.dialogs.namePlaceholder"),
         variant: "destructive",
       });
       return;
@@ -130,18 +132,17 @@ export default function EventCategoriesManagement() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">
-          Event Categories Management
+          {t("admin.events.categories.title")}
         </h2>
         <p className="text-muted-foreground">
-          Manage event categories (for internal admin use only)
+          {t("admin.events.categories.subtitle")}
         </p>
       </div>
 
       <Alert>
         <Info className="h-4 w-4" />
         <AlertDescription>
-          These categories are for internal admin organization only and are not
-          displayed to customers on the website.
+          {t("admin.events.categories.notice")}
         </AlertDescription>
       </Alert>
 
@@ -150,13 +151,13 @@ export default function EventCategoriesManagement() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <CardTitle className="flex items-center gap-2">
               <Tag className="h-5 w-5" />
-              All Event Categories ({categories.length})
+              {t("admin.events.categories.allCategories")} ({categories.length})
             </CardTitle>
             <div className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1 sm:w-64">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search categories..."
+                  placeholder={t("admin.events.categories.searchPlaceholder")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
@@ -164,27 +165,27 @@ export default function EventCategoriesManagement() {
               </div>
               <Button onClick={handleAddCategory}>
                 <Plus className="h-4 w-4 mr-2" />
-                Add Category
+                {t("admin.events.categories.addCategory")}
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="text-center py-12">Loading event categories...</div>
+            <div className="text-center py-12">{t("admin.events.categories.loading")}</div>
           ) : categories.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Tag className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No event categories found</p>
+              <p>{t("admin.events.categories.noCategories")}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Category Name</TableHead>
-                    <TableHead>Created Date</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{t("admin.events.categories.table.name")}</TableHead>
+                    <TableHead>{t("admin.blog.table.date")}</TableHead>
+                    <TableHead className="text-right">{t("admin.events.management.table.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -232,20 +233,20 @@ export default function EventCategoriesManagement() {
           <DialogHeader>
             <DialogTitle>
               {selectedCategory
-                ? "Edit Event Category"
-                : "Add New Event Category"}
+                ? t("admin.events.categories.dialog.editTitle")
+                : t("admin.events.categories.dialog.addTitle")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="categoryName">
-                Category Name <span className="text-red-600">*</span>
+                {t("admin.events.categories.dialog.nameLabel")} <span className="text-red-600">*</span>
               </Label>
               <Input
                 id="categoryName"
                 value={categoryName}
                 onChange={(e) => setCategoryName(e.target.value)}
-                placeholder="Enter event category name"
+                placeholder={t("admin.events.categories.dialog.namePlaceholder")}
                 onKeyPress={(e) => {
                   if (e.key === "Enter") {
                     handleSaveCategory();
@@ -253,7 +254,7 @@ export default function EventCategoriesManagement() {
                 }}
               />
               <p className="text-xs text-muted-foreground">
-                For internal admin use only - not visible to customers
+                {t("admin.events.categories.dialog.adminOnly")}
               </p>
             </div>
           </div>
@@ -263,10 +264,10 @@ export default function EventCategoriesManagement() {
               variant="outline"
               onClick={() => setCategoryDialogOpen(false)}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={handleSaveCategory}>
-              {selectedCategory ? "Update" : "Create"} Category
+              {selectedCategory ? t("common.update") : t("common.create")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -275,8 +276,8 @@ export default function EventCategoriesManagement() {
       <DeleteConfirmDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
-        title="Delete Event Category"
-        description={`Are you sure you want to delete "${selectedCategory?.name}"? Events using this category will need to be updated.`}
+        title={t("admin.events.categories.delete.title")}
+        description={t("admin.events.categories.delete.desc", { name: selectedCategory?.name })}
         onConfirm={handleConfirmDelete}
       />
     </div>

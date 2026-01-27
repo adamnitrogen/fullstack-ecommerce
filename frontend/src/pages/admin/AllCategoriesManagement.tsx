@@ -34,10 +34,12 @@ import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { format } from "date-fns";
 import { categoryService, Category, CategoryType } from "@/services/category.service";
+import { useTranslation } from "react-i18next";
 
 type CategoryTabType = "product" | "event" | "faq" | "gallery";
 
 export default function AllCategoriesManagement() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<CategoryTabType>("product");
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -135,10 +137,10 @@ export default function AllCategoriesManagement() {
       }
 
       toast({
-        title: "Success",
+        title: t("admin.allCategories.toasts.successTitle"),
         description: selectedCategory
-          ? "Category updated successfully"
-          : "Category created successfully",
+          ? t("admin.allCategories.toasts.updateSuccess")
+          : t("admin.allCategories.toasts.createSuccess"),
       });
       setCategoryDialogOpen(false);
       setSelectedCategory(null);
@@ -146,8 +148,8 @@ export default function AllCategoriesManagement() {
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to save category"),
+        title: t("admin.allCategories.toasts.errorTitle"),
+        description: getErrorMessage(error, t("admin.allCategories.toasts.saveFailed")),
         variant: "destructive",
       });
     },
@@ -175,16 +177,16 @@ export default function AllCategoriesManagement() {
       }
 
       toast({
-        title: "Success",
-        description: "Category deleted successfully",
+        title: t("admin.allCategories.toasts.successTitle"),
+        description: t("admin.allCategories.toasts.deleteSuccess"),
       });
       setDeleteDialogOpen(false);
       setSelectedCategory(null);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to delete category"),
+        title: t("admin.allCategories.toasts.errorTitle"),
+        description: getErrorMessage(error, t("admin.allCategories.toasts.deleteFailed")),
         variant: "destructive",
       });
     },
@@ -211,8 +213,8 @@ export default function AllCategoriesManagement() {
     e.preventDefault();
     if (!categoryName.trim()) {
       toast({
-        title: "Error",
-        description: "Category name is required",
+        title: t("admin.allCategories.toasts.errorTitle"),
+        description: t("admin.allCategories.toasts.nameRequired"),
         variant: "destructive",
       });
       return;
@@ -255,19 +257,19 @@ export default function AllCategoriesManagement() {
   };
 
   const getTitle = () => {
-    if (activeTab === "product") return "Product Categories";
-    if (activeTab === "event") return "Event Categories";
-    if (activeTab === "gallery") return "Gallery Categories";
-    return "FAQ Categories";
+    if (activeTab === "product") return t("admin.allCategories.labels.productCategories");
+    if (activeTab === "event") return t("admin.allCategories.labels.eventCategories");
+    if (activeTab === "gallery") return t("admin.allCategories.labels.galleryCategories");
+    return t("admin.allCategories.labels.faqCategories");
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Category Management</h1>
+          <h1 className="text-3xl font-bold">{t("admin.allCategories.title")}</h1>
           <p className="text-muted-foreground">
-            Manage categories for products, events, and FAQs
+            {t("admin.allCategories.subtitle")}
           </p>
         </div>
       </div>
@@ -276,19 +278,19 @@ export default function AllCategoriesManagement() {
         <TabsList className="grid w-full max-w-2xl grid-cols-4">
           <TabsTrigger value="product" className="flex items-center gap-2">
             <Folder className="h-4 w-4" />
-            Products
+            {t("admin.allCategories.tabs.products")}
           </TabsTrigger>
           <TabsTrigger value="event" className="flex items-center gap-2">
             <Tag className="h-4 w-4" />
-            Events
+            {t("admin.allCategories.tabs.events")}
           </TabsTrigger>
           <TabsTrigger value="gallery" className="flex items-center gap-2">
             <Folder className="h-4 w-4" />
-            Gallery
+            {t("admin.allCategories.tabs.gallery")}
           </TabsTrigger>
           <TabsTrigger value="faq" className="flex items-center gap-2">
             <HelpCircle className="h-4 w-4" />
-            FAQs
+            {t("admin.allCategories.tabs.faqs")}
           </TabsTrigger>
         </TabsList>
 
@@ -302,7 +304,7 @@ export default function AllCategoriesManagement() {
                 </div>
                 <Button onClick={handleAddCategory}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Category
+                  {t("admin.allCategories.addCategory")}
                 </Button>
               </CardTitle>
             </CardHeader>
@@ -313,7 +315,7 @@ export default function AllCategoriesManagement() {
                   <Input
                     id="category-search"
                     name="search"
-                    placeholder={`Search ${activeTab} categories...`}
+                    placeholder={t("admin.allCategories.searchPlaceholder", { type: t(`admin.allCategories.tabs.${activeTab}`) })}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-9"
@@ -322,20 +324,20 @@ export default function AllCategoriesManagement() {
 
                 {isLoading ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    Loading categories...
+                    {t("admin.allCategories.loading")}
                   </div>
                 ) : categories.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    No categories found. Add your first category to get started.
+                    {t("admin.allCategories.noCategoriesFound")}
                   </div>
                 ) : (
                   <div className="border rounded-lg">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Created</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
+                          <TableHead>{t("admin.allCategories.table.name")}</TableHead>
+                          <TableHead>{t("admin.allCategories.table.created")}</TableHead>
+                          <TableHead className="text-right">{t("admin.allCategories.table.actions")}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -379,8 +381,11 @@ export default function AllCategoriesManagement() {
 
                 {/* Stats */}
                 <div className="text-sm text-muted-foreground pt-4 border-t">
-                  Total: {categories.length} {activeTab}{" "}
-                  {categories.length !== 1 ? "categories" : "category"}
+                  {t("admin.allCategories.stats", {
+                    count: categories.length,
+                    type: t(`admin.allCategories.tabs.${activeTab}`),
+                    label: categories.length !== 1 ? t("admin.allCategories.categories") : t("admin.allCategories.category")
+                  })}
                 </div>
               </div>
             </CardContent>
@@ -393,20 +398,20 @@ export default function AllCategoriesManagement() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {selectedCategory ? "Edit Category" : "Add New Category"}
+              {selectedCategory ? t("admin.allCategories.dialog.editTitle") : t("admin.allCategories.dialog.addTitle")}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSaveCategory}>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="categoryName">
-                  Category Name <span className="text-destructive">*</span>
+                  {t("admin.allCategories.dialog.categoryName")} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="categoryName"
                   value={categoryName}
                   onChange={(e) => setCategoryName(e.target.value)}
-                  placeholder="Enter category name"
+                  placeholder={t("admin.allCategories.dialog.placeholder")}
                   required
                 />
               </div>
@@ -417,10 +422,10 @@ export default function AllCategoriesManagement() {
                 variant="outline"
                 onClick={() => setCategoryDialogOpen(false)}
               >
-                Cancel
+                {t("admin.allCategories.dialog.cancel")}
               </Button>
               <Button type="submit" disabled={categoryMutation.isPending}>
-                {selectedCategory ? "Update" : "Create"}
+                {selectedCategory ? t("admin.allCategories.dialog.update") : t("admin.allCategories.dialog.create")}
               </Button>
             </DialogFooter>
           </form>
@@ -435,8 +440,8 @@ export default function AllCategoriesManagement() {
           selectedCategory &&
           deleteMutation.mutate({ id: selectedCategory.id, type: activeTab })
         }
-        title="Delete Category"
-        description={`Are you sure you want to delete "${selectedCategory?.name}"? This action cannot be undone.`}
+        title={t("admin.allCategories.delete.title")}
+        description={t("admin.allCategories.delete.description", { name: selectedCategory?.name })}
       />
     </div>
   );

@@ -24,14 +24,14 @@ const reviewSchema = z.object({
   title: z
     .string()
     .trim()
-    .min(5, "Title must be at least 5 characters") // These could be localized if needed, but keeping simple for now
-    .max(100, "Title must be less than 100 characters"),
+    .min(5, "products.validation.titleMin")
+    .max(100, "products.validation.titleMax"),
   comment: z
     .string()
     .trim()
-    .min(10, "Review must be at least 10 characters")
-    .max(1000, "Review must be less than 1000 characters"),
-  rating: z.number().min(1, "Please select a rating").max(5),
+    .min(10, "products.validation.commentMin")
+    .max(1000, "products.validation.commentMax"),
+  rating: z.number().min(1, "products.validation.ratingRequired").max(5),
 });
 
 export const ProductReviews = ({ productId }: ProductReviewsProps) => {
@@ -63,14 +63,14 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
       setRating(0);
       setShowForm(false);
       toast({
-        title: "Success",
-        description: "Review submitted successfully!",
+        title: t("products.messages.successTitle"),
+        description: t("products.messages.successDesc"),
       });
     },
     onError: (error: unknown) => {
       toast({
-        title: getFriendlyTitle(error, "Notice"),
-        description: getErrorMessage(error, "Failed to submit review"),
+        title: getFriendlyTitle(error, t("products.messages.errorTitle")),
+        description: getErrorMessage(error, t("products.messages.errorDesc")),
         variant: "destructive",
       });
     },
@@ -95,8 +95,8 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
 
     if (!user?.name || user.name.trim() === "") {
       toast({
-        title: "Name Required",
-        description: "Please add your name in profile settings before submitting a review.",
+        title: t("products.messages.nameRequired"),
+        description: t("products.messages.nameRequiredDesc"),
         variant: "destructive",
       });
       return;
@@ -104,8 +104,8 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
 
     if (!user?.email || user.email.trim() === "") {
       toast({
-        title: "Email Required",
-        description: "Please add your email address in profile settings before submitting a review.",
+        title: t("products.messages.emailRequired"),
+        description: t("products.messages.emailRequiredDesc"),
         variant: "destructive",
       });
       return;
@@ -119,8 +119,8 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
 
       if (!user.id) {
         toast({
-          title: "Error",
-          description: "User ID not found. Please log in again.",
+          title: t("products.messages.loginRequired"),
+          description: t("products.messages.loginRequiredDesc"),
           variant: "destructive",
         });
         return;
@@ -136,8 +136,8 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
     } catch (error) {
       if (error instanceof z.ZodError) {
         toast({
-          title: "Check your info",
-          description: error.errors[0].message,
+          title: t("products.messages.errorTitle"),
+          description: t(error.errors[0].message), /* Translate the error key from Zod schema */
           variant: "destructive",
         });
       }

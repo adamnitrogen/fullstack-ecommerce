@@ -4,6 +4,7 @@ import { FileText, Loader2, RotateCcw } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errorUtils";
+import { useTranslation } from "react-i18next";
 
 interface RegenerateInvoiceButtonProps {
     orderId: string;
@@ -22,23 +23,24 @@ export const RegenerateInvoiceButton: React.FC<RegenerateInvoiceButtonProps> = (
     size = "sm",
     showIconOnly = false
 }) => {
+    const { t } = useTranslation();
     const [isGenerating, setIsGenerating] = useState(false);
 
     const handleRegenerate = async () => {
         try {
             setIsGenerating(true);
-            toast.info("Regenerating invoice...");
+            toast.info(t("admin.orders.regenerating"));
 
             const response = await apiClient.post(`/invoices/orders/${orderId}/retry`, {});
 
             if (response.data.success) {
-                toast.success("Invoice regenerated successfully");
+                toast.success(t("admin.orders.invoiceRegenerated"));
                 if (onSuccess) onSuccess();
             } else {
-                toast.error(response.data.error || "Failed to regenerate invoice");
+                toast.error(response.data.error || t("admin.orders.regenerateError"));
             }
         } catch (error) {
-            toast.error(getErrorMessage(error, "Failed to regenerate invoice"));
+            toast.error(getErrorMessage(error, t("admin.orders.regenerateError")));
         } finally {
             setIsGenerating(false);
         }
@@ -57,7 +59,7 @@ export const RegenerateInvoiceButton: React.FC<RegenerateInvoiceButtonProps> = (
             ) : (
                 <RotateCcw className={`${showIconOnly ? "" : "mr-2"} h-4 w-4`} />
             )}
-            {!showIconOnly && "Regenerate Invoice"}
+            {!showIconOnly && t("admin.orders.regenerateInvoice")}
         </Button>
     );
 };

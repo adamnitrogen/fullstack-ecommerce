@@ -1,5 +1,6 @@
 import { logger } from "@/lib/logger";
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -37,12 +38,13 @@ interface CouponDialogProps {
     onSave: () => void;
 }
 
-export function CouponDialog({
+export const CouponDialog: React.FC<CouponDialogProps> = ({
     open,
     onOpenChange,
     coupon,
     onSave,
-}: CouponDialogProps) {
+}) => {
+    const { t } = useTranslation();
     const [loading, setLoading] = useState(false);
     const [categories, setCategories] = useState<string[]>([]);
     const [loadingCategories, setLoadingCategories] = useState(false);
@@ -200,20 +202,20 @@ export function CouponDialog({
 
         // Validation
         if (!dataToSave.code || !dataToSave.valid_until) {
-            toast.error("Please fill in all required fields");
+            toast.error(t("admin.coupons.dialog.fillRequired"));
             return;
         }
 
         if (dataToSave.type !== "free_delivery" && (dataToSave.discount_percentage < 1 || dataToSave.discount_percentage > 100)) {
-            toast.error("Discount percentage must be between 1 and 100");
+            toast.error(t("admin.coupons.dialog.discountRange"));
             return;
         }
 
         if (
-            (dataToSave.type === "product" || dataToSave.type === "category") &&
+            (dataToSave.type === "product" || dataToSave.type === "category" || dataToSave.type === "variant") &&
             !dataToSave.target_id
         ) {
-            toast.error(`Please specify a ${dataToSave.type} for this coupon`);
+            toast.error(t("admin.coupons.dialog.specifyTarget", { type: dataToSave.type }));
             return;
         }
 
@@ -223,16 +225,16 @@ export function CouponDialog({
             if (coupon) {
                 // Update existing coupon
                 await couponService.update(coupon.id, dataToSave);
-                toast.success("Coupon updated successfully");
+                toast.success(t("admin.coupons.dialog.updateSuccess"));
             } else {
                 // Create new coupon
                 await couponService.create(dataToSave);
-                toast.success("Coupon created successfully");
+                toast.success(t("admin.coupons.dialog.createSuccess"));
             }
 
             onSave();
         } catch (error: unknown) {
-            toast.error(getErrorMessage(error, "Failed to save coupon"));
+            toast.error(getErrorMessage(error, t("admin.coupons.dialog.saveFailed")));
         } finally {
             setLoading(false);
         }
@@ -243,12 +245,12 @@ export function CouponDialog({
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>
-                        {coupon ? "Edit Coupon" : "Create New Coupon"}
+                        {coupon ? t("admin.coupons.dialog.editTitle") : t("admin.coupons.dialog.addTitle")}
                     </DialogTitle>
                     <DialogDescription>
                         {coupon
-                            ? "Update coupon details"
-                            : "Create a new discount coupon for your store"}
+                            ? t("admin.coupons.dialog.editSubtitle")
+                            : t("admin.coupons.dialog.addSubtitle")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -256,7 +258,7 @@ export function CouponDialog({
                     {/* Code */}
                     <div className="grid gap-2">
                         <Label htmlFor="code">
-                            Coupon Code <span className="text-destructive">*</span>
+                            {t("admin.coupons.dialog.codeLabel")} <span className="text-destructive">*</span>
                         </Label>
                         <Input
                             id="code"
@@ -264,7 +266,7 @@ export function CouponDialog({
                             onChange={(e) =>
                                 handleChange("code", e.target.value.toUpperCase())
                             }
-                            placeholder="e.g., SAVE20"
+                            placeholder={t("admin.coupons.dialog.codePlaceholder")}
                             disabled={loading}
                             required
                         />
@@ -273,7 +275,7 @@ export function CouponDialog({
                     {/* Type */}
                     <div className="grid gap-2">
                         <Label htmlFor="type">
-                            Coupon Type <span className="text-destructive">*</span>
+                            {t("admin.coupons.dialog.typeLabel")} <span className="text-destructive">*</span>
                         </Label>
                         <Select
                             value={formData.type}
@@ -288,11 +290,11 @@ export function CouponDialog({
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="cart">Cart-Level (Apply to entire cart)</SelectItem>
-                                <SelectItem value="category">Category-Level (Apply to a category)</SelectItem>
-                                <SelectItem value="product">Product-Level (Apply to specific product)</SelectItem>
-                                <SelectItem value="variant">Variant-Level (Apply to specific variant)</SelectItem>
-                                <SelectItem value="free_delivery">Free Delivery (Waive shipping charges)</SelectItem>
+                                <SelectItem value="cart">{t("admin.coupons.dialog.types.cart")}</SelectItem>
+                                <SelectItem value="category">{t("admin.coupons.dialog.types.category")}</SelectItem>
+                                <SelectItem value="product">{t("admin.coupons.dialog.types.product")}</SelectItem>
+                                <SelectItem value="variant">{t("admin.coupons.dialog.types.variant")}</SelectItem>
+                                <SelectItem value="free_delivery">{t("admin.coupons.dialog.types.freeDelivery")}</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -301,7 +303,7 @@ export function CouponDialog({
                     {(formData.type === "product" || formData.type === "variant") && (
                         <div className="grid gap-2">
                             <Label htmlFor="target_id">
-                                {formData.type === "product" ? "Select Product" : "Select Variant"} <span className="text-destructive">*</span>
+                                {t("admin.coupons.dialog.selectTarget", { type: formData.type })} <span className="text-destructive">*</span>
                             </Label>
 
                             <Popover open={openSelector} onOpenChange={setOpenSelector}>
@@ -320,7 +322,7 @@ export function CouponDialog({
                                                     <span className="truncate">{selectedEntityName || formData.target_id}</span>
                                                 </>
                                             ) : (
-                                                <span className="text-muted-foreground">Search for a {formData.type}...</span>
+                                                <span className="text-muted-foreground">{t("admin.coupons.dialog.searchPlaceholder", { type: formData.type })}</span>
                                             )}
                                         </div>
                                         <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -329,7 +331,7 @@ export function CouponDialog({
                                 <PopoverContent className="w-[--radix-popover-trigger-width] p-0 rounded-xl shadow-2xl border-primary/10">
                                     <Command shouldFilter={false}>
                                         <CommandInput
-                                            placeholder={`Search for ${formData.type}...`}
+                                            placeholder={t("admin.coupons.dialog.searchPlaceholder", { type: formData.type })}
                                             onValueChange={setSearchTerm}
                                             value={searchTerm}
                                         />
@@ -338,10 +340,10 @@ export function CouponDialog({
                                                 {isSearching ? (
                                                     <div className="flex items-center justify-center gap-2">
                                                         <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                                                        <span>Searching...</span>
+                                                        <span>{t("admin.coupons.dialog.searching")}</span>
                                                     </div>
                                                 ) : (
-                                                    "No results found."
+                                                    t("admin.coupons.dialog.noResults")
                                                 )}
                                             </CommandEmpty>
                                             <CommandGroup>
@@ -371,7 +373,7 @@ export function CouponDialog({
                                                         ) : (
                                                             // For Variants, show product and its variants
                                                             <div className="px-2 py-1.5">
-                                                                <div className="text-[10px] font-black text-primary/50 uppercase px-2 mb-1">{product.title} Variants</div>
+                                                                <div className="text-[10px] font-black text-primary/50 uppercase px-2 mb-1">{t("admin.coupons.dialog.variantsAvailable")}</div>
                                                                 {product.variants && product.variants.length > 0 ? (
                                                                     product.variants.map((v) => (
                                                                         <CommandItem
@@ -397,7 +399,7 @@ export function CouponDialog({
                                                                         </CommandItem>
                                                                     ))
                                                                 ) : (
-                                                                    <div className="text-[10px] italic text-muted-foreground px-4 py-1">No variants available</div>
+                                                                    <div className="text-[10px] italic text-muted-foreground px-4 py-1">{t("admin.coupons.dialog.noVariants")}</div>
                                                                 )}
                                                             </div>
                                                         )}
@@ -414,7 +416,7 @@ export function CouponDialog({
                     {formData.type === "category" && (
                         <div className="grid gap-2">
                             <Label htmlFor="target_id">
-                                Category <span className="text-destructive">*</span>
+                                {t("admin.coupons.dialog.types.category")} <span className="text-destructive">*</span>
                             </Label>
                             <Select
                                 value={formData.target_id || ""}
@@ -422,7 +424,7 @@ export function CouponDialog({
                                 disabled={loading || loadingCategories}
                             >
                                 <SelectTrigger>
-                                    <SelectValue placeholder={loadingCategories ? "Loading categories..." : "Select category"} />
+                                    <SelectValue placeholder={loadingCategories ? t("admin.coupons.dialog.loadingCategories") : t("admin.coupons.dialog.selectCategory")} />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {categories.map((category) => (
@@ -439,7 +441,7 @@ export function CouponDialog({
                     {formData.type !== 'free_delivery' && (
                         <div className="grid gap-2">
                             <Label htmlFor="discount">
-                                Discount Percentage <span className="text-destructive">*</span>
+                                {t("admin.coupons.dialog.discountLabel")} <span className="text-destructive">*</span>
                             </Label>
                             <Input
                                 id="discount"
@@ -460,7 +462,7 @@ export function CouponDialog({
                         <div className="grid grid-cols-2 gap-4">
                             {/* Min Purchase Amount */}
                             <div className="grid gap-2">
-                                <Label htmlFor="min_purchase">Minimum Purchase (₹)</Label>
+                                <Label htmlFor="min_purchase">{t("admin.coupons.dialog.minPurchaseLabel")}</Label>
                                 <Input
                                     id="min_purchase"
                                     type="number"
@@ -472,14 +474,14 @@ export function CouponDialog({
                                             e.target.value ? parseFloat(e.target.value) : undefined
                                         )
                                     }
-                                    placeholder="No minimum"
+                                    placeholder={t("admin.coupons.dialog.noMinimum")}
                                     disabled={loading}
                                 />
                             </div>
 
                             {/* Max Discount Amount */}
                             <div className="grid gap-2">
-                                <Label htmlFor="max_discount">Max Discount Cap (₹)</Label>
+                                <Label htmlFor="max_discount">{t("admin.coupons.dialog.maxDiscountLabel")}</Label>
                                 <Input
                                     id="max_discount"
                                     type="number"
@@ -491,7 +493,7 @@ export function CouponDialog({
                                             e.target.value ? parseFloat(e.target.value) : undefined
                                         )
                                     }
-                                    placeholder="No cap"
+                                    placeholder={t("admin.coupons.dialog.noCap")}
                                     disabled={loading}
                                 />
                             </div>
@@ -501,7 +503,7 @@ export function CouponDialog({
                     <div className="grid grid-cols-2 gap-4">
                         {/* Valid From */}
                         <div className="grid gap-2">
-                            <Label htmlFor="valid_from">Valid From</Label>
+                            <Label htmlFor="valid_from">{t("admin.coupons.dialog.validFromLabel")}</Label>
                             <Input
                                 id="valid_from"
                                 type="date"
@@ -514,7 +516,7 @@ export function CouponDialog({
                         {/* Valid Until */}
                         <div className="grid gap-2">
                             <Label htmlFor="valid_until">
-                                Valid Until <span className="text-destructive">*</span>
+                                {t("admin.coupons.dialog.validUntilLabel")} <span className="text-destructive">*</span>
                             </Label>
                             <Input
                                 id="valid_until"
@@ -530,7 +532,7 @@ export function CouponDialog({
                     <div className="grid grid-cols-2 gap-4">
                         {/* Usage Limit */}
                         <div className="grid gap-2">
-                            <Label htmlFor="usage_limit">Usage Limit</Label>
+                            <Label htmlFor="usage_limit">{t("admin.coupons.dialog.usageLimitLabel")}</Label>
                             <Input
                                 id="usage_limit"
                                 type="number"
@@ -542,14 +544,14 @@ export function CouponDialog({
                                         e.target.value ? parseInt(e.target.value) : undefined
                                     )
                                 }
-                                placeholder="Unlimited"
+                                placeholder={t("admin.coupons.dialog.unlimited")}
                                 disabled={loading}
                             />
                         </div>
 
                         {/* Active Status */}
                         <div className="grid gap-2">
-                            <Label htmlFor="is_active">Status</Label>
+                            <Label htmlFor="is_active">{t("admin.coupons.dialog.statusLabel")}</Label>
                             <Select
                                 value={formData.is_active ? "active" : "inactive"}
                                 onValueChange={(value) =>
@@ -561,8 +563,8 @@ export function CouponDialog({
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="active">Active</SelectItem>
-                                    <SelectItem value="inactive">Inactive</SelectItem>
+                                    <SelectItem value="active">{t("admin.coupons.dialog.active")}</SelectItem>
+                                    <SelectItem value="inactive">{t("admin.coupons.dialog.inactive")}</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -575,11 +577,11 @@ export function CouponDialog({
                             onClick={() => onOpenChange(false)}
                             disabled={loading}
                         >
-                            Cancel
+                            {t("admin.coupons.dialog.cancel")}
                         </Button>
                         <Button type="submit" disabled={loading}>
                             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {coupon ? "Update" : "Create"} Coupon
+                            {coupon ? t("admin.coupons.dialog.update") : t("admin.coupons.dialog.create")} {t("admin.coupons.filters.type")}
                         </Button>
                     </DialogFooter>
                 </form>

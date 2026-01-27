@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { aboutService } from "@/services/about.service";
 import {
@@ -34,6 +35,7 @@ import TeamMemberDialog from "@/components/admin/TeamMemberDialog";
 import FutureGoalDialog from "@/components/admin/FutureGoalDialog";
 
 export default function AboutUsManagement() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState("cards");
   const [editingCard, setEditingCard] = useState<AboutCard | null>(null);
   const [cardDialogOpen, setCardDialogOpen] = useState(false);
@@ -70,13 +72,13 @@ export default function AboutUsManagement() {
     mutationFn: (id: string) => aboutService.deleteCard(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["aboutUs"] });
-      toast({ title: "Card deleted successfully" });
+      toast({ title: t("admin.about.toasts.deleteCard") });
       setDeleteItem(null);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Failed to delete card",
-        description: getErrorMessage(error, "Failed to delete card"),
+        title: t("admin.about.toasts.deleteCardError"),
+        description: getErrorMessage(error, t("admin.about.toasts.deleteCardError")),
         variant: "destructive",
       });
     },
@@ -86,13 +88,13 @@ export default function AboutUsManagement() {
     mutationFn: (id: string) => aboutService.deleteTimeline(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["aboutUs"] });
-      toast({ title: "Timeline item deleted successfully" });
+      toast({ title: t("admin.about.toasts.deleteTimeline") });
       setDeleteItem(null);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Failed to delete timeline item",
-        description: getErrorMessage(error, "Failed to delete timeline item"),
+        title: t("admin.about.toasts.deleteTimelineError"),
+        description: getErrorMessage(error, t("admin.about.toasts.deleteTimelineError")),
         variant: "destructive",
       });
     },
@@ -102,13 +104,13 @@ export default function AboutUsManagement() {
     mutationFn: (id: string) => aboutService.deleteTeamMember(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["aboutUs"] });
-      toast({ title: "Team member deleted successfully" });
+      toast({ title: t("admin.about.toasts.deleteTeam") });
       setDeleteItem(null);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Failed to delete team member",
-        description: getErrorMessage(error, "Failed to delete team member"),
+        title: t("admin.about.toasts.deleteTeamError"),
+        description: getErrorMessage(error, t("admin.about.toasts.deleteTeamError")),
         variant: "destructive"
       });
     },
@@ -118,13 +120,13 @@ export default function AboutUsManagement() {
     mutationFn: (id: string) => aboutService.deleteStat(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["aboutUs"] });
-      toast({ title: "Impact stat deleted successfully" });
+      toast({ title: t("admin.about.toasts.deleteStat") });
       setDeleteItem(null);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Failed to delete impact stat",
-        description: getErrorMessage(error, "Failed to delete impact stat"),
+        title: t("admin.about.toasts.deleteStatError"),
+        description: getErrorMessage(error, t("admin.about.toasts.deleteStatError")),
         variant: "destructive",
       });
     },
@@ -134,13 +136,13 @@ export default function AboutUsManagement() {
     mutationFn: (id: string) => aboutService.deleteGoal(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["aboutUs"] });
-      toast({ title: "Goal deleted successfully" });
+      toast({ title: t("admin.about.toasts.deleteGoal") });
       setDeleteItem(null);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Failed to delete goal",
-        description: getErrorMessage(error, "Failed to delete goal"),
+        title: t("admin.about.toasts.deleteGoalError"),
+        description: getErrorMessage(error, t("admin.about.toasts.deleteGoalError")),
         variant: "destructive",
       });
     },
@@ -152,7 +154,7 @@ export default function AboutUsManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["aboutUs"] });
-      toast({ title: "Footer description updated successfully" });
+      toast({ title: t("admin.about.toasts.updateFooter") });
       setEditingFooter(false);
     },
   });
@@ -173,7 +175,7 @@ export default function AboutUsManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["aboutUs"] });
-      toast({ title: "Section visibility updated successfully" });
+      toast({ title: t("admin.about.toasts.updateVisibility") });
     },
   });
 
@@ -211,7 +213,7 @@ export default function AboutUsManagement() {
   };
 
   if (!aboutContent) {
-    return <div>Loading content...</div>;
+    return <div>{t("common.loading")}</div>;
   }
 
   // Ensure sectionVisibility exists with defaults
@@ -227,18 +229,18 @@ export default function AboutUsManagement() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">About Us Management</h1>
+        <h1 className="text-3xl font-bold">{t("admin.about.title")}</h1>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-7">
-          <TabsTrigger value="cards">Cards</TabsTrigger>
-          <TabsTrigger value="impact">Impact Stats</TabsTrigger>
-          <TabsTrigger value="timeline">Timeline</TabsTrigger>
-          <TabsTrigger value="team">Team</TabsTrigger>
-          <TabsTrigger value="goals">Future Goals</TabsTrigger>
-          <TabsTrigger value="visibility">Visibility</TabsTrigger>
-          <TabsTrigger value="footer">Footer</TabsTrigger>
+          <TabsTrigger value="cards">{t("admin.about.tabs.cards")}</TabsTrigger>
+          <TabsTrigger value="impact">{t("admin.about.tabs.impact")}</TabsTrigger>
+          <TabsTrigger value="timeline">{t("admin.about.tabs.timeline")}</TabsTrigger>
+          <TabsTrigger value="team">{t("admin.about.tabs.team")}</TabsTrigger>
+          <TabsTrigger value="goals">{t("admin.about.tabs.goals")}</TabsTrigger>
+          <TabsTrigger value="visibility">{t("admin.about.tabs.visibility")}</TabsTrigger>
+          <TabsTrigger value="footer">{t("admin.about.tabs.footer")}</TabsTrigger>
         </TabsList>
 
         {/* Cards Tab */}
@@ -246,7 +248,7 @@ export default function AboutUsManagement() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Mission & Vision Cards</CardTitle>
+                <CardTitle>{t("admin.about.cards.title")}</CardTitle>
                 <Button
                   size="sm"
                   onClick={() => {
@@ -255,7 +257,7 @@ export default function AboutUsManagement() {
                   }}
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Card
+                  {t("admin.about.cards.add")}
                 </Button>
               </div>
             </CardHeader>
@@ -263,11 +265,11 @@ export default function AboutUsManagement() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Icon</TableHead>
-                    <TableHead>Order</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{t("admin.about.cards.table.title")}</TableHead>
+                    <TableHead>{t("admin.about.cards.table.desc")}</TableHead>
+                    <TableHead>{t("admin.about.cards.table.icon")}</TableHead>
+                    <TableHead>{t("admin.about.cards.table.order")}</TableHead>
+                    <TableHead className="text-right">{t("admin.categories.table.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -323,7 +325,7 @@ export default function AboutUsManagement() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Impact Statistics</CardTitle>
+                <CardTitle>{t("admin.about.impact.title")}</CardTitle>
                 <Button
                   size="sm"
                   onClick={() => {
@@ -332,7 +334,7 @@ export default function AboutUsManagement() {
                   }}
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Impact Stat
+                  {t("admin.about.impact.add")}
                 </Button>
               </div>
             </CardHeader>
@@ -340,11 +342,11 @@ export default function AboutUsManagement() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Value</TableHead>
-                    <TableHead>Label</TableHead>
-                    <TableHead>Icon</TableHead>
-                    <TableHead>Order</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{t("admin.about.impact.table.value")}</TableHead>
+                    <TableHead>{t("admin.about.impact.table.label")}</TableHead>
+                    <TableHead>{t("admin.about.impact.table.icon")}</TableHead>
+                    <TableHead>{t("admin.about.impact.table.order")}</TableHead>
+                    <TableHead className="text-right">{t("admin.about.impact.table.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -398,7 +400,7 @@ export default function AboutUsManagement() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Our Story Timeline</CardTitle>
+                <CardTitle>{t("admin.about.timeline.title")}</CardTitle>
                 <Button
                   size="sm"
                   onClick={() => {
@@ -407,7 +409,7 @@ export default function AboutUsManagement() {
                   }}
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Timeline Item
+                  {t("admin.about.timeline.add")}
                 </Button>
               </div>
             </CardHeader>
@@ -415,11 +417,11 @@ export default function AboutUsManagement() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Order</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{t("admin.about.timeline.table.date")}</TableHead>
+                    <TableHead>{t("admin.about.timeline.table.title")}</TableHead>
+                    <TableHead>{t("admin.about.timeline.table.desc")}</TableHead>
+                    <TableHead>{t("admin.about.timeline.table.order")}</TableHead>
+                    <TableHead className="text-right">{t("admin.about.timeline.table.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -475,7 +477,7 @@ export default function AboutUsManagement() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Team Members</CardTitle>
+                <CardTitle>{t("admin.about.team.title")}</CardTitle>
                 <Button
                   size="sm"
                   onClick={() => {
@@ -484,7 +486,7 @@ export default function AboutUsManagement() {
                   }}
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Team Member
+                  {t("admin.about.team.add")}
                 </Button>
               </div>
             </CardHeader>
@@ -492,12 +494,12 @@ export default function AboutUsManagement() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Image</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Bio</TableHead>
-                    <TableHead>Order</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{t("admin.about.team.table.image")}</TableHead>
+                    <TableHead>{t("admin.about.team.table.name")}</TableHead>
+                    <TableHead>{t("admin.about.team.table.role")}</TableHead>
+                    <TableHead>{t("admin.about.team.table.bio")}</TableHead>
+                    <TableHead>{t("admin.about.team.table.order")}</TableHead>
+                    <TableHead className="text-right">{t("admin.about.team.table.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -574,7 +576,7 @@ export default function AboutUsManagement() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Future Goals</CardTitle>
+                <CardTitle>{t("admin.about.goals.title")}</CardTitle>
                 <Button
                   size="sm"
                   onClick={() => {
@@ -583,7 +585,7 @@ export default function AboutUsManagement() {
                   }}
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Goal
+                  {t("admin.about.goals.add")}
                 </Button>
               </div>
             </CardHeader>
@@ -591,10 +593,10 @@ export default function AboutUsManagement() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Order</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{t("admin.about.goals.table.title")}</TableHead>
+                    <TableHead>{t("admin.about.goals.table.desc")}</TableHead>
+                    <TableHead>{t("admin.about.goals.table.order")}</TableHead>
+                    <TableHead className="text-right">{t("admin.about.goals.table.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -648,10 +650,9 @@ export default function AboutUsManagement() {
         <TabsContent value="visibility" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Section Visibility Settings</CardTitle>
+              <CardTitle>{t("admin.about.visibility.title")}</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Control which sections appear on the About Us page. Toggle
-                switches to show or hide sections.
+                {t("admin.about.visibility.desc")}
               </p>
             </CardHeader>
             <CardContent>
@@ -662,10 +663,10 @@ export default function AboutUsManagement() {
                       htmlFor="visibility-mission"
                       className="text-base font-semibold cursor-pointer"
                     >
-                      Mission & Vision Cards
+                      {t("admin.about.visibility.sections.mission.label")}
                     </Label>
                     <p className="text-sm text-muted-foreground">
-                      Display the mission and vision cards section
+                      {t("admin.about.visibility.sections.mission.desc")}
                     </p>
                   </div>
                   <Switch
@@ -683,10 +684,10 @@ export default function AboutUsManagement() {
                       htmlFor="visibility-impact"
                       className="text-base font-semibold cursor-pointer"
                     >
-                      Impact Statistics
+                      {t("admin.about.visibility.sections.impact.label")}
                     </Label>
                     <p className="text-sm text-muted-foreground">
-                      Display the impact statistics section
+                      {t("admin.about.visibility.sections.impact.desc")}
                     </p>
                   </div>
                   <Switch
@@ -704,10 +705,10 @@ export default function AboutUsManagement() {
                       htmlFor="visibility-story"
                       className="text-base font-semibold cursor-pointer"
                     >
-                      Our Story Timeline
+                      {t("admin.about.visibility.sections.story.label")}
                     </Label>
                     <p className="text-sm text-muted-foreground">
-                      Display the timeline section showing organization history
+                      {t("admin.about.visibility.sections.story.desc")}
                     </p>
                   </div>
                   <Switch
@@ -725,10 +726,10 @@ export default function AboutUsManagement() {
                       htmlFor="visibility-team"
                       className="text-base font-semibold cursor-pointer"
                     >
-                      Team Members
+                      {t("admin.about.visibility.sections.team.label")}
                     </Label>
                     <p className="text-sm text-muted-foreground">
-                      Display the team members section
+                      {t("admin.about.visibility.sections.team.desc")}
                     </p>
                   </div>
                   <Switch
@@ -746,10 +747,10 @@ export default function AboutUsManagement() {
                       htmlFor="visibility-goals"
                       className="text-base font-semibold cursor-pointer"
                     >
-                      Future Goals
+                      {t("admin.about.visibility.sections.goals.label")}
                     </Label>
                     <p className="text-sm text-muted-foreground">
-                      Display the future goals section
+                      {t("admin.about.visibility.sections.goals.desc")}
                     </p>
                   </div>
                   <Switch
@@ -767,11 +768,10 @@ export default function AboutUsManagement() {
                       htmlFor="visibility-cta"
                       className="text-base font-semibold cursor-pointer"
                     >
-                      Call to Action
+                      {t("admin.about.visibility.sections.cta.label")}
                     </Label>
                     <p className="text-sm text-muted-foreground">
-                      Display the call to action section with Donate/Volunteer
-                      buttons
+                      {t("admin.about.visibility.sections.cta.desc")}
                     </p>
                   </div>
                   <Switch
@@ -792,7 +792,7 @@ export default function AboutUsManagement() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Footer Description</CardTitle>
+                <CardTitle>{t("admin.about.footer.title")}</CardTitle>
                 {!editingFooter && (
                   <Button
                     size="sm"
@@ -802,7 +802,7 @@ export default function AboutUsManagement() {
                     }}
                   >
                     <Pencil className="mr-2 h-4 w-4" />
-                    Edit
+                    {t("admin.about.footer.edit")}
                   </Button>
                 )}
               </div>
@@ -811,22 +811,22 @@ export default function AboutUsManagement() {
               {editingFooter ? (
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="footer-description">Description</Label>
+                    <Label htmlFor="footer-description">{t("admin.about.footer.label")}</Label>
                     <Textarea
                       id="footer-description"
                       value={footerDescription}
                       onChange={(e) => setFooterDescription(e.target.value)}
                       rows={6}
-                      placeholder="Enter footer description for Goshala..."
+                      placeholder={t("admin.about.footer.placeholder")}
                     />
                   </div>
                   <div className="flex gap-2">
-                    <Button onClick={handleSaveFooter}>Save</Button>
+                    <Button onClick={handleSaveFooter}>{t("admin.about.footer.save")}</Button>
                     <Button
                       variant="outline"
                       onClick={() => setEditingFooter(false)}
                     >
-                      Cancel
+                      {t("admin.about.footer.cancel")}
                     </Button>
                   </div>
                 </div>
@@ -844,8 +844,8 @@ export default function AboutUsManagement() {
         open={!!deleteItem}
         onOpenChange={(open) => !open && setDeleteItem(null)}
         onConfirm={handleDelete}
-        title="Delete Item"
-        description={`Are you sure you want to delete "${deleteItem?.name}"? This action cannot be undone.`}
+        title={t("admin.about.common.deleteItem")}
+        description={t("admin.about.common.deleteConfirmDesc", { name: deleteItem?.name })}
       />
 
       <AboutCardDialog

@@ -16,19 +16,21 @@ import { SocialMediaLink } from "@/types/contact";
 import { socialMediaService } from "@/services/social-media.service";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage, getFriendlyTitle } from "@/lib/errorUtils";
+import { useTranslation } from "react-i18next";
 
 const socialPlatforms = [
-  { value: "facebook", label: "Facebook", icon: "facebook" },
-  { value: "instagram", label: "Instagram", icon: "instagram" },
-  { value: "youtube", label: "YouTube", icon: "youtube" },
-  { value: "twitter", label: "Twitter/X", icon: "twitter" },
-  { value: "linkedin", label: "LinkedIn", icon: "linkedin" },
-  { value: "whatsapp", label: "WhatsApp", icon: "phone" },
-  { value: "telegram", label: "Telegram", icon: "send" },
-  { value: "other", label: "Other", icon: "link" },
+  { value: "facebook", label: "admin.social.platforms.facebook", icon: "facebook" },
+  { value: "instagram", label: "admin.social.platforms.instagram", icon: "instagram" },
+  { value: "youtube", label: "admin.social.platforms.youtube", icon: "youtube" },
+  { value: "twitter", label: "admin.social.platforms.twitter", icon: "twitter" },
+  { value: "linkedin", label: "admin.social.platforms.linkedin", icon: "linkedin" },
+  { value: "whatsapp", label: "admin.social.platforms.whatsapp", icon: "phone" },
+  { value: "telegram", label: "admin.social.platforms.telegram", icon: "send" },
+  { value: "other", label: "admin.social.platforms.other", icon: "link" },
 ];
 
 export function SocialMediaSection() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingLink, setEditingLink] = useState<Partial<SocialMediaLink>>({
@@ -54,12 +56,12 @@ export function SocialMediaSection() {
       queryClient.invalidateQueries({ queryKey: ["admin-social-media"] });
       setNewLink({ platform: "", url: "" });
       setIsAdding(false);
-      toast({ title: "Success", description: "Social media link added" });
+      toast({ title: t("common.success"), description: t("admin.social.added") });
     },
     onError: (error: unknown) => {
       toast({
-        title: getFriendlyTitle(error, "Notice"),
-        description: getErrorMessage(error, "Failed to add link"),
+        title: getFriendlyTitle(error, t("common.notice")),
+        description: getErrorMessage(error, t("admin.social.addError")),
         variant: "destructive",
       });
     },
@@ -71,12 +73,12 @@ export function SocialMediaSection() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-social-media"] });
       setEditingId(null);
-      toast({ title: "Success", description: "Social media link updated" });
+      toast({ title: t("common.success"), description: t("admin.social.updated") });
     },
     onError: (error: unknown) => {
       toast({
-        title: getFriendlyTitle(error, "Notice"),
-        description: getErrorMessage(error, "Failed to update link"),
+        title: getFriendlyTitle(error, t("common.notice")),
+        description: getErrorMessage(error, t("admin.social.updateError")),
         variant: "destructive",
       });
     },
@@ -86,12 +88,12 @@ export function SocialMediaSection() {
     mutationFn: socialMediaService.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-social-media"] });
-      toast({ title: "Success", description: "Social media link removed" });
+      toast({ title: t("common.success"), description: t("admin.social.removed") });
     },
     onError: (error: unknown) => {
       toast({
-        title: getFriendlyTitle(error, "Notice"),
-        description: getErrorMessage(error, "Failed to remove link"),
+        title: getFriendlyTitle(error, t("common.notice")),
+        description: getErrorMessage(error, t("admin.social.removeError")),
         variant: "destructive",
       });
     },
@@ -100,8 +102,8 @@ export function SocialMediaSection() {
   const handleAdd = () => {
     if (!newLink.platform || !newLink.url) {
       toast({
-        title: "Check your info",
-        description: "Please fill in all fields",
+        title: t("admin.checkInfo"),
+        description: t("admin.fillFields"),
         variant: "destructive"
       });
       return;
@@ -114,7 +116,7 @@ export function SocialMediaSection() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this link?")) {
+    if (confirm(t("admin.social.deleteConfirm"))) {
       deleteMutation.mutate(id);
     }
   };
@@ -124,7 +126,7 @@ export function SocialMediaSection() {
       <Card>
         <CardContent className="py-8 text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
-          <p className="mt-2 text-muted-foreground">Loading social media links...</p>
+          <p className="mt-2 text-muted-foreground">{t("admin.loading.social")}</p>
         </CardContent>
       </Card>
     );
@@ -134,19 +136,19 @@ export function SocialMediaSection() {
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>Social Media Links</CardTitle>
+          <CardTitle>{t("admin.social.title")}</CardTitle>
           <Button onClick={() => setIsAdding(true)} size="sm">
             <Plus className="h-4 w-4 mr-2" />
-            Add Link
+            {t("admin.social.add")}
           </Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {isAdding && (
           <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
-            <h4 className="font-semibold">Add New Social Media Link</h4>
+            <h4 className="font-semibold">{t("admin.social.addNew")}</h4>
             <div className="space-y-2">
-              <Label>Platform</Label>
+              <Label>{t("admin.social.platform")}</Label>
               <Select
                 value={newLink.platform}
                 onValueChange={(value) =>
@@ -154,25 +156,25 @@ export function SocialMediaSection() {
                 }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select platform" />
+                  <SelectValue placeholder={t("admin.social.selectPlatform")} />
                 </SelectTrigger>
                 <SelectContent>
                   {socialPlatforms.map((platform) => (
                     <SelectItem key={platform.value} value={platform.value}>
-                      {platform.label}
+                      {t(platform.label)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>URL</Label>
+              <Label>{t("admin.social.url")}</Label>
               <Input
                 value={newLink.url}
                 onChange={(e) =>
                   setNewLink({ ...newLink, url: e.target.value })
                 }
-                placeholder="https://..."
+                placeholder={t("admin.social.urlPlaceholder")}
               />
             </div>
             <div className="flex gap-2">
@@ -186,7 +188,7 @@ export function SocialMediaSection() {
                 ) : (
                   <Save className="h-4 w-4 mr-2" />
                 )}
-                Save
+                {t("admin.social.save")}
               </Button>
               <Button
                 variant="outline"
@@ -197,7 +199,7 @@ export function SocialMediaSection() {
                 size="sm"
               >
                 <X className="h-4 w-4 mr-2" />
-                Cancel
+                {t("common.cancel")}
               </Button>
             </div>
           </div>
@@ -205,7 +207,7 @@ export function SocialMediaSection() {
 
         {socialMedia.length === 0 && !isAdding ? (
           <p className="text-sm text-muted-foreground text-center py-8">
-            No social media links added yet. Click "Add Link" to get started.
+            {t("admin.social.empty")}
           </p>
         ) : (
           <div className="space-y-3">
@@ -217,7 +219,7 @@ export function SocialMediaSection() {
                 {editingId === link.id ? (
                   <>
                     <div className="space-y-2">
-                      <Label>Platform</Label>
+                      <Label>{t("admin.social.platform")}</Label>
                       <Select
                         value={editingLink.platform || link.platform}
                         onValueChange={(value) =>
@@ -233,14 +235,14 @@ export function SocialMediaSection() {
                               key={platform.value}
                               value={platform.value}
                             >
-                              {platform.label}
+                              {t(platform.label)}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>URL</Label>
+                      <Label>{t("admin.social.url")}</Label>
                       <Input
                         value={
                           editingLink.url !== undefined
@@ -269,7 +271,7 @@ export function SocialMediaSection() {
                         ) : (
                           <Save className="h-4 w-4 mr-2" />
                         )}
-                        Update
+                        {t("admin.social.update")}
                       </Button>
                       <Button
                         variant="outline"
@@ -280,7 +282,7 @@ export function SocialMediaSection() {
                         size="sm"
                       >
                         <X className="h-4 w-4 mr-2" />
-                        Cancel
+                        {t("common.cancel")}
                       </Button>
                     </div>
                   </>
@@ -289,9 +291,9 @@ export function SocialMediaSection() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-semibold capitalize">
-                          {socialPlatforms.find(
+                          {t(socialPlatforms.find(
                             (p) => p.value === link.platform
-                          )?.label || link.platform}
+                          )?.label || link.platform)}
                         </p>
                         <p className="text-sm text-muted-foreground break-all">
                           {link.url}
@@ -309,7 +311,7 @@ export function SocialMediaSection() {
                             });
                           }}
                         >
-                          Edit
+                          {t("common.edit")}
                         </Button>
                         <Button
                           variant="destructive"

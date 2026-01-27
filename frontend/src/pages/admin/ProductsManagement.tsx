@@ -1,5 +1,6 @@
 import { logger } from "@/lib/logger";
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +35,7 @@ import { deliveryConfigService } from "@/services/delivery-config.service";
 // ... (skipping some lines)
 
 export default function ProductsManagement() {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [productDialogOpen, setProductDialogOpen] = useState(false);
@@ -131,8 +133,8 @@ export default function ProductsManagement() {
             } catch (err) {
               logger.error("Failed to save delivery config for updated product:", err);
               toast({
-                title: "Warning",
-                description: "Product updated but failed to save delivery configuration.",
+                title: t("common.warning"),
+                description: t("admin.products.toasts.updateSuccessWithDeliveryError"),
                 variant: "destructive",
               });
             }
@@ -163,8 +165,8 @@ export default function ProductsManagement() {
               logger.error("Failed to save delivery config for new product:", err);
               // Don't throw here to avoid failing the whole product creation
               toast({
-                title: "Warning",
-                description: "Product created but failed to save delivery configuration.",
+                title: t("common.warning"),
+                description: t("admin.products.toasts.createSuccessWithDeliveryError"),
                 variant: "destructive",
               });
             }
@@ -192,21 +194,21 @@ export default function ProductsManagement() {
       }
       queryClient.invalidateQueries({ queryKey: ["admin-products"] });
       toast({
-        title: "Success",
+        title: t("common.success"),
         description: selectedProduct
-          ? "Product updated successfully"
-          : "Product created successfully",
+          ? t("admin.products.toasts.updateSuccess")
+          : t("admin.products.toasts.createSuccess"),
       });
       setProductDialogOpen(false);
       setSelectedProduct(null);
     },
     onError: (error: unknown) => {
       logger.error("Product mutation error:", error);
-      const message = getErrorMessage(error, "Failed to save product. Please check your connection and try again.");
+      const message = getErrorMessage(error, t("admin.products.toasts.saveError"));
       const details = getErrorDetails(error);
 
       toast({
-        title: "Error",
+        title: t("common.error"),
         description: (
           <div className="space-y-1">
             <p>{message}</p>
@@ -231,7 +233,7 @@ export default function ProductsManagement() {
 
       // Get the product to access its images
       const product = data?.products?.find(p => p.id === id);
-      logger.debug("Deleting product:", id, "Product data:", product);
+      logger.debug("Deleting product", { id, product });
 
       // Delete images from Supabase Storage if they exist
       if (product && product.images && product.images.length > 0) {
@@ -276,8 +278,8 @@ export default function ProductsManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-products"] });
       toast({
-        title: "Success",
-        description: "Product deleted successfully",
+        title: t("common.success"),
+        description: t("admin.products.toasts.deleteSuccess"),
       });
       setDeleteDialogOpen(false);
       setSelectedProduct(null);
@@ -285,8 +287,8 @@ export default function ProductsManagement() {
     onError: (error: unknown) => {
       logger.error("Delete mutation error:", error);
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to delete product. Please try again."),
+        title: t("common.error"),
+        description: getErrorMessage(error, t("admin.products.toasts.deleteError")),
         variant: "destructive",
       });
     },
@@ -320,8 +322,8 @@ export default function ProductsManagement() {
   const handleExport = () => {
     if (!data?.products || data.products.length === 0) {
       toast({
-        title: "No data to export",
-        description: "There are no products to export.",
+        title: t("admin.products.toasts.noExportDataTitle"),
+        description: t("admin.products.toasts.noExportData"),
         variant: "destructive",
       });
       return;
@@ -336,7 +338,7 @@ export default function ProductsManagement() {
         category: product.category,
         inventory: product.inventory || 0,
         rating: product.rating || 0,
-        isNew: product.isNew ? "Yes" : "No",
+        isNew: product.isNew ? t("common.yes") : t("common.no"),
         createdAt: product.createdAt,
         tags: product.tags?.join(", ") || "",
       })
@@ -344,8 +346,8 @@ export default function ProductsManagement() {
 
     downloadCSV(exportData, "products");
     toast({
-      title: "Export successful",
-      description: "Products data has been downloaded.",
+      title: t("admin.products.toasts.exportSuccess"),
+      description: t("admin.products.toasts.exportDesc"),
     });
   };
 
@@ -361,18 +363,18 @@ export default function ProductsManagement() {
 
   const getStockStatus = (inventory?: number) => {
     if (!inventory || inventory === 0)
-      return { label: "Sold Out", variant: "destructive" as const };
+      return { label: t("admin.products.stockStatus.soldOut"), variant: "destructive" as const };
     if (inventory < 15)
       return {
-        label: "Critical - Only " + inventory + " left",
+        label: t("admin.products.stockStatus.critical", { count: inventory }),
         variant: "destructive" as const,
       };
     if (inventory < 50)
       return {
-        label: "Low Stock - " + inventory + " units",
+        label: t("admin.products.stockStatus.low", { count: inventory }),
         variant: "secondary" as const,
       };
-    return { label: "In Stock", variant: "default" as const };
+    return { label: t("admin.products.stockStatus.inStock"), variant: "default" as const };
   };
 
 
@@ -381,10 +383,10 @@ export default function ProductsManagement() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">
-          Products Management
+          {t("admin.products.title")}
         </h2>
         <p className="text-muted-foreground">
-          Manage your product catalog, inventory, and pricing
+          {t("admin.products.subtitle")}
         </p>
       </div>
 
@@ -399,10 +401,10 @@ export default function ProductsManagement() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-red-600 dark:text-red-400">
-                    Out of Stock
+                    {t("admin.products.stats.outOfStock")}
                   </p>
                   <p className="text-2xl font-bold text-red-700 dark:text-red-300">
-                    {data.stats.outOfStockCount} Products
+                    {t("admin.products.stats.productsCount", { count: data.stats.outOfStockCount })}
                   </p>
                 </div>
               </CardContent>
@@ -417,10 +419,10 @@ export default function ProductsManagement() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-orange-600 dark:text-orange-400">
-                    Critical Stock (&lt; 15)
+                    {t("admin.products.stats.criticalStock")}
                   </p>
                   <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">
-                    {data.stats.criticalStockCount} Products
+                    {t("admin.products.stats.productsCount", { count: data.stats.criticalStockCount })}
                   </p>
                 </div>
               </CardContent>
@@ -435,10 +437,10 @@ export default function ProductsManagement() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
-                    Low Stock (&lt; 50)
+                    {t("admin.products.stats.lowStock")}
                   </p>
                   <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">
-                    {data.stats.lowStockCount} Products
+                    {t("admin.products.stats.productsCount", { count: data.stats.lowStockCount })}
                   </p>
                 </div>
               </CardContent>
@@ -452,7 +454,7 @@ export default function ProductsManagement() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <CardTitle className="flex items-center gap-2">
               <Package className="h-5 w-5" />
-              All Products ({data?.total || 0})
+              {t("admin.products.allProducts")} ({data?.total || 0})
             </CardTitle>
             <div className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1 sm:w-64">
@@ -460,7 +462,7 @@ export default function ProductsManagement() {
                 <Input
                   id="product-search"
                   name="search"
-                  placeholder="Search products..."
+                  placeholder={t("admin.products.searchPlaceholder")}
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
@@ -471,22 +473,22 @@ export default function ProductsManagement() {
               </div>
               <Button variant="outline" onClick={handleExport}>
                 <Download className="h-4 w-4 mr-2" />
-                Export
+                {t("admin.products.export")}
               </Button>
               <Button onClick={handleAddProduct}>
                 <Plus className="h-4 w-4 mr-2" />
-                Add Product
+                {t("admin.products.addProduct")}
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="text-center py-12">Loading products...</div>
+            <div className="text-center py-12">{t("admin.products.loading")}</div>
           ) : !data?.products || data.products.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No products found</p>
+              <p>{t("admin.products.noProducts")}</p>
             </div>
           ) : (
             <>
@@ -495,14 +497,14 @@ export default function ProductsManagement() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[40px]"></TableHead>
-                      <TableHead>Product</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>MRP Price</TableHead>
-                      <TableHead>Selling Price</TableHead>
-                      <TableHead>Config</TableHead>
-                      <TableHead>Inventory</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead>{t("admin.products.table.product")}</TableHead>
+                      <TableHead>{t("admin.products.table.category")}</TableHead>
+                      <TableHead>{t("admin.products.table.mrp")}</TableHead>
+                      <TableHead>{t("admin.products.table.sellingPrice")}</TableHead>
+                      <TableHead>{t("admin.products.table.config")}</TableHead>
+                      <TableHead>{t("admin.products.table.inventory")}</TableHead>
+                      <TableHead>{t("admin.products.table.status")}</TableHead>
+                      <TableHead className="text-right">{t("admin.products.table.actions")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -563,8 +565,8 @@ export default function ProductsManagement() {
                                   <RotateCcw className={cn("h-3.5 w-3.5", (product.isReturnable === true || (product as any).is_returnable === true) ? "text-green-600" : "text-muted-foreground opacity-50")} />
                                   <span className={cn("text-xs font-medium", (product.isReturnable === true || (product as any).is_returnable === true) ? "text-green-700" : "text-muted-foreground")}>
                                     {(product.isReturnable === true || (product as any).is_returnable === true)
-                                      ? `${(product.returnDays !== undefined ? product.returnDays : (product as any).return_days) ?? 0} Days`
-                                      : "Not Returnable"}
+                                      ? t('admin.products.dialog.return.daysCount', { count: (product.returnDays !== undefined ? product.returnDays : (product as any).return_days) ?? 0 })
+                                      : t('admin.products.dialog.return.nonReturnableShort')}
                                   </span>
                                 </div>
 
@@ -576,9 +578,9 @@ export default function ProductsManagement() {
                                         <div className="flex items-center gap-1.5 cursor-help">
                                           <Truck className="h-3.5 w-3.5 text-orange-600" />
                                           <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                            {product.delivery_config.calculation_type === 'FLAT_PER_ORDER' ? 'Flat Order' :
-                                              product.delivery_config.calculation_type === 'PER_ITEM' ? 'Per Item' :
-                                                product.delivery_config.calculation_type === 'PER_PACKAGE' ? 'Per Pkg' : 'Custom'}
+                                            {product.delivery_config.calculation_type === 'FLAT_PER_ORDER' ? t('admin.products.delivery.flatOrder') :
+                                              product.delivery_config.calculation_type === 'PER_ITEM' ? t('admin.products.delivery.perItem') :
+                                                product.delivery_config.calculation_type === 'PER_PACKAGE' ? t('admin.products.delivery.perPkg') : t('admin.products.delivery.custom')}
                                             {product.delivery_config.base_delivery_charge > 0 && (
                                               <span className="ml-1 font-medium text-orange-700">(₹{product.delivery_config.base_delivery_charge})</span>
                                             )}
@@ -586,11 +588,11 @@ export default function ProductsManagement() {
                                         </div>
                                       </TooltipTrigger>
                                       <TooltipContent>
-                                        <p className="font-semibold text-xs">Delivery Config</p>
-                                        <p className="text-[10px]">Type: {product.delivery_config.calculation_type}</p>
-                                        <p className="text-[10px]">Base Charge: ₹{product.delivery_config.base_delivery_charge}</p>
+                                        <p className="font-semibold text-xs">{t('admin.products.delivery.configTitle')}</p>
+                                        <p className="text-[10px]">{t('admin.products.delivery.typeLabel')}: {product.delivery_config.calculation_type}</p>
+                                        <p className="text-[10px]">{t('admin.products.delivery.baseChargeLabel')}: ₹{product.delivery_config.base_delivery_charge}</p>
                                         {product.delivery_config.calculation_type === 'PER_PACKAGE' && (
-                                          <p className="text-[10px]">Max Items/Pkg: {product.delivery_config.max_items_per_package || 'N/A'}</p>
+                                          <p className="text-[10px]">{t('admin.products.delivery.maxItemsLabel')}: {product.delivery_config.max_items_per_package || t('admin.products.delivery.na')}</p>
                                         )}
                                       </TooltipContent>
                                     </Tooltip>
@@ -600,10 +602,10 @@ export default function ProductsManagement() {
                             </TableCell>
                             <TableCell>
                               <div className="flex flex-col">
-                                <span>{product.inventory ?? 0} units</span>
+                                <span>{product.inventory ?? 0} {t('admin.products.table.units')}</span>
                                 {hasVariants && (
                                   <span className="text-[10px] text-muted-foreground">
-                                    Total across {product.variants?.length} variants
+                                    {t('admin.products.table.variantAcross', { count: product.variants?.length })}
                                   </span>
                                 )}
                               </div>
@@ -639,12 +641,12 @@ export default function ProductsManagement() {
                                   <Table className="border rounded-md bg-background">
                                     <TableHeader className="bg-muted/50">
                                       <TableRow>
-                                        <TableHead className="h-8 py-0">Variant</TableHead>
-                                        <TableHead className="h-8 py-0">MRP</TableHead>
-                                        <TableHead className="h-8 py-0">Price</TableHead>
-                                        <TableHead className="h-8 py-0">Tax</TableHead>
-                                        <TableHead className="h-8 py-0">Stock</TableHead>
-                                        <TableHead className="h-8 py-0">Status</TableHead>
+                                        <TableHead className="h-8 py-0">{t("admin.products.table.variant")}</TableHead>
+                                        <TableHead className="h-8 py-0">{t("admin.products.table.mrp")}</TableHead>
+                                        <TableHead className="h-8 py-0">{t("admin.products.table.sellingPrice")}</TableHead>
+                                        <TableHead className="h-8 py-0">{t("admin.products.table.tax")}</TableHead>
+                                        <TableHead className="h-8 py-0">{t("admin.products.table.stock")}</TableHead>
+                                        <TableHead className="h-8 py-0">{t("admin.products.table.status")}</TableHead>
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -662,7 +664,7 @@ export default function ProductsManagement() {
                                                 <div className="flex flex-col">
                                                   <span className="text-sm font-medium">{variant.size_label}</span>
                                                   {variant.is_default && (
-                                                    <span className="text-[10px] bg-primary/10 text-primary px-1 rounded w-fit">Default</span>
+                                                    <span className="text-[10px] bg-primary/10 text-primary px-1 rounded w-fit">{t('admin.products.table.default')}</span>
                                                   )}
                                                 </div>
                                               </div>
@@ -673,11 +675,11 @@ export default function ProductsManagement() {
                                             </TableCell>
                                             <TableCell className="py-2">
                                               <div className="flex flex-col text-[10px]">
-                                                <span className="text-blue-700 font-medium">{variant.gst_rate || 0}% GST</span>
-                                                {variant.hsn_code && <span className="text-muted-foreground">HSN: {variant.hsn_code}</span>}
+                                                <span className="text-blue-700 font-medium">{variant.gst_rate || 0}% {t('admin.products.table.gst')}</span>
+                                                {variant.hsn_code && <span className="text-muted-foreground">{t('admin.products.table.hsn')}: {variant.hsn_code}</span>}
                                               </div>
                                             </TableCell>
-                                            <TableCell className="py-2 text-sm">{variant.stock_quantity} units</TableCell>
+                                            <TableCell className="py-2 text-sm">{variant.stock_quantity} {t('admin.products.table.units')}</TableCell>
                                             <TableCell className="py-2">
                                               <Badge variant={variantStockStatus.variant} className="text-[10px] h-5 px-1.5 uppercase">
                                                 {variantStockStatus.label.split(' - ')[0]}
@@ -702,7 +704,11 @@ export default function ProductsManagement() {
               {/* Pagination Controls */}
               <div className="flex items-center justify-between space-x-2 py-4">
                 <div className="text-sm text-muted-foreground">
-                  Showing {(page - 1) * 15 + 1} to {Math.min(page * 15, data.total)} of {data.total} products
+                  {t('admin.products.pagination.showing', {
+                    start: (page - 1) * 15 + 1,
+                    end: Math.min(page * 15, data.total),
+                    total: data.total
+                  })}
                 </div>
                 <div className="space-x-2">
                   <Button
@@ -711,7 +717,7 @@ export default function ProductsManagement() {
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page === 1}
                   >
-                    Previous
+                    {t('admin.products.pagination.previous')}
                   </Button>
                   <Button
                     variant="outline"
@@ -719,7 +725,7 @@ export default function ProductsManagement() {
                     onClick={() => setPage((p) => p + 1)}
                     disabled={page * 15 >= data.total}
                   >
-                    Next
+                    {t('admin.products.pagination.next')}
                   </Button>
                 </div>
               </div>
@@ -742,8 +748,8 @@ export default function ProductsManagement() {
       <DeleteConfirmDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
-        title="Delete Product"
-        description={`Are you sure you want to delete "${selectedProduct?.title}"? This action cannot be undone.`}
+        title={t("admin.products.deleteDialog.title")}
+        description={t("admin.products.deleteDialog.desc", { title: selectedProduct?.title })}
         onConfirm={() => selectedProduct && deleteMutation.mutate(selectedProduct.id)}
         isLoading={deleteMutation.isPending}
       />

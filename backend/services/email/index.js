@@ -365,50 +365,62 @@ class EmailService {
     /**
      * Send registration/welcome email
      */
-    async sendRegistrationEmail(to, { name, email }) {
-        return this.send(EmailEventTypes.USER_REGISTRATION, to, { name, email });
+    async sendRegistrationEmail(to, { name, email }, options = {}) {
+        return this.send(EmailEventTypes.USER_REGISTRATION, to, { name, email }, options);
     }
 
     /**
      * Send order placed email (Pending)
      */
-    async sendOrderPlacedEmail(to, { order, customerName, receiptUrl }, userId = null) {
-        return this.send(EmailEventTypes.ORDER_PLACED, to, { order, customerName, receiptUrl }, { userId, referenceId: order.id });
+    async sendOrderPlacedEmail(to, { order, customerName, receiptUrl }, options = {}) {
+        const userId = typeof options === 'string' ? options : options.userId;
+        const lang = typeof options === 'string' ? null : options.lang;
+        return this.send(EmailEventTypes.ORDER_PLACED, to, { order, customerName, receiptUrl }, { userId, lang, referenceId: order.id });
     }
 
     /**
      * Send order confirmed email
      */
-    async sendOrderConfirmedEmail(to, { order, customerName }, userId = null) {
-        return this.send(EmailEventTypes.ORDER_CONFIRMED, to, { order, customerName }, { userId, referenceId: order.id });
+    async sendOrderConfirmedEmail(to, { order, customerName }, options = {}) {
+        const userId = typeof options === 'string' ? options : options.userId;
+        const lang = typeof options === 'string' ? null : options.lang;
+        return this.send(EmailEventTypes.ORDER_CONFIRMED, to, { order, customerName }, { userId, lang, referenceId: order.id });
     }
 
     /**
      * Send order shipped email
      */
-    async sendOrderShippedEmail(to, { order, customerName }, userId = null) {
-        return this.send(EmailEventTypes.ORDER_SHIPPED, to, { order, customerName }, { userId, referenceId: order.id });
+    async sendOrderShippedEmail(to, { order, customerName }, options = {}) {
+        const userId = typeof options === 'string' ? options : options.userId;
+        const lang = typeof options === 'string' ? null : options.lang;
+        return this.send(EmailEventTypes.ORDER_SHIPPED, to, { order, customerName }, { userId, lang, referenceId: order.id });
     }
 
     /**
      * Send order delivered email
      */
-    async sendOrderDeliveredEmail(to, { order, customerName, invoiceUrl }, userId = null) {
-        return this.send(EmailEventTypes.ORDER_DELIVERED, to, { order, customerName, invoiceUrl }, { userId, referenceId: order.id });
+    async sendOrderDeliveredEmail(to, { order, customerName, invoiceUrl }, options = {}) {
+        const userId = typeof options === 'string' ? options : options.userId;
+        const lang = typeof options === 'string' ? null : options.lang;
+        return this.send(EmailEventTypes.ORDER_DELIVERED, to, { order, customerName, invoiceUrl }, { userId, lang, referenceId: order.id });
     }
 
     /**
      * Send order returned email
      */
-    async sendOrderReturnedEmail(to, { order, customerName }, userId = null) {
-        return this.send(EmailEventTypes.ORDER_RETURNED, to, { order, customerName }, { userId, referenceId: order.id });
+    async sendOrderReturnedEmail(to, { order, customerName }, options = {}) {
+        const userId = typeof options === 'string' ? options : options.userId;
+        const lang = typeof options === 'string' ? null : options.lang;
+        return this.send(EmailEventTypes.ORDER_RETURNED, to, { order, customerName }, { userId, lang, referenceId: order.id });
     }
 
     /**
      * Send order cancellation email
      */
-    async sendOrderCancellationEmail(to, { order, customerName }, userId = null) {
-        return this.send(EmailEventTypes.ORDER_CANCELLED, to, { order, customerName }, { userId, referenceId: order.id });
+    async sendOrderCancellationEmail(to, { order, customerName }, options = {}) {
+        const userId = typeof options === 'string' ? options : options.userId;
+        const lang = typeof options === 'string' ? null : options.lang;
+        return this.send(EmailEventTypes.ORDER_CANCELLED, to, { order, customerName }, { userId, lang, referenceId: order.id });
     }
 
     /**
@@ -428,85 +440,101 @@ class EmailService {
     /**
      * Send event schedule update email
      */
-    async sendEventUpdateEmail(to, { event, attendeeName }, userId = null) {
-        return this.send(EmailEventTypes.EVENT_UPDATE, to, { event, attendeeName }, { userId, referenceId: event.id });
+    async sendEventUpdateEmail(to, { event, attendeeName }, options = {}) {
+        return this.send(EmailEventTypes.EVENT_UPDATE, to, { event, attendeeName }, { ...options, referenceId: event.id });
     }
 
     /**
      * Send donation receipt email
      */
-    async sendDonationReceiptEmail(to, { donation, donorName, isAnonymous = false }, userId = null) {
-        return this.send(EmailEventTypes.DONATION_RECEIPT, to, { donation, donorName, isAnonymous }, { userId, referenceId: donation.id });
+    async sendDonationReceiptEmail(to, { donation, donorName, isAnonymous = false }, options = {}) {
+        return this.send(EmailEventTypes.DONATION_RECEIPT, to, { donation, donorName, isAnonymous }, { ...options, referenceId: donation.id });
     }
 
     /**
      * Send contact form notification to admin
      */
-    async sendContactFormEmail(adminEmail, { name, email, phone, subject, message }) {
-        return this.send(EmailEventTypes.CONTACT_FORM, adminEmail, { name, email, phone, subject, message });
+    async sendContactFormEmail(adminEmail, { name, email, phone, subject, message }, options = {}) {
+        return this.send(EmailEventTypes.CONTACT_FORM, adminEmail, { name, email, phone, subject, message }, options);
+    }
+
+    /**
+     * Alias for sendContactFormEmail (legacy support)
+     */
+    async sendContactNotification(messageData, options = {}) {
+        const adminEmail = process.env.ADMIN_EMAIL || 'admin@merigaumata.com';
+        return this.sendContactFormEmail(adminEmail, messageData, options);
+    }
+
+    /**
+     * Send auto-reply to user who filled contact form
+     */
+    async sendContactAutoReply(to, name, lang = 'en') {
+        const firstName = name ? name.split(' ')[0] : (lang === 'hi' ? 'जी' : 'there');
+        return this.send(EmailEventTypes.CONTACT_FORM, to, { name: firstName }, { lang });
     }
 
     /**
      * Send email confirmation with verification link
      */
-    async sendEmailConfirmation(to, { name, email, verificationLink }, userId = null) {
-        return this.send(EmailEventTypes.EMAIL_CONFIRMATION, to, { name, email, verificationLink }, { userId });
+    async sendEmailConfirmation(to, { name, email, verificationLink }, options = {}) {
+        return this.send(EmailEventTypes.EMAIL_CONFIRMATION, to, { name, email, verificationLink }, options);
     }
 
     /**
      * Send subscription/monthly donation confirmation email
      */
-    async sendSubscriptionConfirmationEmail(to, { subscription, donorName, isAnonymous = false }, userId = null) {
-        return this.send(EmailEventTypes.SUBSCRIPTION_STARTED, to, { subscription, donorName, isAnonymous }, { userId, referenceId: subscription.donationRef });
+    async sendSubscriptionConfirmationEmail(to, { subscription, donorName, isAnonymous = false }, options = {}) {
+        return this.send(EmailEventTypes.SUBSCRIPTION_STARTED, to, { subscription, donorName, isAnonymous }, { ...options, referenceId: subscription.donationRef });
     }
 
     /**
      * Send subscription cancellation email
      */
-    async sendSubscriptionCancellationEmail(to, { subscription, donorName }, userId = null) {
-        return this.send(EmailEventTypes.SUBSCRIPTION_CANCELLED, to, { subscription, donorName }, { userId, referenceId: subscription.donationRef });
+    async sendSubscriptionCancellationEmail(to, { subscription, donorName }, options = {}) {
+        return this.send(EmailEventTypes.SUBSCRIPTION_CANCELLED, to, { subscription, donorName }, { ...options, referenceId: subscription.donationRef });
     }
 
     /**
      * Send account deletion confirmation email
      */
-    async sendAccountDeletedEmail(to, { name }, userId = null) {
-        return this.send(EmailEventTypes.ACCOUNT_DELETED, to, { name }, { userId });
+    async sendAccountDeletedEmail(to, { name }, options = {}) {
+        return this.send(EmailEventTypes.ACCOUNT_DELETED, to, { name }, options);
     }
 
     /**
      * Send account deletion scheduled email
      */
-    async sendAccountDeletionScheduledEmail(to, { name, scheduledDate }, userId = null) {
-        return this.send(EmailEventTypes.ACCOUNT_DELETION_SCHEDULED, to, { name, scheduledDate }, { userId });
+    async sendAccountDeletionScheduledEmail(to, { name, scheduledDate }, options = {}) {
+        return this.send(EmailEventTypes.ACCOUNT_DELETION_SCHEDULED, to, { name, scheduledDate }, options);
     }
 
     /**
      * Send account deletion OTP email
      */
-    async sendAccountDeletionOTPEmail(to, otp, expiryMinutes) {
-        return this.send(EmailEventTypes.ACCOUNT_DELETION_OTP, to, { otp, expiryMinutes });
+    async sendAccountDeletionOTPEmail(to, otp, expiryMinutes, lang = 'en') {
+        return this.send(EmailEventTypes.ACCOUNT_DELETION_OTP, to, { otp, expiryMinutes }, { lang });
     }
 
     /**
      * Send OTP email
      */
-    async sendOTPEmail(to, otp, expiryMinutes) {
-        return this.send(EmailEventTypes.OTP_VERIFICATION, to, { otp, expiryMinutes });
+    async sendOTPEmail(to, otp, expiryMinutes, lang = 'en') {
+        return this.send(EmailEventTypes.OTP_VERIFICATION, to, { otp, expiryMinutes }, { lang });
     }
 
     /**
      * Send password reset email
      */
-    async sendPasswordResetEmail(to, resetLink) {
-        return this.send(EmailEventTypes.PASSWORD_RESET, to, { resetLink });
+    async sendPasswordResetEmail(to, resetLink, lang = 'en') {
+        return this.send(EmailEventTypes.PASSWORD_RESET, to, { resetLink }, { lang });
     }
 
     /**
      * Send manager welcome email with temporary password
      */
-    async sendManagerWelcomeEmail(to, name, password) {
-        return this.send(EmailEventTypes.MANAGER_WELCOME, to, { name, email: to, password });
+    async sendManagerWelcomeEmail(to, name, password, lang = 'en') {
+        return this.send(EmailEventTypes.MANAGER_WELCOME, to, { name, email: to, password }, { lang });
     }
 }
 

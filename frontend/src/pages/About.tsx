@@ -53,7 +53,7 @@ export default function About() {
   });
 
   if (isLoading || !aboutContent) {
-    return <LoadingOverlay message="Just a moment..." isLoading={true} />;
+    return <LoadingOverlay isLoading={true} />;
   }
 
   const visibility = aboutContent.sectionVisibility || {
@@ -154,7 +154,7 @@ export default function About() {
               </div>
               <div className="lg:w-1/2 relative">
                 <div className="relative rounded-[3rem] overflow-hidden shadow-2xl z-10 transform scale-95 group-hover:scale-100 transition-all duration-700">
-                  <img src="/contact-hero.png" alt="Story Visual" className="w-full h-full object-cover" />
+                  <img src="/contact-hero.png" alt={t("about.storyVisualAlt")} className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-[#B85C3C]/10 mix-blend-multiply" />
                 </div>
                 <div className="absolute -top-10 -right-10 w-64 h-64 bg-[#B85C3C]/10 rounded-full blur-3xl -z-10" />

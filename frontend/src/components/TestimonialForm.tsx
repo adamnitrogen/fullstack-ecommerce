@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/store/authStore";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { testimonialService } from "@/services/testimonial.service";
@@ -18,6 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 
 export function TestimonialForm() {
+  const { t } = useTranslation();
   const { user, isAuthenticated } = useAuthStore();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -41,8 +43,8 @@ export function TestimonialForm() {
     },
     onSuccess: () => {
       toast({
-        title: "Thank you!",
-        description: "Your testimonial has been submitted successfully.",
+        title: t("common.thankYou"),
+        description: t("testimonials.form.successDesc"),
       });
       // Reset form
       setRole("");
@@ -53,8 +55,8 @@ export function TestimonialForm() {
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to submit testimonial. Please try again."),
+        title: t("common.error"),
+        description: getErrorMessage(error, t("testimonials.form.submitError")),
         variant: "destructive",
       });
     },
@@ -65,8 +67,8 @@ export function TestimonialForm() {
 
     if (!user) {
       toast({
-        title: "Authentication Required",
-        description: "Please log in to submit a testimonial.",
+        title: t("auth.authRequired"),
+        description: t("testimonials.form.loginRequiredDesc"),
         variant: "destructive",
       });
       return;
@@ -74,8 +76,8 @@ export function TestimonialForm() {
 
     if (!role.trim()) {
       toast({
-        title: "Missing Information",
-        description: "Please enter your role or what you do.",
+        title: t("common.missingInfo"),
+        description: t("testimonials.form.roleRequired"),
         variant: "destructive",
       });
       return;
@@ -83,8 +85,8 @@ export function TestimonialForm() {
 
     if (!content.trim()) {
       toast({
-        title: "Missing Information",
-        description: "Please write your testimonial.",
+        title: t("common.missingInfo"),
+        description: t("testimonials.form.contentRequired"),
         variant: "destructive",
       });
       return;
@@ -92,8 +94,8 @@ export function TestimonialForm() {
 
     if (content.trim().length < 150) {
       toast({
-        title: "Too Short",
-        description: "Please write at least 150 characters.",
+        title: t("common.tooShort"),
+        description: t("testimonials.form.minCharsError"),
         variant: "destructive",
       });
       return;
@@ -114,15 +116,14 @@ export function TestimonialForm() {
     return (
       <Card className="max-w-3xl mx-auto">
         <CardHeader>
-          <CardTitle>Share Your Experience</CardTitle>
+          <CardTitle>{t("testimonials.form.title")}</CardTitle>
           <CardDescription>
-            Please log in to share your testimonial with us.
+            {t("testimonials.form.subtitle")}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground text-center py-8">
-            Sign in to your account to let us know what you think about our
-            services.
+            {t("testimonials.form.loginPrompt")}
           </p>
         </CardContent>
       </Card>
@@ -132,48 +133,47 @@ export function TestimonialForm() {
   return (
     <Card className="max-w-3xl mx-auto">
       <CardHeader>
-        <CardTitle>Share Your Experience</CardTitle>
+        <CardTitle>{t("testimonials.form.title")}</CardTitle>
         <CardDescription>
-          Tell us what you think about our organization and help others learn
-          about our work.
+          {t("testimonials.form.description")}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Name (Read-only, from user profile) */}
           <div className="space-y-2">
-            <Label htmlFor="name">Your Name</Label>
+            <Label htmlFor="name">{t("profile.personalInfo.name")}</Label>
             <Input
               id="name"
               value={user?.name || user?.email || ""}
               disabled
               className="bg-muted"
             />
-            <p className="text-xs text-muted-foreground">From your profile</p>
+            <p className="text-xs text-muted-foreground">{t("testimonials.form.fromProfile")}</p>
           </div>
 
           {/* Role/Title */}
           <div className="space-y-2">
             <Label htmlFor="role">
-              Your Role or Title <span className="text-destructive">*</span>
+              {t("testimonials.form.roleLabel")} <span className="text-destructive">*</span>
             </Label>
             <Input
               id="role"
-              placeholder="e.g., Regular Customer, Event Participant, Volunteer"
+              placeholder={t("testimonials.form.rolePlaceholder")}
               value={role}
               onChange={(e) => setRole(e.target.value)}
               maxLength={50}
               required
             />
             <p className="text-xs text-muted-foreground">
-              How are you associated with us?
+              {t("testimonials.form.roleHelp")}
             </p>
           </div>
 
           {/* Star Rating */}
           <div className="space-y-2">
             <Label>
-              Rating <span className="text-destructive">*</span>
+              {t("common.rating")} <span className="text-destructive">*</span>
             </Label>
             <div className="flex gap-2 items-center">
               {[1, 2, 3, 4, 5].map((star) => (
@@ -194,7 +194,7 @@ export function TestimonialForm() {
                 </button>
               ))}
               <span className="ml-2 text-sm text-muted-foreground">
-                {rating} {rating === 1 ? "star" : "stars"}
+                {rating} {rating === 1 ? t("common.star") : t("common.stars")}
               </span>
             </div>
           </div>
@@ -202,11 +202,11 @@ export function TestimonialForm() {
           {/* Testimonial Content */}
           <div className="space-y-2">
             <Label htmlFor="content">
-              Your Testimonial <span className="text-destructive">*</span>
+              {t("testimonials.form.contentLabel")} <span className="text-destructive">*</span>
             </Label>
             <Textarea
               id="content"
-              placeholder="Share your experience with us... What did you like? How did we help you?"
+              placeholder={t("testimonials.form.contentPlaceholder")}
               value={content}
               onChange={(e) => setContent(e.target.value)}
               rows={6}
@@ -215,8 +215,8 @@ export function TestimonialForm() {
               className="resize-none"
             />
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Minimum 150 characters</span>
-              <span>{content.length}/500 characters</span>
+              <span>{t("testimonials.form.minChars")}</span>
+              <span>{content.length}/500 {t("common.characters")}</span>
             </div>
           </div>
 
@@ -232,15 +232,15 @@ export function TestimonialForm() {
               }}
               disabled={createTestimonialMutation.isPending}
             >
-              Clear
+              {t("common.clear")}
             </Button>
             <Button
               type="submit"
               disabled={createTestimonialMutation.isPending}
             >
               {createTestimonialMutation.isPending
-                ? "Submitting..."
-                : "Submit Testimonial"}
+                ? t("common.submitting")
+                : t("testimonials.form.submitBtn")}
             </Button>
           </div>
         </form>

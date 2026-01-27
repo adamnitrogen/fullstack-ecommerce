@@ -1,16 +1,22 @@
 import { useState, useRef } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { Loader2, Upload, FileText, CheckCircle, AlertCircle, Eye } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
+import { Loader2, Upload, FileText, CheckCircle, AlertCircle, Eye, FileUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { policyService, PolicyType } from "@/services/policy.service";
 import { PolicyPreviewDialog } from "@/components/admin/PolicyPreviewDialog";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 export default function PolicyManagement() {
+    const { t } = useTranslation();
+    const queryClient = useQueryClient();
     const [selectedPolicy, setSelectedPolicy] = useState<PolicyType>("privacy");
+    const [policyType, setPolicyType] = useState<PolicyType | "">("");
     const [previewContent, setPreviewContent] = useState<string | null>(null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -24,7 +30,7 @@ export default function PolicyManagement() {
         }
     };
 
-    // Fetch current policy version
+    // Fetch current policy version for the selected type
     const { data: currentPolicy, refetch } = useQuery({
         queryKey: ["policy", selectedPolicy],
         queryFn: async () => {
@@ -39,23 +45,20 @@ export default function PolicyManagement() {
 
     const uploadMutation = useMutation({
         mutationFn: async (file: File) => {
-            return await policyService.upload(file, selectedPolicy);
+            if (!policyType) throw new Error(t("admin.policies.toasts.selectPolicyType"));
+            return await policyService.upload(file, policyType);
         },
         onSuccess: async (data: any) => {
-            toast.success(`${selectedPolicy} policy uploaded successfully!`);
+            toast({ title: t("admin.policies.toasts.uploadSuccess") });
 
-            // Handle potential field naming discrepancies (snake_case vs camelCase)
             const content = data.contentHtml || data.content_html;
             setPreviewContent(content);
 
             resetFileInput();
+            setPolicyType("");
 
-            // Clear cache for this policy type to ensure fresh data on next fetch
-            localStorage.removeItem(`policy_${selectedPolicy}`);
+            queryClient.invalidateQueries({ queryKey: ["policy", selectedPolicy] });
 
-            refetch();
-
-            // Simulate rendering delay for a smoother experience
             setIsRendering(true);
             setTimeout(() => {
                 setIsRendering(false);
@@ -63,7 +66,11 @@ export default function PolicyManagement() {
             }, 1000);
         },
         onError: (error: any) => {
-            toast.error(error.response?.data?.error || error.message || "Failed to upload policy");
+            toast({
+                title: t("common.error"),
+                description: error.response?.data?.error || error.message || t("admin.policies.toasts.uploadFailed"),
+                variant: "destructive",
+            });
         },
     });
 
@@ -77,7 +84,11 @@ export default function PolicyManagement() {
             ];
 
             if (!validTypes.includes(file.type)) {
-                toast.error("Invalid file type. Please upload PDF, DOC, or DOCX.");
+                toast({
+                    title: t("common.error"),
+                    description: t("admin.policies.toasts.invalidFileType"),
+                    variant: "destructive",
+                });
                 return;
             }
 
@@ -86,15 +97,13 @@ export default function PolicyManagement() {
     };
 
     const handleUpload = () => {
-        if (!selectedFile) return;
+        if (!selectedFile || !policyType) return;
         uploadMutation.mutate(selectedFile);
     };
 
     const handlePreview = () => {
         if (currentPolicy) {
             setPreviewContent(currentPolicy.contentHtml);
-
-            // Simulate rendering delay for a smoother experience
             setIsRendering(true);
             setTimeout(() => {
                 setIsRendering(false);
@@ -105,56 +114,54 @@ export default function PolicyManagement() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 relative">
-            <LoadingOverlay isLoading={isRendering} message="Preparing preview..." />
+            <LoadingOverlay isLoading={isRendering} message={t("admin.policies.preview.preparing")} />
             <div>
-                <h1 className="text-3xl font-bold tracking-tight">Policy Management</h1>
+                <h1 className="text-3xl font-bold tracking-tight">{t("admin.policies.title")}</h1>
                 <p className="text-muted-foreground">
-                    Manage website policies (Privacy, Terms, Shipping, Refund).
+                    {t("admin.policies.subtitle")}
                 </p>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Upload Policy Document</CardTitle>
+                        <CardTitle>{t("admin.policies.upload.title")}</CardTitle>
                         <CardDescription>
-                            Select the policy type and upload a PDF/DOC/DOCX file.
+                            {t("admin.policies.upload.description")}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
-                            <label id="policy-type-label" className="text-sm font-medium">Policy Type</label>
+                            <Label htmlFor="policy-type">{t("admin.policies.upload.type")}</Label>
                             <Select
-                                value={selectedPolicy}
-                                name="policyType"
+                                value={policyType}
                                 onValueChange={(value: PolicyType) => {
-                                    setSelectedPolicy(value);
-                                    setPreviewContent(null);
+                                    setPolicyType(value);
                                     resetFileInput();
                                 }}
                             >
-                                <SelectTrigger aria-labelledby="policy-type-label">
-                                    <SelectValue placeholder="Select policy type" />
+                                <SelectTrigger id="policy-type">
+                                    <SelectValue placeholder={t("admin.policies.upload.selectType")} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="privacy">Privacy Policy</SelectItem>
-                                    <SelectItem value="terms">Terms & Conditions</SelectItem>
-                                    <SelectItem value="shipping-refund">Shipping & Refund Policy</SelectItem>
+                                    <SelectItem value="privacy">{t("admin.policies.types.privacy")}</SelectItem>
+                                    <SelectItem value="terms">{t("admin.policies.types.terms")}</SelectItem>
+                                    <SelectItem value="shipping-refund">{t("admin.policies.types.shippingRefund")}</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Upload Document</label>
+                            <Label htmlFor="policy-file-upload">{t("admin.policies.upload.file")}</Label>
                             <div className="flex items-center justify-center w-full">
                                 <label htmlFor="policy-file-upload" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
                                     <div className="flex flex-col items-center justify-center pt-5 pb-6">
                                         <Upload className="w-8 h-8 mb-2 text-muted-foreground" />
                                         <p className="text-sm text-muted-foreground">
-                                            <span className="font-semibold">Click to upload</span> or drag and drop
+                                            <span className="font-semibold">{t("admin.policies.upload.clickToUpload")}</span> {t("admin.policies.upload.dragAndDrop")}
                                         </p>
                                         <p className="text-xs text-muted-foreground">
-                                            PDF, DOC, DOCX
+                                            {t("admin.policies.upload.fileTypes")}
                                         </p>
                                     </div>
                                     <input
@@ -179,41 +186,67 @@ export default function PolicyManagement() {
                         <Button
                             onClick={handleUpload}
                             className="w-full"
-                            disabled={!selectedFile || uploadMutation.isPending}
+                            disabled={!selectedFile || !policyType || uploadMutation.isPending}
                         >
                             {uploadMutation.isPending ? (
                                 <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Parsing & Uploading...
+                                    {t("admin.policies.upload.uploading")}
                                 </>
                             ) : (
-                                "Upload & Update Policy"
+                                <>
+                                    <FileUp className="mr-2 h-4 w-4" />
+                                    {t("admin.policies.upload.button")}
+                                </>
                             )}
                         </Button>
 
                         <div className="mt-4 text-xs text-muted-foreground">
-                            <p>Note: Parsing happens on upload only. Frontend caches the content for performance.</p>
+                            <p>{t("admin.policies.upload.note")}</p>
                         </div>
                     </CardContent>
                 </Card>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Current Version Status</CardTitle>
+                        <CardTitle>{t("admin.policies.list.title")}</CardTitle>
+                        <CardDescription>
+                            {t("admin.policies.list.description")}
+                        </CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="view-policy-type">{t("admin.policies.list.viewPolicy")}</Label>
+                            <Select
+                                value={selectedPolicy}
+                                onValueChange={(value: PolicyType) => {
+                                    setSelectedPolicy(value);
+                                    setPreviewContent(null);
+                                }}
+                            >
+                                <SelectTrigger id="view-policy-type">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="privacy">{t("admin.policies.types.privacy")}</SelectItem>
+                                    <SelectItem value="terms">{t("admin.policies.types.terms")}</SelectItem>
+                                    <SelectItem value="shipping-refund">{t("admin.policies.types.shippingRefund")}</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
                         {currentPolicy ? (
-                            <div className="space-y-4">
+                            <div className="space-y-4 pt-4 border-t">
                                 <div className="flex items-center gap-2 text-green-600">
                                     <CheckCircle className="w-5 h-5" />
-                                    <span className="font-medium">Active Version Found</span>
+                                    <span className="font-medium">{t("admin.policies.list.activeVersionFound")}</span>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2 text-sm">
-                                    <span className="text-muted-foreground">Version:</span>
+                                    <span className="text-muted-foreground">{t("admin.policies.list.version")}:</span>
                                     <span>v{currentPolicy.version}</span>
-                                    <span className="text-muted-foreground">Last Updated:</span>
+                                    <span className="text-muted-foreground">{t("admin.policies.list.lastUpdated")}:</span>
                                     <span>{new Date(currentPolicy.updatedAt || "").toLocaleDateString()}</span>
-                                    <span className="text-muted-foreground">Title:</span>
+                                    <span className="text-muted-foreground">{t("admin.policies.list.title")}:</span>
                                     <span>{currentPolicy.title}</span>
                                 </div>
                                 <Button variant="outline" onClick={handlePreview} className="w-full">
@@ -222,12 +255,12 @@ export default function PolicyManagement() {
                                 </Button>
                             </div>
                         ) : (
-                            <div className="flex flex-col gap-4">
+                            <div className="flex flex-col gap-4 pt-4 border-t">
                                 <div className="flex items-center gap-2 text-amber-600">
                                     <AlertCircle className="w-5 h-5" />
-                                    <span>No active policy found for this type.</span>
+                                    <span>{t("admin.policies.list.noActivePolicy")}</span>
                                 </div>
-                                <p className="text-sm text-muted-foreground">Upload a document to set the initial policy.</p>
+                                <p className="text-sm text-muted-foreground">{t("admin.policies.list.uploadInitial")}</p>
                             </div>
                         )}
                     </CardContent>
@@ -237,10 +270,10 @@ export default function PolicyManagement() {
             <PolicyPreviewDialog
                 open={isPreviewOpen}
                 onOpenChange={setIsPreviewOpen}
-                title={currentPolicy?.title || "Policy Preview"}
+                title={currentPolicy?.title || t("admin.policies.preview.title")}
                 contentHtml={previewContent}
                 lastUpdated={currentPolicy?.updatedAt}
             />
-        </div>
+        </div >
     );
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { aboutService } from "@/services/about.service";
 import { FutureGoal } from "@/types";
 import { useToast } from "@/hooks/use-toast";
@@ -29,6 +30,7 @@ export default function FutureGoalDialog({
   onOpenChange,
   goal,
 }: FutureGoalDialogProps) {
+  const { t } = useTranslation();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [order, setOrder] = useState(1);
@@ -53,13 +55,13 @@ export default function FutureGoalDialog({
       aboutService.createGoal(newGoal),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["aboutUs"] });
-      toast({ title: "Future goal added successfully" });
+      toast({ title: t("admin.about.toasts.deleteGoal") });
       onOpenChange(false);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Failed to add future goal",
-        description: getErrorMessage(error, "Failed to add future goal"),
+        title: t("admin.about.toasts.deleteGoalError"),
+        description: getErrorMessage(error, t("admin.about.toasts.deleteGoalError")),
         variant: "destructive",
       });
     },
@@ -75,13 +77,13 @@ export default function FutureGoalDialog({
     }) => aboutService.updateGoal(id, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["aboutUs"] });
-      toast({ title: "Future goal updated successfully" });
+      toast({ title: t("admin.about.toasts.deleteGoal") });
       onOpenChange(false);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Failed to update future goal",
-        description: getErrorMessage(error, "Failed to update future goal"),
+        title: t("admin.about.toasts.deleteGoalError"),
+        description: getErrorMessage(error, t("admin.about.toasts.deleteGoalError")),
         variant: "destructive",
       });
     },
@@ -92,8 +94,8 @@ export default function FutureGoalDialog({
 
     if (!title.trim() || !description.trim()) {
       toast({
-        title: "Error",
-        description: "Please fill in all required fields",
+        title: t("common.error"),
+        description: t("auth.fillAllFields"),
         variant: "destructive",
       });
       return;
@@ -117,7 +119,9 @@ export default function FutureGoalDialog({
       <DialogContent className="sm:max-w-4xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="text-2xl">
-            {goal ? "Edit Future Goal" : "Add New Future Goal"}
+            {goal
+              ? t("admin.about.dialog.editTitle", { type: t("admin.about.dialog.types.goal") })
+              : t("admin.about.dialog.addTitle", { type: t("admin.about.dialog.types.goal") })}
           </DialogTitle>
         </DialogHeader>
 
@@ -125,30 +129,30 @@ export default function FutureGoalDialog({
           <form onSubmit={handleSubmit} className="space-y-6 py-2">
             {/* Goal Information */}
             <div className="space-y-4 border rounded-lg p-4">
-              <h3 className="text-base font-semibold">Goal Details</h3>
+              <h3 className="text-base font-semibold">{t("admin.about.dialog.types.goal")}</h3>
 
               <div className="space-y-2">
                 <Label htmlFor="title">
-                  Title <span className="text-destructive">*</span>
+                  {t("admin.about.dialog.goal.title")} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g., Expand Capacity to 1000+ Cows"
+                  placeholder={t("admin.about.dialog.goal.titlePlaceholder")}
                   required
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="description">
-                  Description <span className="text-destructive">*</span>
+                  {t("admin.about.dialog.goal.desc")} <span className="text-destructive">*</span>
                 </Label>
                 <Textarea
                   id="description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Enter goal description..."
+                  placeholder={t("admin.about.dialog.goal.descPlaceholder")}
                   rows={4}
                   required
                 />
@@ -157,10 +161,10 @@ export default function FutureGoalDialog({
 
             {/* Display Settings */}
             <div className="space-y-4 border rounded-lg p-4">
-              <h3 className="text-base font-semibold">Display Settings</h3>
+              <h3 className="text-base font-semibold">{t("admin.about.dialog.displaySettings")}</h3>
 
               <div className="space-y-2">
-                <Label htmlFor="order">Display Order</Label>
+                <Label htmlFor="order">{t("admin.about.dialog.displayOrder")}</Label>
                 <Input
                   id="order"
                   type="number"
@@ -177,13 +181,13 @@ export default function FutureGoalDialog({
                 variant="outline"
                 onClick={() => onOpenChange(false)}
               >
-                Cancel
+                {t("admin.about.dialog.cancel")}
               </Button>
               <Button
                 type="submit"
                 disabled={addMutation.isPending || updateMutation.isPending}
               >
-                {goal ? "Update" : "Add"} Future Goal
+                {goal ? t("common.update") : t("common.add")} {t("admin.about.dialog.types.goal")}
               </Button>
             </DialogFooter>
           </form>

@@ -73,7 +73,7 @@ export function ProductQuickView({
       // For single-variant or no-variant products, add directly
       const variantId = product.variants?.[0]?.id;
       await addItem(product, 1, variantId);
-      toast.success(`${product.title} added to cart`, {
+      toast.success(t("success.cart.added", { product: product.title }), {
         icon: <ShoppingCart size={16} className="text-[#B85C3C]" />,
       });
     } catch (error) {
@@ -101,7 +101,7 @@ export function ProductQuickView({
           await updateQuantity(product.id, specificQuantity - 1, specificCartItem.variantId);
         } else {
           await removeItem(product.id, specificCartItem.variantId);
-          toast.success(`${product.title} removed from cart`);
+          toast.success(t("success.cart.removed", { product: product.title }));
         }
       } catch (error) {
         // Handled by store
@@ -117,9 +117,9 @@ export function ProductQuickView({
   const getStockStatus = () => {
     const stock = effectiveStock || 0;
     if (stock === 0) return { text: t("products.outOfStock"), color: "text-red-600" };
-    if (stock < 5) return { text: "Only few left", color: "text-orange-600" };
-    if (stock < 20) return { text: "Low stock", color: "text-orange-500" };
-    return { text: "In Stock", color: "text-green-600" };
+    if (stock < 5) return { text: t("products.fewLeft"), color: "text-orange-600" };
+    if (stock < 20) return { text: t("products.lowStock"), color: "text-orange-500" };
+    return { text: t("products.inStock"), color: "text-green-600" };
   };
 
   const stockStatus = getStockStatus();
@@ -143,12 +143,12 @@ export function ProductQuickView({
               <div className="absolute top-3 left-3 flex flex-col gap-2">
                 {product.isNew && (
                   <Tag variant="new" size="sm" className="bg-[#B85C3C] text-white border-none px-3 py-1 shadow-md font-bold uppercase tracking-wider text-[9px]">
-                    New
+                    {t("products.new")}
                   </Tag>
                 )}
                 {product.mrp && product.mrp > product.price && (
                   <Tag variant="discount" size="sm" className="bg-[#D4AF37] text-white border-none px-3 py-1 shadow-md font-black text-[9px]">
-                    {calculateDiscount(product.mrp, product.price)}% OFF
+                    {t("products.off", { percent: calculateDiscount(product.mrp, product.price) })}
                   </Tag>
                 )}
               </div>
@@ -217,7 +217,7 @@ export function ProductQuickView({
                   <span className="text-[11px] font-black text-[#2C1810]">{product.rating}</span>
                 </div>
                 <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">
-                  {product.ratingCount} Ratings
+                  {product.ratingCount} {t("products.ratings")}
                 </span>
               </div>
             )}
@@ -246,13 +246,13 @@ export function ProductQuickView({
                   <>
                     <RotateCcw size={14} className="text-green-600" />
                     <span className="font-medium text-green-600">
-                      {(product as any).return_days ?? product.returnDays} days return
+                      {t("products.daysReturn", { count: (product as any).return_days ?? product.returnDays })}
                     </span>
                   </>
                 ) : (
                   <>
                     <X size={14} className="text-muted-foreground" />
-                    <span className="text-muted-foreground">Non-returnable</span>
+                    <span className="text-muted-foreground">{t("products.nonReturnable")}</span>
                   </>
                 )}
               </div>
@@ -263,7 +263,7 @@ export function ProductQuickView({
             {/* Description */}
             {product.description && (
               <div className="space-y-1">
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-[#2C1810]">Description</h3>
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-[#2C1810]">{t("products.description")}</h3>
                 <p className="text-xs text-muted-foreground leading-relaxed font-light line-clamp-3">
                   {product.description}
                 </p>
@@ -273,7 +273,7 @@ export function ProductQuickView({
             {/* Benefits */}
             {product.benefits && product.benefits.length > 0 && (
               <div className="space-y-1.5">
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-[#2C1810]">Key Benefits</h3>
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-[#2C1810]">{t("products.keyBenefits")}</h3>
                 <div className="grid grid-cols-1 gap-1">
                   {product.benefits.slice(0, 3).map((benefit, index) => (
                     <div key={index} className="flex items-center gap-2">
@@ -294,8 +294,8 @@ export function ProductQuickView({
                 totalProductQuantity > 0 ? (
                   <>
                     <div className="flex items-center justify-between bg-[#FAF7F2] p-2 rounded-xl border border-[#B85C3C]/10">
-                      <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground ml-2">In Your Cart</span>
-                      <span className="text-sm font-black text-[#2C1810]">{totalProductQuantity} item{totalProductQuantity > 1 ? 's' : ''}</span>
+                      <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground ml-2">{t("products.inYourCart")}</span>
+                      <span className="text-sm font-black text-[#2C1810]">{t("products.itemCount", { count: totalProductQuantity })}</span>
                     </div>
                     <Link to="/cart" className="block">
                       <Button
@@ -319,7 +319,7 @@ export function ProductQuickView({
                     >
                       {!effectiveStock || effectiveStock === 0
                         ? t("products.outOfStock")
-                        : t("products.selectOptions", "Select Options")}
+                        : t("products.selectOptions")}
                     </Button>
                   </Link>
                 )
@@ -328,7 +328,7 @@ export function ProductQuickView({
                 specificQuantity > 0 ? (
                   <>
                     <div className="flex items-center justify-between bg-[#FAF7F2] p-2 rounded-xl border border-[#B85C3C]/10">
-                      <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground ml-2">Cart Quantity</span>
+                      <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground ml-2">{t("products.cartQuantity")}</span>
                       <div className="flex items-center gap-3">
                         <Button
                           variant="ghost"
@@ -389,7 +389,7 @@ export function ProductQuickView({
                   onClick={() => onOpenChange(false)}
                 >
                   <ExternalLink className="mr-2 h-3.5 w-3.5" />
-                  View Full Details
+                  {t("products.viewFullDetails")}
                 </Button>
               </Link>
             </div>

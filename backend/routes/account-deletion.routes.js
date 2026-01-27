@@ -60,7 +60,8 @@ router.post('/request-otp', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Email is required for verification' });
         }
 
-        const result = await AccountDeletionService.requestDeletionOTP(userId, email, correlationId);
+        const lang = req.get('x-user-lang') || 'en';
+        const result = await AccountDeletionService.requestDeletionOTP(userId, email, correlationId, lang);
 
         if (!result.success) {
             return res.status(400).json({
@@ -128,11 +129,13 @@ router.post('/confirm', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Authorization token is required' });
         }
 
+        const lang = req.get('x-user-lang') || 'en';
         const result = await AccountDeletionService.confirmImmediateDeletion(
             userId,
             authorizationToken,
             reason,
-            correlationId
+            correlationId,
+            lang
         );
 
         if (!result.success) {
@@ -171,12 +174,14 @@ router.post('/schedule', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Invalid grace period. Choose 7, 15, or 30 days.' });
         }
 
+        const lang = req.get('x-user-lang') || 'en';
         const result = await AccountDeletionService.scheduleDeletion(
             userId,
             authorizationToken,
             days,
             reason,
-            correlationId
+            correlationId,
+            lang
         );
 
         if (!result.success) {

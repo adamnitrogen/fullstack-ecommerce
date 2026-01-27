@@ -1,5 +1,6 @@
 import { logger } from "@/lib/logger";
 import { useEffect, useState, useCallback } from "react";
+import { CONFIG } from "@/config";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { apiClient } from "@/lib/api-client";
@@ -196,7 +197,7 @@ export default function UserOrderDetail() {
             fetchReturnableItems(); // Fetch items available for return
         } catch (error) {
             logger.error("Error fetching order", { err: error });
-            // toast.error("Failed to load order details");
+            toast.error(t("orderDetail.loadError"));
             navigate("/my-orders");
         } finally {
             setLoading(false);
@@ -209,18 +210,18 @@ export default function UserOrderDetail() {
 
     const handleCancelOrder = async () => {
         if (!cancelReason || !cancelReason.trim()) {
-            toast.error(t("orderDetail.cancelReasonRequired") || "Please provide a reason for cancellation");
+            toast.error(t("orderDetail.cancelReasonRequired"));
             return;
         }
         try {
-            setLoadingMessage("Cancelling your order...");
+            setLoadingMessage(t("orderDetail.cancellingOrder"));
             setActionLoading(true);
             setCancelOpen(false);
             await apiClient.post(`/orders/${id}/cancel`, { reason: cancelReason });
-            toast.success("Order cancelled successfully");
+            toast.success(t("orderDetail.cancelSuccess"));
             fetchOrderDetail(); // Refresh
         } catch (error: unknown) {
-            toast.error(getErrorMessage(error, "Failed to cancel order"));
+            toast.error(getErrorMessage(error, t("orderDetail.cancelError")));
         } finally {
             setActionLoading(false);
             setLoadingMessage("");
@@ -236,14 +237,14 @@ export default function UserOrderDetail() {
                 const totalFiles = [...currentFiles, ...newFiles];
 
                 if (totalFiles.length > 3) {
-                    toast.error(t("orderDetail.maxImages") || "Maximum 3 images allowed per item");
+                    toast.error(t("orderDetail.maxImages"));
                     return prev;
                 }
 
                 // Validate size (5MB limit)
                 const invalidFile = newFiles.find(f => f.size > 5 * 1024 * 1024);
                 if (invalidFile) {
-                    toast.error(t("orderDetail.fileTooLarge", { name: invalidFile.name }) || `File ${invalidFile.name} exceeds 5MB limit`);
+                    toast.error(t("orderDetail.fileTooLarge", { name: invalidFile.name }));
                     return prev;
                 }
 
@@ -263,7 +264,7 @@ export default function UserOrderDetail() {
     const handleReturnOrder = async () => {
         try {
             if (selectedReturnItems.length === 0) {
-                toast.error("Please select at least one item to return");
+                toast.error(t("orderDetail.selectItemToReturn"));
                 return;
             }
 
@@ -273,16 +274,16 @@ export default function UserOrderDetail() {
                 const images = itemImages[item.id];
 
                 if (!reason || !reason.trim()) {
-                    toast.error(t("orderDetail.returnReasonRequired") || "Please provide a return reason for all selected items");
+                    toast.error(t("orderDetail.returnReasonRequired"));
                     return;
                 }
                 if (!images || images.length < 1) {
-                    toast.error(t("orderDetail.minImagesRequired") || "Please upload at least 1 image for each selected item");
+                    toast.error(t("orderDetail.minImagesRequired"));
                     return;
                 }
             }
 
-            setLoadingMessage("Submitting your return request...");
+            setLoadingMessage(t("orderDetail.submittingReturn"));
             setActionLoading(true);
             setReturnOpen(false);
 
@@ -304,7 +305,7 @@ export default function UserOrderDetail() {
 
                     if (uploadError) {
                         logger.error('Return image upload failed', { module: 'UserOrderDetail', err: uploadError, orderId: id, itemId: item.id });
-                        throw new Error(`Failed to upload image for item`);
+                        throw new Error(t("orderDetail.imageUploadError"));
                     }
 
                     uploadedPaths.push(path);
@@ -333,7 +334,7 @@ export default function UserOrderDetail() {
                     reason: returnReason // Keeping global reason optional or as summary
                 });
 
-                toast.success("Return request submitted successfully");
+                toast.success(t("orderDetail.returnSubmitSuccess"));
                 setReturnOpen(false);
                 // Reset state
                 setItemImages({});
@@ -352,7 +353,7 @@ export default function UserOrderDetail() {
                 throw apiError;
             }
         } catch (error: unknown) {
-            toast.error(getErrorMessage(error, "Failed to submit return request"));
+            toast.error(getErrorMessage(error, t("orderDetail.returnSubmitError")));
         } finally {
             setActionLoading(false);
             setLoadingMessage("");
@@ -363,13 +364,13 @@ export default function UserOrderDetail() {
 
     const handleCancelReturn = async (returnId: string) => {
         try {
-            setLoadingMessage("Cancelling your return request...");
+            setLoadingMessage(t("orderDetail.cancellingReturn"));
             setActionLoading(true);
             await apiClient.post(`/returns/${returnId}/cancel`);
-            toast.success("Return request cancelled");
+            toast.success(t("orderDetail.returnCancelled"));
             fetchOrderDetail(); // Refresh everything
         } catch (error) {
-            toast.error(getErrorMessage(error, "Failed to cancel return"));
+            toast.error(getErrorMessage(error, t("orderDetail.cancelReturnError")));
         } finally {
             setActionLoading(false);
             setLoadingMessage("");
@@ -411,7 +412,7 @@ export default function UserOrderDetail() {
                         </h1>
                         <div className="flex items-center gap-3 mt-2 text-muted-foreground">
                             <Badge variant="secondary" className="text-sm font-normal px-3 py-1">
-                                {order.created_at ? format(new Date(order.created_at), "PPP") : "N/A"}
+                                {order.created_at ? format(new Date(order.created_at), "PPP") : t("orderDetail.na")}
                             </Badge>
                             <span>•</span>
                             <Badge
@@ -419,7 +420,7 @@ export default function UserOrderDetail() {
                                     ['cancelled', 'returned'].includes(order.status) ? 'destructive' : 'secondary'}
                                 className="text-sm capitalize px-3 py-1"
                             >
-                                {order.status.replace(/_/g, ' ')}
+                                {t(`orderStatus.${order.status}`)}
                             </Badge>
                         </div>
                     </div>
@@ -454,7 +455,7 @@ export default function UserOrderDetail() {
                                     // or if order.invoice_url is already full URL (it was setting relative in Orchestrator)
                                     // Orchestrator sets: /api/invoices/:id/download
                                     // So we need to ensure we open full URL.
-                                    const fullUrl = url.startsWith('http') ? url : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${url}`;
+                                    const fullUrl = url.startsWith('http') ? url : `${CONFIG.BACKEND_URL}${url}`;
 
                                     // For authenticated download, we might need a fetch or window.open might fail if auth cookie is strict?
                                     // Usually window.open works if cookies are SameSite=Lax/None. 
@@ -621,12 +622,10 @@ export default function UserOrderDetail() {
                                                     })
                                                 )}
                                             </div>
-                                            {returnableItems.length > 0 && selectedReturnItems.length === 0 && (
-                                                <p className="text-xs text-orange-600 flex items-center gap-1">
-                                                    <AlertTriangle className="h-3 w-3" />
-                                                    {t("orderDetail.selectItemsRequired") || "Please select at least one item to return"}
-                                                </p>
-                                            )}
+                                            <p className="text-xs text-orange-600 flex items-center gap-1">
+                                                <AlertTriangle className="h-3 w-3" />
+                                                {t("orderDetail.selectItemsRequired")}
+                                            </p>
                                         </div>
 
 
@@ -711,7 +710,7 @@ export default function UserOrderDetail() {
                                     </div>
                                     <DialogFooter className="gap-2 sm:gap-0 pt-4 border-t">
                                         <Button variant="ghost" onClick={() => setReturnOpen(false)}>
-                                            {t("auth.cancel") || "Cancel"}
+                                            {t("common.cancel")}
                                         </Button>
                                         <Button
                                             className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
@@ -720,7 +719,7 @@ export default function UserOrderDetail() {
                                         >
                                             {actionLoading ? (
                                                 <>
-                                                    <span className="animate-spin mr-2">⏳</span>
+                                                    <Loader2 className="animate-spin mr-2 h-4 w-4" />
                                                     {t("orderDetail.submitting")}
                                                 </>
                                             ) : (
@@ -791,7 +790,7 @@ export default function UserOrderDetail() {
                                                     </div>
                                                     <div className="flex-1">
                                                         <div className="flex items-center gap-2">
-                                                            <h4 className="font-medium">{item.product?.title || t("products.defaultTitle") || "Product"}</h4>
+                                                            <h4 className="font-medium">{item.product?.title || t("orderDetail.item")}</h4>
                                                             {sizeLabel && (
                                                                 <Badge variant="secondary" className="text-xs font-normal">
                                                                     {sizeLabel}
@@ -801,7 +800,7 @@ export default function UserOrderDetail() {
                                                         <p className="text-sm text-muted-foreground">
                                                             {t("orderDetail.qty")}: {item.quantity} × ₹{bundledUnitPrice.toFixed(2)}
                                                             <span className="text-xs ml-2 text-muted-foreground/80">
-                                                                ({(item.product?.price_includes_tax ?? item.product?.default_price_includes_tax ?? true) ? t("products.incTax") || 'Inc. Tax' : t("products.exclTax") || 'Excl. Tax'})
+                                                                ({(item.product?.price_includes_tax ?? item.product?.default_price_includes_tax ?? true) ? t("orderDetail.incTax") : t("orderDetail.exclTax")})
                                                             </span>
                                                         </p>
                                                         {/* Base Price Display */}
@@ -810,7 +809,7 @@ export default function UserOrderDetail() {
                                                             const baseUnitPrice = gstRate > 0 ? bundledUnitPrice / (1 + gstRate / 100) : bundledUnitPrice;
                                                             return (
                                                                 <p className="text-xs text-slate-500">
-                                                                    {t("products.basePrice") || 'Base Price'}: ₹{baseUnitPrice.toFixed(2)} ({t("products.exclTax") || 'Excl. Tax'})
+                                                                    {t("orderDetail.basePrice")}: ₹{baseUnitPrice.toFixed(2)} ({t("orderDetail.exclTax")})
                                                                 </p>
                                                             );
                                                         })()}
@@ -861,7 +860,7 @@ export default function UserOrderDetail() {
                                                         <span className="text-muted-foreground flex items-center gap-1.5">
                                                             {t("orderDetail.delivery")}
                                                             {refundableTotal > 0 && (
-                                                                <Badge variant="outline" className="text-[10px] h-4 font-normal text-blue-600 border-blue-200 bg-blue-50">{t("orderDetail.refundable") || 'Refundable'}</Badge>
+                                                                <Badge variant="outline" className="text-[10px] h-4 font-normal text-blue-600 border-blue-200 bg-blue-50">{t("orderDetail.refundable")}</Badge>
                                                             )}
                                                         </span>
                                                         <span>₹{deliveryTotal.toFixed(2)}</span>
@@ -894,11 +893,11 @@ export default function UserOrderDetail() {
                                             <RotateCcw className="h-5 w-5 text-orange-600" /> {t("orderDetail.returns")}
                                         </CardTitle>
                                         <Badge variant="outline" className="bg-white border-orange-200 text-orange-800">
-                                            {returns.length} {t("orderDetail.requestCount", { count: returns.length }) || (returns.length > 1 ? 'Requests' : 'Request')}
+                                            {t("orderDetail.requestCount", { count: returns.length })}
                                         </Badge>
                                     </div>
                                     <CardDescription className="text-orange-800/70">
-                                        {t("orderDetail.returnsTrackDesc") || 'Track the status of your return and refund requests.'}
+                                        {t("orderDetail.returnsTrackDesc")}
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="p-0">
@@ -928,7 +927,7 @@ export default function UserOrderDetail() {
                                                             onClick={() => handleCancelReturn(ret.id)}
                                                             disabled={actionLoading}
                                                         >
-                                                            {t("orderDetail.cancelRequest") || 'Cancel Request'}
+                                                            {t("orderDetail.cancelRequest")}
                                                         </Button>
                                                     )}
                                                 </div>
@@ -938,8 +937,7 @@ export default function UserOrderDetail() {
                                                     <div className="bg-blue-50 border border-blue-100 rounded-md p-3 text-xs text-blue-800 flex items-start gap-2">
                                                         <Clock className="h-4 w-4 mt-0.5 shrink-0" />
                                                         <p>
-                                                            <strong>Next Step:</strong> Our courier partner will contact you shortly to schedule the pickup.
-                                                            Your refund will be initiated once the items reach our warehouse and are verified.
+                                                            <strong>{t("orderDetail.nextStepPickupTitle")}</strong> {t("orderDetail.nextStepPickup")}
                                                         </p>
                                                     </div>
                                                 )}
@@ -947,8 +945,7 @@ export default function UserOrderDetail() {
                                                     <div className="bg-indigo-50 border border-indigo-100 rounded-md p-3 text-xs text-indigo-800 flex items-start gap-2">
                                                         <Truck className="h-4 w-4 mt-0.5 shrink-0" />
                                                         <p>
-                                                            <strong>Item Picked Up:</strong> Your return is on its way to our warehouse.
-                                                            We will process your refund immediately upon receipt and verification of the items.
+                                                            <strong>{t("orderDetail.itemPickedUpTitle")}</strong> {t("orderDetail.itemPickedUp")}
                                                         </p>
                                                     </div>
                                                 )}
@@ -956,8 +953,7 @@ export default function UserOrderDetail() {
                                                     <div className="bg-green-50 border border-green-100 rounded-md p-3 text-xs text-green-800 flex items-start gap-2">
                                                         <CheckCircle className="h-4 w-4 mt-0.5 shrink-0" />
                                                         <p>
-                                                            <strong>Returned & Verified:</strong> We have received your returned items.
-                                                            Your refund has been initiated and should reflect in your account within 5-7 business days.
+                                                            <strong>{t("orderDetail.returnedVerifiedTitle")}</strong> {t("orderDetail.returnedVerified")}
                                                         </p>
                                                     </div>
                                                 )}
@@ -979,7 +975,7 @@ export default function UserOrderDetail() {
                                                     ))}
                                                     {(ret.status === 'approved' || ret.refund_amount > 0) && (
                                                         <div className="pt-2 mt-2 border-t border-dashed flex justify-between items-center">
-                                                            <span className="text-[11px] font-semibold text-gray-700">{t("orderDetail.refundableAmount") || 'Refundable Amount'}</span>
+                                                            <span className="text-[11px] font-semibold text-gray-700">{t("orderDetail.refundableAmount")}</span>
                                                             <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200 text-xs py-0">
                                                                 ₹{ret.refund_amount.toFixed(2)}
                                                             </Badge>
@@ -1016,7 +1012,7 @@ export default function UserOrderDetail() {
                                                 status: 'pending',
                                                 event_type: 'ORDER_PLACED',
                                                 created_at: order.created_at,
-                                                notes: 'Order placed successfully.',
+                                                notes: t("success.order.placed") || 'Order placed successfully.',
                                                 actor: 'SYSTEM'
                                             });
                                         }
@@ -1038,7 +1034,7 @@ export default function UserOrderDetail() {
                                                     <div key={index} className="ml-6 relative">
                                                         <span className="absolute -left-[1.65rem] top-1 h-3 w-3 rounded-full bg-primary border-2 border-background ring-2 ring-muted" />
                                                         <p className="font-medium text-sm capitalize flex items-center gap-2">
-                                                            <span>{t(`myOrders.statuses.${history.event_type || history.status}`) || (history.event_type || history.status || 'Updated').replace(/_/g, ' ')}</span>
+                                                            <span>{t(`orderStatus.${history.event_type || history.status}`) || (history.event_type || history.status || 'Updated').replace(/_/g, ' ')}</span>
                                                             {(history.event_type === 'REFUND_COMPLETED' || history.event_type === 'REFUND_PARTIAL' || history.status === 'refunded' || history.status === 'partially_refunded') && order.refunds?.some(r => {
                                                                 try {
                                                                     return Math.abs(new Date(r.created_at).getTime() - new Date(history.created_at).getTime()) < 120000;
@@ -1057,7 +1053,7 @@ export default function UserOrderDetail() {
                                                             {formattedDate}
                                                             {history.updater && (
                                                                 <span className="ml-1">
-                                                                    • {(history.updater.role_data?.name === 'admin' || history.updater.role_data?.name === 'manager') ? 'Staff' : 'You'}
+                                                                    • {(history.updater.role_data?.name === 'admin' || history.updater.role_data?.name === 'manager') ? t("orderDetail.staff") : t("orderDetail.you")}
                                                                 </span>
                                                             )}
                                                         </p>
@@ -1071,7 +1067,7 @@ export default function UserOrderDetail() {
                                             });
                                     })()}
                                     {(!order.order_status_history || order.order_status_history.length === 0) && (
-                                        <p className="text-sm text-muted-foreground ml-6">No history available.</p>
+                                        <p className="text-sm text-muted-foreground ml-6">{t("orderDetail.noHistory")}</p>
                                     )}
                                 </div>
                             </CardContent>
@@ -1096,11 +1092,11 @@ export default function UserOrderDetail() {
                                         <p>{order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.postal_code}</p>
                                         <p>{order.shipping_address.country}</p>
                                         <div className="mt-2 pt-2 border-t">
-                                            <p className="text-muted-foreground">{t("nav.phone") || 'Phone'}: <span className="text-foreground">{order.shipping_address.phone}</span></p>
+                                            <p className="text-muted-foreground">{t("nav.phone")}: <span className="text-foreground">{order.shipping_address.phone}</span></p>
                                         </div>
                                     </div>
                                 ) : (
-                                    <p className="text-muted-foreground italic">Address not available</p>
+                                    <p className="text-muted-foreground italic">{t("orderDetail.addressNotAvailable")}</p>
                                 )}
                             </CardContent>
                         </Card>
@@ -1120,11 +1116,11 @@ export default function UserOrderDetail() {
                                         <p>{order.billing_address.city}, {order.billing_address.state} {order.billing_address.postal_code}</p>
                                         <p>{order.billing_address.country}</p>
                                         <div className="mt-2 pt-2 border-t">
-                                            <p className="text-muted-foreground">{t("nav.phone") || 'Phone'}: <span className="text-foreground">{order.billing_address.phone}</span></p>
+                                            <p className="text-muted-foreground">{t("nav.phone")}: <span className="text-foreground">{order.billing_address.phone}</span></p>
                                         </div>
                                     </div>
                                 ) : (
-                                    <p className="text-muted-foreground italic">Same as shipping address</p>
+                                    <p className="text-muted-foreground italic">{t("orderDetail.sameAsShipping")}</p>
                                 )}
                             </CardContent>
                         </Card>
@@ -1132,7 +1128,7 @@ export default function UserOrderDetail() {
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <CreditCard className="h-5 w-5" /> {t("orderDetail.paymentInfo") || 'Payment Info'}
+                                    <CreditCard className="h-5 w-5" /> {t("orderDetail.paymentInfo")}
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
@@ -1143,11 +1139,11 @@ export default function UserOrderDetail() {
                                             (order.payment_status === 'refunded' || order.payment_status === 'partially_refunded') ? 'destructive' :
                                                 order.payment_status === 'refund_initiated' ? 'outline' : 'secondary'}
                                             className="ml-2 uppercase">
-                                            {order.payment_status === 'partially_refunded' ? 'Refunded' : order.payment_status?.replace(/_/g, ' ')}
+                                            {t(`orderDetail.paymentStatus.${order.payment_status}`) || order.payment_status?.replace(/_/g, ' ')}
                                         </Badge>
                                         {order.payment_status === 'refund_initiated' && (
                                             <p className="text-xs text-orange-600 mt-1 font-medium">
-                                                Refund Initiated. Processing time: 5-7 business days.
+                                                {t("orderDetail.refundInitiated")}
                                             </p>
                                         )}
                                     </div>
@@ -1158,12 +1154,12 @@ export default function UserOrderDetail() {
                                         </div>
                                     )}
                                     <div>
-                                        <span className="text-muted-foreground">Payment ID:</span>
+                                        <span className="text-muted-foreground">{t("orderDetail.paymentId")}:</span>
                                         {order.payment_id && order.payment_id.startsWith('pay_') ? (
                                             <p className="font-mono text-xs mt-1 bg-muted p-1 rounded inline-block">{order.payment_id}</p>
                                         ) : (
                                             <p className="text-xs text-muted-foreground italic mt-1">
-                                                {order.payment_id ? 'System Reference' : 'Not Available'}
+                                                {order.payment_id ? t("orderDetail.systemReference") : t("orderDetail.na")}
                                             </p>
                                         )}
                                     </div>
@@ -1171,7 +1167,7 @@ export default function UserOrderDetail() {
                                     {/* Refund Details */}
                                     {(order.payment_status === 'refund_initiated' || order.payment_status === 'refunded' || order.payment_status === 'partially_refunded' || (order.refunds && order.refunds.length > 0)) && (
                                         <div className="pt-2 border-t mt-2">
-                                            <span className="text-muted-foreground text-xs block mb-1">Refund Information:</span>
+                                            <span className="text-muted-foreground text-xs block mb-1">{t("orderDetail.refundInfo")}:</span>
                                             {order.refunds && order.refunds.length > 0 ? (
                                                 <div className="space-y-1">
                                                     {order.refunds.map((r, idx) => (
@@ -1182,7 +1178,7 @@ export default function UserOrderDetail() {
                                                             </div>
                                                             {r.notes && (
                                                                 <p className="text-[10px] text-red-600/70 mt-0.5 italic pl-1 border-l border-red-200 ml-0.5">
-                                                                    Note: {r.notes}
+                                                                    {t("orderDetail.note")}: {r.notes}
                                                                 </p>
                                                             )}
                                                         </div>
@@ -1190,8 +1186,8 @@ export default function UserOrderDetail() {
                                                 </div>
                                             ) : (
                                                 <div className="bg-blue-50 p-2 rounded border border-blue-100 text-[10px] text-blue-700">
-                                                    <p className="font-medium">Refund Processing</p>
-                                                    <p className="opacity-80">Our team has initiated your refund. Details will be updated here shortly.</p>
+                                                    <p className="font-medium">{t("orderDetail.refundProcessing")}</p>
+                                                    <p className="opacity-80">{t("orderDetail.refundProcessingDesc")}</p>
                                                 </div>
                                             )}
                                         </div>
@@ -1265,7 +1261,7 @@ export default function UserOrderDetail() {
                                             url = internalInv.public_url || `/api/invoices/${internalInv.id}/download`;
                                         }
                                         if (!url) return undefined;
-                                        return url.startsWith('http') ? url : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${url}`;
+                                        return url.startsWith('http') ? url : `${CONFIG.BACKEND_URL}${url}`;
                                     })()}
                                     items={order.items}
                                     deliveryCharge={deliveryCharge}

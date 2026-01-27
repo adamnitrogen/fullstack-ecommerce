@@ -123,7 +123,7 @@ export default function AuthPage({
           setFieldErrors({}); // Clear errors when moving to OTP step
         } else {
           // Pass the error to the catch block to be handled by getErrorDetails/getErrorMessage
-          throw new Error(res.error || "Validation failed");
+          throw new Error(res.error || t("auth.validationFailed"));
         }
       }
     } catch (error: unknown) {
@@ -236,7 +236,7 @@ export default function AuthPage({
     try {
       await loginWithGoogle();
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Google login failed"));
+      toast.error(getErrorMessage(error, t("auth.googleLoginFailed")));
     }
   };
 
@@ -427,7 +427,7 @@ export default function AuthPage({
                       </p>
                     </div>
                     <div>
-                      <Label htmlFor="otp">One-Time Password</Label>
+                      <Label htmlFor="otp">{t("auth.otpLabel")}</Label>
                       <Input
                         id="otp"
                         type="text"

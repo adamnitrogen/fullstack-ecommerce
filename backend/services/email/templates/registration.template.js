@@ -1,115 +1,191 @@
-/**
- * Registration Email Templates
- */
 const { wrapInTemplate, APP_NAME, FRONTEND_URL } = require('./base.template');
+const { getCommonStrings } = require('./i18n');
 
 /**
  * Welcome email for new user registration
  */
-function getRegistrationEmail({ name, email }) {
-    const firstName = name ? name.split(' ')[0] : 'there';
+function getRegistrationEmail({ name, email, lang = 'en' }) {
+    const common = getCommonStrings(lang);
+    const i18n = {
+        en: {
+            title: `Welcome to ${APP_NAME}! 🎉`,
+            thrilled: "We're thrilled to have you join our community. Your account has been successfully created.",
+            detailsTitle: 'Your Account Details:',
+            email: 'Email',
+            joined: 'Joined',
+            whatsNext: "What's Next?",
+            step1: 'Browse our latest products',
+            step2: 'Complete your profile',
+            step3: 'Start shopping!',
+            startButton: 'Start Exploring',
+            questions: 'If you have any questions, our support team is always here to help.',
+            welcomeAboard: 'Welcome aboard!',
+            subject: 'Welcome to',
+            templateTitle: 'Welcome to'
+        },
+        hi: {
+            title: `${APP_NAME} में आपका स्वागत है! 🎉`,
+            thrilled: 'हमें खुशी है कि आप हमारे समुदाय में शामिल हुए हैं। आपका खाता सफलतापूर्वक बना लिया गया है।',
+            detailsTitle: 'आपके खाते का विवरण:',
+            email: 'ईमेल',
+            joined: 'शामिल हुए',
+            whatsNext: 'आगे क्या?',
+            step1: 'हमारे नवीनतम उत्पादों को ब्राउज़ करें',
+            step2: 'अपनी प्रोफ़ाइल पूरी करें',
+            step3: 'खरीदारी शुरू करें!',
+            startButton: 'खोजना शुरू करें',
+            questions: 'यदि आपके कोई प्रश्न हैं, तो हमारी सहायता टीम हमेशा मदद के लिए यहाँ है।',
+            welcomeAboard: 'स्वागत है!',
+            subject: 'में आपका स्वागत है',
+            templateTitle: 'में आपका स्वागत है'
+        }
+    };
+
+    const s = i18n[lang] || i18n.en;
+    const firstName = name ? name.split(' ')[0] : (lang === 'hi' ? 'जी' : 'there');
 
     const content = `
-        <h2>Welcome to ${APP_NAME}! 🎉</h2>
-        <p>Hi ${firstName},</p>
-        <p>We're thrilled to have you join our community. Your account has been successfully created.</p>
+        <h2>${s.title}</h2>
+        <p>${common.dear} ${firstName},</p>
+        <p>${s.thrilled}</p>
         
         <div class="info-box">
-            <strong>Your Account Details:</strong><br>
-            📧 Email: ${email}<br>
-            📅 Joined: ${new Date().toLocaleDateString()}
+            <strong>${s.detailsTitle}</strong><br>
+            📧 ${s.email}: ${email}<br>
+            📅 ${s.joined}: ${new Date().toLocaleDateString(lang === 'hi' ? 'hi-IN' : 'en-IN')}
         </div>
         
-        <h3>What's Next?</h3>
+        <h3>${s.whatsNext}</h3>
         <ul style="color: #555;">
-            <li>Browse our latest products</li>
-            <li>Complete your profile</li>
-            <li>Start shopping!</li>
+            <li>${s.step1}</li>
+            <li>${s.step2}</li>
+            <li>${s.step3}</li>
         </ul>
         
         <p style="text-align: center;">
-            <a href="${FRONTEND_URL}" class="button">Start Exploring</a>
+            <a href="${FRONTEND_URL}" class="button">${s.startButton}</a>
         </p>
         
-        <p>If you have any questions, our support team is always here to help.</p>
-        <p class="text-muted">Welcome aboard!<br>The ${APP_NAME} Team</p>
+        <p>${s.questions}</p>
+        <p class="text-muted">${s.welcomeAboard}<br>${common.team}</p>
     `;
 
     return {
-        subject: `Welcome to ${APP_NAME}! 🎉`,
-        html: wrapInTemplate(content, { title: `Welcome to ${APP_NAME}` })
+        subject: `${s.subject} ${APP_NAME}! 🎉`,
+        html: wrapInTemplate(content, { title: `${s.templateTitle} ${APP_NAME}`, lang })
     };
 }
 
 /**
  * Email verification (if needed separately)
  */
-function getEmailVerificationEmail({ name, verificationLink }) {
-    const firstName = name ? name.split(' ')[0] : 'there';
+function getEmailVerificationEmail({ name, verificationLink, lang = 'en' }) {
+    const common = getCommonStrings(lang);
+    const i18n = {
+        en: {
+            title: 'Verify Your Email Address',
+            desc: 'Please click the button below to verify your email address:',
+            verifyButton: 'Verify Email',
+            copyPaste: 'Or copy and paste this link:',
+            expire: 'This link will expire in 24 hours.',
+            subject: 'Verify your email'
+        },
+        hi: {
+            title: 'अपना ईमेल पता सत्यापित करें',
+            desc: 'अपना ईमेल पता सत्यापित करने के लिए कृपया नीचे दिए गए बटन पर क्लिक करें:',
+            verifyButton: 'ईमेल सत्यापित करें',
+            copyPaste: 'या इस लिंक को कॉपी और पेस्ट करें:',
+            expire: 'यह लिंक 24 घंटों में समाप्त हो जाएगा।',
+            subject: 'अपना ईमेल सत्यापित करें'
+        }
+    };
+
+    const s = i18n[lang] || i18n.en;
+    const firstName = name ? name.split(' ')[0] : (lang === 'hi' ? 'जी' : 'there');
 
     const content = `
-        <h2>Verify Your Email Address</h2>
-        <p>Hi ${firstName},</p>
-        <p>Please click the button below to verify your email address:</p>
+        <h2>${s.title}</h2>
+        <p>${common.dear} ${firstName},</p>
+        <p>${s.desc}</p>
         
         <p style="text-align: center;">
-            <a href="${verificationLink}" class="button">Verify Email</a>
+            <a href="${verificationLink}" class="button">${s.verifyButton}</a>
         </p>
         
-        <p class="text-muted">Or copy and paste this link:</p>
+        <p class="text-muted">${s.copyPaste}</p>
         <p style="word-break: break-all; font-size: 12px; color: #667eea;">
             ${verificationLink}
         </p>
         
-        <p class="text-muted">This link will expire in 24 hours.</p>
+        <p class="text-muted">${s.expire}</p>
     `;
 
     return {
-        subject: `Verify your email - ${APP_NAME}`,
-        html: wrapInTemplate(content)
+        subject: `${s.subject} - ${APP_NAME}`,
+        html: wrapInTemplate(content, { title: s.title, lang })
     };
 }
-
-module.exports = {
-    getRegistrationEmail,
-    getEmailVerificationEmail
-};
 
 /**
  * Email confirmation for signup verification (with link)
  */
-function getEmailConfirmationEmail({ name, email, verificationLink }) {
-    const firstName = name ? name.split(' ')[0] : 'there';
+function getEmailConfirmationEmail({ name, email, verificationLink, lang = 'en' }) {
+    const common = getCommonStrings(lang);
+    const i18n = {
+        en: {
+            title: 'Confirm Your Email Address',
+            desc: 'Thank you for signing up! Please confirm your email address to activate your account.',
+            confirmButton: 'Confirm My Email',
+            copyPaste: 'Or copy and paste this link in your browser:',
+            important: 'Important:',
+            expire: 'This link will expire in 24 hours. If you didn\'t create an account, please ignore this email.',
+            thanks: 'Thanks',
+            subject: 'Confirm your email',
+            templateTitle: 'Email Confirmation'
+        },
+        hi: {
+            title: 'अपने ईमेल पते की पुष्टि करें',
+            desc: 'साइन अप करने के लिए धन्यवाद! अपना खाता सक्रिय करने के लिए कृपया अपने ईमेल पते की पुष्टि करें।',
+            confirmButton: 'मेरा ईमेल पुष्ट करें',
+            copyPaste: 'या अपने ब्राउज़र में इस लिंक को कॉपी और पेस्ट करें:',
+            important: 'महत्वपूर्ण:',
+            expire: 'यह लिंक 24 घंटों में समाप्त हो जाएगा। यदि आपने खाता नहीं बनाया है, तो कृपया इस ईमेल को अनदेखा करें।',
+            thanks: 'धन्यवाद',
+            subject: 'अपने ईमेल की पुष्टि करें',
+            templateTitle: 'ईमेल पुष्टिकरण'
+        }
+    };
+
+    const s = i18n[lang] || i18n.en;
+    const firstName = name ? name.split(' ')[0] : (lang === 'hi' ? 'जी' : 'there');
 
     const content = `
-        <h2>Confirm Your Email Address</h2>
-        <p>Hi ${firstName},</p>
-        <p>Thank you for signing up! Please confirm your email address to activate your account.</p>
+        <h2>${s.title}</h2>
+        <p>${common.dear} ${firstName},</p>
+        <p>${s.desc}</p>
         
         <p style="text-align: center;">
-            <a href="${verificationLink}" class="button">Confirm My Email</a>
+            <a href="${verificationLink}" class="button">${s.confirmButton}</a>
         </p>
         
-        <p class="text-muted">Or copy and paste this link in your browser:</p>
+        <p class="text-muted">${s.copyPaste}</p>
         <p style="word-break: break-all; font-size: 12px; color: #667eea; background: #f5f5f5; padding: 10px; border-radius: 4px;">
             ${verificationLink}
         </p>
         
         <div class="warning-box">
-            <strong>Important:</strong> This link will expire in 24 hours.
-            If you didn't create an account, please ignore this email.
+            <strong>${s.important}</strong> ${s.expire}
         </div>
         
-        <p class="text-muted">Thanks,<br>The ${APP_NAME} Team</p>
+        <p class="text-muted">${s.thanks},<br>${common.team}</p>
     `;
 
     return {
-        subject: `Confirm your email - ${APP_NAME}`,
-        html: wrapInTemplate(content, { title: 'Email Confirmation' })
+        subject: `${s.subject} - ${APP_NAME}`,
+        html: wrapInTemplate(content, { title: s.templateTitle, lang })
     };
 }
 
-// Re-export all functions
 module.exports = {
     getRegistrationEmail,
     getEmailVerificationEmail,

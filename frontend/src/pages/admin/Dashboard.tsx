@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Package, Calendar, FileText, ShoppingCart, Users, Heart, Shield, Activity, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { analyticsService, DashboardStats } from '@/services/analytics.service';
 import { format } from 'date-fns';
+import { getDateLocale } from '@/utils/dateLocale';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/lib/supabase';
 import { orderService } from '@/services/order.service';
@@ -25,6 +27,7 @@ import { Order } from '@/types';
 
 
 export default function AdminDashboard() {
+  const { t } = useTranslation();
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -58,7 +61,7 @@ export default function AdminDashboard() {
     const channel = supabase
       .channel('dashboard-notifications')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
-        toast.info(`New Order #${payload.new.order_number} received!`, {
+        toast.info(t('admin.dashboard.notifications.newOrder', { number: payload.new.order_number }), {
           duration: 60000,
           icon: <ShoppingCart className="h-4 w-4" />
         });
@@ -66,14 +69,14 @@ export default function AdminDashboard() {
         queryClient.invalidateQueries({ queryKey: ['admin-dashboard-recent-orders'] });
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'donations' }, (payload) => {
-        toast.info(`New Donation of ₹${payload.new.amount} received!`, {
+        toast.info(t('admin.dashboard.notifications.newDonation', { amount: payload.new.amount }), {
           duration: 60000,
           icon: <Heart className="h-4 w-4 text-red-500" />
         });
         queryClient.invalidateQueries({ queryKey: ['admin-dashboard-stats'] });
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'event_registrations' }, () => {
-        toast.info(`New Event Registration!`, {
+        toast.info(t('admin.dashboard.notifications.newEventReg'), {
           duration: 60000,
           icon: <Calendar className="h-4 w-4" />
         });
@@ -82,11 +85,11 @@ export default function AdminDashboard() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'returns' }, (payload) => {
         // Only notify on initial request
         if (payload.new.status === 'requested') {
-          toast.info(`New Return Request Received!`, {
+          toast.info(t('admin.dashboard.notifications.newReturn'), {
             duration: 60000,
             icon: <RotateCcw className="h-4 w-4 text-orange-500" />,
             action: {
-              label: "View Orders",
+              label: t('admin.dashboard.notifications.viewOrders'),
               onClick: () => navigate("/admin/orders?status=return_requested")
             }
           });
@@ -103,10 +106,10 @@ export default function AdminDashboard() {
   if (statsError) {
     return (
       <div className="p-8 text-center text-red-500">
-        <h3 className="text-lg font-bold">Failed to load dashboard data</h3>
+        <h3 className="text-lg font-bold">{t('admin.dashboard.error.failedLoad')}</h3>
         <p className="text-sm opacity-80 mb-4">{statsError.message}</p>
         <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['admin-dashboard-stats'] })}>
-          Retry
+          {t('admin.dashboard.error.retry')}
         </Button>
       </div>
     );
@@ -123,72 +126,82 @@ export default function AdminDashboard() {
 
   const dashboardStats = [
     {
-      title: 'Active Events',
+      title: t('admin.dashboard.stats.activeEvents'),
       value: stats?.activeEvents?.toString() || '0',
       icon: Calendar,
-      trend: stats?.newEventsCount ? `+${stats.newEventsCount} this week` : 'No new events',
+      trend: (stats?.newEventsCount || 0) > 0
+        ? t('admin.dashboard.stats.thisWeek', { count: Number(stats?.newEventsCount || 0) })
+        : t('admin.dashboard.stats.noNew', { item: t('admin.dashboard.stats.activeEvents').toLowerCase() }),
       trendUp: (stats?.newEventsCount || 0) > 0,
     },
     {
-      title: 'Ongoing Events',
+      title: t('admin.dashboard.stats.ongoingEvents'),
       value: ongoingEvents?.length.toString() || '0',
       icon: Activity,
-      trend: 'Now',
+      trend: t('admin.dashboard.stats.now'),
       trendUp: true,
     },
     {
-      title: 'Blog Posts',
+      title: t('admin.dashboard.stats.blogPosts'),
       value: stats?.blogPosts?.toString() || '0',
       icon: FileText,
-      trend: 'All',
+      trend: t('admin.dashboard.stats.all'),
       trendUp: true,
     },
     {
-      title: 'Total Orders',
+      title: t('admin.dashboard.stats.totalOrders'),
       value: stats?.totalOrders?.toString() || '0',
       icon: ShoppingCart,
-      trend: stats?.newOrdersCount ? `+${stats.newOrdersCount} this week` : 'No new orders',
+      trend: (stats?.newOrdersCount || 0) > 0
+        ? t('admin.dashboard.stats.thisWeek', { count: Number(stats?.newOrdersCount || 0) })
+        : t('admin.dashboard.stats.noNew', { item: t('admin.dashboard.stats.totalOrders').toLowerCase() }),
       trendUp: (stats?.newOrdersCount || 0) > 0,
     },
     {
-      title: 'Pending Returns',
+      title: t('admin.dashboard.stats.pendingReturns'),
       value: stats?.pendingReturns?.toString() || '0',
       icon: RotateCcw,
-      trend: (stats?.pendingReturns || 0) > 0 ? `${stats?.pendingReturns} awaiting action` : 'All caught up!',
-      trendUp: false, // More is usually not better in this context
+      trend: (stats?.pendingReturns || 0) > 0
+        ? t('admin.dashboard.stats.awaitingAction', { count: Number(stats?.pendingReturns || 0) })
+        : t('admin.dashboard.stats.allCaughtUp'),
+      trendUp: false,
       onClick: () => navigate("/admin/orders?status=active_returns")
     },
   ];
 
   // Add Admin-only cards
-  if (user?.role === 'admin') {
+  if (user?.role === 'admin' && stats) {
     dashboardStats.push(
       {
-        title: 'Total Managers',
+        title: t('admin.dashboard.stats.totalManagers'),
         value: stats?.totalManagers?.toString() || '0',
         icon: Shield,
-        trend: 'Admins Only',
+        trend: t('admin.dashboard.stats.adminsOnly'),
         trendUp: true
       },
       {
-        title: 'Total Customers',
+        title: t('admin.dashboard.stats.totalCustomers'),
         value: stats?.totalCustomers?.toString() || '0',
         icon: Users,
-        trend: stats?.newCustomersCount ? `+${stats.newCustomersCount} this week` : 'No new customers',
+        trend: (stats?.newCustomersCount || 0) > 0
+          ? t('admin.dashboard.stats.thisWeek', { count: Number(stats?.newCustomersCount || 0) })
+          : t('admin.dashboard.stats.noNew', { item: t('admin.dashboard.stats.totalCustomers').toLowerCase() }),
         trendUp: (stats?.newCustomersCount || 0) > 0,
       },
       {
-        title: 'Total Donations',
+        title: t('admin.dashboard.stats.totalDonations'),
         value: '₹' + (stats?.totalDonations?.toLocaleString() || '0'),
         icon: Heart,
-        trend: stats?.newDonationsAmount ? `+₹${stats.newDonationsAmount.toLocaleString()} this week` : 'No new donations',
+        trend: (stats?.newDonationsAmount || 0) > 0
+          ? `+₹${stats.newDonationsAmount.toLocaleString()} ${t('admin.dashboard.stats.thisWeek', { count: 1 }).trim().replace('1', '')}`
+          : t('admin.dashboard.stats.noNew', { item: t('admin.dashboard.stats.totalDonations').toLowerCase() }),
         trendUp: (stats?.newDonationsAmount || 0) > 0,
       }
     );
   }
 
   if (isStatsLoading) {
-    return <LoadingOverlay isLoading={true} message="Loading dashboard..." />;
+    return <LoadingOverlay isLoading={true} message={t('admin.dashboard.loading')} />;
   }
 
   return (
@@ -198,7 +211,7 @@ export default function AdminDashboard() {
         <div className="absolute top-0 right-0 z-50 p-2">
           <div className="flex items-center gap-2 px-3 py-1.5 bg-white/80 backdrop-blur-sm border border-[#B85C3C]/20 rounded-full shadow-sm">
             <div className="w-2 h-2 bg-[#B85C3C] rounded-full animate-pulse" />
-            <span className="text-[10px] font-medium text-[#B85C3C] uppercase tracking-wider">Syncing</span>
+            <span className="text-[10px] font-medium text-[#B85C3C] uppercase tracking-wider">{t('admin.dashboard.syncing')}</span>
           </div>
         </div>
       )}
@@ -208,9 +221,9 @@ export default function AdminDashboard() {
         <div className="absolute inset-0 bg-gradient-to-r from-[#B85C3C]/5 via-transparent to-[#2C1810]/5 rounded-2xl -z-10" />
         <div className="py-2">
           <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-[#2C1810] to-[#B85C3C] bg-clip-text text-transparent">
-            Dashboard
+            {t('admin.dashboard.title')}
           </h2>
-          <p className="text-muted-foreground mt-1">Overview of your cow welfare platform</p>
+          <p className="text-muted-foreground mt-1">{t('admin.dashboard.subtitle')}</p>
         </div>
       </div>
 
@@ -264,10 +277,10 @@ export default function AdminDashboard() {
                   <Activity className="h-5 w-5 text-green-600" />
                 </div>
               </div>
-              <span>Ongoing Events</span>
+              <span>{t('admin.dashboard.ongoingEvents.title')}</span>
               {ongoingEvents && ongoingEvents.length > 0 && (
                 <span className="ml-auto text-xs font-medium px-2 py-1 rounded-full bg-green-100 text-green-700">
-                  {ongoingEvents.length} Live
+                  {t('admin.dashboard.ongoingEvents.live', { count: ongoingEvents.length })}
                 </span>
               )}
             </CardTitle>
@@ -283,12 +296,12 @@ export default function AdminDashboard() {
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-[#2C1810] truncate">{event.title}</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Ends: {format(new Date(event.endDate), 'PPP')}
+                        {t('admin.dashboard.ongoingEvents.ends', { date: format(new Date(event.endDate), 'PPP', { locale: getDateLocale() }) })}
                       </p>
                     </div>
                     <div className="text-right ml-3 flex-shrink-0">
                       <p className="text-sm font-semibold text-green-600">{event.registeredCount}</p>
-                      <p className="text-xs text-muted-foreground">Registered</p>
+                      <p className="text-xs text-muted-foreground">{t('admin.dashboard.ongoingEvents.registered')}</p>
                       {event.cancelledCount > 0 && (
                         <p className="text-xs text-red-500 mt-1">-{event.cancelledCount}</p>
                       )}
@@ -298,7 +311,7 @@ export default function AdminDashboard() {
               ) : (
                 <div className="text-center py-6">
                   <Activity className="h-10 w-10 text-muted-foreground/30 mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">No ongoing events</p>
+                  <p className="text-sm text-muted-foreground">{t('admin.dashboard.ongoingEvents.noEvents')}</p>
                 </div>
               )}
             </div>
@@ -314,10 +327,10 @@ export default function AdminDashboard() {
               <div className="p-2 rounded-xl bg-[#FDFBF7]">
                 <Calendar className="h-5 w-5 text-[#B85C3C]" />
               </div>
-              <span>Upcoming Events</span>
+              <span>{t('admin.dashboard.upcomingEvents.title')}</span>
               {upcomingEvents && upcomingEvents.length > 0 && (
                 <span className="ml-auto text-xs font-medium px-2 py-1 rounded-full bg-[#FDFBF7] text-[#B85C3C]">
-                  {upcomingEvents.length} Scheduled
+                  {t('admin.dashboard.upcomingEvents.scheduled', { count: upcomingEvents.length })}
                 </span>
               )}
             </CardTitle>
@@ -333,12 +346,12 @@ export default function AdminDashboard() {
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-[#2C1810] truncate">{event.title}</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {format(new Date(event.date), 'PPP')}
+                        {format(new Date(event.date), 'PPP', { locale: getDateLocale() })}
                       </p>
                     </div>
                     <div className="text-right ml-3 flex-shrink-0">
                       <p className="text-sm font-semibold text-[#B85C3C]">{event.registeredCount}</p>
-                      <p className="text-xs text-muted-foreground">Registered</p>
+                      <p className="text-xs text-muted-foreground">{t('admin.dashboard.ongoingEvents.registered')}</p>
                       {event.cancelledCount > 0 && (
                         <p className="text-xs text-red-500 mt-1">-{event.cancelledCount}</p>
                       )}
@@ -348,7 +361,7 @@ export default function AdminDashboard() {
               ) : (
                 <div className="text-center py-6">
                   <Calendar className="h-10 w-10 text-muted-foreground/30 mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">No upcoming events</p>
+                  <p className="text-sm text-muted-foreground">{t('admin.dashboard.upcomingEvents.noEvents')}</p>
                 </div>
               )}
             </div>
@@ -364,10 +377,10 @@ export default function AdminDashboard() {
               <div className="p-2 rounded-xl bg-amber-50">
                 <Package className="h-5 w-5 text-amber-600" />
               </div>
-              <span>Top Categories</span>
+              <span>{t('admin.dashboard.topCategories.title')}</span>
               {productCategories && productCategories.length > 0 && (
                 <span className="ml-auto text-xs font-medium px-2 py-1 rounded-full bg-amber-50 text-amber-700">
-                  {productCategories.length} Total
+                  {t('admin.dashboard.topCategories.total', { count: productCategories.length })}
                 </span>
               )}
             </CardTitle>
@@ -388,7 +401,7 @@ export default function AdminDashboard() {
                     </div>
                     <div className="text-right flex-shrink-0">
                       <span className="text-sm font-semibold text-amber-600">{cat.count}</span>
-                      <span className="text-xs text-muted-foreground ml-1">items</span>
+                      <span className="text-xs text-muted-foreground ml-1">{t('admin.dashboard.topCategories.items')}</span>
                     </div>
                   </div>
                 ))}
@@ -396,7 +409,7 @@ export default function AdminDashboard() {
             ) : (
               <div className="text-center py-6">
                 <Package className="h-10 w-10 text-muted-foreground/30 mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">No products yet</p>
+                <p className="text-sm text-muted-foreground">{t('admin.dashboard.topCategories.noProducts')}</p>
               </div>
             )}
           </CardContent>
@@ -412,10 +425,10 @@ export default function AdminDashboard() {
             <div className="p-2 rounded-xl bg-[#FDFBF7]">
               <ShoppingCart className="h-5 w-5 text-[#B85C3C]" />
             </div>
-            <span>Recent Orders</span>
+            <span>{t('admin.dashboard.recentOrders.title')}</span>
             {ordersPagination && ordersPagination.total > 0 && (
               <span className="ml-auto text-xs font-medium px-2 py-1 rounded-full bg-[#FDFBF7] text-[#B85C3C]">
-                {ordersPagination.total} Total
+                {t('admin.dashboard.recentOrders.total', { count: ordersPagination.total })}
               </span>
             )}
           </CardTitle>
@@ -423,23 +436,23 @@ export default function AdminDashboard() {
         <CardContent className="relative">
           {/* Table Loading Overlay - Only on pagination/search (placeholder data) */}
           {(isOrdersFetching && !isOrdersLoading) && (
-            <LoadingOverlayRelative isLoading={true} message="Syncing orders..." className="z-10 bg-white/40 backdrop-blur-[1px]" />
+            <LoadingOverlayRelative isLoading={true} message={t('admin.dashboard.recentOrders.syncing')} className="z-10 bg-white/40 backdrop-blur-[1px]" />
           )}
 
           {isOrdersLoading ? (
             <div className="h-48 flex items-center justify-center">
-              <LoadingOverlayRelative isLoading={true} message="Loading order details..." />
+              <LoadingOverlayRelative isLoading={true} message={t('admin.dashboard.recentOrders.loading')} />
             </div>
           ) : (
             <div className="rounded-xl border border-border/50 bg-white overflow-hidden">
               <Table>
                 <TableHeader className="bg-[#FDFBF7]">
                   <TableRow className="hover:bg-transparent border-b-border/50">
-                    <TableHead className="w-[120px] font-bold text-[#2C1810]">Order #</TableHead>
-                    <TableHead className="font-bold text-[#2C1810]">Customer</TableHead>
-                    <TableHead className="hidden sm:table-cell font-bold text-[#2C1810]">Date</TableHead>
-                    <TableHead className="font-bold text-[#2C1810]">Status</TableHead>
-                    <TableHead className="text-right font-bold text-[#2C1810]">Amount</TableHead>
+                    <TableHead className="w-[120px] font-bold text-[#2C1810]">{t('admin.dashboard.recentOrders.orderNumber')}</TableHead>
+                    <TableHead className="font-bold text-[#2C1810]">{t('admin.dashboard.recentOrders.customer')}</TableHead>
+                    <TableHead className="hidden sm:table-cell font-bold text-[#2C1810]">{t('admin.dashboard.recentOrders.date')}</TableHead>
+                    <TableHead className="font-bold text-[#2C1810]">{t('admin.dashboard.recentOrders.status')}</TableHead>
+                    <TableHead className="text-right font-bold text-[#2C1810]">{t('admin.dashboard.recentOrders.amount')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -451,13 +464,13 @@ export default function AdminDashboard() {
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col">
-                            <span className="font-semibold text-[#2C1810]">{order.customer_name || 'Guest'}</span>
+                            <span className="font-semibold text-[#2C1810]">{order.customer_name || t('admin.dashboard.recentOrders.guest')}</span>
                           </div>
                         </TableCell>
                         <TableCell className="hidden sm:table-cell">
                           <div className="flex flex-col text-xs text-muted-foreground">
-                            <span>{order.created_at ? format(new Date(order.created_at as string), 'MMM d, yyyy') : 'N/A'}</span>
-                            <span>{order.created_at ? format(new Date(order.created_at as string), 'h:mm a') : ''}</span>
+                            <span>{order.created_at ? format(new Date(order.created_at as string), 'MMM d, yyyy', { locale: getDateLocale() }) : 'N/A'}</span>
+                            <span>{order.created_at ? format(new Date(order.created_at as string), 'h:mm a', { locale: getDateLocale() }) : ''}</span>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -481,7 +494,7 @@ export default function AdminDashboard() {
                       <TableCell colSpan={5} className="h-48 text-center">
                         <div className="flex flex-col items-center justify-center gap-2">
                           <ShoppingCart className="h-10 w-10 text-muted-foreground/30" />
-                          <p className="text-muted-foreground">No orders found</p>
+                          <p className="text-muted-foreground">{t('admin.dashboard.recentOrders.noOrders')}</p>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -495,7 +508,11 @@ export default function AdminDashboard() {
           {ordersPagination && ordersPagination.pages > 1 && (
             <div className="flex items-center justify-between mt-6 pt-4 border-t">
               <p className="text-sm text-muted-foreground">
-                Showing {((ordersPage - 1) * ordersLimit) + 1}-{Math.min(ordersPage * ordersLimit, ordersPagination.total)} of {ordersPagination.total} orders
+                {t('admin.dashboard.recentOrders.showing', {
+                  start: ((ordersPage - 1) * ordersLimit) + 1,
+                  end: Math.min(ordersPage * ordersLimit, ordersPagination.total),
+                  total: ordersPagination.total
+                })}
               </p>
               <div className="flex items-center gap-2">
                 <Button

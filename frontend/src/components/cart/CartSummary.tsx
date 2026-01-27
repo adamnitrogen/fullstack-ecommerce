@@ -106,8 +106,8 @@ export const CartSummary = ({
                                         <div className="space-y-1">
                                             <p className="text-sm font-black text-foreground uppercase tracking-tight leading-tight">
                                                 {coupon.type === 'free_delivery'
-                                                    ? '🚚 FREE SHIPPING'
-                                                    : `💰 ${coupon.discount_percentage || 0}% OFF`}
+                                                    ? `🚚 ${t("products.freeShipping")}`
+                                                    : `💰 ${t("products.off", { percent: coupon.discount_percentage || 0 })}`}
                                             </p>
                                             <p className="text-[10px] text-muted-foreground font-semibold">
                                                 {coupon.min_purchase_amount
@@ -172,7 +172,7 @@ export const CartSummary = ({
                                                     {t("cart.summary.standardDelivery")}
                                                     {!isFreeDelivery && (
                                                         <>
-                                                            <span className="text-[9px] opacity-40 font-normal">(Non-Ref)</span>
+                                                            <span className="text-[9px] opacity-40 font-normal">({t("products.nonRef")})</span>
                                                             {globalGST > 0 && (
                                                                 <span className="text-[8px] uppercase tracking-wider text-emerald-600 bg-emerald-50/50 border border-emerald-100/50 px-1 py-0 rounded-sm font-bold">
                                                                     {t("cart.summary.inclTax")}
@@ -233,7 +233,7 @@ export const CartSummary = ({
                                                 <div className="flex justify-between items-center pl-1 group/sur">
                                                     <span className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium">
                                                         <div className="w-1.5 h-1.5 rounded-full bg-[#3B82F6]" />
-                                                        {t("cart.summary.refundableSurcharge")}
+                                                        {t("products.refundableSurcharge")}
                                                         {refundableGst > 0 && (
                                                             <span className="text-[8px] uppercase tracking-wider text-blue-600 bg-blue-50/50 border border-blue-100/50 px-1 py-0 rounded-sm font-bold">
                                                                 {t("cart.summary.inclTax")}
@@ -249,8 +249,8 @@ export const CartSummary = ({
                                                 <div className="flex justify-between items-center pl-1 group/sur">
                                                     <span className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium">
                                                         <div className="w-1.5 h-1.5 rounded-full bg-[#F97316]" />
-                                                        {t("cart.summary.additionalProcessing")}
-                                                        <span className="text-[9px] opacity-40 font-normal">(Non-Ref)</span>
+                                                        {t("products.additionalProcessing")}
+                                                        <span className="text-[9px] opacity-40 font-normal">({t("products.nonRef")})</span>
                                                         {nonRefundableGst > 0 && (
                                                             <span className="text-[8px] uppercase tracking-wider text-orange-600 bg-orange-50/50 border border-orange-100/50 px-1 py-0 rounded-sm font-bold">
                                                                 {t("cart.summary.inclTax")}
@@ -320,7 +320,7 @@ export const CartSummary = ({
                                             return (
                                                 <div key={`tax-${idx}`} className="flex flex-col text-[10px] text-muted-foreground border-b border-dashed border-border/40 last:border-0 pb-2 last:pb-0">
                                                     <div className="flex justify-between font-bold text-foreground/80 mb-0.5">
-                                                        <span className="truncate max-w-[140px]">{item.product?.title || 'Product'}</span>
+                                                        <span className="truncate max-w-[140px]">{item.product?.title || t("cart.item")}</span>
                                                         <span className="text-[9px] bg-primary/5 px-1.5 py-0.5 rounded text-primary">{taxRate}% GST</span>
                                                     </div>
                                                     <div className="flex justify-between pl-1 opacity-80">
@@ -340,12 +340,12 @@ export const CartSummary = ({
                                             const delTaxLines = [];
                                             const globalDeliveryGST = totals?.globalDeliveryGST ?? totals?.global_delivery_gst ?? 0;
                                             if (globalDeliveryGST > 0) {
-                                                delTaxLines.push({ label: "Standard Delivery GST", amount: globalDeliveryGST });
+                                                delTaxLines.push({ label: t("products.standardDeliveryGst"), amount: globalDeliveryGST });
                                             }
                                             let surchargeGST = 0;
                                             (items || []).forEach(it => { if (it.delivery_meta?.source !== 'global') surchargeGST += (it.delivery_gst || 0); });
                                             if (surchargeGST > 0) {
-                                                delTaxLines.push({ label: "Surcharge GST", amount: surchargeGST });
+                                                delTaxLines.push({ label: t("products.surchargeGst"), amount: surchargeGST });
                                             }
 
                                             return delTaxLines.map((line, lidx) => (

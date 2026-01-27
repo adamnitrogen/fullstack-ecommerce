@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 
 import { useTranslation } from "react-i18next";
+import { hi } from "date-fns/locale";
 
 export default function Profile() {
   const { t } = useTranslation();
@@ -442,7 +443,7 @@ export default function Profile() {
                                 <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                                   <Calendar className="h-3 w-3" />
                                   {reg.events?.start_date
-                                    ? format(new Date(reg.events.start_date), 'PPP')
+                                    ? format(new Date(reg.events.start_date), 'PPP', { locale: t('common.lang') === 'hi' ? hi : undefined })
                                     : t("profile.dateTbd")}
                                 </p>
                               </div>
@@ -472,7 +473,7 @@ export default function Profile() {
                                 <Badge variant="outline" className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-sm ${reg.refunds[0].status === 'SETTLED' ? 'bg-green-100 text-green-800' :
                                   reg.refunds[0].status === 'FAILED' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
                                   }`}>
-                                  {t("profile.refund")}: {reg.refunds[0].status}
+                                  {t("profile.refund")}: {t(`profile.status.${reg.refunds[0].status.toLowerCase()}`, reg.refunds[0].status)}
                                 </Badge>
                               )}
 

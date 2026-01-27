@@ -1,4 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { MapPin, Package, ArrowLeft, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +12,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useAuthStore } from "@/store/authStore";
 import { CartItem } from "@/types";
+import { toast } from "sonner";
 
 const DELIVERY_THRESHOLD = 2000;
 const DELIVERY_CHARGE = 50;
@@ -18,6 +20,7 @@ const DELIVERY_CHARGE = 50;
 const OrderSummary = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation();
   const { user } = useAuthStore();
 
   const { addressId, orderDetails } = location.state || {};
@@ -59,8 +62,8 @@ const OrderSummary = () => {
 
   const handleProceedToPayment = () => {
     // TODO: Integrate with Razorpay
-    // For now, show alert
-    alert("Razorpay integration pending. Order total: ₹" + orderTotal);
+    // For now, show info toast
+    toast.info(`Razorpay integration pending. Order total: ₹${orderTotal}`);
 
     // In production, this will redirect to Razorpay payment gateway
     // After successful payment, redirect to order confirmation page
@@ -76,10 +79,10 @@ const OrderSummary = () => {
           onClick={() => navigate("/checkout")}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Checkout
+          {t("orderSummary.backToCheckout")}
         </Button>
 
-        <h1 className="text-3xl font-bold mb-8">Order Summary</h1>
+        <h1 className="text-3xl font-bold mb-8">{t("orderSummary.title")}</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left: Order Details */}
@@ -90,14 +93,14 @@ const OrderSummary = () => {
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
                     <MapPin className="h-5 w-5" />
-                    Delivery Address
+                    {t("orderSummary.deliveryAddress")}
                   </CardTitle>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => navigate("/checkout")}
                   >
-                    Change
+                    {t("orderSummary.change")}
                   </Button>
                 </div>
               </CardHeader>
@@ -125,8 +128,8 @@ const OrderSummary = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Package className="h-5 w-5" />
-                  Order Items ({items.length}{" "}
-                  {items.length === 1 ? "item" : "items"})
+                  {t("orderSummary.orderItems")} ({items.length}{" "}
+                  {items.length === 1 ? t("orderSummary.item") : t("orderSummary.items")})
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -150,7 +153,7 @@ const OrderSummary = () => {
                           {item.product.title}
                         </h4>
                         <p className="text-xs text-muted-foreground mb-2">
-                          Qty: {item.quantity}
+                          {t("orderSummary.qty")}: {item.quantity}
                         </p>
                         <div className="flex items-baseline gap-2">
                           <p className="text-base font-bold text-primary">
@@ -174,12 +177,12 @@ const OrderSummary = () => {
           <div className="lg:col-span-1">
             <Card className="sticky top-24">
               <CardHeader>
-                <CardTitle>Payment Summary</CardTitle>
+                <CardTitle>{t("orderSummary.paymentSummary")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 {/* Items Price */}
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Items Price</span>
+                  <span className="text-muted-foreground">{t("orderSummary.itemsPrice")}</span>
                   <span className="font-medium">₹{totalMRP}</span>
                 </div>
 
@@ -187,7 +190,7 @@ const OrderSummary = () => {
                 {discount > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">
-                      Discount Price
+                      {t("orderSummary.discountPrice")}
                     </span>
                     <span className="font-medium text-green-600">
                       -₹{discount.toFixed(2)}
@@ -198,16 +201,16 @@ const OrderSummary = () => {
                 {/* Delivery Charges */}
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">
-                    Delivery Charges
+                    {t("orderSummary.deliveryCharges")}
                     {totalPrice < DELIVERY_THRESHOLD && (
                       <span className="block text-xs mt-0.5">
-                        (Free above ₹{DELIVERY_THRESHOLD})
+                        {t("orderSummary.freeThreshold", { amount: DELIVERY_THRESHOLD })}
                       </span>
                     )}
                   </span>
                   <span className="font-medium">
                     {deliveryCharges === 0 ? (
-                      <span className="text-green-600">Free</span>
+                      <span className="text-green-600">{t("orderSummary.free")}</span>
                     ) : (
                       `₹${deliveryCharges}`
                     )}
@@ -218,7 +221,7 @@ const OrderSummary = () => {
 
                 {/* Order Total */}
                 <div className="flex justify-between items-center pt-2">
-                  <span className="text-lg font-bold">Order Total</span>
+                  <span className="text-lg font-bold">{t("orderSummary.orderTotal")}</span>
                   <span className="text-2xl font-bold text-primary">
                     ₹{orderTotal}
                   </span>
@@ -228,7 +231,7 @@ const OrderSummary = () => {
                 {discount > 0 && (
                   <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                     <p className="text-sm text-green-700 dark:text-green-300 font-medium">
-                      You saved ₹{discount} on this order!
+                      {t("orderSummary.savedMessage", { amount: discount })}
                     </p>
                   </div>
                 )}
@@ -240,10 +243,10 @@ const OrderSummary = () => {
                   onClick={handleProceedToPayment}
                 >
                   <CreditCard className="mr-2 h-5 w-5" />
-                  Proceed to Payment
+                  {t("orderSummary.proceedPayment")}
                 </Button>
                 <p className="text-xs text-center text-muted-foreground">
-                  By proceeding, you agree to our Terms & Conditions
+                  {t("orderSummary.termsAgreement")}
                 </p>
               </CardFooter>
             </Card>

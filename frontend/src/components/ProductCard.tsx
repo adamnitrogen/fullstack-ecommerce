@@ -72,7 +72,7 @@ export const ProductCard = ({
     // For single-variant or no-variant products, add directly
     const variantId = product.variants?.[0]?.id;
     addItem(product, 1, variantId);
-    toast.success(`${product.title} added to cart`);
+    toast.success(t("success.cart.added", { product: product.title }));
   };
 
   const handleIncreaseQuantity = (e: React.MouseEvent) => {
@@ -88,7 +88,7 @@ export const ProductCard = ({
       updateQuantity(product.id, specificQuantity - 1, expectedVariantId);
     } else {
       removeItem(product.id, expectedVariantId);
-      toast.success(`${product.title} removed from cart`);
+      toast.success(t("success.cart.removed", { product: product.title }));
     }
   };
 
@@ -203,7 +203,7 @@ export const ProductCard = ({
                     navigate("/cart");
                   }}
                 >
-                  {t("products.viewInCart", "View in Cart")} ({totalProductQuantity})
+                  {t("products.viewInCart")} ({totalProductQuantity})
                 </Button>
               ) : (
                 <Button
@@ -214,7 +214,7 @@ export const ProductCard = ({
                 >
                   {!effectiveStock || effectiveStock === 0
                     ? t("products.outOfStock")
-                    : t("products.selectOptions", "Select Options")}
+                    : t("products.selectOptions")}
                 </Button>
               )
             ) : (
@@ -243,7 +243,7 @@ export const ProductCard = ({
                       onClick={handleDecreaseQuantity}
                       className="h-8 w-8"
                     >
-                      <span className="sr-only">Decrease</span>
+                      <span className="sr-only">{t("products.decrease")}</span>
                       <Minus className="h-3 w-3" />
                     </Button>
                     <span className="flex-1 text-center font-bold text-sm">
@@ -259,7 +259,7 @@ export const ProductCard = ({
                         specificQuantity >= effectiveStock
                       }
                     >
-                      <span className="sr-only">Increase</span>
+                      <span className="sr-only">{t("products.increase")}</span>
                       <Plus className="h-3 w-3" />
                     </Button>
                   </div>

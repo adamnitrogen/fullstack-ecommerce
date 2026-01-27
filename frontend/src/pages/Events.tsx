@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Calendar, Clock, CheckCircle2, MapPin, Loader2, Sparkles } from "lucide-react";
 import { format } from "date-fns";
+import { hi, enUS } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -26,7 +27,8 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 
 export default function Events() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const currentLocale = i18n.language === "hi" ? hi : enUS;
   const { toast } = useToast();
   const { user } = useAuthStore();
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
@@ -83,9 +85,8 @@ export default function Events() {
 
     if (!user?.email || user.email.trim() === "") {
       toast({
-        title: "Email Required",
-        description:
-          "Please add your email address in profile settings before registering for an event.",
+        title: t("events.public.feedback.emailRequiredTitle"),
+        description: t("events.public.feedback.emailRequiredDesc"),
         variant: "destructive",
       });
       return;
@@ -154,10 +155,10 @@ export default function Events() {
               {isFetchingNextPage ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Loading more...
+                  {t("events.loadingMore")}
                 </>
               ) : (
-                "Load More Events"
+                t("events.loadMore")
               )}
             </Button>
           </div>
@@ -265,7 +266,7 @@ export default function Events() {
             </div>
             <DialogTitle className="text-2xl font-bold font-playfair text-center">{t("events.registerFor")}</DialogTitle>
             <DialogDescription className="text-center text-muted-foreground/80 leading-relaxed italic">
-              "{selectedEvent?.title || "Complete your registration details below"}"
+              "{selectedEvent?.title || t("events.placeholders.completeDetails")}"
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmitRegistration} className="space-y-6 mt-6">
@@ -283,7 +284,7 @@ export default function Events() {
                     name: e.target.value,
                   })
                 }
-                placeholder="John Doe"
+                placeholder={t("events.placeholders.name")}
                 className="h-12 rounded-xl bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-[#B85C3C]"
                 required
               />
@@ -303,7 +304,7 @@ export default function Events() {
                     email: e.target.value,
                   })
                 }
-                placeholder="john@example.com"
+                placeholder={t("events.placeholders.email")}
                 className="h-12 rounded-xl bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-[#B85C3C]"
                 required
               />
@@ -345,7 +346,7 @@ export default function Events() {
               <div className="bg-[#2C1810]/5 p-4 rounded-2xl border border-[#2C1810]/10 text-sm space-y-2">
                 <div className="flex items-center gap-3 text-[#2C1810]">
                   <Calendar className="h-4 w-4 text-[#B85C3C]" />
-                  <span className="font-semibold">{format(new Date(selectedEvent.startDate), "PPP")}</span>
+                  <span className="font-semibold">{format(new Date(selectedEvent.startDate), "PPP", { locale: currentLocale })}</span>
                 </div>
                 <div className="flex items-center gap-3 text-muted-foreground">
                   <MapPin className="h-4 w-4 text-[#B85C3C]" />

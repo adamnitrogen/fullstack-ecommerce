@@ -5,6 +5,7 @@ const emailService = require('./email');
 const crypto = require('crypto');
 const orderService = require('./order.service');
 const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
+const { ORDER_STATUS, PAYMENT_STATUS, RAZORPAY_STATUS, SUBSCRIPTION_STATUS } = require('../config/constants');
 
 /**
  * Webhook Service
@@ -55,7 +56,7 @@ const webhookService = {
  */
 async function handleDonationWebhook(event, payment, notes) {
     if (event === 'payment.captured') {
-        const status = payment.status === 'captured' ? 'success' : payment.status;
+        const status = payment.status === RAZORPAY_STATUS.CAPTURED ? PAYMENT_STATUS.SUCCESS : payment.status;
 
         // One-Time Donation
         if (notes.donation_type === 'ONE_TIME' && payment.order_id) {
@@ -134,7 +135,7 @@ async function handleSubscriptionWebhook(event, payment, payload) {
                 donor_email: originalDonation.donor_email,
                 donor_phone: originalDonation.donor_phone,
                 is_anonymous: originalDonation.is_anonymous,
-                payment_status: 'success',
+                payment_status: PAYMENT_STATUS.SUCCESS,
                 razorpay_payment_id: payment.id,
                 razorpay_subscription_id: subscription.id,
                 created_at: new Date().toISOString()
@@ -165,7 +166,7 @@ async function handleSubscriptionWebhook(event, payment, payload) {
         const { error: subUpdateError } = await supabase
             .from('donation_subscriptions')
             .update({
-                status: 'active',
+                status: SUBSCRIPTION_STATUS.ACTIVE,
                 current_start: subscription.current_start ? new Date(subscription.current_start * 1000).toISOString() : undefined,
                 current_end: subscription.current_end ? new Date(subscription.current_end * 1000).toISOString() : undefined,
                 next_billing_at: subscription.charge_at ? new Date(subscription.charge_at * 1000).toISOString() : undefined,
@@ -179,9 +180,9 @@ async function handleSubscriptionWebhook(event, payment, payload) {
     if (event === 'subscription.cancelled' || event === 'subscription.halted' || event === 'subscription.paused') {
         const subscription = payload.subscription.entity;
         const statusMap = {
-            'subscription.cancelled': 'cancelled',
-            'subscription.halted': 'halted',
-            'subscription.paused': 'paused'
+            'subscription.cancelled': SUBSCRIPTION_STATUS.CANCELLED,
+            'subscription.halted': SUBSCRIPTION_STATUS.HALTED,
+            'subscription.paused': SUBSCRIPTION_STATUS.PAUSED
         };
         const newStatus = statusMap[event] || 'unknown';
 
@@ -202,8 +203,8 @@ async function handleSubscriptionWebhook(event, payment, payload) {
  */
 async function handleEventWebhook(event, payment, notes) {
     if (event === 'payment.captured') {
-        const status = payment.status === 'captured' ? 'paid' : 'failed';
-        const regStatus = status === 'paid' ? 'confirmed' : 'pending';
+        const status = payment.status === RAZORPAY_STATUS.CAPTURED ? PAYMENT_STATUS.PAID : PAYMENT_STATUS.FAILED;
+        const regStatus = status === PAYMENT_STATUS.PAID ? ORDER_STATUS.CONFIRMED : ORDER_STATUS.PENDING;
 
         const { data: updatedReg, error } = await supabase
             .from('event_registrations')
@@ -223,7 +224,7 @@ async function handleEventWebhook(event, payment, notes) {
             logger.info(`Event Registration ${payment.order_id} updated to ${status}`);
 
             // Send Event Registration Email
-            if (regStatus === 'confirmed') {
+            if (regStatus === ORDER_STATUS.CONFIRMED) {
                 try {
                     // We need event details 
                     const { data: eventDetails } = await supabase
@@ -265,13 +266,13 @@ async function handleOrderWebhook(event, payload, payment) {
             .maybeSingle();
 
         if (dbPayment) {
-            if (dbPayment.status === 'PAYMENT_SUCCESS') {
+            if (dbPayment.status === PAYMENT_STATUS.PAYMENT_SUCCESS) {
                 logger.info(`Idempotency: Payment ${dbPayment.id} already captured`);
                 return;
             }
 
             await updatePaymentRecord(dbPayment.id, {
-                status: 'PAYMENT_SUCCESS', // Standardized robust status
+                status: PAYMENT_STATUS.PAYMENT_SUCCESS, // Standardized robust status
                 razorpay_payment_id: payment.id,
                 method: payment.method,
                 updated_at: new Date().toISOString()
@@ -282,8 +283,8 @@ async function handleOrderWebhook(event, payload, payment) {
                 const { data: updatedOrder } = await supabaseAdmin
                     .from('orders')
                     .update({
-                        payment_status: 'paid',
-                        status: 'pending',
+                        payment_status: PAYMENT_STATUS.PAID,
+                        status: ORDER_STATUS.PENDING,
                         updated_at: new Date().toISOString()
                     })
                     .eq('id', dbPayment.order_id)
@@ -345,7 +346,7 @@ async function handleOrderWebhook(event, payload, payment) {
 
         if (dbPayment) {
             await updatePaymentRecord(dbPayment.id, {
-                status: 'PAYMENT_FAILED',
+                status: PAYMENT_STATUS.PAYMENT_FAILED,
                 error_description: payment.error_description || 'Payment Failed via Webhook',
                 updated_at: new Date().toISOString()
             });
@@ -388,8 +389,8 @@ async function handleOrderWebhook(event, payload, payment) {
         const { data: updatedRefund, error: refundUpdateError } = await supabase
             .from('refunds')
             .update({
-                razorpay_refund_status: 'PROCESSED',
-                status: 'processed',
+                razorpay_refund_status: RAZORPAY_STATUS.PROCESSED,
+                status: PAYMENT_STATUS.PROCESSED,
                 amount: refundAmount, // Ensure strict sync
                 updated_at: new Date().toISOString()
             })
@@ -426,7 +427,7 @@ async function handleOrderWebhook(event, payload, payment) {
 
         // 4. Determine New Payment Status
         const isFullRefund = totalRefunded >= totalPaid;
-        const newPaymentStatus = isFullRefund ? 'REFUND_COMPLETED' : 'REFUND_PARTIAL';
+        const newPaymentStatus = isFullRefund ? PAYMENT_STATUS.REFUND_COMPLETED : PAYMENT_STATUS.REFUND_PARTIAL;
 
         // 5. Update Payment
         await supabase
@@ -448,7 +449,7 @@ async function handleOrderWebhook(event, payload, payment) {
                 .from('orders')
                 .update({
                     payment_status: orderStatus,
-                    status: isFullRefund ? 'refunded' : 'confirmed', // Only full refund cancels order? Or keep confirmed? 
+                    status: isFullRefund ? ORDER_STATUS.REFUNDED : ORDER_STATUS.CONFIRMED, // Only full refund cancels order? Or keep confirmed? 
                     // Usually full refund = order refunded. Partial = order still confirmed/delivered but money back.
                     updated_at: new Date().toISOString()
                 })

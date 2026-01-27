@@ -117,7 +117,7 @@ export default function Checkout() {
 
     } catch (error) {
       logger.error("Checkout error", error);
-      toast.error(t("checkout.error") || "Failed to load checkout details");
+      toast.error(getErrorMessage(error, t("checkout.loadError")));
     } finally {
       setLoading(false);
     }
@@ -126,7 +126,7 @@ export default function Checkout() {
   useEffect(() => {
     const initCheckout = async () => {
       if (!isAuthenticated) {
-        toast.error("Please login to checkout");
+        toast.error(t("auth.loginToCheckout"));
         navigate("/auth?returnUrl=/checkout");
         return;
       }
@@ -172,7 +172,7 @@ export default function Checkout() {
           prefetchRazorpay();
         } catch (error) {
           logger.error("Buy Now checkout error", error);
-          const errorMsg = getErrorMessage(error) || "Unable to load checkout. Please try again.";
+          const errorMsg = getErrorMessage(error) || t("checkout.loadError");
           toast.error(errorMsg);
           navigate("/shop");
         } finally {
@@ -197,7 +197,7 @@ export default function Checkout() {
 
   const handlePayment = async () => {
     if (!shippingAddress) {
-      toast.error(t("checkout.shipping") + " is required"); // Simplified but localized
+      toast.error(t("validation.required", { field: t("checkout.shipping") }));
       return;
     }
 
@@ -208,7 +208,7 @@ export default function Checkout() {
     }
 
     if (!billingSameAsShipping && !billingAddress) {
-      toast.error(t("checkout.billing") + " is required");
+      toast.error(t("validation.required", { field: t("checkout.billing") }));
       return;
     }
 
@@ -241,9 +241,19 @@ export default function Checkout() {
           const stockIssue = error.response.data.stockIssue;
           const errorMsg = error.response.data.error || '';
 
-          // Extract product title from error message
-          const titleMatch = errorMsg.match(/Sorry, (.+?) is/);
-          const productTitle = titleMatch ? titleMatch[1] : 'Product';
+          // Build title from available data instead of regex
+          let productTitle = 'Product';
+
+          // Try to find name in Buy Now state state first
+          if (location.state && (location.state as any).buyNowItem?.product?.id === stockIssue.productId) {
+            productTitle = (location.state as any).buyNowItem.product.title;
+          } else if (summary?.cart?.cart_items) {
+            // Fallback to searching in summary if somehow we have it
+            const foundItem = summary.cart.cart_items.find(item => item.product_id === stockIssue.productId);
+            if (foundItem?.products?.title) {
+              productTitle = foundItem.products.title;
+            }
+          }
 
           setStockIssues([{
             productId: stockIssue.productId,
@@ -272,7 +282,7 @@ export default function Checkout() {
       if (!window.Razorpay) {
         const isLoaded = await loadRazorpay();
         if (!isLoaded) {
-          toast.error("Failed to load payment gateway. Please check your connection.");
+          toast.error(t("checkout.paymentGatewayLoadError"));
           setProcessing(false);
           return;
         }
@@ -283,7 +293,7 @@ export default function Checkout() {
         key: summary.razorpay_key_id || orderData.key_id, // PHASE 2B: Use key from summary (fallback to orderData for compatibility)
         amount: orderData.amount,
         currency: orderData.currency,
-        name: "MeriGauMata",
+        name: t("common.brandName"),
         description: isBuyNow ? t("products.buyNow") : t("checkout.title"),
         image: "https://wjdncjhlpioohrjkamqw.supabase.co/storage/v1/object/public/brand-assets/brand-logo.png",
         order_id: orderData.order_id,
@@ -321,7 +331,7 @@ export default function Checkout() {
             await fetchCart();
 
             if (result.success) {
-              toast.success(t("checkout.success") || "Order placed successfully!");
+              toast.success(t("checkout.orderPlaceSuccess"));
               navigate(`/order-confirmation/${result.order.id}`, { state: { order: result.order } });
             }
           } catch (error: unknown) {
@@ -329,7 +339,7 @@ export default function Checkout() {
 
             if (isNetworkError(error)) {
               toast.error(
-                "Network Error: Payment was successful but order verification timed out. Please DO NOT retry. Your order will be processed shortly. Contact support if you don't receive an email within 10 minutes.",
+                t("checkout.networkError"),
                 { duration: 10000 }
               );
             } else {
@@ -337,7 +347,7 @@ export default function Checkout() {
               const serverMsg = getErrorMessage(error);
 
               // The backend now provides user-friendly messages
-              let userMsg = serverMsg || "Unable to complete your order. Please try again or contact support.";
+              let userMsg = serverMsg || t("checkout.orderError");
 
               // Extend duration for important messages
               const duration = serverMsg?.includes('refund') || serverMsg?.includes('contact support') ? 8000 : 5000;
@@ -363,7 +373,7 @@ export default function Checkout() {
         modal: {
           ondismiss: function () {
             setProcessing(false);
-            toast("Payment cancelled");
+            toast(t("checkout.paymentCancelled"));
           }
         }
       };
@@ -371,7 +381,7 @@ export default function Checkout() {
       const rzp1 = new window.Razorpay(options);
       rzp1.on('payment.failed', function (response: { error: { description: string } }) {
         logger.error("Payment failed", response.error);
-        toast.error(`Payment Failed: ${response.error.description || "Unknown error"}`);
+        toast.error(t("checkout.paymentFailed", { error: response.error.description || t("common.unknownError") }));
         setProcessing(false);
       });
       rzp1.open();
@@ -396,13 +406,13 @@ export default function Checkout() {
     } catch (error) {
       logger.error("Payment initiation error", error);
       const serverMsg = getErrorMessage(error);
-      toast.error(serverMsg || "Failed to initiate payment. Please try again.");
+      toast.error(serverMsg || t("checkout.paymentInitError"));
       setProcessing(false);
     }
   };
 
   if (loading && !summary) {
-    return <LoadingOverlay isLoading={true} message={t("checkout.preparing")} />;
+    return <LoadingOverlay isLoading={true} />;
   }
 
   if (!summary) return null;
@@ -549,7 +559,7 @@ export default function Checkout() {
                       {processing ? (
                         <>
                           <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                          Processing...
+                          {t("checkout.processing")}
                         </>
                       ) : (
                         <>

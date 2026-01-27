@@ -40,20 +40,23 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { Search, Flag, CheckCircle, Trash2, AlertTriangle, ExternalLink } from "lucide-react";
+import { Trash2, Shield, ShieldCheck, Search, ShieldAlert, UserX, UserCheck, EyeOff, CheckCircle, ExternalLink, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { Comment } from "@/types/comment";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 
 export default function FlaggedCommentsManagement() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedComment, setSelectedComment] = useState<Comment | null>(null);
-  const [actionType, setActionType] = useState<"dismiss" | "delete" | "block" | "unblock" | null>(null);
+  const [actionType, setActionType] = useState<"dismiss" | "delete" | "block" | "unblock" | "approve" | "hide" | null>(null);
+  const [isActionOpen, setIsActionOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["flagged-comments"],
@@ -73,16 +76,17 @@ export default function FlaggedCommentsManagement() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["flagged-comments"] });
       toast({
-        title: "Success",
-        description: variables.action === "hide" ? "Comment hidden" : "Comment approved",
+        title: t("common.success"),
+        description: variables.action === "hide" ? t("admin.flaggedComments.toasts.hideSuccess") : t("admin.flaggedComments.toasts.approveSuccess"),
       });
       setActionType(null);
       setSelectedComment(null);
+      setIsActionOpen(false);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to resolve flag"),
+        title: t("common.error"),
+        description: getErrorMessage(error, t("admin.flaggedComments.toasts.resolveError")),
         variant: "destructive",
       });
     },
@@ -93,16 +97,17 @@ export default function FlaggedCommentsManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["flagged-comments"] });
       toast({
-        title: "Success",
-        description: "Comment permanently deleted",
+        title: t("common.success"),
+        description: t("admin.flaggedComments.toasts.deleteSuccess"),
       });
       setActionType(null);
       setSelectedComment(null);
+      setIsActionOpen(false);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to delete comment"),
+        title: t("common.error"),
+        description: getErrorMessage(error, t("admin.flaggedComments.toasts.deleteError")),
         variant: "destructive",
       });
     },
@@ -113,16 +118,17 @@ export default function FlaggedCommentsManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["flagged-comments"] });
       toast({
-        title: "Success",
-        description: "User blocked successfully",
+        title: t("common.success"),
+        description: t("admin.flaggedComments.toasts.blockSuccess"),
       });
       setActionType(null);
       setSelectedComment(null);
+      setIsActionOpen(false);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to block user"),
+        title: t("common.error"),
+        description: getErrorMessage(error, t("admin.flaggedComments.toasts.blockError")),
         variant: "destructive",
       });
     },
@@ -133,16 +139,17 @@ export default function FlaggedCommentsManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["flagged-comments"] });
       toast({
-        title: "Success",
-        description: "User unblocked successfully",
+        title: t("common.success"),
+        description: t("admin.flaggedComments.toasts.unblockSuccess"),
       });
       setActionType(null);
       setSelectedComment(null);
+      setIsActionOpen(false);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to unblock user"),
+        title: t("common.error"),
+        description: getErrorMessage(error, t("admin.flaggedComments.toasts.unblockError")),
         variant: "destructive",
       });
     },
@@ -163,8 +170,10 @@ export default function FlaggedCommentsManagement() {
         unblockUserMutation.mutate(selectedComment.user_id);
       } else if (actionType === "delete") {
         deletePermanentlyMutation.mutate(selectedComment.id);
-      } else if (actionType === "dismiss") {
+      } else if (actionType === "approve" || actionType === "dismiss") {
         resolveMutation.mutate({ id: selectedComment.id, action: "approve" });
+      } else if (actionType === "hide") {
+        resolveMutation.mutate({ id: selectedComment.id, action: "hide" });
       }
     }
   };
@@ -177,18 +186,18 @@ export default function FlaggedCommentsManagement() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Flagged Comments</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t("admin.flaggedComments.title")}</h1>
           <p className="text-muted-foreground">
-            Review and moderate flagged comments from blog posts.
+            {t("admin.flaggedComments.subtitle")}
           </p>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Flagged Comments</CardTitle>
+          <CardTitle>{t("admin.flaggedComments.cardTitle")}</CardTitle>
           <CardDescription>
-            A list of all comments that have been flagged by users.
+            {t("admin.flaggedComments.cardDescription")}
           </CardDescription>
           <div className="flex items-center gap-4 mt-4">
             <div className="relative flex-1 max-w-sm">
@@ -196,7 +205,7 @@ export default function FlaggedCommentsManagement() {
               <Input
                 id="comment-search"
                 name="search"
-                placeholder="Search comments..."
+                placeholder={t("admin.flaggedComments.searchPlaceholder")}
                 className="pl-8"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -208,26 +217,26 @@ export default function FlaggedCommentsManagement() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Comment</TableHead>
-                <TableHead>Blog Post</TableHead>
-                <TableHead>Reason</TableHead>
-                <TableHead>Flagged By</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>{t("admin.flaggedComments.table.cols.user")}</TableHead>
+                <TableHead>{t("admin.flaggedComments.table.cols.comment")}</TableHead>
+                <TableHead>{t("admin.flaggedComments.table.cols.blogPost")}</TableHead>
+                <TableHead>{t("admin.flaggedComments.table.cols.reason")}</TableHead>
+                <TableHead>{t("admin.flaggedComments.table.cols.flaggedBy")}</TableHead>
+                <TableHead>{t("admin.flaggedComments.table.cols.date")}</TableHead>
+                <TableHead className="text-right">{t("admin.flaggedComments.table.cols.actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8">
-                    Loading flagged comments...
+                    {t("admin.flaggedComments.loading")}
                   </TableCell>
                 </TableRow>
               ) : filteredComments.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8">
-                    No flagged comments found.
+                    {t("admin.flaggedComments.noComments")}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -267,11 +276,11 @@ export default function FlaggedCommentsManagement() {
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
-                        {comment.flag_reason || 'Unknown'}
+                        {comment.flag_reason || t("common.unknown")}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {comment.flag_count} flags
+                      {comment.flag_count} {t("admin.flaggedComments.flags")}
                     </TableCell>
                     <TableCell>
                       {format(new Date(comment.created_at), "MMM d, yyyy")}
@@ -279,39 +288,56 @@ export default function FlaggedCommentsManagement() {
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
-                          className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                          className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
                           onClick={() => {
                             setSelectedComment(comment);
-                            setActionType("dismiss");
+                            setActionType("approve");
+                            setIsActionOpen(true);
                           }}
+                          title={t("admin.flaggedComments.actions.approve")}
                         >
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          Approve
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedComment(comment);
-                            setActionType("delete");
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          Perm Delete
+                          <ShieldCheck className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          className="h-8 w-8 p-0 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                          onClick={() => {
+                            setSelectedComment(comment);
+                            setActionType("hide");
+                            setIsActionOpen(true);
+                          }}
+                          title={t("admin.flaggedComments.actions.hide")}
+                        >
+                          <EyeOff className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => {
+                            setSelectedComment(comment);
+                            setActionType("delete");
+                            setIsActionOpen(true);
+                          }}
+                          title={t("admin.flaggedComments.actions.delete")}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
                           onClick={() => {
                             setSelectedComment(comment);
                             setActionType("block");
+                            setIsActionOpen(true);
                           }}
+                          title={t("admin.flaggedComments.actions.block")}
                         >
-                          <AlertTriangle className="h-4 w-4 mr-1" />
-                          Block User
+                          <UserX className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
@@ -323,36 +349,66 @@ export default function FlaggedCommentsManagement() {
         </CardContent>
       </Card>
 
-      <AlertDialog open={!!selectedComment} onOpenChange={() => setSelectedComment(null)}>
+      <AlertDialog open={isActionOpen && !!selectedComment} onOpenChange={(open) => {
+        if (!open) {
+          setSelectedComment(null);
+          setActionType(null);
+        }
+        setIsActionOpen(open);
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {actionType === "delete" ? "Delete Comment Permanently" : actionType === "block" ? "Block User" : actionType === "unblock" ? "Unblock User" : "Approve Comment"}
+              {actionType === "delete"
+                ? t("admin.flaggedComments.dialog.deleteTitle")
+                : actionType === "block"
+                  ? t("admin.flaggedComments.dialog.blockTitle")
+                  : actionType === "unblock"
+                    ? t("admin.flaggedComments.dialog.unblockTitle")
+                    : actionType === "hide"
+                      ? t("admin.flaggedComments.dialog.hideTitle")
+                      : t("admin.flaggedComments.dialog.approveTitle")}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {actionType === "delete" ? (
                 <>
-                  Are you sure you want to <strong>permanently delete</strong> this comment? This action cannot be undone.
+                  {t("admin.flaggedComments.dialog.deleteDesc")}
                   <div className="mt-4 p-4 bg-muted rounded-md text-sm italic">
                     "{selectedComment?.content}"
                   </div>
                 </>
               ) : actionType === "block" ? (
-                <>
-                  Are you sure you want to block <strong>{selectedComment?.profiles?.first_name} {selectedComment?.profiles?.last_name}</strong>? They will no longer be able to log in or comment.
-                </>
+                t("admin.flaggedComments.dialog.blockDesc", {
+                  firstName: selectedComment?.profiles?.first_name,
+                  lastName: selectedComment?.profiles?.last_name,
+                })
+              ) : actionType === "unblock" ? (
+                t("admin.flaggedComments.dialog.unblockDesc", {
+                  firstName: selectedComment?.profiles?.first_name,
+                  lastName: selectedComment?.profiles?.last_name,
+                })
+              ) : actionType === "hide" ? (
+                t("admin.flaggedComments.dialog.hideDesc")
               ) : (
-                "Are you sure you want to approve this comment? All flags will be cleared."
+                t("admin.flaggedComments.dialog.approveDesc")
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleAction}
               className={actionType === "delete" || actionType === "block" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
             >
-              {actionType === "delete" ? "Delete Permanently" : actionType === "block" ? "Block User" : actionType === "unblock" ? "Unblock User" : "Approve"}
+              {actionType === "delete"
+                ? t("admin.flaggedComments.actions.delete")
+                : actionType === "block"
+                  ? t("admin.flaggedComments.actions.block")
+                  : actionType === "unblock"
+                    ? t("admin.flaggedComments.actions.unblock")
+                    : actionType === "hide"
+                      ? t("admin.flaggedComments.actions.hide")
+                      : t("admin.flaggedComments.actions.approve")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

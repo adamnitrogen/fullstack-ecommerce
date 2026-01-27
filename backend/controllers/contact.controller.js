@@ -49,14 +49,15 @@ exports.submitContactForm = async (req, res, next) => {
         });
 
         // 5. Send Auto-Reply (Async)
-        emailService.sendContactAutoReply(validatedData.email, validatedData.name).catch(err => {
+        const lang = req.get('x-user-lang') || 'en';
+        emailService.sendContactAutoReply(validatedData.email, validatedData.name, lang).catch(err => {
             logger.error({ err, email: validatedData.email }, 'Failed to send contact auto-reply');
         });
 
         // 6. Return Success
         res.status(201).json({
             success: true,
-            message: 'Message received successfully',
+            message: MESSAGES.SUCCESS.MESSAGE_RECEIVED,
             data: {
                 id: message.id
             }
@@ -66,7 +67,7 @@ exports.submitContactForm = async (req, res, next) => {
         if (error instanceof z.ZodError) {
             return res.status(400).json({
                 success: false,
-                message: 'Validation failed',
+                message: MESSAGES.ERRORS.VALIDATION_FAILED,
                 errors: error.errors
             });
         }
@@ -82,7 +83,7 @@ exports.getMessages = async (req, res) => {
         });
     } catch (error) {
         logger.error({ err: error }, 'Error fetching contact messages:');
-        res.status(500).json({ error: 'Internal Server Error' });
+        res.status(500).json({ error: MESSAGES.ERRORS.INTERNAL_SERVER_ERROR });
     }
 };
 
@@ -113,6 +114,6 @@ exports.getMessageDetail = async (req, res) => {
         });
     } catch (error) {
         logger.error({ err: error, id: req.params.id }, 'Error fetching contact message detail:');
-        res.status(500).json({ error: 'Internal Server Error', details: error.message });
+        res.status(500).json({ error: MESSAGES.ERRORS.INTERNAL_SERVER_ERROR, details: error.message });
     }
 };

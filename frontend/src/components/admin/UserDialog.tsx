@@ -65,7 +65,7 @@ export function UserDialog({ open, onOpenChange }: UserDialogProps) {
         email: data.email,
         phone: data.phone,
         role: "admin",
-        password: "TempPassword123!", // Should be handled by backend sending invite email
+        password: crypto.randomUUID(), // Backend should handle invite/reset flow
         // Logic for address could be sent here if backend supports it
       };
 

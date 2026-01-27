@@ -1,21 +1,7 @@
 const { supabase, supabaseAdmin } = require('../lib/supabase');
 const logger = require('../utils/logger');
+const { ORDER_STATUS } = require('../config/constants');
 
-const ORDER_STATUS = {
-    PENDING: 'pending',
-    CONFIRMED: 'confirmed',
-    PROCESSING: 'processing',
-    PACKED: 'packed',
-    SHIPPED: 'shipped',
-    OUT_FOR_DELIVERY: 'out_for_delivery',
-    DELIVERED: 'delivered',
-    CANCELLED: 'cancelled',
-    RETURN_REQUESTED: 'return_requested',
-    RETURN_APPROVED: 'return_approved',
-    RETURNED: 'returned',
-    REFUNDED: 'refunded',
-    RETURN_REJECTED: 'return_rejected'
-};
 
 const ALLOWED_TRANSITIONS = {
     [ORDER_STATUS.PENDING]: [ORDER_STATUS.CONFIRMED, ORDER_STATUS.CANCELLED],

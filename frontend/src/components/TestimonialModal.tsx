@@ -1,4 +1,5 @@
 import { Testimonial } from "@/types";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogContent,
@@ -87,15 +88,16 @@ export function TestimonialModal({
   open,
   onClose,
 }: TestimonialModalProps) {
+  const { t, i18n } = useTranslation();
   if (!testimonial) return null;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="sr-only">Testimonial Details</DialogTitle>
+          <DialogTitle className="sr-only">{t("nav.testimonialDetails")}</DialogTitle>
           <DialogDescription className="sr-only">
-            Full testimonial from {testimonial.name}
+            {t("nav.fullTestimonialFrom", { name: testimonial.name })}
           </DialogDescription>
         </DialogHeader>
 
@@ -130,8 +132,8 @@ export function TestimonialModal({
           {/* Date */}
           {testimonial.createdAt && (
             <p className="text-xs text-muted-foreground">
-              Posted on{" "}
-              {new Date(testimonial.createdAt).toLocaleDateString("en-US", {
+              {t("nav.postedOn")}{" "}
+              {new Date(testimonial.createdAt).toLocaleDateString(i18n.language, {
                 year: "numeric",
                 month: "long",
                 day: "numeric",

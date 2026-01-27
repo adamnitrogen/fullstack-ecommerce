@@ -17,6 +17,7 @@ const {
 const { getUserCart, calculateCartTotals } = require('../services/cart.service');
 const { validateCoupon } = require('../services/coupon.service');
 const supabase = require('../config/supabase');
+const MESSAGES = require('../config/messages');
 
 /**
  * Checkout Routes
@@ -139,7 +140,7 @@ router.post('/create-payment-order', validate(createPaymentOrderSchema), request
     try {
         const userId = req.user?.id;
         if (!userId) {
-            return res.status(401).json({ error: req.t('errors.auth.authentication_required') });
+            return res.status(401).json({ error: MESSAGES.AUTH.AUTHENTICATION_REQUIRED });
         }
 
 
@@ -156,13 +157,13 @@ router.post('/create-payment-order', validate(createPaymentOrderSchema), request
         }
 
         if (!profile) {
-            return res.status(404).json({ error: req.t('errors.auth.account_not_found') });
+            return res.status(404).json({ error: MESSAGES.CHECKOUT.ACCOUNT_NOT_FOUND });
         }
 
         // 2. Get Cart
         const cart = await getUserCart(userId);
         if (!cart || !cart.cart_items || cart.cart_items.length === 0) {
-            return res.status(400).json({ error: req.t('errors.cart.empty') });
+            return res.status(400).json({ error: MESSAGES.CHECKOUT.EMPTY_CART });
         }
 
         // Get address_id from request (optional) - Ensures accurate delivery/tax calc
@@ -276,7 +277,7 @@ router.post('/create-payment-order', validate(createPaymentOrderSchema), request
 
         if (orderNumberError || !orderNumberData) {
             logger.error({ err: orderNumberError }, 'Failed to generate order number');
-            return res.status(500).json({ error: req.t('errors.checkout.order_number_failed') });
+            return res.status(500).json({ error: MESSAGES.CHECKOUT.ORDER_NUMBER_FAILED });
         }
 
         const receipt = orderNumberData; // e.g., ODR20260121000001
@@ -399,7 +400,7 @@ router.post('/buy-now/summary', async (req, res) => {
 
         // Validation
         if (!productId) {
-            return res.status(400).json({ error: req.t('errors.checkout.product_required') });
+            return res.status(400).json({ error: MESSAGES.CHECKOUT.PRODUCT_REQUIRED });
         }
         if (quantity < 1 || quantity > 100) {
             return res.status(400).json({ error: 'Please select a valid quantity (1-100).' });
@@ -427,10 +428,10 @@ router.post('/buy-now/validate-stock', async (req, res) => {
 
         const { productId, variantId, quantity = 1 } = req.body;
         if (!productId) {
-            return res.status(400).json({ error: req.t('errors.checkout.invalid_session') });
+            return res.status(400).json({ error: MESSAGES.CHECKOUT.INVALID_SESSION });
         }
         if (quantity < 1) {
-            return res.status(400).json({ error: req.t('errors.cart.invalid_quantity') });
+            return res.status(400).json({ error: MESSAGES.CHECKOUT.INVALID_QUANTITY });
         }
 
 
@@ -489,7 +490,7 @@ router.post('/buy-now/validate-stock', async (req, res) => {
         res.json({ valid: true, items: [] });
     } catch (error) {
         logger.error({ err: error }, 'Error validating buy now stock:');
-        res.status(500).json({ error: req.t('errors.system.internal_error') });
+        res.status(500).json({ error: MESSAGES.CHECKOUT.SYSTEM_ERROR });
     }
 });
 
@@ -499,7 +500,7 @@ router.post('/buy-now/create-payment-order', requestLock('create-payment-order')
     try {
         const userId = getUserId(req);
         if (!userId) {
-            return res.status(401).json({ error: req.t('errors.auth.authentication_required') });
+            return res.status(401).json({ error: MESSAGES.AUTH.AUTHENTICATION_REQUIRED });
         }
 
         const { productId, variantId, quantity = 1 } = req.body;
@@ -569,7 +570,7 @@ router.post('/buy-now/create-payment-order', requestLock('create-payment-order')
         const profile = summary.user_profile;
 
         if (!profile) {
-            return res.status(404).json({ error: req.t('errors.profile.incomplete') });
+            return res.status(404).json({ error: MESSAGES.CHECKOUT.PROFILE_INCOMPLETE });
         }
 
         // 3. Pre-generate Sequential Order Number for Buy Now
@@ -579,7 +580,7 @@ router.post('/buy-now/create-payment-order', requestLock('create-payment-order')
 
         if (orderNumberError || !orderNumberData) {
             logger.error({ err: orderNumberError }, 'Failed to generate order number');
-            return res.status(500).json({ error: req.t('errors.checkout.order_number_failed') });
+            return res.status(500).json({ error: MESSAGES.CHECKOUT.ORDER_NUMBER_FAILED });
         }
 
         const receipt = orderNumberData; // e.g., ODR20260121000001
@@ -641,7 +642,7 @@ router.post('/buy-now/create-payment-order', requestLock('create-payment-order')
         });
     } catch (error) {
         logger.error({ err: error }, 'Error creating buy now payment order:');
-        res.status(error.status || 500).json({ error: req.t('errors.system.internal_error') });
+        res.status(error.status || 500).json({ error: MESSAGES.CHECKOUT.SYSTEM_ERROR });
     }
 });
 

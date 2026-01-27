@@ -3,6 +3,7 @@ import { Loader2 } from "lucide-react";
 import DOMPurify from "dompurify";
 import { policyService, PolicyType } from "@/services/policy.service";
 import { contactInfoService } from "@/services/contact-info.service";
+import { useTranslation } from "react-i18next";
 
 interface PolicyViewerProps {
     type: PolicyType;
@@ -10,6 +11,7 @@ interface PolicyViewerProps {
 }
 
 export function PolicyViewer({ type, fallbackContent }: PolicyViewerProps) {
+    const { t } = useTranslation();
     // Fetch policy data
     const { data: policy, isLoading: policyLoading, error: policyError } = useQuery({
         queryKey: ['policy', type],
@@ -57,9 +59,11 @@ export function PolicyViewer({ type, fallbackContent }: PolicyViewerProps) {
                         </h1>
                         {policy.updatedAt && (
                             <p className="text-[13px] text-[#666666] font-bold tracking-widest uppercase">
-                                Last Updated: {new Date(policy.updatedAt).toLocaleDateString('en-US', {
-                                    year: 'numeric',
-                                    month: 'long'
+                                {t('common.lastUpdated', {
+                                    date: new Date(policy.updatedAt).toLocaleDateString('en-US', {
+                                        year: 'numeric',
+                                        month: 'long'
+                                    })
                                 })}
                             </p>
                         )}
@@ -117,20 +121,20 @@ export function PolicyViewer({ type, fallbackContent }: PolicyViewerProps) {
                         </h3>
                         <div className="space-y-3 text-[16px] leading-relaxed text-[#4A4A4A]">
                             <p>
-                                <span className="font-bold text-[#1A1A1A]">Email:</span> {primaryEmail}
+                                <span className="font-bold text-[#1A1A1A]">{t('common.emailLabel')}</span> {primaryEmail}
                             </p>
                             <p>
-                                <span className="font-bold text-[#1A1A1A]">Phone:</span> {primaryPhone}
+                                <span className="font-bold text-[#1A1A1A]">{t('common.phoneLabel')}</span> {primaryPhone}
                             </p>
                             <p>
-                                <span className="font-bold text-[#1A1A1A]">Response Time:</span>{' '}
+                                <span className="font-bold text-[#1A1A1A]">{t('common.responseTimeLabel')}</span>{' '}
                                 {type === 'terms' ? '7–14 business days' :
                                     type === 'shipping-refund' ? 'Within 2–3 business days' :
                                         'Within 2–3 business days'}
                             </p>
                             {address && (
                                 <p>
-                                    <span className="font-bold text-[#1A1A1A]">Address:</span>{' '}
+                                    <span className="font-bold text-[#1A1A1A]">{t('common.addressLabel')}</span>{' '}
                                     {[
                                         address.address_line1,
                                         address.address_line2,

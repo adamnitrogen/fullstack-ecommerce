@@ -1,6 +1,7 @@
 import { logger } from "@/lib/logger";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogContent,
@@ -66,6 +67,7 @@ export function ProductDialog({
   onSave,
   isSaving = false,
 }: ProductDialogProps) {
+  const { t } = useTranslation();
   // Fetch categories dynamically
   const { data: categories = EMPTY_CATEGORIES } = useQuery({
     queryKey: ["categories", "product"],
@@ -293,21 +295,21 @@ export function ProductDialog({
 
     // Validate required fields
     if (!formData.title?.trim() || !formData.description?.trim()) {
-      alert("Please fill in all required fields");
+      alert(t('errors.fillRequired'));
       return;
     }
 
     // Validate Price/MRP only if NO variants are present
     if (variants.length === 0) {
       if (!formData.price || !formData.mrp) {
-        alert("Price and MRP are required when no variants are added.");
+        alert(t('errors.inventory.priceRequiredNoVariants'));
         return;
       }
     }
 
     // Check for either existing images or new image files
     if ((!formData.imageFiles || formData.imageFiles.length === 0) && (!formData.images || formData.images.length === 0)) {
-      alert("Please upload at least one product image");
+      alert(t('errors.inventory.imageRequired'));
       return;
     }
 
@@ -399,19 +401,19 @@ export function ProductDialog({
       <DialogContent className="max-w-3xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>
-            {product ? "Edit Product" : "Add New Product"}
+            {product ? t('admin.products.dialog.editTitle') : t('admin.products.dialog.addTitle')}
           </DialogTitle>
           <DialogDescription>
             {product
-              ? "Update the details of your product below. Click save when you're done."
-              : "Fill in the details to create a new product. Click save when you're done."}
+              ? t('admin.products.dialog.editDesc')
+              : t('admin.products.dialog.addDesc')}
           </DialogDescription>
         </DialogHeader>
 
         {/* Loading Overlay for Save Operations */}
         <LoadingOverlay
           isLoading={isSaving}
-          message={product ? "Saving product changes..." : "Creating new product..."}
+          message={product ? t('admin.products.dialog.savingChanges') : t('admin.products.dialog.creatingProduct')}
         />
 
         <ScrollArea className="max-h-[calc(90vh-120px)] pr-4">
@@ -419,10 +421,10 @@ export function ProductDialog({
             {/* Product Images */}
             <div className="space-y-2 border rounded-lg p-4 bg-muted/30">
               <Label className="text-base font-semibold">
-                Product Images (Max 5)
+                {t('admin.products.dialog.images.title')}
               </Label>
               <p className="text-sm text-muted-foreground mb-2">
-                Upload up to 5 high-quality images of the product
+                {t('admin.products.dialog.images.desc')}
               </p>
               <ImageUpload
                 images={formData.imageFiles || []}
@@ -434,11 +436,11 @@ export function ProductDialog({
 
             {/* Basic Information */}
             <div className="space-y-4 border rounded-lg p-4">
-              <h3 className="text-base font-semibold">Basic Information</h3>
+              <h3 className="text-base font-semibold">{t('admin.products.dialog.basic.title')}</h3>
 
               <div className="space-y-2">
                 <Label htmlFor="title">
-                  Product Name <span className="text-destructive">*</span>
+                  {t('admin.products.dialog.basic.name')} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="title"
@@ -447,14 +449,14 @@ export function ProductDialog({
                   onChange={(e) =>
                     setFormData({ ...formData, title: e.target.value })
                   }
-                  placeholder="Enter product name"
+                  placeholder={t('admin.products.dialog.basic.namePlaceholder')}
                   required
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="description">
-                  Description <span className="text-destructive">*</span>
+                  {t('admin.products.dialog.basic.description')} <span className="text-destructive">*</span>
                 </Label>
                 <Textarea
                   id="description"
@@ -463,7 +465,7 @@ export function ProductDialog({
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
                   }
-                  placeholder="Enter detailed product description"
+                  placeholder={t('admin.products.dialog.basic.descriptionPlaceholder')}
                   rows={4}
                   required
                 />
@@ -471,7 +473,7 @@ export function ProductDialog({
 
               <div className="space-y-2">
                 <Label htmlFor="category">
-                  Category <span className="text-destructive">*</span>
+                  {t('admin.products.dialog.basic.category')} <span className="text-destructive">*</span>
                 </Label>
                 <Select
                   value={formData.category}
@@ -481,12 +483,12 @@ export function ProductDialog({
                   }
                 >
                   <SelectTrigger id="category">
-                    <SelectValue placeholder="Select category" />
+                    <SelectValue placeholder={t('admin.products.dialog.basic.selectCategory')} />
                   </SelectTrigger>
                   <SelectContent>
                     {categories.length === 0 ? (
                       <SelectItem value="no-categories" disabled>
-                        No categories available
+                        {t('admin.products.dialog.basic.noCategories')}
                       </SelectItem>
                     ) : (
                       categories.map((cat) => (
@@ -502,17 +504,17 @@ export function ProductDialog({
 
             {/* Pricing */}
             <div className="space-y-4 border rounded-lg p-4">
-              <h3 className="text-base font-semibold">Pricing</h3>
+              <h3 className="text-base font-semibold">{t('admin.products.dialog.pricing.title')}</h3>
               {variants.length > 0 && (
                 <p className="text-xs text-muted-foreground -mt-2">
-                  💡 Pricing is optional. If left blank, it will be auto-set to the lowest variant price.
+                  {t('admin.products.dialog.pricing.optionalHint')}
                 </p>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="mrp">
-                    MRP Price (₹) {variants.length === 0 && <span className="text-destructive">*</span>}
+                    {t('admin.products.dialog.pricing.mrp')} {variants.length === 0 && <span className="text-destructive">*</span>}
                   </Label>
                   <Input
                     id="mrp"
@@ -527,14 +529,16 @@ export function ProductDialog({
                         mrp: parseFloat(e.target.value) || 0,
                       })
                     }
-                    placeholder={variants.length > 0 ? "Auto-calculated if empty" : "Original price"}
+                    placeholder={variants.length > 0
+                      ? t('admin.products.dialog.pricing.mrpPlaceholderAuto')
+                      : t('admin.products.dialog.pricing.mrpPlaceholderManual')}
                     required={variants.length === 0}
                   />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="price">
-                    Selling Price (₹){" "}
+                    {t('admin.products.dialog.pricing.sellingPrice')}{" "}
                     {variants.length === 0 && <span className="text-destructive">*</span>}
                   </Label>
                   <Input
@@ -550,7 +554,9 @@ export function ProductDialog({
                         price: parseFloat(e.target.value) || 0,
                       })
                     }
-                    placeholder={variants.length > 0 ? "Auto-calculated if empty" : "Discounted price"}
+                    placeholder={variants.length > 0
+                      ? t('admin.products.dialog.pricing.sellingPricePlaceholderAuto')
+                      : t('admin.products.dialog.pricing.sellingPricePlaceholderManual')}
                     required={variants.length === 0}
                   />
                 </div>
@@ -561,7 +567,7 @@ export function ProductDialog({
               {discountPercentage > 0 && (
                 <div className="p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-md">
                   <p className="text-sm font-medium text-green-800 dark:text-green-200">
-                    Discount: {discountPercentage}% off
+                    {t('admin.products.dialog.pricing.discount', { percent: discountPercentage })}
                   </p>
                 </div>
               )}
@@ -569,9 +575,9 @@ export function ProductDialog({
 
             {/* Tax Configuration */}
             <div className="space-y-4 border rounded-lg p-4">
-              <h3 className="text-base font-semibold">Tax Configuration (Default)</h3>
+              <h3 className="text-base font-semibold">{t('admin.products.dialog.tax.title')}</h3>
               <p className="text-sm text-muted-foreground">
-                Set default tax rates for this product. These apply when no variants are used, or as a fallback.
+                {t('admin.products.dialog.tax.desc')}
               </p>
 
               <div className="flex items-center space-x-2">
@@ -582,13 +588,13 @@ export function ProductDialog({
                     setFormData({ ...formData, default_tax_applicable: checked as boolean })
                   }
                 />
-                <Label htmlFor="default-tax-applicable">Tax Applicable</Label>
+                <Label htmlFor="default-tax-applicable">{t('admin.products.dialog.tax.applicable')}</Label>
               </div>
 
               {formData.default_tax_applicable !== false && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="default-hsn">HSN Code</Label>
+                    <Label htmlFor="default-hsn">{t('admin.products.dialog.tax.hsn')}</Label>
                     <Input
                       id="default-hsn"
                       value={formData.default_hsn_code || ''}
@@ -600,7 +606,7 @@ export function ProductDialog({
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="default-gst">GST Rate (%)</Label>
+                    <Label htmlFor="default-gst">{t('admin.products.dialog.tax.gstRate')}</Label>
                     <Select
                       value={formData.default_gst_rate?.toString() || "0"}
                       onValueChange={(value) =>
@@ -608,7 +614,7 @@ export function ProductDialog({
                       }
                     >
                       <SelectTrigger id="default-gst">
-                        <SelectValue placeholder="Select Rate" />
+                        <SelectValue placeholder={t('admin.products.dialog.tax.selectRate')} />
                       </SelectTrigger>
                       <SelectContent>
                         {[0, 5, 12, 18, 28].map((rate) => (
@@ -628,7 +634,7 @@ export function ProductDialog({
                         setFormData({ ...formData, default_price_includes_tax: checked as boolean })
                       }
                     />
-                    <Label htmlFor="default-inc-tax">Price includes Tax</Label>
+                    <Label htmlFor="default-inc-tax">{t('admin.products.dialog.tax.priceIncludesTax')}</Label>
                   </div>
                 </div>
               )}
@@ -638,9 +644,9 @@ export function ProductDialog({
             <div className="space-y-4 border rounded-lg p-4 bg-muted/10">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-base font-semibold">Variant Configuration</h3>
+                  <h3 className="text-base font-semibold">{t('admin.products.dialog.variants.title')}</h3>
                   <p className="text-sm text-muted-foreground">
-                    Choose how variants are defined for this product
+                    {t('admin.products.dialog.variants.desc')}
                   </p>
                 </div>
                 <div className="flex items-center space-x-2 bg-background p-1 rounded-lg border">
@@ -651,7 +657,7 @@ export function ProductDialog({
                     onClick={() => {
                       // Clear variants if mode changes to avoid schema mismatch
                       if (formData.variant_mode !== 'UNIT' && variants.length > 0) {
-                        if (confirm("Changing variant mode will clear existing variants. Continue?")) {
+                        if (confirm(t('admin.products.dialog.variants.clearConfirm'))) {
                           setVariants([]);
                           setFormData({ ...formData, variant_mode: 'UNIT' });
                         }
@@ -660,7 +666,7 @@ export function ProductDialog({
                       }
                     }}
                   >
-                    Weight/Unit Based
+                    {t('admin.products.dialog.variants.weightMode')}
                   </Button>
                   <Button
                     type="button"
@@ -668,7 +674,7 @@ export function ProductDialog({
                     size="sm"
                     onClick={() => {
                       if (formData.variant_mode !== 'SIZE' && variants.length > 0) {
-                        if (confirm("Changing variant mode will clear existing variants. Continue?")) {
+                        if (confirm(t('admin.products.dialog.variants.clearConfirm'))) {
                           setVariants([]);
                           setFormData({ ...formData, variant_mode: 'SIZE' });
                         }
@@ -677,7 +683,7 @@ export function ProductDialog({
                       }
                     }}
                   >
-                    Size/Description Based
+                    {t('admin.products.dialog.variants.sizeMode')}
                   </Button>
                 </div>
               </div>
@@ -700,21 +706,23 @@ export function ProductDialog({
                     <div className="flex items-center gap-2">
                       <Package className="h-5 w-5 text-muted-foreground" />
                       <h3 className="text-base font-semibold">
-                        {formData.variant_mode === 'SIZE' ? 'Size Variants' : 'Unit Variants'}
+                        {formData.variant_mode === 'SIZE'
+                          ? t('admin.products.dialog.variants.sizeTitle')
+                          : t('admin.products.dialog.variants.unitTitle')}
                       </h3>
                       {variants.length > 0 && (
                         <Badge variant="secondary" className="ml-2">
-                          {variants.length} variant{variants.length > 1 ? "s" : ""}
+                          {t('admin.products.dialog.variants.variantCount', { count: variants.length })}
                         </Badge>
                       )}
                       {variants.length > 0 && !variants.some(v => v.is_default) && (
                         <Badge variant="destructive" className="ml-1 text-xs">
-                          No default
+                          {t('admin.products.dialog.variants.noDefault')}
                         </Badge>
                       )}
                     </div>
                     <Button type="button" variant="ghost" size="sm">
-                      {variantsOpen ? "Collapse" : "Expand"}
+                      {variantsOpen ? t('admin.products.dialog.variants.collapse') : t('admin.products.dialog.variants.expand')}
                     </Button>
                   </div>
                 </CollapsibleTrigger>
@@ -732,11 +740,11 @@ export function ProductDialog({
 
             {/* Inventory */}
             <div className="space-y-4 border rounded-lg p-4">
-              <h3 className="text-base font-semibold">Inventory Management</h3>
+              <h3 className="text-base font-semibold">{t('admin.products.dialog.inventory.title')}</h3>
 
               <div className="space-y-2">
                 <Label htmlFor="inventory">
-                  Stock Quantity <span className="text-destructive">*</span>
+                  {t('admin.products.dialog.inventory.stock')} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="inventory"
@@ -750,21 +758,20 @@ export function ProductDialog({
                       inventory: parseInt(e.target.value) || 0,
                     })
                   }
-                  placeholder="Available stock quantity"
+                  placeholder={t('admin.products.dialog.inventory.stockPlaceholder')}
                   required
                 />
                 {formData.inventory !== undefined &&
                   formData.inventory < 15 && (
                     <p className="text-sm text-destructive font-medium">
-                      ⚠️ Low stock alert: Only {formData.inventory} items
-                      remaining
+                      {t('admin.products.dialog.inventory.lowStock', { count: formData.inventory })}
                     </p>
                   )}
                 {formData.inventory !== undefined &&
                   formData.inventory >= 15 &&
                   formData.inventory < 50 && (
                     <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">
-                      ⚠️ Stock running low: {formData.inventory} items remaining
+                      {t('admin.products.dialog.inventory.runningLow', { count: formData.inventory })}
                     </p>
                   )}
               </div>
@@ -772,18 +779,17 @@ export function ProductDialog({
 
             {/* Key Benefits */}
             <div className="space-y-3 border rounded-lg p-4">
-              <h3 className="text-base font-semibold">Key Benefits</h3>
+              <h3 className="text-base font-semibold">{t('admin.products.dialog.benefits.title')}</h3>
               <p className="text-sm text-muted-foreground">
-                Add product benefits that will be displayed as checkmark bullet
-                points
+                {t('admin.products.dialog.benefits.desc')}
               </p>
               <div className="space-y-3">
                 <div className="flex gap-2">
                   <Input
                     id="benefit-input"
                     name="benefitInput"
-                    aria-label="Add a benefit"
-                    placeholder="Add a benefit (e.g., 100% Pure & Natural)"
+                    aria-label={t('admin.products.dialog.benefits.title')}
+                    placeholder={t('admin.products.dialog.benefits.placeholder')}
                     value={benefitInput}
                     onChange={(e) => setBenefitInput(e.target.value)}
                     onKeyPress={(e) => {
@@ -860,10 +866,9 @@ export function ProductDialog({
 
             {/* Product Tags */}
             <div className="space-y-3 border rounded-lg p-4">
-              <h3 className="text-base font-semibold">Product Tags</h3>
+              <h3 className="text-base font-semibold">{t('admin.products.dialog.tags.title')}</h3>
               <p className="text-sm text-muted-foreground">
-                Select existing tags or add custom tags. "New" tag automatically
-                applies for 2 months.
+                {t('admin.products.dialog.tags.desc')}
               </p>
 
               {/* Existing Tags */}
@@ -879,7 +884,7 @@ export function ProductDialog({
                       htmlFor={`tag-${tag}`}
                       className="text-sm font-normal cursor-pointer capitalize"
                     >
-                      {tag}
+                      {t(`admin.products.tags.${tag}`)}
                     </Label>
                   </div>
                 ))}
@@ -887,13 +892,13 @@ export function ProductDialog({
 
               {/* Custom Tags */}
               <div className="space-y-2">
-                <Label className="text-sm">Add Custom Tags</Label>
+                <Label className="text-sm">{t('admin.products.dialog.tags.customLabel')}</Label>
                 <div className="flex gap-2">
                   <Input
                     id="custom-tag-input"
                     name="customTagInput"
-                    aria-label="Add custom tag"
-                    placeholder="Enter custom tag"
+                    aria-label={t('admin.products.dialog.tags.customLabel')}
+                    placeholder={t('admin.products.dialog.tags.customPlaceholder')}
                     value={customTag}
                     onChange={(e) => setCustomTag(e.target.value)}
                     onKeyPress={(e) => {
@@ -941,7 +946,7 @@ export function ProductDialog({
             <div className="space-y-4 border rounded-lg p-5 bg-muted/20">
               <div className="flex items-center gap-2 mb-2">
                 <RotateCcw className="h-5 w-5 text-primary" />
-                <h3 className="text-base font-semibold">Return Policy</h3>
+                <h3 className="text-base font-semibold">{t('admin.products.dialog.return.title')}</h3>
               </div>
 
               <div className="space-y-6">
@@ -961,16 +966,16 @@ export function ProductDialog({
                     <RadioGroupItem value="returnable" id="returnable" className="mt-1" />
                     <div className="grid gap-1.5 leading-none">
                       <Label htmlFor="returnable" className="font-semibold cursor-pointer text-sm">
-                        Returnable
+                        {t('admin.products.dialog.return.returnable')}
                       </Label>
                       <p className="text-xs text-muted-foreground">
-                        Customers can return the product within a specific window.
+                        {t('admin.products.dialog.return.returnableDesc')}
                       </p>
 
                       {formData.isReturnable && (
                         <div className="mt-3 p-3 bg-background border rounded-md space-y-3 max-w-[200px]">
                           <Label htmlFor="returnDays" className="text-xs font-medium">
-                            Return Window (Days)
+                            {t('admin.products.dialog.return.days')}
                           </Label>
                           <div className="flex items-center gap-2">
                             <Input
@@ -986,7 +991,7 @@ export function ProductDialog({
                               }}
                               className="h-8 w-20 text-center font-medium"
                             />
-                            <span className="text-xs text-muted-foreground">Days</span>
+                            <span className="text-xs text-muted-foreground">{t("common.days")}</span>
                           </div>
                         </div>
                       )}
@@ -997,10 +1002,10 @@ export function ProductDialog({
                     <RadioGroupItem value="non-returnable" id="non-returnable" className="mt-1" />
                     <div className="grid gap-1.5 leading-none">
                       <Label htmlFor="non-returnable" className="font-semibold cursor-pointer text-sm">
-                        Non-returnable
+                        {t('admin.products.dialog.return.nonReturnable')}
                       </Label>
                       <p className="text-xs text-muted-foreground">
-                        This product cannot be returned once delivered.
+                        {t('admin.products.dialog.return.nonReturnableDesc')}
                       </p>
                     </div>
                   </div>
@@ -1015,11 +1020,11 @@ export function ProductDialog({
                 onClick={() => onOpenChange(false)}
                 disabled={isSaving}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button type="submit" disabled={isSaving}>
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {product ? "Update Product" : "Create Product"}
+                {product ? t('common.update') : t('common.save')}
               </Button>
             </DialogFooter>
           </form>

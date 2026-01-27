@@ -1,9 +1,9 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { format } from "date-fns";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface TransactionCardProps {
     id: string;
@@ -34,14 +34,19 @@ export function TransactionCard({
     id,
     date,
     total,
-    idLabel = "Order ID",
-    dateLabel = "Date",
-    detailsLabel = "Details",
+    idLabel,
+    dateLabel,
+    detailsLabel,
     badge,
     items,
     action,
 }: TransactionCardProps) {
+    const { t, i18n } = useTranslation();
     const [expanded, setExpanded] = useState(false);
+
+    const displayIdLabel = idLabel || t("donate.history.orderId");
+    const displayDateLabel = dateLabel || t("donate.history.date");
+    const displayDetailsLabel = detailsLabel || t("donate.history.details");
 
     return (
         <Card className="overflow-hidden">
@@ -50,7 +55,7 @@ export function TransactionCard({
                     <div className="flex-1 min-w-0 grid gap-1">
                         <div className="flex items-center gap-2">
                             <span className="font-medium text-sm text-muted-foreground">
-                                {idLabel}: {id}
+                                {displayIdLabel}: {id}
                             </span>
                             {badge && (
                                 <Badge className={badge.color} variant="secondary">
@@ -58,9 +63,9 @@ export function TransactionCard({
                                 </Badge>
                             )}
                         </div>
-                        <div className="font-semibold">{detailsLabel}</div>
+                        <div className="font-semibold">{displayDetailsLabel}</div>
                         <div className="text-sm text-muted-foreground">
-                            {dateLabel}: {format(new Date(date), "MMM d, yyyy")}
+                            {displayDateLabel}: {new Date(date).toLocaleDateString(i18n.language, { month: 'short', day: 'numeric', year: 'numeric' })}
                         </div>
                     </div>
 
@@ -90,7 +95,9 @@ export function TransactionCard({
                             className="w-full justify-between rounded-none h-auto py-2 px-4 text-xs text-muted-foreground hover:bg-muted/50"
                             onClick={() => setExpanded(!expanded)}
                         >
-                            <span>{items.length} Item{items.length !== 1 ? 's' : ''}</span>
+                            <span>
+                                {items.length} {items.length === 1 ? t("donate.history.item") : t("donate.history.items")}
+                            </span>
                             {expanded ? (
                                 <ChevronUp className="h-3 w-3" />
                             ) : (

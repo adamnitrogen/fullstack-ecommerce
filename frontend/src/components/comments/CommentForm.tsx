@@ -1,5 +1,6 @@
 import { logger } from "@/lib/logger";
 import React, { useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import DOMPurify from 'dompurify';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,12 +22,15 @@ interface CommentFormProps {
 export const CommentForm = ({
     onSubmit,
     initialContent = "",
-    placeholder = "Write a comment...",
-    submitLabel = "Post",
+    placeholder,
+    submitLabel,
     onCancel,
     autoFocus = false,
     isReply = false
 }: CommentFormProps) => {
+    const { t } = useTranslation();
+    const finalPlaceholder = placeholder || t("comments.defaultPlaceholder");
+    const finalSubmitLabel = submitLabel || t("comments.defaultSubmit");
     const [content, setContent] = useState(initialContent);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isExpanded, setIsExpanded] = useState(isReply || !!initialContent);
@@ -43,8 +47,8 @@ export const CommentForm = ({
 
         if (content.length < minLength) {
             toast({
-                title: "Comment too short",
-                description: `Comment must be at least ${minLength} characters.`,
+                title: t("comments.validation.tooShort"),
+                description: t("comments.validation.tooShortMsg", { min: minLength }),
                 variant: "destructive"
             });
             return;
@@ -52,8 +56,8 @@ export const CommentForm = ({
 
         if (content.length > maxLength) {
             toast({
-                title: "Comment too long",
-                description: `Comment cannot exceed ${maxLength} characters.`,
+                title: t("comments.validation.tooLong"),
+                description: t("comments.validation.tooLongMsg", { max: maxLength }),
                 variant: "destructive"
             });
             return;
@@ -74,8 +78,8 @@ export const CommentForm = ({
         } catch (error) {
             logger.error("Failed to submit comment:", error);
             toast({
-                title: "Error",
-                description: "Failed to post comment. Please try again.",
+                title: t("common.error"),
+                description: t("comments.postFailed"),
                 variant: "destructive"
             });
         } finally {
@@ -99,8 +103,8 @@ export const CommentForm = ({
     if (!isAuthenticated) {
         return (
             <div className="p-6 border rounded-xl bg-muted/40 text-center space-y-3">
-                <p className="text-muted-foreground font-medium">Join the conversation</p>
-                <p className="text-sm text-muted-foreground">Please log in to leave a comment.</p>
+                <p className="text-muted-foreground font-medium">{t("comments.joinConversation")}</p>
+                <p className="text-sm text-muted-foreground">{t("comments.authMsg")}</p>
                 {/* Login button or link could go here via a callback or link */}
             </div>
         );
@@ -114,7 +118,7 @@ export const CommentForm = ({
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     onFocus={handleFocus}
-                    placeholder={placeholder}
+                    placeholder={finalPlaceholder}
                     rows={isExpanded ? 4 : 2}
                     autoFocus={autoFocus}
                     className={cn(
@@ -143,7 +147,7 @@ export const CommentForm = ({
                         size="sm"
                         className="text-muted-foreground hover:text-foreground"
                     >
-                        Cancel
+                        {t("comments.cancel")}
                     </Button>
                     <Button
                         type="submit"
@@ -154,11 +158,11 @@ export const CommentForm = ({
                         {isSubmitting ? (
                             <>
                                 <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                                Posting...
+                                {t("comments.posting")}
                             </>
                         ) : (
                             <>
-                                {submitLabel}
+                                {finalSubmitLabel}
                                 {!isSubmitting && <Send className="ml-2 h-3.5 w-3.5 opacity-70" />}
                             </>
                         )}

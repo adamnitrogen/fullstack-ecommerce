@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Plus, Trash2, GripVertical, ImageIcon, Check, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,26 +25,7 @@ interface VariantFormSectionProps {
     onVariantImageRemoved?: (url: string) => void;
 }
 
-const UNIT_OPTIONS: { value: VariantUnit; label: string }[] = [
-    { value: "kg", label: "Kilogram (KG)" },
-    { value: "gm", label: "Gram (GM)" },
-    { value: "ltr", label: "Litre (LTR)" },
-    { value: "ml", label: "Millilitre (ML)" },
-    { value: "pcs", label: "Pieces (PCS)" },
-];
-
-const SIZE_PRESETS: { value: number; unit: VariantUnit; label: string }[] = [
-    { value: 0.25, unit: "kg", label: "250 GM" },
-    { value: 0.5, unit: "kg", label: "500 GM" },
-    { value: 1, unit: "kg", label: "1 KG" },
-    { value: 2, unit: "kg", label: "2 KG" },
-    { value: 3, unit: "kg", label: "3 KG" },
-    { value: 5, unit: "kg", label: "5 KG" },
-];
-
 const GST_RATES = [0, 5, 12, 18, 28];
-
-const SIZE_LABELS_PRESETS = ["Small", "Medium", "Large", "XL", "XXL", "Pack of 2", "Pack of 5"];
 
 const createEmptyVariant = (mode: "UNIT" | "SIZE" = "UNIT"): VariantFormData => ({
     size_label: mode === "SIZE" ? "Small" : "",
@@ -67,11 +49,38 @@ export function VariantFormSection({
     mode = "UNIT",
     onVariantImageRemoved,
 }: VariantFormSectionProps) {
+    const { t } = useTranslation();
     const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+    const UNIT_OPTIONS: { value: VariantUnit; label: string }[] = [
+        { value: "kg", label: t("admin.variants.units.kg") },
+        { value: "gm", label: t("admin.variants.units.gm") },
+        { value: "ltr", label: t("admin.variants.units.ltr") },
+        { value: "ml", label: t("admin.variants.units.ml") },
+        { value: "pcs", label: t("admin.variants.units.pcs") },
+    ];
+
+    const SIZE_PRESETS: { value: number; unit: VariantUnit; label: string }[] = [
+        { value: 0.25, unit: "kg", label: "250 GM" },
+        { value: 0.5, unit: "kg", label: "500 GM" },
+        { value: 1, unit: "kg", label: "1 KG" },
+        { value: 2, unit: "kg", label: "2 KG" },
+        { value: 3, unit: "kg", label: "3 KG" },
+        { value: 5, unit: "kg", label: "5 KG" },
+    ];
+
+    const SIZE_LABELS_PRESETS = [
+        t("admin.variants.presets.small"),
+        t("admin.variants.presets.medium"),
+        t("admin.variants.presets.large"),
+        "XL",
+        "XXL",
+        t("admin.variants.presets.pack2"),
+        t("admin.variants.presets.pack5")
+    ];
 
     const handleAddVariant = () => {
         const newVariant = createEmptyVariant(mode);
-        // If this is the first variant, make it default
         if (variants.length === 0) {
             newVariant.is_default = true;
         }
@@ -81,7 +90,6 @@ export function VariantFormSection({
 
     const handleRemoveVariant = (index: number) => {
         const updated = variants.filter((_, i) => i !== index);
-        // If we removed the default variant, make the first one default
         if (variants[index].is_default && updated.length > 0) {
             updated[0].is_default = true;
         }
@@ -96,7 +104,6 @@ export function VariantFormSection({
         const updated = [...variants];
         updated[index] = { ...updated[index], [field]: value };
 
-        // Auto-generate size_label when size_value or unit changes (ONLY IF MODE IS UNIT)
         if (mode === 'UNIT' && (field === "size_value" || field === "unit")) {
             const sizeValue = field === "size_value" ? value : updated[index].size_value;
             const unit = field === "unit" ? value : updated[index].unit;
@@ -124,7 +131,6 @@ export function VariantFormSection({
 
         onChange(updated);
 
-        // Notify parent about removal if it was a stored URL
         if (removedUrl && typeof removedUrl === 'string' && !removedUrl.startsWith('blob:') && onVariantImageRemoved) {
             onVariantImageRemoved(removedUrl);
         }
@@ -168,19 +174,13 @@ export function VariantFormSection({
         return variant.selling_price <= variant.mrp;
     };
 
-    // State to force re-render when URLs change/load
     const [, setUrlTrigger] = useState(0);
-
-    // Ref to track active object URLs for variant images
-    // Map<File, string>
     const activeUrlsRef = useRef<Map<File, string>>(new Map());
 
-    // Effect to manage object URLs lifecycle
     useEffect(() => {
         const filesInUse = new Set<File>();
         let changed = false;
 
-        // 1. Identify files currently in use
         variants.forEach(v => {
             if (v.imageFile instanceof File) {
                 filesInUse.add(v.imageFile);
@@ -192,7 +192,6 @@ export function VariantFormSection({
             }
         });
 
-        // 2. Revoke URLs for files no longer in use
         for (const [file, url] of activeUrlsRef.current.entries()) {
             if (!filesInUse.has(file)) {
                 URL.revokeObjectURL(url);
@@ -207,7 +206,6 @@ export function VariantFormSection({
 
     }, [variants]);
 
-    // Cleanup on unmount
     useEffect(() => {
         return () => {
             for (const url of activeUrlsRef.current.values()) {
@@ -229,12 +227,11 @@ export function VariantFormSection({
 
     return (
         <div className="space-y-4">
-            {/* Variant Cards */}
             {variants.length === 0 ? (
                 <div className="text-center py-8 border-2 border-dashed rounded-lg bg-muted/20">
                     <ImageIcon className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
                     <p className="text-sm text-muted-foreground mb-4">
-                        {mode === 'SIZE' ? 'No size variants added yet (e.g., Small, Medium)' : 'No unit variants added yet (e.g., 1 KG, 500 GM)'}
+                        {t("admin.products.variants.noVariants")}
                     </p>
                     <Button
                         type="button"
@@ -243,7 +240,7 @@ export function VariantFormSection({
                         disabled={disabled}
                     >
                         <Plus className="h-4 w-4 mr-2" />
-                        Add First Variant
+                        {t("admin.products.variants.addFirst")}
                     </Button>
                 </div>
             ) : (
@@ -261,27 +258,26 @@ export function VariantFormSection({
                                 )}
                             >
                                 <CardContent className="p-4">
-                                    {/* Header Row */}
                                     <div className="flex items-center gap-3 mb-4">
                                         <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
 
                                         <div className="flex-1 flex items-center gap-2">
                                             <span className="font-medium">
-                                                {variant.size_label || `Variant ${index + 1}`}
+                                                {variant.size_label || `${t("common.variant")} ${index + 1}`}
                                             </span>
                                             {variant.is_default && (
                                                 <Badge variant="default" className="text-xs">
-                                                    Default
+                                                    {t("admin.products.variants.default")}
                                                 </Badge>
                                             )}
                                             {!isPriceValid(variant) && (
                                                 <Badge variant="destructive" className="text-xs">
-                                                    Price Error
+                                                    {t("admin.products.variants.priceError")}
                                                 </Badge>
                                             )}
                                             {getDiscountPercent(variant.mrp, variant.selling_price) > 0 && (
                                                 <Badge variant="secondary" className="text-xs">
-                                                    {getDiscountPercent(variant.mrp, variant.selling_price)}% OFF
+                                                    {getDiscountPercent(variant.mrp, variant.selling_price)}% {t("admin.products.variants.off")}
                                                 </Badge>
                                             )}
                                         </div>
@@ -297,7 +293,7 @@ export function VariantFormSection({
                                                     className="text-xs"
                                                 >
                                                     <Check className="h-3 w-3 mr-1" />
-                                                    Set Default
+                                                    {t("admin.products.variants.setDefault")}
                                                 </Button>
                                             )}
                                             <Button
@@ -313,13 +309,11 @@ export function VariantFormSection({
                                         </div>
                                     </div>
 
-                                    {/* Size/Unit Controls based on MODE */}
                                     {mode === "UNIT" ? (
                                         <>
-                                            {/* Size Presets */}
                                             <div className="mb-4">
                                                 <Label className="text-xs text-muted-foreground mb-2 block">
-                                                    Quick Size Select
+                                                    {t("admin.products.variants.quickSizeSelect")}
                                                 </Label>
                                                 <div className="flex flex-wrap gap-2">
                                                     {SIZE_PRESETS.map((preset) => (
@@ -342,12 +336,10 @@ export function VariantFormSection({
                                                 </div>
                                             </div>
 
-                                            {/* Form Fields Grid */}
                                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                                {/* Size Value */}
                                                 <div className="space-y-1">
                                                     <Label htmlFor={`variant-size-${index}`} className="text-xs">
-                                                        Size Value
+                                                        {t("admin.products.variants.sizeValue")}
                                                     </Label>
                                                     <Input
                                                         id={`variant-size-${index}`}
@@ -367,10 +359,9 @@ export function VariantFormSection({
                                                     />
                                                 </div>
 
-                                                {/* Unit */}
                                                 <div className="space-y-1">
                                                     <Label htmlFor={`variant-unit-${index}`} className="text-xs">
-                                                        Unit
+                                                        {t("admin.products.variants.unit")}
                                                     </Label>
                                                     <Select
                                                         value={variant.unit}
@@ -392,10 +383,9 @@ export function VariantFormSection({
                                                     </Select>
                                                 </div>
 
-                                                {/* Description Field for UNIT Mode */}
                                                 <div className="space-y-1 md:col-span-2">
                                                     <Label htmlFor={`variant-desc-${index}`} className="text-xs">
-                                                        Description
+                                                        {t("admin.products.variants.description")}
                                                     </Label>
                                                     <Textarea
                                                         id={`variant-desc-${index}`}
@@ -408,13 +398,11 @@ export function VariantFormSection({
                                             </div>
                                         </>
                                     ) : (
-                                        // SIZE MODE
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                             <div className="space-y-1">
                                                 <Label htmlFor={`variant-label-${index}`} className="text-xs">
-                                                    Size Label (e.g. Small, Medium)
+                                                    {t("admin.products.variants.sizeLabel")} (e.g. Small, Medium)
                                                 </Label>
-                                                {/* Could be Select or Input */}
                                                 <div className="flex gap-2 flex-wrap mb-1">
                                                     {SIZE_LABELS_PRESETS.map((label) => (
                                                         <Badge
@@ -431,13 +419,13 @@ export function VariantFormSection({
                                                     id={`variant-label-${index}`}
                                                     value={variant.size_label}
                                                     onChange={(e) => handleVariantChange(index, "size_label", e.target.value)}
-                                                    placeholder="Enter size label"
+                                                    placeholder={t("admin.products.variants.sizeLabelPlaceholder")}
                                                     className="h-9"
                                                 />
                                             </div>
                                             <div className="space-y-1">
                                                 <Label htmlFor={`variant-desc-${index}`} className="text-xs">
-                                                    Description (Bullet points supported)
+                                                    {t("admin.products.variants.description")} ({t("common.bulletPointsSupported")})
                                                 </Label>
                                                 <Textarea
                                                     id={`variant-desc-${index}`}
@@ -450,12 +438,10 @@ export function VariantFormSection({
                                         </div>
                                     )}
 
-                                    {/* Price and Stock - Common for both modes (resumed Grid) */}
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                                        {/* MRP */}
                                         <div className="space-y-1">
                                             <Label htmlFor={`variant-mrp-${index}`} className="text-xs">
-                                                MRP (₹)
+                                                {t("admin.products.variants.mrp")} (₹)
                                             </Label>
                                             <Input
                                                 id={`variant-mrp-${index}`}
@@ -475,7 +461,6 @@ export function VariantFormSection({
                                             />
                                         </div>
 
-                                        {/* Selling Price */}
                                         <div className="space-y-1">
                                             <Label
                                                 htmlFor={`variant-price-${index}`}
@@ -484,7 +469,7 @@ export function VariantFormSection({
                                                     !isPriceValid(variant) && "text-destructive"
                                                 )}
                                             >
-                                                Selling Price (₹)
+                                                {t("admin.products.variants.sellingPrice")} (₹)
                                             </Label>
                                             <Input
                                                 id={`variant-price-${index}`}
@@ -506,14 +491,13 @@ export function VariantFormSection({
                                                 )}
                                             />
                                             {!isPriceValid(variant) && (
-                                                <p className="text-xs text-destructive">Must be ≤ MRP</p>
+                                                <p className="text-xs text-destructive">{t("admin.products.variants.mrpError")}</p>
                                             )}
                                         </div>
 
-                                        {/* Stock */}
                                         <div className="space-y-1">
                                             <Label htmlFor={`variant-stock-${index}`} className="text-xs">
-                                                Stock Quantity
+                                                {t("admin.products.variants.stock")}
                                             </Label>
                                             <Input
                                                 id={`variant-stock-${index}`}
@@ -532,11 +516,9 @@ export function VariantFormSection({
                                             />
                                         </div>
 
-
-                                        {/* Variant Image Upload */}
                                         <div className="space-y-1 md:col-span-1">
                                             <Label className="text-xs">
-                                                Variant Image
+                                                {t("admin.products.variants.variantImage")}
                                             </Label>
                                             {imagePreview ? (
                                                 <div className="relative inline-block">
@@ -560,7 +542,7 @@ export function VariantFormSection({
                                                 <div
                                                     className="flex items-center justify-center h-9 w-full border-2 border-dashed rounded-lg cursor-pointer hover:border-primary/50 transition-colors"
                                                     onClick={() => fileInputRefs.current[index]?.click()}
-                                                    title="Upload Variant Image"
+                                                    title={t("admin.products.variants.uploadImage")}
                                                 >
                                                     <Upload className="h-4 w-4 text-muted-foreground" />
                                                     <input
@@ -581,11 +563,9 @@ export function VariantFormSection({
                                         </div>
                                     </div>
 
-                                    {/* Tax Information */}
                                     <div className="mt-4 pt-4 border-t border-dashed">
-                                        <Label className="text-xs font-semibold mb-3 block">Tax Information (GST)</Label>
+                                        <Label className="text-xs font-semibold mb-3 block">{t("admin.products.variants.taxInfo")}</Label>
                                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                            {/* Tax Applicable Toggle */}
                                             <div className="flex items-center space-x-2 h-9">
                                                 <input
                                                     type="checkbox"
@@ -596,15 +576,14 @@ export function VariantFormSection({
                                                     disabled={disabled}
                                                 />
                                                 <Label htmlFor={`tax-app-${index}`} className="text-xs font-normal cursor-pointer">
-                                                    Tax Applicable
+                                                    {t("admin.products.variants.taxApplicable")}
                                                 </Label>
                                             </div>
 
                                             {variant.tax_applicable !== false && (
                                                 <>
-                                                    {/* HSN Code */}
                                                     <div className="space-y-1">
-                                                        <Label htmlFor={`hsn-${index}`} className="text-xs">HSN Code</Label>
+                                                        <Label htmlFor={`hsn-${index}`} className="text-xs">{t("admin.products.variants.hsnCode")}</Label>
                                                         <Input
                                                             id={`hsn-${index}`}
                                                             value={variant.hsn_code || ''}
@@ -615,16 +594,15 @@ export function VariantFormSection({
                                                         />
                                                     </div>
 
-                                                    {/* GST Rate */}
                                                     <div className="space-y-1">
-                                                        <Label htmlFor={`gst-${index}`} className="text-xs">GST Rate (%)</Label>
+                                                        <Label htmlFor={`gst-${index}`} className="text-xs">{t("admin.products.variants.gstRate")}</Label>
                                                         <Select
                                                             value={variant.gst_rate?.toString() || "0"}
                                                             onValueChange={(value) => handleVariantChange(index, "gst_rate", parseFloat(value))}
                                                             disabled={disabled}
                                                         >
                                                             <SelectTrigger id={`gst-${index}`} className="h-8 text-xs">
-                                                                <SelectValue placeholder="Select Rate" />
+                                                                <SelectValue placeholder={t("admin.settings.gst.placeholder")} />
                                                             </SelectTrigger>
                                                             <SelectContent>
                                                                 {GST_RATES.map((rate) => (
@@ -636,7 +614,6 @@ export function VariantFormSection({
                                                         </Select>
                                                     </div>
 
-                                                    {/* Price Includes Tax Toggle */}
                                                     <div className="flex items-center space-x-2 h-9 md:col-start-4">
                                                         <input
                                                             type="checkbox"
@@ -647,7 +624,7 @@ export function VariantFormSection({
                                                             disabled={disabled}
                                                         />
                                                         <Label htmlFor={`inc-tax-${index}`} className="text-xs font-normal cursor-pointer">
-                                                            Price includes Tax
+                                                            {t("admin.products.variants.priceIncludesTax")}
                                                         </Label>
                                                     </div>
                                                 </>
@@ -661,7 +638,6 @@ export function VariantFormSection({
                 </div>
             )}
 
-            {/* Add Variant Button */}
             {variants.length > 0 && (
                 <Button
                     type="button"
@@ -671,17 +647,15 @@ export function VariantFormSection({
                     className="w-full"
                 >
                     <Plus className="h-4 w-4 mr-2" />
-                    Add Another {mode === 'SIZE' ? 'Size' : 'Unit'} Variant
+                    {t("admin.products.variants.addAnother")}
                 </Button>
             )}
 
-            {/* Validation Message */}
             {variants.length > 0 && !variants.some((v) => v.is_default) && (
                 <p className="text-sm text-amber-600 dark:text-amber-400">
-                    ⚠️ No default variant selected. The first variant will be used as default.
+                    ⚠️ {t("admin.products.variants.noDefaultWarning")}
                 </p>
             )}
         </div>
     );
 }
-

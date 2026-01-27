@@ -17,13 +17,15 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
-import { toast } from "sonner";
+import { toast } from "@/hooks/use-toast"; // Changed from "sonner" to "@/hooks/use-toast"
 import { getErrorMessage } from "@/lib/errorUtils";
 import { Check, Image as ImageIcon, Loader2, EyeOff, Eye } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { useTranslation } from "react-i18next"; // Ensure this import is present
 
 export default function CarouselManagement() {
+    const { t } = useTranslation();
     const queryClient = useQueryClient();
     const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
 
@@ -42,10 +44,14 @@ export default function CarouselManagement() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["gallery-folders"] });
             queryClient.invalidateQueries({ queryKey: ["carousel-slides"] }); // Invalidate homepage cache
-            toast.success("Home carousel folder updated successfully");
+            toast({ title: t("admin.carousel.toasts.updateCarouselSuccess") }); // Updated toast
         },
         onError: (error: unknown) => {
-            toast.error(getErrorMessage(error, "Failed to update home carousel folder"));
+            toast({ // Updated toast
+                title: t("common.error"),
+                description: getErrorMessage(error, t("admin.carousel.toasts.updateCarouselFailed")),
+                variant: "destructive",
+            });
         },
     });
 
@@ -59,10 +65,15 @@ export default function CarouselManagement() {
             galleryFolderService.update(id, { is_hidden }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["gallery-folders"] });
-            toast.success("Folder visibility updated");
+            queryClient.invalidateQueries({ queryKey: ["admin-settings"] }); // Added invalidate query
+            toast({ title: t("admin.carousel.toasts.updateFolderSuccess") }); // Updated toast
         },
-        onError: (error: unknown) => {
-            toast.error(getErrorMessage(error, "Failed to update folder visibility"));
+        onError: (error: any) => { // Changed error type to any for consistency with instruction
+            toast({ // Updated toast
+                title: t("common.error"),
+                description: getErrorMessage(error, t("admin.carousel.toasts.updateFolderFailed")),
+                variant: "destructive",
+            });
         },
     });
 
@@ -79,20 +90,18 @@ export default function CarouselManagement() {
         <div className="space-y-6">
             <div>
                 <h1 className="text-3xl font-bold tracking-tight">
-                    Carousel Management
+                    {t("admin.carousel.title")}
                 </h1>
                 <p className="text-muted-foreground">
-                    Select a Gallery Folder to populate the homepage carousel.
+                    {t("admin.carousel.subtitle")}
                 </p>
             </div>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Carousel Source</CardTitle>
+                    <CardTitle>{t("admin.carousel.source.title")}</CardTitle>
                     <CardDescription>
-                        Choose which gallery folder should be displayed on the homepage. The
-                        images, titles, and descriptions from the selected folder will be
-                        used.
+                        {t("admin.carousel.source.description")}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -108,7 +117,7 @@ export default function CarouselManagement() {
                                     onValueChange={handleSetFolder}
                                 >
                                     <SelectTrigger className="w-[300px]">
-                                        <SelectValue placeholder="Select a folder" />
+                                        <SelectValue placeholder={t("admin.carousel.selectFolder")} />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {folders.map((folder) => (
@@ -127,11 +136,10 @@ export default function CarouselManagement() {
                                 <div className="bg-muted/50 p-4 rounded-lg border">
                                     <div className="flex items-center gap-2 mb-2 text-green-600 font-medium">
                                         <Check className="h-4 w-4" />
-                                        Currently Active: {currentCarouselFolder.name}
+                                        {t("admin.carousel.active.label", { name: currentCarouselFolder.name })}
                                     </div>
                                     <p className="text-sm text-muted-foreground mb-4">
-                                        This folder's contents are currently being shown on the
-                                        homepage carousel.
+                                        {t("admin.carousel.active.description")}
                                     </p>
 
                                     <div className="flex items-center justify-between pt-4 border-t">
@@ -143,10 +151,10 @@ export default function CarouselManagement() {
                                             )}
                                             <div className="space-y-0.5">
                                                 <Label htmlFor="hide-from-gallery" className="text-sm font-medium">
-                                                    Hide from Gallery
+                                                    {t("admin.carousel.hide.label")}
                                                 </Label>
                                                 <p className="text-xs text-muted-foreground">
-                                                    Hide this folder from the public gallery page while it's in the carousel.
+                                                    {t("admin.carousel.hide.description")}
                                                 </p>
                                             </div>
                                         </div>
@@ -168,8 +176,7 @@ export default function CarouselManagement() {
                             {!currentCarouselFolder && folders.length > 0 && (
                                 <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 text-yellow-800">
                                     <p className="text-sm font-medium">
-                                        No folder is currently selected. The homepage carousel might
-                                        be empty.
+                                        {t("admin.carousel.empty.noSelected")}
                                     </p>
                                 </div>
                             )}
@@ -178,12 +185,11 @@ export default function CarouselManagement() {
                                 <div className="bg-muted p-4 rounded-lg text-center">
                                     <ImageIcon className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                                     <p className="text-muted-foreground">
-                                        No gallery folders found. Please create a folder in Gallery
-                                        Management first.
+                                        {t("admin.carousel.empty.noFolders")}
                                     </p>
                                     <Link to="/admin/gallery">
                                         <Button variant="link" className="mt-2">
-                                            Go to Gallery Management
+                                            {t("admin.carousel.empty.goGallery")}
                                         </Button>
                                     </Link>
                                 </div>

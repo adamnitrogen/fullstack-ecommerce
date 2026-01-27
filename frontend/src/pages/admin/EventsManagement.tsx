@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import type { Event, CancellationJobStatus } from "@/types";
 import { format } from "date-fns";
+import { hi, enUS } from "date-fns/locale";
 import { EventDialog } from "@/components/admin/EventDialog";
 import {
   Tooltip,
@@ -31,6 +33,8 @@ import { eventService } from "@/services/event.service";
 import { uploadService } from "@/services/upload.service";
 
 export default function EventsManagement() {
+  const { t, i18n } = useTranslation();
+  const currentLocale = i18n.language === "hi" ? hi : enUS;
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
@@ -69,16 +73,16 @@ export default function EventsManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-events"] });
       toast({
-        title: "Success",
-        description: selectedEvent ? "Event updated successfully" : "Event created successfully",
+        title: t("common.success"),
+        description: selectedEvent ? t("admin.events.toasts.updated") : t("admin.events.toasts.created"),
       });
       setEventDialogOpen(false);
       setSelectedEvent(null);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to save event"),
+        title: t("common.error"),
+        description: getErrorMessage(error, t("admin.events.toasts.saveError")),
         variant: "destructive",
       });
     },
@@ -93,16 +97,16 @@ export default function EventsManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-events"] });
       toast({
-        title: "Cancellation Initiated",
-        description: "Event cancellation job started successfully",
+        title: t("admin.events.toasts.cancelInitiated"),
+        description: t("admin.events.toasts.cancelInitiated"),
       });
       setCancelDialogOpen(false);
       setSelectedEvent(null);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to initiate cancellation"),
+        title: t("common.error"),
+        description: getErrorMessage(error, t("admin.events.toasts.cancelError")),
         variant: "destructive",
       });
     },
@@ -115,16 +119,16 @@ export default function EventsManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-events"] });
       toast({
-        title: "Event Rescheduled",
-        description: "Schedule updated and notifications sent to all registrants.",
+        title: t("admin.events.toasts.rescheduled"),
+        description: t("admin.events.toasts.rescheduled"),
       });
       setRescheduleDialogOpen(false);
       setSelectedEvent(null);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to reschedule event"),
+        title: t("common.error"),
+        description: getErrorMessage(error, t("admin.events.toasts.rescheduleError")),
         variant: "destructive",
       });
     },
@@ -138,26 +142,26 @@ export default function EventsManagement() {
       queryClient.invalidateQueries({ queryKey: ["admin-events"] });
       queryClient.invalidateQueries({ queryKey: ["job-status"] });
       toast({
-        title: "Retry Initiated",
+        title: t("admin.events.toasts.retryInitiated", { message: data.message }),
         description: data.message,
       });
     },
     onError: (error: unknown) => {
       toast({
-        title: "Retry Failed",
-        description: getErrorMessage(error, "Failed to retry cancellation"),
+        title: t("admin.events.toasts.retryFailed"),
+        description: getErrorMessage(error, t("admin.events.toasts.retryFailed")),
         variant: "destructive",
       });
     },
   });
 
   const getLoadingMessage = () => {
-    if (isUploading) return "Uploading event image...";
-    if (eventMutation.isPending) return selectedEvent ? "Updating event details..." : "Creating new event...";
-    if (cancelMutation.isPending) return "Initiating event cancellation...";
-    if (rescheduleMutation.isPending) return "Updating event schedule...";
-    if (retryMutation.isPending) return "Retrying cancellation process...";
-    return "Processing request...";
+    if (isUploading) return t("admin.events.toasts.uploading");
+    if (eventMutation.isPending) return selectedEvent ? t("admin.events.toasts.updating") : t("admin.events.toasts.creating");
+    if (cancelMutation.isPending) return t("admin.events.toasts.cancelling");
+    if (rescheduleMutation.isPending) return t("admin.events.toasts.updatingSchedule");
+    if (retryMutation.isPending) return t("admin.events.toasts.retrying");
+    return t("admin.events.toasts.processing");
   };
 
   const isAnyMutationPending =
@@ -233,14 +237,14 @@ export default function EventsManagement() {
       if (jobStatus?.status && lastStatus && lastStatus !== jobStatus.status) {
         if (jobStatus.status === 'COMPLETED') {
           toast({
-            title: "Cancellation Complete",
-            description: "All registrants have been processed and refunded.",
+            title: t("admin.events.toasts.cancelInitiated"),
+            description: t("admin.events.toasts.cancelInitiated"),
           });
           queryClient.invalidateQueries({ queryKey: ["admin-events"] });
         } else if (jobStatus.status === 'FAILED' || jobStatus.status === 'PARTIAL_FAILURE') {
           toast({
-            title: "Job Warning",
-            description: `Cancellation job ended with status: ${jobStatus.status}`,
+            title: t("admin.events.jobs.status.failed"),
+            description: t("admin.events.jobs.status.failed"),
             variant: "destructive",
           });
         }
@@ -253,11 +257,11 @@ export default function EventsManagement() {
     if (!jobStatus) return null;
 
     const statusConfig: Record<string, { icon: React.ReactNode; className: string; label: string }> = {
-      PENDING: { icon: <Loader2 className="h-3 w-3 animate-spin" />, className: "bg-blue-100 text-blue-700", label: "Pending" },
-      IN_PROGRESS: { icon: <Loader2 className="h-3 w-3 animate-spin" />, className: "bg-blue-100 text-blue-700", label: "Processing" },
-      COMPLETED: { icon: <CheckCircle2 className="h-3 w-3" />, className: "bg-green-100 text-green-700", label: "Completed" },
-      PARTIAL_FAILURE: { icon: <AlertTriangle className="h-3 w-3" />, className: "bg-orange-100 text-orange-700", label: "Partial" },
-      FAILED: { icon: <XCircle className="h-3 w-3" />, className: "bg-red-100 text-red-700", label: "Failed" },
+      PENDING: { icon: <Loader2 className="h-3 w-3 animate-spin" />, className: "bg-blue-100 text-blue-700", label: t("admin.events.jobs.pending") },
+      IN_PROGRESS: { icon: <Loader2 className="h-3 w-3 animate-spin" />, className: "bg-blue-100 text-blue-700", label: t("admin.events.jobs.processing") },
+      COMPLETED: { icon: <CheckCircle2 className="h-3 w-3" />, className: "bg-green-100 text-green-700", label: t("admin.events.jobs.completed") },
+      PARTIAL_FAILURE: { icon: <AlertTriangle className="h-3 w-3" />, className: "bg-orange-100 text-orange-700", label: t("admin.events.jobs.partial") },
+      FAILED: { icon: <XCircle className="h-3 w-3" />, className: "bg-red-100 text-red-700", label: t("admin.events.jobs.failed") },
     };
 
     const config = statusConfig[jobStatus.status] || statusConfig.PENDING;
@@ -277,9 +281,9 @@ export default function EventsManagement() {
             </TooltipTrigger>
             <TooltipContent side="top" className="text-xs">
               <div className="space-y-1">
-                <p className="font-semibold">Job: {jobStatus.status}</p>
-                <p>Processed: {jobStatus.processed_count || 0}/{jobStatus.total_registrations || 0}</p>
-                {jobStatus.failed_count > 0 && <p className="text-red-500">Failed: {jobStatus.failed_count}</p>}
+                <p className="font-semibold">{t("admin.events.jobs.jobTitle")}: {jobStatus.status}</p>
+                <p>{t("admin.events.jobs.processedInfo", { processed: jobStatus.processed_count || 0, total: jobStatus.total_registrations || 0 })}</p>
+                {jobStatus.failed_count > 0 && <p className="text-red-500">{t("admin.events.jobs.failedCount", { count: jobStatus.failed_count })}</p>}
               </div>
             </TooltipContent>
           </Tooltip>
@@ -308,8 +312,8 @@ export default function EventsManagement() {
         message={getLoadingMessage()}
       />
       <div>
-        <h2 className="text-3xl font-bold tracking-tight">Events Management</h2>
-        <p className="text-muted-foreground">Manage events, workshops, and ceremonies</p>
+        <h2 className="text-3xl font-bold tracking-tight">{t("admin.events.management.title")}</h2>
+        <p className="text-muted-foreground">{t("admin.events.management.subtitle")}</p>
       </div>
 
       <Card>
@@ -317,7 +321,7 @@ export default function EventsManagement() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
-              All Events ({data?.total || 0})
+              {t("admin.events.management.allEvents")} ({data?.total || 0})
             </CardTitle>
             <div className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1 sm:w-64">
@@ -325,7 +329,7 @@ export default function EventsManagement() {
                 <Input
                   id="event-search"
                   name="search"
-                  placeholder="Search events..."
+                  placeholder={t("admin.events.management.searchPlaceholder")}
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
@@ -336,18 +340,18 @@ export default function EventsManagement() {
               </div>
               <Button onClick={handleAddEvent}>
                 <Plus className="h-4 w-4 mr-2" />
-                Add Event
+                {t("admin.events.management.addEvent")}
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="text-center py-12">Loading event records...</div>
+            <div className="text-center py-12">{t("admin.events.management.loadingRecords")}</div>
           ) : !data?.events || data.events.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No events found</p>
+              <p>{t("admin.events.management.noEventsFound")}</p>
             </div>
           ) : (
             <>
@@ -355,11 +359,11 @@ export default function EventsManagement() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Event</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Location</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead>{t("admin.events.management.table.event")}</TableHead>
+                      <TableHead>{t("admin.events.management.table.date")}</TableHead>
+                      <TableHead>{t("admin.events.management.table.location")}</TableHead>
+                      <TableHead>{t("admin.events.management.table.status")}</TableHead>
+                      <TableHead className="text-right">{t("admin.events.management.table.actions")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -383,9 +387,9 @@ export default function EventsManagement() {
                         </TableCell>
                         <TableCell>
                           <div className="text-sm">
-                            <p className="font-medium">{format(new Date(event.startDate), "MMM dd, yyyy")}</p>
+                            <p className="font-medium">{format(new Date(event.startDate), "MMM dd, yyyy", { locale: currentLocale })}</p>
                             {event.endDate && event.endDate !== event.startDate && (
-                              <p className="text-muted-foreground text-xs">to {format(new Date(event.endDate), "MMM dd, yyyy")}</p>
+                              <p className="text-muted-foreground text-xs">{t("common.in")} {format(new Date(event.endDate), "MMM dd, yyyy", { locale: currentLocale })}</p>
                             )}
                           </div>
                         </TableCell>
@@ -407,7 +411,7 @@ export default function EventsManagement() {
                               variant="ghost"
                               size="icon"
                               onClick={() => handleEditEvent(event)}
-                              title="Edit"
+                              title={t("admin.events.management.tooltips.edit")}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
@@ -416,7 +420,7 @@ export default function EventsManagement() {
                               size="icon"
                               onClick={() => handleRescheduleClick(event)}
                               disabled={event.status === 'cancelled' || event.status === 'completed'}
-                              title="Reschedule"
+                              title={t("admin.events.management.tooltips.reschedule")}
                             >
                               <CalendarDays className="h-4 w-4" />
                             </Button>
@@ -426,7 +430,7 @@ export default function EventsManagement() {
                                 size="icon"
                                 className="text-orange-500 hover:text-orange-600"
                                 onClick={() => handleCancelEventClick(event)}
-                                title="Cancel Event"
+                                title={t("admin.events.management.tooltips.cancel")}
                               >
                                 <XCircle className="h-4 w-4" />
                               </Button>
@@ -441,11 +445,15 @@ export default function EventsManagement() {
 
               <div className="flex items-center justify-between space-x-2 py-4">
                 <div className="text-sm text-muted-foreground">
-                  Showing {(page - 1) * 15 + 1} to {Math.min(page * 15, data.total)} of {data.total} events
+                  {t("admin.events.management.pagination.info", {
+                    start: (page - 1) * 15 + 1,
+                    end: Math.min(page * 15, data.total),
+                    total: data.total
+                  })}
                 </div>
                 <div className="space-x-2">
-                  <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>Previous</Button>
-                  <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={page * 15 >= data.total}>Next</Button>
+                  <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>{t("common.back")}</Button>
+                  <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={page * 15 >= data.total}>{t("common.next")}</Button>
                 </div>
               </div>
             </>

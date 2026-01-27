@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useTranslation } from "react-i18next";
 
 // Type Definitions
 interface Job {
@@ -98,55 +99,69 @@ interface StatsResponse {
     stats: any;
 }
 
-// Constants
-const TYPE_OPTIONS = [
-    { value: "all", label: "All Job Types" },
-    { value: "ACCOUNT_DELETION", label: "Account Deletion" },
-    { value: "EVENT_CANCELLATION", label: "Event Cancellation" },
-];
-
-const STATUS_OPTIONS = [
-    { value: "all", label: "All Statuses" },
-    { value: "PENDING", label: "Pending" },
-    { value: "IN_PROGRESS", label: "In Progress" },
-    { value: "COMPLETED", label: "Completed" },
-    { value: "FAILED", label: "Failed" },
-    { value: "PARTIAL_FAILURE", label: "Partial Failure" },
-    { value: "BLOCKED", label: "Blocked" },
-    { value: "CANCELLED", label: "Cancelled" },
-];
-
 // Helper Components
-const getStatusBadge = (status: string) => {
-    const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; className: string }> = {
-        PENDING: { variant: "secondary", className: "bg-yellow-100 text-yellow-800 hover:bg-yellow-100" },
-        IN_PROGRESS: { variant: "default", className: "bg-blue-500 hover:bg-blue-500" },
-        COMPLETED: { variant: "default", className: "bg-green-500 hover:bg-green-500" },
-        FAILED: { variant: "destructive", className: "" },
-        PARTIAL_FAILURE: { variant: "secondary", className: "bg-orange-100 text-orange-800 hover:bg-orange-100" },
-        BLOCKED: { variant: "secondary", className: "bg-orange-100 text-orange-800 hover:bg-orange-100" },
-        CANCELLED: { variant: "secondary", className: "bg-gray-100 text-gray-600 hover:bg-gray-100" },
-    };
-    const config = variants[status] || { variant: "outline" as const, className: "" };
-    return <Badge variant={config.variant} className={config.className}>{status.replace("_", " ")}</Badge>;
-};
-
-const getTypeBadge = (type: string) => {
-    if (type === "ACCOUNT_DELETION") {
-        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200"><User className="h-3 w-3 mr-1" />Account Deletion</Badge>;
-    }
-    return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200"><Calendar className="h-3 w-3 mr-1" />Event Cancellation</Badge>;
-};
-
-const formatDate = (dateString: string | null) => {
-    if (!dateString) return "-";
-    return new Date(dateString).toLocaleString("en-IN", {
-        dateStyle: "short",
-        timeStyle: "short",
-    });
-};
+// export default function BackgroundJobs() { (this line will be replaced in another chunk or by context)
 
 export default function BackgroundJobs() {
+    const { t } = useTranslation();
+
+    // Helper Components moved inside to access t()
+    const getStatusBadge = (status: string) => {
+        const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; className: string }> = {
+            PENDING: { variant: "secondary", className: "bg-yellow-100 text-yellow-800 hover:bg-yellow-100" },
+            IN_PROGRESS: { variant: "default", className: "bg-blue-500 hover:bg-blue-500" },
+            COMPLETED: { variant: "default", className: "bg-green-500 hover:bg-green-500" },
+            FAILED: { variant: "destructive", className: "" },
+            PARTIAL_FAILURE: { variant: "secondary", className: "bg-orange-100 text-orange-800 hover:bg-orange-100" },
+            BLOCKED: { variant: "secondary", className: "bg-orange-100 text-orange-800 hover:bg-orange-100" },
+            CANCELLED: { variant: "secondary", className: "bg-gray-100 text-gray-600 hover:bg-gray-100" },
+        };
+        const config = variants[status] || { variant: "outline" as const, className: "" };
+
+        // Map status to translation key
+        const statusMap: Record<string, string> = {
+            PENDING: "admin.backgroundJobs.statuses.pending",
+            IN_PROGRESS: "admin.backgroundJobs.statuses.inProgress",
+            COMPLETED: "admin.backgroundJobs.statuses.completed",
+            FAILED: "admin.backgroundJobs.statuses.failed",
+            PARTIAL_FAILURE: "admin.backgroundJobs.statuses.partialFailure",
+            BLOCKED: "admin.backgroundJobs.statuses.blocked",
+            CANCELLED: "admin.backgroundJobs.statuses.cancelled",
+        };
+
+        const label = statusMap[status] ? t(statusMap[status]) : status.replace("_", " ");
+        return <Badge variant={config.variant} className={config.className}>{label}</Badge>;
+    };
+
+    const getTypeBadge = (type: string) => {
+        if (type === "ACCOUNT_DELETION") {
+            return (
+                <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                    <User className="h-3 w-3 mr-1" />
+                    {t("admin.backgroundJobs.types.accountDeletion")}
+                </Badge>
+            );
+        }
+        return (
+            <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                <Calendar className="h-3 w-3 mr-1" />
+                {t("admin.backgroundJobs.types.eventCancellation")}
+            </Badge>
+        );
+    };
+
+    const formatDate = (dateString: string | null) => {
+        if (!dateString) return "-";
+        try {
+            return new Date(dateString).toLocaleString("en-IN", {
+                dateStyle: "short",
+                timeStyle: "short",
+            });
+        } catch (e) {
+            return "-";
+        }
+    };
+
     const [typeFilter, setTypeFilter] = useState("all");
     const [statusFilter, setStatusFilter] = useState("all");
     const [page, setPage] = useState(1);
@@ -154,6 +169,24 @@ export default function BackgroundJobs() {
     const [detailsOpen, setDetailsOpen] = useState(false);
     const queryClient = useQueryClient();
     const limit = 10;
+
+    // Constants with translations
+    const TYPE_OPTIONS = [
+        { value: "all", label: t("admin.backgroundJobs.types.all") },
+        { value: "ACCOUNT_DELETION", label: t("admin.backgroundJobs.types.accountDeletion") },
+        { value: "EVENT_CANCELLATION", label: t("admin.backgroundJobs.types.eventCancellation") },
+    ];
+
+    const STATUS_OPTIONS = [
+        { value: "all", label: t("admin.backgroundJobs.statuses.all") },
+        { value: "PENDING", label: t("admin.backgroundJobs.statuses.pending") },
+        { value: "IN_PROGRESS", label: t("admin.backgroundJobs.statuses.inProgress") },
+        { value: "COMPLETED", label: t("admin.backgroundJobs.statuses.completed") },
+        { value: "FAILED", label: t("admin.backgroundJobs.statuses.failed") },
+        { value: "PARTIAL_FAILURE", label: t("admin.backgroundJobs.statuses.partialFailure") },
+        { value: "BLOCKED", label: t("admin.backgroundJobs.statuses.blocked") },
+        { value: "CANCELLED", label: t("admin.backgroundJobs.statuses.cancelled") },
+    ];
 
     // --- Queries ---
 
@@ -209,11 +242,11 @@ export default function BackgroundJobs() {
             return response.data;
         },
         onSuccess: (data) => {
-            toast.success(data.message || "Job retry triggered successfully");
+            toast.success(data.message || t("admin.backgroundJobs.toasts.retrySuccess"));
             queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
         },
         onError: (error: any) => {
-            toast.error(error.response?.data?.error || "Failed to retry job");
+            toast.error(error.response?.data?.error || t("admin.backgroundJobs.toasts.retryFailed"));
         },
     });
 
@@ -223,11 +256,11 @@ export default function BackgroundJobs() {
             return response.data;
         },
         onSuccess: (data) => {
-            toast.success(data.message || "Job processing triggered successfully");
+            toast.success(data.message || t("admin.backgroundJobs.toasts.processSuccess"));
             queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
         },
         onError: (error: any) => {
-            toast.error(error.response?.data?.error || "Failed to process job");
+            toast.error(error.response?.data?.error || t("admin.backgroundJobs.toasts.processFailed"));
         },
     });
 
@@ -237,11 +270,11 @@ export default function BackgroundJobs() {
             return response.data;
         },
         onSuccess: () => {
-            toast.success("Email retry triggered successfully");
+            toast.success(t("admin.backgroundJobs.toasts.emailRetrySuccess"));
             refetchEmailStats();
         },
         onError: (error: any) => {
-            toast.error(error.response?.data?.error || "Failed to trigger email retry");
+            toast.error(error.response?.data?.error || t("admin.backgroundJobs.toasts.emailRetryFailed"));
         }
     });
 
@@ -251,11 +284,11 @@ export default function BackgroundJobs() {
             return response.data;
         },
         onSuccess: () => {
-            toast.success("Invoice retry triggered successfully");
+            toast.success(t("admin.backgroundJobs.toasts.invoiceRetrySuccess"));
             refetchInvoiceStats();
         },
         onError: (error: any) => {
-            toast.error(error.response?.data?.error || "Failed to trigger invoice retry");
+            toast.error(error.response?.data?.error || t("admin.backgroundJobs.toasts.invoiceRetryFailed"));
         }
     });
 
@@ -293,7 +326,7 @@ export default function BackgroundJobs() {
             };
         }
         return {
-            primary: job.eventTitle || "Unknown Event",
+            primary: job.eventTitle || t("admin.backgroundJobs.table.unknownEvent"),
             secondary: `${job.processedCount || 0}/${job.totalRegistrations || 0} processed`
         };
     };
@@ -303,9 +336,9 @@ export default function BackgroundJobs() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold">Background Jobs</h1>
+                    <h1 className="text-2xl sm:text-3xl font-bold">{t("admin.backgroundJobs.title")}</h1>
                     <p className="text-sm sm:text-base text-muted-foreground">
-                        Monitor and manage system background processes
+                        {t("admin.backgroundJobs.subtitle")}
                     </p>
                 </div>
                 <Button
@@ -322,11 +355,11 @@ export default function BackgroundJobs() {
                 <TabsList className="grid w-full max-w-md grid-cols-2">
                     <TabsTrigger value="scheduled">
                         <Clock className="h-4 w-4 mr-2" />
-                        Scheduled Tasks
+                        {t("admin.backgroundJobs.tabs.scheduled")}
                     </TabsTrigger>
                     <TabsTrigger value="batch">
                         <Activity className="h-4 w-4 mr-2" />
-                        Batch Jobs
+                        {t("admin.backgroundJobs.tabs.batch")}
                     </TabsTrigger>
                 </TabsList>
 
@@ -337,7 +370,7 @@ export default function BackgroundJobs() {
                         <Card>
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
-                                    Scheduler Status
+                                    {t("admin.backgroundJobs.scheduler.title")}
                                     {schedStatus?.running ?
                                         <CheckCircle2 className="h-4 w-4 text-green-500" /> :
                                         <AlertCircle className="h-4 w-4 text-destructive" />
@@ -345,9 +378,9 @@ export default function BackgroundJobs() {
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold">{schedStatus?.running ? "Running" : "Stopped"}</div>
+                                <div className="text-2xl font-bold">{schedStatus?.running ? t("admin.backgroundJobs.scheduler.running") : t("admin.backgroundJobs.scheduler.stopped")}</div>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                    {schedStatus?.jobs?.length || 0} active cron jobs
+                                    {t("admin.backgroundJobs.schedulerStatus.activeCronJobs", { count: schedStatus?.jobs?.length || 0 })}
                                 </p>
                             </CardContent>
                         </Card>
@@ -355,7 +388,7 @@ export default function BackgroundJobs() {
                         <Card>
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
-                                    Failed Emails
+                                    {t("admin.backgroundJobs.stats.failedEmails")}
                                     <Mail className="h-4 w-4" />
                                 </CardTitle>
                             </CardHeader>
@@ -364,7 +397,7 @@ export default function BackgroundJobs() {
                                     {emailStatsData?.stats?.FAILED || 0}
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                    Pending retry attempts
+                                    {t("admin.backgroundJobs.stats.pendingRetry")}
                                 </p>
                             </CardContent>
                         </Card>
@@ -372,7 +405,7 @@ export default function BackgroundJobs() {
                         <Card>
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
-                                    Failed Invoices
+                                    {t("admin.backgroundJobs.stats.failedInvoices")}
                                     <FileText className="h-4 w-4" />
                                 </CardTitle>
                             </CardHeader>
@@ -381,7 +414,7 @@ export default function BackgroundJobs() {
                                     {invoiceStatsData?.stats?.orders?.failed || 0}
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                    Requires re-generation
+                                    {t("admin.backgroundJobs.stats.regenerationRequired")}
                                 </p>
                             </CardContent>
                         </Card>
@@ -391,23 +424,23 @@ export default function BackgroundJobs() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-lg">Email Retry Engine</CardTitle>
+                                <CardTitle className="text-lg">{t("admin.backgroundJobs.emailRetry.title")}</CardTitle>
                                 <CardDescription>
-                                    Manually trigger a retry for all emails currently in 'FAILED' status.
+                                    {t("admin.backgroundJobs.emailRetry.description")}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="p-3 bg-muted rounded-md text-sm">
                                     <div className="flex justify-between mb-1">
-                                        <span>Total Notifications:</span>
+                                        <span>{t("admin.backgroundJobs.emailRetry.totalNotifications")}</span>
                                         <span className="font-medium">{String(Object.values(emailStatsData?.stats || {}).reduce((a: any, b: any) => a + b, 0))}</span>
                                     </div>
                                     <div className="flex justify-between mb-1">
-                                        <span>Sent:</span>
+                                        <span>{t("admin.backgroundJobs.emailRetry.sent")}</span>
                                         <span className="text-green-600 font-medium">{emailStatsData?.stats?.SENT || 0}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>Failed:</span>
+                                        <span>{t("admin.backgroundJobs.emailRetry.failed")}</span>
                                         <span className="text-destructive font-medium">{emailStatsData?.stats?.FAILED || 0}</span>
                                     </div>
                                 </div>
@@ -417,26 +450,26 @@ export default function BackgroundJobs() {
                                     disabled={triggerEmailRetry.isPending || (emailStatsData?.stats?.FAILED || 0) === 0}
                                 >
                                     <Play className="h-4 w-4 mr-2" />
-                                    Run Email Retry Job
+                                    {t("admin.backgroundJobs.emailRetry.button")}
                                 </Button>
                             </CardContent>
                         </Card>
 
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-lg">Invoice Recovery</CardTitle>
+                                <CardTitle className="text-lg">{t("admin.backgroundJobs.invoiceRetry.title")}</CardTitle>
                                 <CardDescription>
-                                    Trigger re-generation for orders where the GST invoice failed.
+                                    {t("admin.backgroundJobs.invoiceRetry.description")}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="p-3 bg-muted rounded-md text-sm">
                                     <div className="flex justify-between mb-1">
-                                        <span>Orders with Invoices:</span>
+                                        <span>{t("admin.backgroundJobs.invoiceRetry.ordersWithInvoices")}</span>
                                         <span className="font-medium">{invoiceStatsData?.stats?.orders?.generated || 0}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>Failed Generation:</span>
+                                        <span>{t("admin.backgroundJobs.invoiceRetry.failedGeneration")}</span>
                                         <span className="text-destructive font-medium">{invoiceStatsData?.stats?.orders?.failed || 0}</span>
                                     </div>
                                 </div>
@@ -446,7 +479,7 @@ export default function BackgroundJobs() {
                                     disabled={triggerInvoiceRetry.isPending || (invoiceStatsData?.stats?.orders?.failed || 0) === 0}
                                 >
                                     <Play className="h-4 w-4 mr-2" />
-                                    Run Invoice Retry Job
+                                    {t("admin.backgroundJobs.invoiceRetry.button")}
                                 </Button>
                             </CardContent>
                         </Card>
@@ -455,16 +488,16 @@ export default function BackgroundJobs() {
                     {/* Configured Schedules */}
                     <Card>
                         <CardHeader>
-                            <CardTitle>Configured Schedules (Cron)</CardTitle>
-                            <CardDescription>System intervals for recurring tasks</CardDescription>
+                            <CardTitle>{t("admin.backgroundJobs.configuredSchedules.title")}</CardTitle>
+                            <CardDescription>{t("admin.backgroundJobs.configuredSchedules.subtitle")}</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Task Name</TableHead>
-                                        <TableHead>Schedule (Cron)</TableHead>
-                                        <TableHead>Status</TableHead>
+                                        <TableHead>{t("admin.backgroundJobs.configuredSchedules.taskName")}</TableHead>
+                                        <TableHead>{t("admin.backgroundJobs.configuredSchedules.schedule")}</TableHead>
+                                        <TableHead>{t("common.status")}</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -473,7 +506,7 @@ export default function BackgroundJobs() {
                                             <TableCell className="font-medium font-mono">{key}</TableCell>
                                             <TableCell className="font-mono text-xs">{value}</TableCell>
                                             <TableCell>
-                                                <Badge variant="outline" className="text-green-600 bg-green-50 border-green-200">ACTIVE</Badge>
+                                                <Badge variant="outline" className="text-green-600 bg-green-50 border-green-200">{t("admin.backgroundJobs.configuredSchedules.active")}</Badge>
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -489,7 +522,7 @@ export default function BackgroundJobs() {
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                         <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v); setPage(1); }}>
                             <SelectTrigger className="w-full sm:w-[200px]">
-                                <SelectValue placeholder="Filter by type" />
+                                <SelectValue placeholder={t("admin.backgroundJobs.filters.filterByType")} />
                             </SelectTrigger>
                             <SelectContent>
                                 {TYPE_OPTIONS.map((opt) => (
@@ -501,7 +534,7 @@ export default function BackgroundJobs() {
                         </Select>
                         <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
                             <SelectTrigger className="w-full sm:w-[180px]">
-                                <SelectValue placeholder="Filter by status" />
+                                <SelectValue placeholder={t("admin.backgroundJobs.filters.filterByStatus")} />
                             </SelectTrigger>
                             <SelectContent>
                                 {STATUS_OPTIONS.map((opt) => (
@@ -512,7 +545,7 @@ export default function BackgroundJobs() {
                             </SelectContent>
                         </Select>
                         <span className="text-sm text-muted-foreground ml-auto">
-                            Showing {jobs.length} of {pagination.total} jobs
+                            {t("admin.backgroundJobs.filters.showing", { count: jobs.length, total: pagination.total })}
                         </span>
                     </div>
 
@@ -521,19 +554,19 @@ export default function BackgroundJobs() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="w-[120px]">ID</TableHead>
-                                    <TableHead>Type</TableHead>
-                                    <TableHead>Subject</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Updated</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
+                                    <TableHead className="w-[120px]">{t("admin.backgroundJobs.table.id")}</TableHead>
+                                    <TableHead>{t("admin.backgroundJobs.table.type")}</TableHead>
+                                    <TableHead>{t("admin.backgroundJobs.table.subject")}</TableHead>
+                                    <TableHead>{t("common.status")}</TableHead>
+                                    <TableHead>{t("admin.backgroundJobs.table.updated")}</TableHead>
+                                    <TableHead className="text-right">{t("admin.backgroundJobs.table.actions")}</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {jobsLoading ? (
-                                    <TableRow><TableCell colSpan={6} className="text-center py-8">Loading...</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={6} className="text-center py-8">{t("admin.backgroundJobs.table.loading")}</TableCell></TableRow>
                                 ) : jobs.length === 0 ? (
-                                    <TableRow><TableCell colSpan={6} className="text-center py-8">No jobs found.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={6} className="text-center py-8">{t("admin.backgroundJobs.table.noJobs")}</TableCell></TableRow>
                                 ) : (
                                     jobs.map((job) => {
                                         const subject = getJobSubject(job);
@@ -551,7 +584,7 @@ export default function BackgroundJobs() {
                                                 <TableCell className="text-xs">{formatDate(job.updatedAt)}</TableCell>
                                                 <TableCell className="text-right">
                                                     <div className="flex justify-end gap-1">
-                                                        <Button variant="ghost" size="icon" onClick={() => handleViewDetails(job)} title="View Details">
+                                                        <Button variant="ghost" size="icon" onClick={() => handleViewDetails(job)} title={t("admin.backgroundJobs.tooltips.viewDetails")}>
                                                             <Eye className="h-4 w-4" />
                                                         </Button>
                                                         {job.status === "PENDING" && (
@@ -559,7 +592,7 @@ export default function BackgroundJobs() {
                                                                 variant="ghost" size="icon"
                                                                 onClick={() => processJobMutation.mutate(job.id)}
                                                                 disabled={processJobMutation.isPending}
-                                                                title="Process Job"
+                                                                title={t("admin.backgroundJobs.tooltips.processJob")}
                                                                 className="text-green-600"
                                                             >
                                                                 <Play className="h-4 w-4" />
@@ -570,7 +603,7 @@ export default function BackgroundJobs() {
                                                                 variant="ghost" size="icon"
                                                                 onClick={() => retryJobMutation.mutate(job.id)}
                                                                 disabled={retryJobMutation.isPending}
-                                                                title="Retry Job"
+                                                                title={t("admin.backgroundJobs.tooltips.retryJob")}
                                                                 className="text-orange-600"
                                                             >
                                                                 <RotateCcw className="h-4 w-4" />
@@ -590,7 +623,7 @@ export default function BackgroundJobs() {
                     {pagination.totalPages > 1 && (
                         <div className="flex items-center justify-between gap-3 pt-2">
                             <p className="text-sm text-muted-foreground">
-                                Page {pagination.page} of {pagination.totalPages}
+                                {t("admin.backgroundJobs.pagination.page", { current: pagination.page, total: pagination.totalPages })}
                             </p>
                             <div className="flex gap-2">
                                 <Button
@@ -618,7 +651,7 @@ export default function BackgroundJobs() {
                 <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            Job Details
+                            {t("admin.backgroundJobs.dialog.title")}
                             {selectedJob && getTypeBadge(selectedJob.type)}
                         </DialogTitle>
                     </DialogHeader>
@@ -626,21 +659,21 @@ export default function BackgroundJobs() {
                         <div className="space-y-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
                                 <div>
-                                    <span className="text-muted-foreground">Job ID:</span>
+                                    <span className="text-muted-foreground">{t("admin.backgroundJobs.dialog.jobId")}</span>
                                     <p className="font-mono text-xs sm:text-sm break-all">{selectedJob.id}</p>
                                 </div>
                                 <div>
-                                    <span className="text-muted-foreground">Status:</span>
+                                    <span className="text-muted-foreground">{t("common.status")}:</span>
                                     <div className="mt-1">{getStatusBadge(selectedJob.status)}</div>
                                 </div>
                                 {selectedJob.type === "ACCOUNT_DELETION" && (
                                     <>
                                         <div className="sm:col-span-2">
-                                            <span className="text-muted-foreground">User:</span>
+                                            <span className="text-muted-foreground">{t("admin.backgroundJobs.dialog.user")}</span>
                                             <p className="break-all font-medium">{selectedJob.userName} ({selectedJob.userEmail})</p>
                                         </div>
                                         <div>
-                                            <span className="text-muted-foreground">Current Step:</span>
+                                            <span className="text-muted-foreground">{t("admin.backgroundJobs.dialog.currentStep")}</span>
                                             <p className="font-mono text-xs">{selectedJob.currentStep || "LOCK_USER"}</p>
                                         </div>
                                     </>
@@ -648,32 +681,32 @@ export default function BackgroundJobs() {
                                 {selectedJob.type === "EVENT_CANCELLATION" && (
                                     <>
                                         <div className="sm:col-span-2">
-                                            <span className="text-muted-foreground">Event:</span>
+                                            <span className="text-muted-foreground">{t("admin.backgroundJobs.dialog.event")}</span>
                                             <p className="font-medium">{selectedJob.eventTitle}</p>
                                         </div>
                                         <div>
-                                            <span className="text-muted-foreground">Processed:</span>
+                                            <span className="text-muted-foreground">{t("admin.backgroundJobs.dialog.processed")}</span>
                                             <p>{selectedJob.processedCount || 0} / {selectedJob.totalRegistrations || 0}</p>
                                         </div>
                                     </>
                                 )}
                                 <div>
-                                    <span className="text-muted-foreground">Created At:</span>
+                                    <span className="text-muted-foreground">{t("admin.backgroundJobs.dialog.createdAt")}</span>
                                     <p>{formatDate(selectedJob.createdAt)}</p>
                                 </div>
                                 <div>
-                                    <span className="text-muted-foreground">Updated At:</span>
+                                    <span className="text-muted-foreground">{t("admin.backgroundJobs.dialog.updatedAt")}</span>
                                     <p>{formatDate(selectedJob.updatedAt)}</p>
                                 </div>
                             </div>
 
                             {selectedJob.errorLog && selectedJob.errorLog.length > 0 && (
                                 <div className="space-y-2">
-                                    <span className="text-muted-foreground text-sm font-medium">Logs & Errors:</span>
+                                    <span className="text-muted-foreground text-sm font-medium">{t("admin.backgroundJobs.dialog.logsErrors")}</span>
                                     <div className="p-3 bg-destructive/5 border border-destructive/10 rounded-md max-h-40 overflow-y-auto">
                                         {selectedJob.errorLog.map((log, i) => (
                                             <div key={i} className="text-xs mb-2 pb-2 border-b border-destructive/5 last:border-0">
-                                                <div className="font-mono text-destructive mb-1">{log.step || "Error"}</div>
+                                                <div className="font-mono text-destructive mb-1">{log.step || t("admin.backgroundJobs.dialog.error")}</div>
                                                 <div className="text-muted-foreground italic">{log.message || log.error}</div>
                                                 <div className="text-[10px] text-muted-foreground/60 mt-1">{formatDate(log.timestamp)}</div>
                                             </div>
@@ -688,7 +721,7 @@ export default function BackgroundJobs() {
                                         className="flex-1 bg-green-600"
                                         onClick={() => { processJobMutation.mutate(selectedJob.id); setDetailsOpen(false); }}
                                     >
-                                        <Play className="h-4 w-4 mr-2" /> Start Processing
+                                        <Play className="h-4 w-4 mr-2" /> {t("admin.backgroundJobs.actions.startProcessing")}
                                     </Button>
                                 )}
                                 {canRetry(selectedJob) && (
@@ -696,7 +729,7 @@ export default function BackgroundJobs() {
                                         className="flex-1"
                                         onClick={() => { retryJobMutation.mutate(selectedJob.id); setDetailsOpen(false); }}
                                     >
-                                        <RotateCcw className="h-4 w-4 mr-2" /> Retry Job
+                                        <RotateCcw className="h-4 w-4 mr-2" /> {t("admin.backgroundJobs.actions.retryJob")}
                                     </Button>
                                 )}
                             </div>

@@ -183,7 +183,7 @@ class AccountDeletionService {
     /**
      * Request deletion OTP
      */
-    static async requestDeletionOTP(userId, email, correlationId = null) {
+    static async requestDeletionOTP(userId, email, correlationId = null, lang = 'en') {
         correlationId = correlationId || crypto.randomBytes(16).toString('hex');
 
         logger.info({ userId, correlationId }, '[AccountDeletion] Requesting deletion OTP');
@@ -205,7 +205,7 @@ class AccountDeletionService {
                 purpose: 'ACCOUNT_DELETION',
                 userId: userId,
                 correlationId: correlationId
-            });
+            }, lang);
 
             return {
                 success: true,
@@ -296,7 +296,7 @@ class AccountDeletionService {
     /**
      * Confirm immediate deletion
      */
-    static async confirmImmediateDeletion(userId, authorizationToken, reason = null, correlationId = null) {
+    static async confirmImmediateDeletion(userId, authorizationToken, reason = null, correlationId = null, lang = 'en') {
         correlationId = correlationId || crypto.randomBytes(16).toString('hex');
 
         logger.info({ userId, correlationId }, '[AccountDeletion] Confirming immediate deletion');
@@ -337,7 +337,7 @@ class AccountDeletionService {
             // Send deletion confirmation email BEFORE anonymizing, or use the captured email
             if (oldEmail) {
                 // We send this in background to not block the request
-                emailService.sendAccountDeletedEmail(oldEmail, { name: userName }).catch(err =>
+                emailService.sendAccountDeletedEmail(oldEmail, { name: userName }, { lang }).catch(err =>
                     logger.error({ err, userId }, '[AccountDeletion] Failed to send deletion confirmation email')
                 );
             }
@@ -407,7 +407,7 @@ class AccountDeletionService {
     /**
      * Schedule deletion for future date
      */
-    static async scheduleDeletion(userId, authorizationToken, days, reason = null, correlationId = null) {
+    static async scheduleDeletion(userId, authorizationToken, days, reason = null, correlationId = null, lang = 'en') {
         correlationId = correlationId || crypto.randomBytes(16).toString('hex');
 
         if (![7, 15, 30].includes(days)) {
@@ -453,7 +453,7 @@ class AccountDeletionService {
 
             // Send deletion scheduled email
             if (userEmail) {
-                emailService.sendAccountDeletionScheduledEmail(userEmail, { name: userName, scheduledDate: scheduledFor }).catch(err =>
+                emailService.sendAccountDeletionScheduledEmail(userEmail, { name: userName, scheduledDate: scheduledFor }, { lang }).catch(err =>
                     logger.error({ err, userId }, '[AccountDeletion] Failed to send deletion scheduled email')
                 );
             }

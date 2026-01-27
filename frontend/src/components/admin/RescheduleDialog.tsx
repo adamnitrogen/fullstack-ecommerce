@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import {
     Dialog,
     DialogContent,
@@ -18,6 +19,7 @@ import {
 } from "@/components/ui/popover";
 import { CalendarIcon, AlertCircle, Loader2 } from "lucide-react";
 import { format, isBefore, isAfter } from "date-fns";
+import { hi, enUS } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import type { Event } from "@/types";
 
@@ -36,6 +38,8 @@ export function RescheduleDialog({
     event,
     isLoading = false
 }: RescheduleDialogProps) {
+    const { t, i18n } = useTranslation();
+    const currentLocale = i18n.language === "hi" ? hi : enUS;
     const [startDate, setStartDate] = useState<Date | undefined>();
     const [endDate, setEndDate] = useState<Date | undefined>();
     const [reason, setReason] = useState("");
@@ -77,17 +81,17 @@ export function RescheduleDialog({
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <CalendarIcon className="h-5 w-5 text-primary" />
-                        Reschedule Event
+                        {t("admin.events.dialogs.rescheduleDialog.title")}
                     </DialogTitle>
                     <DialogDescription>
-                        Change the dates for "{event?.title}". This will NOT trigger refunds, but will notify all registered users about the schedule change.
+                        {t("admin.events.dialogs.rescheduleDialog.desc", { title: event?.title })}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-4 py-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label>New Start Date</Label>
+                            <Label>{t("admin.events.dialogs.rescheduleDialog.newStartDate")}</Label>
                             <Popover>
                                 <PopoverTrigger asChild>
                                     <Button
@@ -98,7 +102,7 @@ export function RescheduleDialog({
                                         )}
                                     >
                                         <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {startDate ? format(startDate, "PPP") : <span>Pick date</span>}
+                                        {startDate ? format(startDate, "PPP", { locale: currentLocale }) : <span>{t("admin.events.dialogs.pickDate")}</span>}
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0" align="start">
@@ -113,7 +117,7 @@ export function RescheduleDialog({
                         </div>
 
                         <div className="space-y-2">
-                            <Label>New End Date (Opt)</Label>
+                            <Label>{t("admin.events.dialogs.rescheduleDialog.newEndDate")}</Label>
                             <Popover>
                                 <PopoverTrigger asChild>
                                     <Button
@@ -124,7 +128,7 @@ export function RescheduleDialog({
                                         )}
                                     >
                                         <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {endDate ? format(endDate, "PPP") : <span>Pick date</span>}
+                                        {endDate ? format(endDate, "PPP", { locale: currentLocale }) : <span>{t("admin.events.dialogs.pickDate")}</span>}
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0" align="start">
@@ -142,39 +146,39 @@ export function RescheduleDialog({
 
                     <div className="space-y-2">
                         <Label htmlFor="reschedule-reason">
-                            Reason for Schedule Change <span className="text-destructive">*</span>
+                            {t("admin.events.dialogs.rescheduleDialog.reasonLabel")} <span className="text-destructive">*</span>
                         </Label>
                         <Textarea
                             id="reschedule-reason"
-                            placeholder="e.g. Venue availability issue, health emergency..."
+                            placeholder={t("admin.events.dialogs.rescheduleDialog.reasonPlaceholder")}
                             value={reason}
                             onChange={(e) => setReason(e.target.value)}
                             className="resize-none"
                             rows={3}
                         />
                         <p className="text-[10px] text-muted-foreground">
-                            This message will be included in the notification email sent to all registrants.
+                            {t("admin.events.dialogs.rescheduleDialog.emailNotice")}
                         </p>
                     </div>
 
                     {!isRescheduled() && startDate && (
                         <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs">
                             <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                            <span>You haven't changed the dates. If you just want to update the details, use the Edit action instead.</span>
+                            <span>{t("admin.events.dialogs.rescheduleDialog.noChangeWarn")}</span>
                         </div>
                     )}
                 </div>
 
                 <DialogFooter>
                     <Button variant="outline" onClick={onClose} disabled={isLoading}>
-                        Cancel
+                        {t("common.cancel")}
                     </Button>
                     <Button
                         onClick={handleConfirm}
                         disabled={!startDate || !reason.trim() || !isRescheduled() || isLoading}
                     >
                         {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Confirm Reschedule
+                        {t("admin.events.dialogs.rescheduleDialog.confirm")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

@@ -2,13 +2,21 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { Button } from "@/components/ui/button";
-import { Menu, Home } from "lucide-react";
+import { Menu, Home, Languages } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useManagerPermissions } from "@/hooks/useManagerPermissions";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function AdminLayout() {
+  const { t, i18n } = useTranslation();
   const { user } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
@@ -16,6 +24,11 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isManager } = useManagerPermissions();
+
+  const changeLanguage = (lng: string) => {
+    i18n.changeLanguage(lng);
+    localStorage.setItem("language", lng);
+  };
 
   useEffect(() => {
     // Subscribe to realtime updates for account deletion jobs
@@ -35,12 +48,12 @@ export default function AdminLayout() {
           // Only notify on completion or failure transitions
           if (newStatus !== oldStatus) {
             if (newStatus === 'COMPLETED') {
-              toast.success(`Account Deletion Job Completed`, {
-                description: `Job ${payload.new.id.slice(0, 8)} finished successfully.`
+              toast.success(t('admin.layout.accountDeletion.jobCompleted'), {
+                description: t('admin.layout.accountDeletion.jobCompletedDesc', { id: payload.new.id.slice(0, 8) })
               });
             } else if (newStatus === 'FAILED') {
-              toast.error(`Account Deletion Job Failed`, {
-                description: `Job ${payload.new.id.slice(0, 8)} failed. Check logs.`
+              toast.error(t('admin.layout.accountDeletion.jobFailed'), {
+                description: t('admin.layout.accountDeletion.jobFailedDesc', { id: payload.new.id.slice(0, 8) })
               });
             }
           }
@@ -80,18 +93,40 @@ export default function AdminLayout() {
             </Button>
             <div className="flex-1">
               <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent animate-in fade-in slide-in-from-left-2 duration-500">
-                {isManager ? "Manager Portal" : "Admin Portal"}
+                {isManager ? t('admin.layout.managerPortal') : t('admin.layout.adminPortal')}
               </h1>
             </div>
             <div className="flex items-center gap-4">
               <span className="text-sm text-muted-foreground hidden sm:inline-block">
-                Welcome, {user?.name || 'User'}
+                {t('admin.layout.welcome', { name: user?.name || 'User' })}
               </span>
+
+              {/* Language Switcher */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full h-9 w-9 hover:bg-accent hover:text-accent-foreground transition-all duration-300"
+                  >
+                    <Languages className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="rounded-xl shadow-elevated border-border/50">
+                  <DropdownMenuItem onClick={() => changeLanguage("en")} className="rounded-lg cursor-pointer">
+                    English
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => changeLanguage("hi")} className="rounded-lg cursor-pointer">
+                    हिन्दी
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => navigate("/")}
-                title="Back to Website"
+                title={t('admin.layout.backToWebsite')}
                 className="hover:scale-110 transition-transform duration-200"
               >
                 <Home className="h-5 w-5" />

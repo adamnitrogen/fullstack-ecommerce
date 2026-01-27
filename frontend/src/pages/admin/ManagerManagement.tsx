@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { managerService, Manager } from "@/services/manager.service";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -20,6 +21,7 @@ import { ManagerDialog } from "@/components/admin/ManagerDialog";
 import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
 
 export default function ManagerManagement() {
+    const { t } = useTranslation();
     const [managerDialogOpen, setManagerDialogOpen] = useState(false);
     const [editingManager, setEditingManager] = useState<Manager | null>(null);
     const [deleteItem, setDeleteItem] = useState<{ id: string; name: string } | null>(null);
@@ -38,12 +40,12 @@ export default function ManagerManagement() {
         mutationFn: (id: string) => managerService.delete(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["managers"] });
-            toast({ title: "Manager deleted successfully" });
+            toast({ title: t("admin.managers.toasts.deleteSuccess") || "Manager deleted successfully" });
             setDeleteItem(null);
         },
         onError: (error: unknown) => {
             toast({
-                title: "Failed to delete manager",
+                title: t("admin.managers.toasts.deleteError"),
                 description: getErrorMessage(error),
                 variant: "destructive",
             });
@@ -56,11 +58,11 @@ export default function ManagerManagement() {
             managerService.toggleStatus(id, is_active),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["managers"] });
-            toast({ title: "Manager status updated" });
+            toast({ title: t("admin.managers.toasts.statusSuccess") || "Manager status updated" });
         },
         onError: (error: unknown) => {
             toast({
-                title: "Failed to update status",
+                title: t("admin.managers.toasts.statusError"),
                 description: getErrorMessage(error),
                 variant: "destructive",
             });
@@ -98,15 +100,15 @@ export default function ManagerManagement() {
                 open={!!deleteItem}
                 onOpenChange={(open) => !open && setDeleteItem(null)}
                 onConfirm={() => deleteItem && deleteMutation.mutate(deleteItem.id)}
-                title="Delete Manager"
-                description={`Are you sure you want to delete ${deleteItem?.name}? This will permanently remove their account and they will no longer be able to access the portal.`}
+                title={t("admin.managers.delete.title")}
+                description={t("admin.managers.delete.description", { name: deleteItem?.name })}
             />
 
             <div className="space-y-6">
                 <div>
-                    <h1 className="text-3xl font-bold">Manager Management</h1>
+                    <h1 className="text-3xl font-bold">{t("admin.managers.title")}</h1>
                     <p className="text-muted-foreground">
-                        Create and manage manager accounts with specific permissions
+                        {t("admin.managers.subtitle")}
                     </p>
                 </div>
 
@@ -116,9 +118,9 @@ export default function ManagerManagement() {
                             <div>
                                 <CardTitle className="flex items-center gap-2">
                                     <Users className="h-5 w-5" />
-                                    Managers
+                                    {t("admin.managers.listTitle")}
                                 </CardTitle>
-                                <CardDescription>Total: {managers.length} manager(s)</CardDescription>
+                                <CardDescription>{t("admin.managers.totalManagers", { count: managers.length })}</CardDescription>
                             </div>
                             <Button
                                 onClick={() => {
@@ -127,28 +129,28 @@ export default function ManagerManagement() {
                                 }}
                             >
                                 <Plus className="h-4 w-4 mr-2" />
-                                Add Manager
+                                {t("admin.managers.addManager")}
                             </Button>
                         </div>
                     </CardHeader>
                     <CardContent>
                         {isLoading ? (
-                            <p className="text-center text-muted-foreground py-8">Loading managers...</p>
+                            <p className="text-center text-muted-foreground py-8">{t("admin.managers.loading")}</p>
                         ) : managers.length === 0 ? (
                             <p className="text-center text-muted-foreground py-8">
-                                No managers yet. Create your first manager to get started.
+                                {t("admin.managers.noManagers")}
                             </p>
                         ) : (
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Name</TableHead>
-                                        <TableHead>Email</TableHead>
-                                        <TableHead>Created By</TableHead>
-                                        <TableHead>Permissions</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead>Created</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
+                                        <TableHead>{t("profile.personalInfo.name")}</TableHead>
+                                        <TableHead>{t("profile.personalInfo.email")}</TableHead>
+                                        <TableHead>{t("admin.managers.cols.createdBy")}</TableHead>
+                                        <TableHead>{t("admin.managers.cols.permissions")}</TableHead>
+                                        <TableHead>{t("common.status")}</TableHead>
+                                        <TableHead>{t("admin.managers.cols.created")}</TableHead>
+                                        <TableHead className="text-right">{t("common.actions")}</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -164,13 +166,13 @@ export default function ManagerManagement() {
                                                 <TableCell>
                                                     <div className="flex items-center gap-2">
                                                         <Badge variant="outline" className="font-normal">
-                                                            {manager.creator_name || 'System'}
+                                                            {manager.creator_name || t("common.system")}
                                                         </Badge>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge variant="secondary">
-                                                        {getActivePermissionsCount(manager)} of 18
+                                                        {t("admin.managers.permissionsCount", { count: getActivePermissionsCount(manager), total: 18 })}
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell>
@@ -188,7 +190,7 @@ export default function ManagerManagement() {
                                                         <Badge
                                                             variant={isActive ? "default" : "secondary"}
                                                         >
-                                                            {isActive ? "Active" : "Inactive"}
+                                                            {isActive ? t("admin.managers.status.active") : t("admin.managers.status.inactive")}
                                                         </Badge>
                                                     </div>
                                                 </TableCell>

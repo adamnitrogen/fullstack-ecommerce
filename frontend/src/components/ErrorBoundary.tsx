@@ -1,5 +1,6 @@
 import React, { ErrorInfo, ReactNode } from "react";
 import { logger } from "@/lib/logger";
+import { Translation } from "react-i18next";
 
 interface Props {
     children: ReactNode;
@@ -35,20 +36,24 @@ export class ErrorBoundary extends React.Component<Props, State> {
                 return this.props.fallback;
             }
             return (
-                <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-                    <div className="max-w-md w-full text-center">
-                        <h1 className="text-2xl font-bold text-gray-900 mb-2">Something went wrong</h1>
-                        <p className="text-gray-600 mb-6">
-                            We've been notified and are looking into it. Please try refreshing the page.
-                        </p>
-                        <button
-                            onClick={() => window.location.reload()}
-                            className="bg-primary text-white px-6 py-2 rounded-md hover:bg-primary/90 transition-colors"
-                        >
-                            Refresh Page
-                        </button>
-                    </div>
-                </div>
+                <Translation>
+                    {(t) => (
+                        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+                            <div className="max-w-md w-full text-center">
+                                <h1 className="text-2xl font-bold text-gray-900 mb-2">{t('common.errorBoundary.title')}</h1>
+                                <p className="text-gray-600 mb-6">
+                                    {t('common.errorBoundary.desc')}
+                                </p>
+                                <button
+                                    onClick={() => window.location.reload()}
+                                    className="bg-primary text-white px-6 py-2 rounded-md hover:bg-primary/90 transition-colors"
+                                >
+                                    {t('common.errorBoundary.retry')}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </Translation>
             );
         }
 

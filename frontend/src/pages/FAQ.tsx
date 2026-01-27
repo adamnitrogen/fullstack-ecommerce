@@ -43,7 +43,7 @@ export default function FAQ() {
 
   // Group FAQs by category
   const faqsByCategory = faqs.reduce((acc, faq) => {
-    const categoryName = faq.category?.name || 'General';
+    const categoryName = faq.category?.name || t("faq.generalCategory", "General");
     if (!acc[categoryName]) {
       acc[categoryName] = [];
     }
@@ -63,7 +63,7 @@ export default function FAQ() {
   });
 
   if (isLoading) {
-    return <LoadingOverlay isLoading={true} message="Just a moment..." />;
+    return <LoadingOverlay isLoading={true} message={t("faq.loading")} />;
   }
 
   const primaryPhone = contactInfo?.phones.find(p => p.is_primary) || contactInfo?.phones[0];
@@ -87,7 +87,7 @@ export default function FAQ() {
             <span className="text-sm font-bold uppercase tracking-widest">{t("faq.title")}</span>
           </div>
           <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 font-playfair animate-in fade-in slide-in-from-bottom-8 duration-700 delay-150">
-            How can we help?
+            {t("faq.heroTitle")}
           </h1>
 
           <div className="max-w-2xl mx-auto relative group animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
@@ -114,7 +114,7 @@ export default function FAQ() {
               : "bg-white hover:bg-muted"
               }`}
           >
-            All Questions
+            {t("faq.allQuestions")}
           </Button>
           {categories.map((category) => (
             <Button
@@ -160,14 +160,14 @@ export default function FAQ() {
                   <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mx-auto mb-6 text-muted-foreground">
                     <Search className="h-10 w-10" />
                   </div>
-                  <h3 className="text-2xl font-bold text-[#2C1810] mb-2">No matches found</h3>
-                  <p className="text-muted-foreground">We couldn't find any questions matching your search for "{searchQuery}"</p>
+                  <h3 className="text-2xl font-bold text-[#2C1810] mb-2">{t("faq.noMatches")}</h3>
+                  <p className="text-muted-foreground">{t("faq.noMatchesDesc", { query: searchQuery })}</p>
                   <Button
                     variant="link"
                     className="mt-4 text-[#B85C3C] font-bold"
                     onClick={() => { setSearchQuery(""); setActiveCategory(null); }}
                   >
-                    Clear all filters
+                    {t("faq.clearFilters")}
                   </Button>
                 </Card>
               )}
@@ -202,64 +202,64 @@ export default function FAQ() {
             ))
           )}
         </div>
+      </div>
 
-        {/* Still Have Questions? */}
-        <section className="mt-32">
-          <Card className="border-none shadow-2xl bg-[#2C1810] text-white overflow-hidden rounded-[3rem]">
-            <CardContent className="p-0 flex flex-col md:flex-row items-center">
-              <div className="p-10 md:p-16 flex-1 space-y-8">
-                <div className="space-y-4">
-                  <h2 className="text-4xl md:text-5xl font-bold font-playfair">{t("faq.stillHaveQuestions")}</h2>
-                  <p className="text-white/70 text-lg leading-relaxed">
-                    {t("faq.contactSupport")}
-                  </p>
-                </div>
+      {/* Still Have Questions? */}
+      <section className="mt-32">
+        <Card className="border-none shadow-2xl bg-[#2C1810] text-white overflow-hidden rounded-[3rem]">
+          <CardContent className="p-0 flex flex-col md:flex-row items-center">
+            <div className="p-10 md:p-16 flex-1 space-y-8">
+              <div className="space-y-4">
+                <h2 className="text-4xl md:text-5xl font-bold font-playfair">{t("faq.stillHaveQuestions")}</h2>
+                <p className="text-white/70 text-lg leading-relaxed">
+                  {t("faq.contactSupport")}
+                </p>
+              </div>
 
-                <div className="flex flex-col sm:flex-row gap-6">
-                  {primaryPhone && (
-                    <a
-                      href={`tel:${primaryPhone.number}`}
-                      className="flex items-center gap-4 group"
-                    >
-                      <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center text-white group-hover:bg-[#B85C3C] transition-all duration-300 transform group-hover:-translate-y-1">
-                        <Phone className="h-6 w-6" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-white/50 uppercase tracking-widest">{t("faq.callUs")}</p>
-                        <p className="text-xl font-bold group-hover:text-[#B85C3C] transition-colors">{primaryPhone.number}</p>
-                      </div>
-                    </a>
-                  )}
-
-                  <Link
-                    to="/contact#contact-form"
+              <div className="flex flex-col sm:flex-row gap-6">
+                {primaryPhone && (
+                  <a
+                    href={`tel:${primaryPhone.number}`}
                     className="flex items-center gap-4 group"
                   >
-                    <div className="w-14 h-14 rounded-2xl bg-[#B85C3C] flex items-center justify-center text-white shadow-lg shadow-[#B85C3C]/20 transition-all duration-300 transform group-hover:-translate-y-1 group-hover:bg-[#A04B2E]">
-                      <Mail className="h-6 w-6" />
+                    <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center text-white group-hover:bg-[#B85C3C] transition-all duration-300 transform group-hover:-translate-y-1">
+                      <Phone className="h-6 w-6" />
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-white/50 uppercase tracking-widest">{t("faq.contactUs")}</p>
-                      <p className="text-xl font-bold group-hover:text-[#B85C3C] transition-colors flex items-center gap-2">
-                        Message Us <ArrowRight className="h-5 w-5 animate-in slide-in-from-left-2 duration-700" />
-                      </p>
+                      <p className="text-sm font-bold text-white/50 uppercase tracking-widest">{t("faq.callUs")}</p>
+                      <p className="text-xl font-bold group-hover:text-[#B85C3C] transition-colors">{primaryPhone.number}</p>
                     </div>
-                  </Link>
-                </div>
-              </div>
+                  </a>
+                )}
 
-              <div className="hidden md:block w-1/3 h-full relative self-stretch">
-                <img
-                  src="/contact-hero.png"
-                  alt="Contact"
-                  className="absolute inset-0 w-full h-full object-cover opacity-50 grayscale hover:grayscale-0 transition-all duration-700"
-                />
-                <div className="absolute inset-0 bg-gradient-to-r from-[#2C1810]" />
+                <Link
+                  to="/contact#contact-form"
+                  className="flex items-center gap-4 group"
+                >
+                  <div className="w-14 h-14 rounded-2xl bg-[#B85C3C] flex items-center justify-center text-white shadow-lg shadow-[#B85C3C]/20 transition-all duration-300 transform group-hover:-translate-y-1 group-hover:bg-[#A04B2E]">
+                    <Mail className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-white/50 uppercase tracking-widest">{t("faq.contactUs")}</p>
+                    <p className="text-xl font-bold group-hover:text-[#B85C3C] transition-colors flex items-center gap-2">
+                      {t("faq.messageUs")} <ArrowRight className="h-5 w-5 animate-in slide-in-from-left-2 duration-700" />
+                    </p>
+                  </div>
+                </Link>
               </div>
-            </CardContent>
-          </Card>
-        </section>
-      </div>
+            </div>
+
+            <div className="hidden md:block w-1/3 h-full relative self-stretch">
+              <img
+                src="/contact-hero.png"
+                alt="Contact"
+                className="absolute inset-0 w-full h-full object-cover opacity-50 grayscale hover:grayscale-0 transition-all duration-700"
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-[#2C1810]" />
+            </div>
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
 }

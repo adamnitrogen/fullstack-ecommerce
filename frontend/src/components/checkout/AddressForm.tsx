@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +21,7 @@ interface AddressFormProps {
 }
 
 export function AddressForm({ address, onSubmit, onCancel, loading }: AddressFormProps) {
+    const { t } = useTranslation();
     const [formData, setFormData] = useState<CreateAddressDto>({
         type: (address?.type === 'shipping' || address?.type === 'billing' || address?.type === 'both' ? address.type : 'shipping') as 'shipping' | 'billing' | 'both',
         full_name: address?.full_name || '',
@@ -42,7 +44,7 @@ export function AddressForm({ address, onSubmit, onCancel, loading }: AddressFor
         <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <Label htmlFor="type">Address Type</Label>
+                    <Label htmlFor="type">{t("donate.addressForm.addressType")}</Label>
                     <Select
                         value={formData.type}
                         onValueChange={(value: 'shipping' | 'billing' | 'both') => setFormData({ ...formData, type: value })}
@@ -51,15 +53,15 @@ export function AddressForm({ address, onSubmit, onCancel, loading }: AddressFor
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="shipping">Shipping</SelectItem>
-                            <SelectItem value="billing">Billing</SelectItem>
-                            <SelectItem value="both">Both</SelectItem>
+                            <SelectItem value="shipping">{t("donate.addressForm.shipping")}</SelectItem>
+                            <SelectItem value="billing">{t("donate.addressForm.billing")}</SelectItem>
+                            <SelectItem value="both">{t("donate.addressForm.both")}</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
 
                 <div>
-                    <Label htmlFor="full_name">Full Name *</Label>
+                    <Label htmlFor="full_name">{t("donate.addressForm.fullName")} *</Label>
                     <Input
                         id="full_name"
                         required
@@ -70,7 +72,7 @@ export function AddressForm({ address, onSubmit, onCancel, loading }: AddressFor
                 </div>
 
                 <div>
-                    <Label htmlFor="phone">Phone *</Label>
+                    <Label htmlFor="phone">{t("donate.addressForm.phone")} *</Label>
                     <Input
                         id="phone"
                         type="tel"
@@ -82,7 +84,7 @@ export function AddressForm({ address, onSubmit, onCancel, loading }: AddressFor
                 </div>
 
                 <div className="md:col-span-2">
-                    <Label htmlFor="address_line1">Address Line 1 *</Label>
+                    <Label htmlFor="address_line1">{t("donate.addressForm.addressLine1")} *</Label>
                     <Input
                         id="address_line1"
                         required
@@ -93,7 +95,7 @@ export function AddressForm({ address, onSubmit, onCancel, loading }: AddressFor
                 </div>
 
                 <div className="md:col-span-2">
-                    <Label htmlFor="address_line2">Address Line 2</Label>
+                    <Label htmlFor="address_line2">{t("donate.addressForm.addressLine2")}</Label>
                     <Input
                         id="address_line2"
                         value={formData.address_line2}
@@ -103,7 +105,7 @@ export function AddressForm({ address, onSubmit, onCancel, loading }: AddressFor
                 </div>
 
                 <div>
-                    <Label htmlFor="city">City *</Label>
+                    <Label htmlFor="city">{t("donate.addressForm.city")} *</Label>
                     <Input
                         id="city"
                         required
@@ -114,7 +116,7 @@ export function AddressForm({ address, onSubmit, onCancel, loading }: AddressFor
                 </div>
 
                 <div>
-                    <Label htmlFor="state">State *</Label>
+                    <Label htmlFor="state">{t("donate.addressForm.state")} *</Label>
                     <Input
                         id="state"
                         required
@@ -125,7 +127,7 @@ export function AddressForm({ address, onSubmit, onCancel, loading }: AddressFor
                 </div>
 
                 <div>
-                    <Label htmlFor="postal_code">Postal Code *</Label>
+                    <Label htmlFor="postal_code">{t("donate.addressForm.postalCode")} *</Label>
                     <Input
                         id="postal_code"
                         required
@@ -136,7 +138,7 @@ export function AddressForm({ address, onSubmit, onCancel, loading }: AddressFor
                 </div>
 
                 <div>
-                    <Label htmlFor="country">Country</Label>
+                    <Label htmlFor="country">{t("donate.addressForm.country")}</Label>
                     <Input
                         id="country"
                         value={formData.country}
@@ -155,16 +157,16 @@ export function AddressForm({ address, onSubmit, onCancel, loading }: AddressFor
                     }
                 />
                 <Label htmlFor="is_primary" className="cursor-pointer">
-                    Set as primary address
+                    {t("donate.addressForm.setPrimary")}
                 </Label>
             </div>
 
             <div className="flex justify-end gap-3">
                 <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
-                    Cancel
+                    {t("common.cancel")}
                 </Button>
                 <Button type="submit" disabled={loading}>
-                    {loading ? "Saving..." : address ? "Update Address" : "Add Address"}
+                    {loading ? t("donate.addressForm.saving") : address ? t("donate.addressForm.updateAddress") : t("donate.addressForm.addAddress")}
                 </Button>
             </div>
         </form>

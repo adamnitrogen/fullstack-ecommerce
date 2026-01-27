@@ -95,10 +95,10 @@ export default function Contact() {
       !formData.message
     ) {
       const newErrors: Record<string, string> = {};
-      if (!formData.name) newErrors.name = t("contact.name") + " is required";
-      if (!formData.email) newErrors.email = t("contact.email") + " is required";
-      if (!formData.subject) newErrors.subject = t("contact.subject") + " is required";
-      if (!formData.message) newErrors.message = t("contact.message") + " is required";
+      if (!formData.name) newErrors.name = t("validation.required", { field: t("contact.name") });
+      if (!formData.email) newErrors.email = t("validation.required", { field: t("contact.email") });
+      if (!formData.subject) newErrors.subject = t("validation.required", { field: t("contact.subject") });
+      if (!formData.message) newErrors.message = t("validation.required", { field: t("contact.message") });
       setErrors(newErrors);
       return;
     }
@@ -117,12 +117,12 @@ export default function Contact() {
         // Actually, backend has metadata support in email service but DB schema usually just has message.
         // Let's check DB schema I created: name, email, message.
         // So I will combine subject and message.
-        message: `Subject: ${formData.subject}\n\n${formData.message}`
+        message: `${t("contact.subject")}: ${formData.subject}\n\n${formData.message}`
       });
 
       toast({
-        title: t("auth.success") || "Success",
-        description: "Message sent successfully! We'll get back to you soon.",
+        title: t("common.success"),
+        description: t("success.contact.message_received"),
       });
       setFormData({ name: "", email: "", subject: "", message: "" });
     } catch (error: unknown) {
@@ -136,8 +136,8 @@ export default function Contact() {
         setErrors(backendErrors);
       } else {
         toast({
-          title: t("auth.error") || "Error",
-          description: getErrorMessage(error, "Failed to send message. Please try again."),
+          title: t("common.error"),
+          description: getErrorMessage(error, t("errors.system.generic_error")),
           variant: "destructive",
         });
       }
@@ -160,7 +160,7 @@ export default function Contact() {
   };
 
   if (isLoadingFAQs || isLoadingSocial || isLoadingContact) {
-    return <LoadingOverlay isLoading={true} message="Getting contact details..." />;
+    return <LoadingOverlay isLoading={true} />;
   }
 
   const primaryPhone = contactInfo?.phones.find(p => p.is_primary) || contactInfo?.phones[0];
@@ -172,7 +172,7 @@ export default function Contact() {
     if (!time) return '';
     const [hours, minutes] = time.split(':');
     const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const ampm = hour >= 12 ? t("common.pm") : t("common.am");
     const displayHour = hour % 12 || 12;
     return `${displayHour}:${minutes} ${ampm}`;
   };
@@ -184,7 +184,7 @@ export default function Contact() {
         <div className="absolute inset-0 z-0">
           <img
             src="/contact-hero.png"
-            alt="Contact Hero"
+            alt={t("contact.heroAlt")}
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-background" />
@@ -222,7 +222,7 @@ export default function Contact() {
                   )}
                 </div>
               ) : (
-                <p className="text-muted-foreground italic opacity-70">{t("contact.closed")}</p> // Reusing 'closed' for 'Not set'
+                <p className="text-muted-foreground italic opacity-70">{t("contact.closed")}</p>
               )}
             </CardContent>
           </Card>
@@ -291,7 +291,7 @@ export default function Contact() {
                         id="name"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="John Doe"
+                        placeholder={t("contact.namePlaceholder")}
                         required
                         className={`h-12 bg-muted/30 border-none focus-visible:ring-2 focus-visible:ring-[#B85C3C] ${errors.name ? "ring-2 ring-destructive" : ""}`}
                       />
@@ -305,7 +305,7 @@ export default function Contact() {
                         type="email"
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        placeholder="john@example.com"
+                        placeholder={t("contact.emailPlaceholder")}
                         required
                         className={`h-12 bg-muted/30 border-none focus-visible:ring-2 focus-visible:ring-[#B85C3C] ${errors.email ? "ring-2 ring-destructive" : ""}`}
                       />
@@ -336,9 +336,13 @@ export default function Contact() {
                       onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                       placeholder={t("contact.messagePlaceholder")}
                       rows={10}
+                      maxLength={1000}
                       required
                       className={`bg-muted/30 border-none focus-visible:ring-2 focus-visible:ring-[#B85C3C] resize-none ${errors.message ? "ring-2 ring-destructive" : ""}`}
                     />
+                    <div className="flex justify-end text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1">
+                      {formData.message.length}/1000 {t("common.characters")}
+                    </div>
                   </div>
 
                   <div className="flex-1" />
@@ -372,24 +376,17 @@ export default function Contact() {
               <Card className="overflow-hidden border-none shadow-xl bg-white group">
                 <div className="h-64 w-full bg-muted relative">
                   <iframe
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent(
+                      [address?.address_line1, address?.address_line2, address?.city, address?.state, address?.pincode]
+                        .filter(Boolean)
+                        .join(", ") || t("admin.address.mapFallback")
+                    )}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
                     width="100%"
                     height="100%"
                     style={{ border: 0 }}
-                    loading="lazy"
                     allowFullScreen
-                    referrerPolicy="no-referrer-when-downgrade"
-                    src={`https://maps.google.com/maps?q=${encodeURIComponent(
-                      [
-                        contactInfo?.address?.address_line1,
-                        contactInfo?.address?.city,
-                        contactInfo?.address?.state,
-                        contactInfo?.address?.pincode,
-                        contactInfo?.address?.country,
-                      ]
-                        .filter(Boolean)
-                        .join(", ") || "Vrindavan, Mathura"
-                    )}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
-                    title="Office Location"
+                    loading="lazy"
+                    title={t("admin.address.mapPreview")}
                   ></iframe>
 
                   <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors pointer-events-none" />
@@ -413,7 +410,7 @@ export default function Contact() {
                             contactInfo?.address?.country,
                           ]
                             .filter(Boolean)
-                            .join(", ") || "Vrindavan, Mathura"
+                            .join(", ") || t("admin.address.mapFallback")
                         )}`,
                         "_blank"
                       )
@@ -436,12 +433,6 @@ export default function Contact() {
                 <div className="space-y-4">
                   {contactInfo?.officeHours && contactInfo.officeHours.length > 0 ? (
                     (() => {
-                      // Day abbreviations
-                      const dayAbbr: Record<string, string> = {
-                        'Monday': 'Mon', 'Tuesday': 'Tue', 'Wednesday': 'Wed',
-                        'Thursday': 'Thu', 'Friday': 'Fri', 'Saturday': 'Sat', 'Sunday': 'Sun'
-                      };
-
                       interface GroupedHours {
                         days: string[];
                         open_time: string;
@@ -467,12 +458,12 @@ export default function Contact() {
                         return groups;
                       }, []);
 
-                      return (groupedHours as GroupedHours[]).map((group, index) => (
-                        <div key={index} className="flex justify-between items-center py-2 border-b border-dashed border-border last:border-none">
-                          <span className="text-[#2C1810] font-medium">
-                            {group.days.length === 1 ? group.days[0] : `${dayAbbr[group.days[0]]} - ${dayAbbr[group.days[group.days.length - 1]]}`}
+                      return (groupedHours).map((group, idx) => (
+                        <div key={idx} className="flex justify-between items-center py-2 border-b border-[#2C1810]/5 last:border-0">
+                          <span className="font-medium text-[#2C1810]">
+                            {group.days.map(day => t(`admin.hours.days.${day.substring(0, 3).toLowerCase()}`)).join(' - ')}
                           </span>
-                          <span className="text-muted-foreground font-mono">
+                          <span className="text-[#B85C3C] font-semibold">
                             {group.is_closed
                               ? <span className="text-destructive font-bold uppercase tracking-tighter">{t("contact.closed")}</span>
                               : `${formatTime(group.open_time)} - ${formatTime(group.close_time)}`}

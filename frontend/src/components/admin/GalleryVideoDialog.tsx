@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
@@ -35,6 +36,7 @@ export function GalleryVideoDialog({
   video,
   defaultFolderId,
 }: GalleryVideoDialogProps) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState({
@@ -116,12 +118,12 @@ export function GalleryVideoDialog({
       queryClient.invalidateQueries({ queryKey: ["gallery-videos"] });
       queryClient.invalidateQueries({ queryKey: ["gallery-folders"] });
       toast.success(
-        video ? "Video updated successfully" : "Video added successfully"
+        video ? t("admin.gallery.toasts.videoUpdated") : t("admin.gallery.toasts.videoCreated")
       );
       onOpenChange(false);
     },
     onError: () => {
-      toast.error(video ? "Failed to update video" : "Failed to add video");
+      toast.error(video ? t("admin.gallery.toasts.saveVideoError") : t("admin.gallery.toasts.saveVideoError"));
     },
   });
 
@@ -129,17 +131,17 @@ export function GalleryVideoDialog({
     e.preventDefault();
 
     if (!formData.folder_id) {
-      toast.error("Please select a folder");
+      toast.error(t("admin.gallery.toasts.requiredFolder"));
       return;
     }
 
     if (!extractedId) {
-      toast.error("Please enter a valid YouTube URL");
+      toast.error(t("admin.gallery.toasts.requiredYoutubeUrl"));
       return;
     }
 
     if (!formData.title.trim()) {
-      toast.error("Title is required");
+      toast.error(t("admin.gallery.toasts.requiredTitle"));
       return;
     }
 
@@ -151,12 +153,12 @@ export function GalleryVideoDialog({
       <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl">
-            {video ? "Edit Video" : "Add New Video"}
+            {video ? t("admin.gallery.dialog.editVideo") : t("admin.gallery.dialog.addVideo")}
           </DialogTitle>
           <DialogDescription>
             {video
-              ? "Update the video details and metadata"
-              : "Add a new YouTube video to the gallery"}
+              ? t("admin.gallery.dialog.editVideoDesc")
+              : t("admin.gallery.dialog.addVideoDesc")}
           </DialogDescription>
         </DialogHeader>
 
@@ -164,11 +166,11 @@ export function GalleryVideoDialog({
           {/* Video Preview */}
           {extractedId && (
             <div className="space-y-2 border rounded-lg p-4 bg-muted/30">
-              <Label className="text-base font-semibold">Video Preview</Label>
+              <Label className="text-base font-semibold">{t("admin.gallery.dialog.videoPreview")}</Label>
               <div className="aspect-video rounded-md overflow-hidden bg-black">
                 <iframe
                   src={`https://www.youtube.com/embed/${extractedId}`}
-                  title="Video preview"
+                  title={t("admin.gallery.dialog.videoPreview")}
                   className="w-full h-full"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
@@ -180,7 +182,7 @@ export function GalleryVideoDialog({
           {/* Folder Selection */}
           <div className="space-y-2">
             <Label htmlFor="folder">
-              Folder <span className="text-destructive">*</span>
+              {t("admin.gallery.folder")} <span className="text-destructive">*</span>
             </Label>
             <Select
               value={formData.folder_id}
@@ -189,7 +191,7 @@ export function GalleryVideoDialog({
               }
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select a folder" />
+                <SelectValue placeholder={t("admin.gallery.toasts.requiredFolder")} />
               </SelectTrigger>
               <SelectContent>
                 {folders.map((folder) => (
@@ -204,11 +206,11 @@ export function GalleryVideoDialog({
           {/* Video URL */}
           {!video && (
             <div className="space-y-4 border rounded-lg p-4">
-              <h3 className="text-base font-semibold">YouTube Video URL</h3>
+              <h3 className="text-base font-semibold">{t("admin.gallery.dialog.youtubeUrl")}</h3>
 
               <div className="space-y-2">
                 <Label htmlFor="youtubeUrl">
-                  YouTube URL <span className="text-destructive">*</span>
+                  {t("admin.gallery.dialog.youtubeUrl")} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="youtubeUrl"
@@ -218,7 +220,7 @@ export function GalleryVideoDialog({
                   required
                 />
                 <p className="text-sm text-muted-foreground">
-                  Paste the full YouTube URL
+                  {t("admin.gallery.dialog.youtubeUrlHelp")}
                 </p>
               </div>
             </div>
@@ -226,11 +228,11 @@ export function GalleryVideoDialog({
 
           {/* Video Information */}
           <div className="space-y-4 border rounded-lg p-4">
-            <h3 className="text-base font-semibold">Video Information</h3>
+            <h3 className="text-base font-semibold">{t("admin.gallery.dialog.videoInformation")}</h3>
 
             <div className="space-y-2">
               <Label htmlFor="title">
-                Title <span className="text-destructive">*</span>
+                {t("common.title")} <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="title"
@@ -238,20 +240,20 @@ export function GalleryVideoDialog({
                 onChange={(e) =>
                   setFormData({ ...formData, title: e.target.value })
                 }
-                placeholder="Enter video title"
+                placeholder={t("common.titlePlaceholder")}
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Description (Optional)</Label>
+              <Label htmlFor="description">{t("admin.gallery.dialog.description")} ({t("common.optional")})</Label>
               <Textarea
                 id="description"
                 value={formData.description}
                 onChange={(e) =>
                   setFormData({ ...formData, description: e.target.value })
                 }
-                placeholder="Enter video description"
+                placeholder={t("admin.gallery.dialog.descPlaceholder")}
                 rows={4}
               />
             </div>
@@ -264,14 +266,14 @@ export function GalleryVideoDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={mutation.isPending}>
               {mutation.isPending
-                ? "Saving..."
+                ? t("common.saving")
                 : video
-                  ? "Update Video"
-                  : "Add Video"}
+                  ? t("admin.gallery.toasts.videoUpdated")
+                  : t("admin.gallery.addVideo")}
             </Button>
           </div>
         </form>

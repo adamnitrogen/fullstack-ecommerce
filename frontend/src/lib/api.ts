@@ -1,3 +1,4 @@
+import { CONFIG } from "../config";
 import axios, { InternalAxiosRequestConfig } from "axios";
 import { logAPICall, logger } from "./logger";
 import { getGuestId } from "./guestId";
@@ -10,9 +11,8 @@ declare module 'axios' {
   }
 }
 
-// Base URL for your Spring Boot backend
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5173/api";
+// Base URL for your Spring Boot backend (or Node.js)
+const API_BASE_URL = CONFIG.API_BASE_URL;
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

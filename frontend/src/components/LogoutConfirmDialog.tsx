@@ -8,6 +8,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useTranslation } from "react-i18next";
 
 interface LogoutConfirmDialogProps {
   open: boolean;
@@ -20,19 +21,19 @@ export function LogoutConfirmDialog({
   onOpenChange,
   onConfirm,
 }: LogoutConfirmDialogProps) {
+  const { t } = useTranslation();
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Confirm Logout</AlertDialogTitle>
+          <AlertDialogTitle>{t('common.logoutConfirmTitle')}</AlertDialogTitle>
           <AlertDialogDescription>
-            Are you sure you want to log out? You will need to log in again to
-            access your account.
+            {t('common.logoutConfirmDesc')}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm}>Yes, Logout</AlertDialogAction>
+          <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm}>{t('nav.logout')}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

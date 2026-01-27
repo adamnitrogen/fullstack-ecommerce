@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { Comment } from "@/types/comment";
@@ -40,6 +41,7 @@ export const CommentItem = ({
     onFlag,
     depth = 0
 }: CommentItemProps) => {
+    const { t } = useTranslation();
     const { user, isAuthenticated } = useAuthStore();
     const [isReplying, setIsReplying] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -100,12 +102,12 @@ export const CommentItem = ({
                                 </span>
                                 {comment.edit_count > 0 && (
                                     <span className="text-xs text-muted-foreground italic">
-                                        (edited)
+                                        {t("comments.edited")}
                                     </span>
                                 )}
                                 {isHidden && (
                                     <span className="text-xs bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded-full border border-yellow-200 font-medium">
-                                        Hidden
+                                        {t("comments.hidden")}
                                     </span>
                                 )}
                             </div>
@@ -122,19 +124,19 @@ export const CommentItem = ({
                                         {canEdit && (
                                             <DropdownMenuItem onClick={() => setIsEditing(true)}>
                                                 <Edit2 className="mr-2 h-4 w-4" />
-                                                Edit
+                                                {t("comments.edit")}
                                             </DropdownMenuItem>
                                         )}
                                         {(isOwner || isAdmin) && (
                                             <DropdownMenuItem onClick={() => onDelete(comment.id)} className="text-destructive focus:text-destructive">
                                                 <Trash2 className="mr-2 h-4 w-4" />
-                                                Delete
+                                                {t("comments.delete")}
                                             </DropdownMenuItem>
                                         )}
                                         {!isOwner && isAuthenticated && (
                                             <DropdownMenuItem onClick={() => setIsFlagging(true)}>
                                                 <Flag className="mr-2 h-4 w-4" />
-                                                Report
+                                                {t("comments.report")}
                                             </DropdownMenuItem>
                                         )}
                                     </DropdownMenuContent>
@@ -149,7 +151,7 @@ export const CommentItem = ({
                                     initialContent={comment.content}
                                     onSubmit={handleEditSubmit}
                                     onCancel={() => setIsEditing(false)}
-                                    submitLabel="Save Changes"
+                                    submitLabel={t("comments.saveChanges")}
                                     autoFocus
                                 />
                             </div>
@@ -157,7 +159,7 @@ export const CommentItem = ({
                             <div className={cn("text-sm sm:text-base leading-relaxed text-foreground/90 break-words whitespace-pre-wrap py-1",
                                 isDeleted && "text-muted-foreground italic bg-muted/30 p-2 rounded"
                             )}>
-                                {isDeleted ? "This comment has been deleted." : comment.content}
+                                {isDeleted ? t("comments.deletedMsg") : comment.content}
                             </div>
                         )}
                     </div>
@@ -173,7 +175,7 @@ export const CommentItem = ({
                                     onClick={() => setIsReplying(!isReplying)}
                                 >
                                     <Reply className="h-3.5 w-3.5" />
-                                    Reply
+                                    {t("comments.reply")}
                                 </Button>
                             )}
 
@@ -184,7 +186,7 @@ export const CommentItem = ({
                                     className="h-auto p-0 text-xs font-medium text-muted-foreground hover:text-primary transition-colors"
                                     onClick={() => setShowReplies(!showReplies)}
                                 >
-                                    {showReplies ? "Hide Replies" : `View ${comment.replies.length} Replies`}
+                                    {showReplies ? t("comments.hideReplies") : t("comments.viewReplies", { count: comment.replies.length })}
                                 </Button>
                             )}
                         </div>
@@ -196,8 +198,8 @@ export const CommentItem = ({
                             <CommentForm
                                 onSubmit={handleReplySubmit}
                                 onCancel={() => setIsReplying(false)}
-                                submitLabel="Reply"
-                                placeholder={`Reply to ${comment.profiles?.first_name}...`}
+                                submitLabel={t("comments.reply")}
+                                placeholder={t("comments.replyTo", { name: comment.profiles?.first_name })}
                                 autoFocus
                                 isReply
                             />
@@ -236,7 +238,7 @@ export const CommentItem = ({
                                 className="h-auto py-1 text-xs text-muted-foreground hover:text-foreground flex items-center gap-2"
                             >
                                 <CornerDownRight className="h-3 w-3" />
-                                Show {comment.replies.length - visibleReplies} more replies
+                                {t("comments.showMoreReplies", { count: comment.replies.length - visibleReplies })}
                             </Button>
                         </div>
                     )}

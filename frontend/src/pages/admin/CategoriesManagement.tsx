@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ import { format } from "date-fns";
 import { categoryService, Category } from "@/services/category.service";
 
 export default function CategoriesManagement() {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -60,10 +62,10 @@ export default function CategoriesManagement() {
       queryClient.invalidateQueries({ queryKey: ["categories"] });
       queryClient.invalidateQueries({ queryKey: ["admin-products"] });
       toast({
-        title: "Success",
+        title: t("common.success"),
         description: selectedCategory
-          ? "Category updated successfully"
-          : "Category created successfully",
+          ? t("admin.categories.dialog.updateSuccess")
+          : t("admin.categories.dialog.createSuccess"),
       });
       setCategoryDialogOpen(false);
       setSelectedCategory(null);
@@ -71,8 +73,8 @@ export default function CategoriesManagement() {
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to save category"),
+        title: t("common.error"),
+        description: getErrorMessage(error, t("admin.categories.dialog.saveError")),
         variant: "destructive",
       });
     },
@@ -88,16 +90,16 @@ export default function CategoriesManagement() {
       queryClient.invalidateQueries({ queryKey: ["categories"] });
       queryClient.invalidateQueries({ queryKey: ["admin-products"] });
       toast({
-        title: "Success",
-        description: "Category deleted successfully",
+        title: t("common.success"),
+        description: t("admin.categories.dialog.deleteSuccess"),
       });
       setDeleteDialogOpen(false);
       setSelectedCategory(null);
     },
     onError: (error: unknown) => {
       toast({
-        title: "Error",
-        description: getErrorMessage(error, "Failed to delete category"),
+        title: t("common.error"),
+        description: getErrorMessage(error, t("admin.categories.dialog.deleteError")),
         variant: "destructive",
       });
     },
@@ -123,8 +125,8 @@ export default function CategoriesManagement() {
   const handleSaveCategory = () => {
     if (!categoryName.trim()) {
       toast({
-        title: "Error",
-        description: "Category name is required",
+        title: t("common.error"),
+        description: t("admin.categories.dialog.nameRequired"),
         variant: "destructive",
       });
       return;
@@ -146,9 +148,9 @@ export default function CategoriesManagement() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">
-          Categories Management
+          {t("admin.categories.title")}
         </h2>
-        <p className="text-muted-foreground">Manage product categories</p>
+        <p className="text-muted-foreground">{t("admin.categories.subtitle")}</p>
       </div>
 
       <Card>
@@ -156,7 +158,7 @@ export default function CategoriesManagement() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <CardTitle className="flex items-center gap-2">
               <Folder className="h-5 w-5" />
-              All Categories ({categories.length})
+              {t("admin.categories.all")} ({categories.length})
             </CardTitle>
             <div className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1 sm:w-64">
@@ -164,7 +166,7 @@ export default function CategoriesManagement() {
                 <Input
                   id="category-mgmt-search"
                   name="search"
-                  placeholder="Search categories..."
+                  placeholder={t("admin.categories.search")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
@@ -172,27 +174,27 @@ export default function CategoriesManagement() {
               </div>
               <Button onClick={handleAddCategory}>
                 <Plus className="h-4 w-4 mr-2" />
-                Add Category
+                {t("admin.categories.add")}
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="text-center py-12">Loading categories...</div>
+            <div className="text-center py-12">{t("admin.categories.loading")}</div>
           ) : categories.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Folder className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No categories found</p>
+              <p>{t("admin.categories.noFound")}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Category Name</TableHead>
-                    <TableHead>Created Date</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{t("admin.categories.table.name")}</TableHead>
+                    <TableHead>{t("admin.categories.table.date")}</TableHead>
+                    <TableHead className="text-right">{t("admin.categories.table.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -239,19 +241,19 @@ export default function CategoriesManagement() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {selectedCategory ? "Edit Category" : "Add New Category"}
+              {selectedCategory ? t("admin.categories.dialog.edit") : t("admin.categories.dialog.add")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="categoryName">
-                Category Name <span className="text-red-600">*</span>
+                {t("admin.categories.dialog.nameLabel")} <span className="text-red-600">*</span>
               </Label>
               <Input
                 id="categoryName"
                 value={categoryName}
                 onChange={(e) => setCategoryName(e.target.value)}
-                placeholder="Enter category name"
+                placeholder={t("admin.categories.dialog.namePlaceholder")}
                 onKeyPress={(e) => {
                   if (e.key === "Enter") {
                     handleSaveCategory();
@@ -266,10 +268,10 @@ export default function CategoriesManagement() {
               variant="outline"
               onClick={() => setCategoryDialogOpen(false)}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={handleSaveCategory}>
-              {selectedCategory ? "Update" : "Create"} Category
+              {selectedCategory ? t("admin.categories.dialog.update") : t("admin.categories.dialog.create")} {t("admin.categories.dialog.nameLabel")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -278,8 +280,8 @@ export default function CategoriesManagement() {
       <DeleteConfirmDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
-        title="Delete Category"
-        description={`Are you sure you want to delete "${selectedCategory?.name}"? Products using this category will need to be updated.`}
+        title={t("admin.categories.delete.title")}
+        description={t("admin.categories.delete.desc", { name: selectedCategory?.name })}
         onConfirm={handleConfirmDelete}
       />
     </div>

@@ -25,7 +25,7 @@ import { LoadingOverlay } from "@/components/ui/loading-overlay";
 
 export default function BlogPost() {
   const { postId } = useParams<{ postId: string }>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
 
   // Fetch blog post from database
@@ -56,7 +56,7 @@ export default function BlogPost() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#FAF7F2] relative">
-        <LoadingOverlay message="Just a moment..." isLoading={true} />
+        <LoadingOverlay message={t("blog.justAMoment")} isLoading={true} />
       </div>
     );
   }
@@ -138,7 +138,7 @@ export default function BlogPost() {
                 <span className="text-white/40">•</span>
                 <div className="flex items-center gap-1.5">
                   <Calendar className="h-4 w-4" />
-                  <span>{format(new Date(post.date), "MMMM dd, yyyy")}</span>
+                  <span>{new Date(post.date).toLocaleDateString(i18n.language, { month: 'long', day: '2-digit', year: 'numeric' })}</span>
                 </div>
               </div>
             </div>
@@ -191,7 +191,7 @@ export default function BlogPost() {
             <div className="mt-10 p-6 bg-white rounded-2xl border border-[#B85C3C]/10 shadow-sm">
               <div className="flex items-center gap-2 mb-3">
                 <Share2 className="h-4 w-4 text-[#B85C3C]" />
-                <span className="text-xs font-bold uppercase tracking-widest text-[#2C1810]">Share this article</span>
+                <span className="text-xs font-bold uppercase tracking-widest text-[#2C1810]">{t("blog.shareThis")}</span>
               </div>
               <SocialShare
                 url={`/blog/${postId}`}
@@ -215,7 +215,7 @@ export default function BlogPost() {
             <div className="max-w-6xl mx-auto">
               <div className="text-center mb-10">
                 <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#B85C3C] mb-2 block">
-                  Continue Reading
+                  {t("blog.continueReading")}
                 </span>
                 <h2 className="text-2xl lg:text-3xl font-bold text-[#2C1810] font-playfair">
                   {t("blog.relatedPosts")}
@@ -250,7 +250,7 @@ export default function BlogPost() {
                       <CardContent className="pt-0">
                         <div className="flex items-center gap-1.5 text-[10px] text-[#2C1810]/50">
                           <Calendar className="h-3 w-3" />
-                          <span>{format(new Date(relatedPost.date), "MMM dd, yyyy")}</span>
+                          <span>{new Date(relatedPost.date).toLocaleDateString(i18n.language, { month: 'short', day: '2-digit', year: 'numeric' })}</span>
                         </div>
                       </CardContent>
                     </Card>

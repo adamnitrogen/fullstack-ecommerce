@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -39,6 +40,8 @@ const deliverySchema = z.object({
 type DeliveryFormValues = z.infer<typeof deliverySchema>;
 
 export default function SettingsManagement() {
+  const { t } = useTranslation();
+  const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('delivery');
   const queryClient = useQueryClient();
 
@@ -87,14 +90,14 @@ export default function SettingsManagement() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Settings</h1>
-        <p className="text-muted-foreground">Manage website configuration, delivery settings, and coupons</p>
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">{t("admin.settings.title") || "Settings"}</h1>
+        <p className="text-muted-foreground">{t("admin.settings.subtitle") || "Manage website configuration, delivery settings, and coupons"}</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="delivery">Delivery</TabsTrigger>
-          <TabsTrigger value="coupons">Coupons</TabsTrigger>
+          <TabsTrigger value="delivery">{t("admin.settings.delivery.label") || "Delivery"}</TabsTrigger>
+          <TabsTrigger value="coupons">{t("admin.settings.coupons.label") || "Coupons"}</TabsTrigger>
         </TabsList>
 
         {/* Delivery Tab */}
@@ -103,16 +106,16 @@ export default function SettingsManagement() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Truck className="h-5 w-5 text-primary" />
-                Delivery Settings
+                {t("admin.settings.delivery.cardTitle")}
               </CardTitle>
               <CardDescription>
-                Configure free delivery thresholds and charges
+                {t("admin.settings.delivery.cardDesc")}
               </CardDescription>
             </CardHeader>
             <CardContent>
               {isDeliveryLoading ? (
                 <div className="flex items-center justify-center py-8">
-                  <p className="text-muted-foreground animate-pulse">Loading delivery settings...</p>
+                  <p className="text-muted-foreground animate-pulse">{t("admin.settings.delivery_loading") || "Loading delivery settings..."}</p>
                 </div>
               ) : (
                 <Form {...deliveryForm}>
@@ -128,7 +131,7 @@ export default function SettingsManagement() {
                         name="delivery_threshold"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Free Delivery Threshold (₹)</FormLabel>
+                            <FormLabel>{t("admin.settings.delivery.thresholdLabel")}</FormLabel>
                             <FormControl>
                               <Input
                                 type="number"
@@ -139,7 +142,7 @@ export default function SettingsManagement() {
                               />
                             </FormControl>
                             <FormDescription>
-                              Orders above this amount will have free delivery.
+                              {t("admin.settings.delivery.thresholdDesc")}
                             </FormDescription>
                             <FormMessage />
                           </FormItem>
@@ -154,7 +157,7 @@ export default function SettingsManagement() {
                         name="delivery_charge"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Delivery Charge (₹)</FormLabel>
+                            <FormLabel>{t("admin.settings.delivery.chargeLabel")}</FormLabel>
                             <FormControl>
                               <Input
                                 type="number"
@@ -165,7 +168,7 @@ export default function SettingsManagement() {
                               />
                             </FormControl>
                             <FormDescription>
-                              Base delivery amount.
+                              {t("admin.settings.delivery.chargeDesc")}
                             </FormDescription>
                             <FormMessage />
                           </FormItem>
@@ -177,14 +180,14 @@ export default function SettingsManagement() {
                         name="delivery_gst"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Delivery GST (%)</FormLabel>
+                            <FormLabel>{t("admin.settings.delivery.gstLabel")}</FormLabel>
                             <Select
                               onValueChange={(value) => field.onChange(parseInt(value))}
                               value={field.value?.toString() ?? "0"}
                             >
                               <FormControl>
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Select GST Rate" />
+                                  <SelectValue placeholder={t("admin.settings.gst.placeholder")} />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
@@ -196,7 +199,7 @@ export default function SettingsManagement() {
                               </SelectContent>
                             </Select>
                             <FormDescription>
-                              Standard GST rate for delivery charges.
+                              {t("admin.settings.delivery.gstDesc")}
                             </FormDescription>
                             <FormMessage />
                           </FormItem>
@@ -209,7 +212,7 @@ export default function SettingsManagement() {
                       disabled={updateDeliveryMutation.isPending}
                       className="w-full md:w-auto transition-transform hover:scale-105"
                     >
-                      {updateDeliveryMutation.isPending ? 'Saving...' : 'Save Changes'}
+                      {updateDeliveryMutation.isPending ? t("admin.settings.actions.saving") : t("admin.settings.actions.saveChanges")}
                     </Button>
                   </form>
                 </Form>

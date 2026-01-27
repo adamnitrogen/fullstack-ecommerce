@@ -97,14 +97,14 @@ async function deleteOTP(identifier) {
 /**
  * Send OTP via Email using Resend
  */
-async function sendEmailOTP(email, otp, metadata = null) {
+async function sendEmailOTP(email, otp, metadata = null, lang = 'en') {
 
     try {
         let result;
         if (metadata?.purpose === 'ACCOUNT_DELETION') {
-            result = await emailService.sendAccountDeletionOTPEmail(email, otp, OTP_EXPIRY_MINUTES);
+            result = await emailService.sendAccountDeletionOTPEmail(email, otp, OTP_EXPIRY_MINUTES, lang);
         } else {
-            result = await emailService.sendOTPEmail(email, otp, OTP_EXPIRY_MINUTES);
+            result = await emailService.sendOTPEmail(email, otp, OTP_EXPIRY_MINUTES, lang);
         }
         logger.info(`✅ OTP email sent to ${email}`);
         return result;
@@ -148,7 +148,7 @@ async function sendPhoneOTP(phone, otp) {
  * @param {string} identifier - Email or Phone
  * @param {object} [metadata] - Optional metadata to store with OTP (e.g. encrypted session)
  */
-async function sendOTP(identifier, metadata = null) {
+async function sendOTP(identifier, metadata = null, lang = 'en') {
     try {
         // Validation: Must be email OR phone (basic length check)
         const isEmail = identifier.includes('@');
@@ -218,7 +218,7 @@ async function sendOTP(identifier, metadata = null) {
         // Send OTP via appropriate channel
         if (isEmail) {
             // Optimization: Send email in background to speed up response
-            sendEmailOTP(identifier, otp, metadata).catch(err =>
+            sendEmailOTP(identifier, otp, metadata, lang).catch(err =>
                 logger.error({ err }, 'Background OTP email send failed')
             );
         } else {

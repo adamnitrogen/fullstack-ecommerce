@@ -10,8 +10,11 @@ import { format } from 'date-fns';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errorUtils';
+import { useTranslation } from 'react-i18next';
+import { getDateLocale } from '@/utils/dateLocale';
 
 export default function ContactMessageDetail() {
+    const { t } = useTranslation();
     const { id } = useParams();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
@@ -26,23 +29,23 @@ export default function ContactMessageDetail() {
         mutationFn: () => adminAlertService.markAsReadByReferenceId('contact_message', id!),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['admin-alerts-unread'] });
-            toast.success('Notification dismissed');
+            toast.success(t("admin.messages.notificationDismissed"));
         },
         onError: (error: unknown) => {
-            toast.error(getErrorMessage(error, 'Failed to dismiss notification'));
+            toast.error(getErrorMessage(error, t("admin.messages.dismissError")));
         }
     });
 
     const getStatusBadge = (status: string) => {
         switch (status) {
             case 'NEW':
-                return <Badge variant="destructive">New</Badge>;
+                return <Badge variant="destructive">{t("admin.messages.status.new")}</Badge>;
             case 'READ':
-                return <Badge variant="secondary">Read</Badge>;
+                return <Badge variant="secondary">{t("admin.messages.status.read")}</Badge>;
             case 'REPLIED':
-                return <Badge variant="default" className="bg-green-500">Replied</Badge>;
+                return <Badge variant="default" className="bg-green-500">{t("admin.messages.status.replied")}</Badge>;
             case 'ARCHIVED':
-                return <Badge variant="outline">Archived</Badge>;
+                return <Badge variant="outline">{t("admin.messages.status.archived")}</Badge>;
             default:
                 return <Badge variant="outline">{status}</Badge>;
         }
@@ -50,8 +53,8 @@ export default function ContactMessageDetail() {
 
     const handleReply = () => {
         if (message) {
-            const subject = encodeURIComponent(`Re: Your message to Merigaumata`);
-            const body = encodeURIComponent(`Hi ${message.name},\n\nThank you for reaching out.\n\n--- Original Message ---\n${message.message}`);
+            const subject = encodeURIComponent(t("admin.messages.reply.subject"));
+            const body = encodeURIComponent(t("admin.messages.reply.body", { name: message.name, message: message.message }));
             window.location.href = `mailto:${message.email}?subject=${subject}&body=${body}`;
         }
     };
@@ -67,8 +70,8 @@ export default function ContactMessageDetail() {
     if (error || !message) {
         return (
             <div className="text-center p-12">
-                <p className="text-destructive mb-4">Failed to load message details</p>
-                <Button onClick={() => navigate('/admin/contact-management')}>Back to Messages</Button>
+                <p className="text-destructive mb-4">{t("admin.messages.loadError")}</p>
+                <Button onClick={() => navigate('/admin/contact-management')}>{t("admin.messages.backToMessages")}</Button>
             </div>
         );
     }
@@ -80,8 +83,8 @@ export default function ContactMessageDetail() {
                     <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <div>
-                    <h1 className="text-3xl font-bold font-playfair text-[#2C1810]">Message Details</h1>
-                    <p className="text-muted-foreground">Submitted on {format(new Date(message.created_at), 'PPPpppp')}</p>
+                    <h1 className="text-3xl font-bold font-playfair text-[#2C1810]">{t("admin.messages.detailTitle")}</h1>
+                    <p className="text-muted-foreground">{t("admin.messages.submittedOn", { date: format(new Date(message.created_at), 'PPPpppp', { locale: getDateLocale() }) })}</p>
                 </div>
             </div>
 
@@ -92,7 +95,7 @@ export default function ContactMessageDetail() {
                             <div className="flex items-center justify-between">
                                 <CardTitle className="text-lg font-bold flex items-center gap-2">
                                     <MailSearch className="h-5 w-5 text-[#B85C3C]" />
-                                    Message Content
+                                    {t("admin.messages.contentTitle")}
                                 </CardTitle>
                                 {getStatusBadge(message.status)}
                             </div>
@@ -112,7 +115,7 @@ export default function ContactMessageDetail() {
                             onClick={handleReply}
                         >
                             <Mail className="h-4 w-4 mr-2" />
-                            Reply via Email
+                            {t("admin.messages.replyViaEmail")}
                         </Button>
                         <Button
                             variant="outline"
@@ -121,7 +124,7 @@ export default function ContactMessageDetail() {
                             disabled={dismissMutation.isPending}
                         >
                             <X className="h-4 w-4 mr-2" />
-                            Dismiss Alert
+                            {t("admin.messages.dismissAlert")}
                         </Button>
                     </div>
                 </div>
@@ -131,16 +134,16 @@ export default function ContactMessageDetail() {
                         <CardHeader className="border-b bg-[#FDFBF7]/30">
                             <CardTitle className="text-lg font-bold flex items-center gap-2">
                                 <User className="h-5 w-5 text-[#B85C3C]" />
-                                Sender Information
+                                {t("admin.messages.senderInfo")}
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-6 space-y-4">
                             <div>
-                                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Name</label>
+                                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("admin.messages.name")}</label>
                                 <p className="font-bold text-[#2C1810] text-lg">{message.name}</p>
                             </div>
                             <div className="pt-2">
-                                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Email</label>
+                                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("admin.messages.email")}</label>
                                 <div className="flex items-center gap-2 text-[#B85C3C] font-medium underline underline-offset-4">
                                     <Mail className="h-4 w-4" />
                                     <a href={`mailto:${message.email}`}>{message.email}</a>
@@ -153,22 +156,22 @@ export default function ContactMessageDetail() {
                         <CardHeader className="border-b bg-[#FDFBF7]/30">
                             <CardTitle className="text-lg font-bold flex items-center gap-2">
                                 <ShieldCheck className="h-5 w-5 text-[#B85C3C]" />
-                                Technical Metadata
+                                {t("admin.messages.technicalMetadata")}
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-6 space-y-4 text-sm">
                             <div className="flex items-center gap-3">
                                 <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
                                 <div>
-                                    <label className="text-[10px] font-bold text-muted-foreground uppercase">IP Address</label>
-                                    <p className="font-mono text-muted-foreground">{message.ip_address || 'Not captured'}</p>
+                                    <label className="text-[10px] font-bold text-muted-foreground uppercase">{t("admin.messages.ipAddress")}</label>
+                                    <p className="font-mono text-muted-foreground">{message.ip_address || t("admin.messages.notCaptured")}</p>
                                 </div>
                             </div>
                             <div className="flex items-start gap-3">
                                 <Monitor className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
                                 <div>
-                                    <label className="text-[10px] font-bold text-muted-foreground uppercase">User Agent</label>
-                                    <p className="text-muted-foreground leading-snug break-all">{message.user_agent || 'Not captured'}</p>
+                                    <label className="text-[10px] font-bold text-muted-foreground uppercase">{t("admin.messages.userAgent")}</label>
+                                    <p className="text-muted-foreground leading-snug break-all">{message.user_agent || t("admin.messages.notCaptured")}</p>
                                 </div>
                             </div>
                         </CardContent>

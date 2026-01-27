@@ -9,6 +9,7 @@ const { capturePayment, voidAuthorization, refundPayment, fetchPayment } = requi
 const EventPricingService = require('./event-pricing.service');
 const EventRefundService = require('./event-refund.service');
 const EventCancellationService = require('./event-cancellation.service');
+const MESSAGES = require('../config/messages');
 
 // Initialize Razorpay
 const razorpay = new Razorpay({
@@ -101,7 +102,7 @@ class EventRegistrationService {
             .single();
 
         if (eventError || !event) {
-            throw new Error('Event not found');
+            throw new Error(MESSAGES.ERRORS.EVENT_NOT_FOUND);
         }
 
         // Check if event is cancelled
@@ -119,7 +120,7 @@ class EventRegistrationService {
 
             if (Date.now() >= deadline.getTime()) {
                 logger.warn({ eventId, deadline: event.registration_deadline }, '[EventRegistration] Attempted registration after deadline (strict)');
-                throw new Error('Registration for this event is closed.');
+                throw new Error(MESSAGES.ERRORS.REGISTRATION_CLOSED);
             }
         }
 
@@ -305,7 +306,7 @@ class EventRegistrationService {
 
         if (fetchError || !regData) {
             logger.error({ err: fetchError, registration_id }, '[EventRegistration] Registration not found during verify');
-            throw new Error('Registration not found');
+            throw new Error(MESSAGES.ERRORS.REGISTRATION_NOT_FOUND);
         }
 
         // define registration alias for consistency with downstream code
@@ -642,12 +643,12 @@ class EventRegistrationService {
 
         if (fetchError || !registration) {
             logger.warn({ registrationId, userId, correlationId }, 'Registration not found for cancellation');
-            throw new Error('Registration not found');
+            throw new Error(MESSAGES.ERRORS.REGISTRATION_NOT_FOUND);
         }
 
         if (registration.status === 'cancelled') {
             logger.info({ registrationId, correlationId }, 'Registration already cancelled');
-            return { message: 'Registration is already cancelled' };
+            return { message: MESSAGES.ERRORS.REGISTRATION_ALREADY_CANCELLED };
         }
 
         // 2. Deadline Check (48 hours before start)
@@ -686,7 +687,7 @@ class EventRegistrationService {
             correlationId
         }, 'User cancellation completed successfully');
 
-        return { message: 'Registration cancelled successfully' };
+        return { message: MESSAGES.SUCCESS.REGISTRATION_CANCELLED };
     }
 
     /**
@@ -728,7 +729,7 @@ class EventRegistrationService {
             .single();
 
         if (error || !data) {
-            const err = new Error('Registration not found');
+            const err = new Error(MESSAGES.ERRORS.REGISTRATION_NOT_FOUND);
             err.statusCode = 404;
             throw err;
         }

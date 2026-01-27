@@ -17,6 +17,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { format } from "date-fns";
+import { hi, enUS } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { BackButton } from "@/components/ui/BackButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +30,8 @@ import { LoadingOverlay } from "@/components/ui/loading-overlay";
 const EventDetail = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const currentLocale = i18n.language === "hi" ? hi : enUS;
 
   const { data: event, isLoading } = useQuery({
     queryKey: ["event", eventId],
@@ -50,22 +52,22 @@ const EventDetail = () => {
       const [hours, minutes] = time.split(':');
       const date = new Date();
       date.setHours(parseInt(hours), parseInt(minutes));
-      return format(date, "h:mm a");
+      return format(date, "h:mm a", { locale: currentLocale });
     } catch (e) {
       return time;
     }
   };
 
   if (isLoading) {
-    return <LoadingOverlay isLoading={true} message="Getting event details..." />;
+    return <LoadingOverlay isLoading={true} message={t("common.loading")} />;
   }
 
   if (!event) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4 font-playfair">Event not found</h2>
-          <BackButton to="/events" label="Back to Events" />
+          <h2 className="text-2xl font-bold mb-4 font-playfair">{t("events.registration.notFound")}</h2>
+          <BackButton to="/events" label={t("common.back")} />
         </div>
       </div>
     );
@@ -111,7 +113,7 @@ const EventDetail = () => {
                 <div className="flex flex-wrap items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
                   {eventData.category && (
                     <Tag variant="category" size="sm" className="bg-[#B85C3C]/20 text-[#D4AF37] border-[#B85C3C]/30 font-bold uppercase tracking-widest text-[10px]">
-                      {eventData.category}
+                      {t(`admin.events.categories.types.${eventData.category}`, { defaultValue: eventData.category })}
                     </Tag>
                   )}
                   <Tag variant={getStatusVariant(eventData.status)} size="sm" className="font-bold uppercase tracking-widest text-[10px]">
@@ -123,7 +125,7 @@ const EventDetail = () => {
                 </h1>
                 {isKatha && eventData.kathaVachak && (
                   <p className="text-[#D4AF37] text-lg font-medium italic flex items-center gap-2 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
-                    <User size={18} /> Katha Vachak: {eventData.kathaVachak}
+                    <User size={18} /> {t("events.public.details.kathaVachak")}: {eventData.kathaVachak}
                   </p>
                 )}
 
@@ -133,7 +135,7 @@ const EventDetail = () => {
                     <div className="space-y-1">
                       <p className="text-red-400 font-bold uppercase tracking-widest text-xs">{t("events.eventCancelled")}</p>
                       <p className="text-white/90 text-sm font-light leading-relaxed">
-                        Reason: {eventData.cancellationReason}
+                        {t("admin.gallery.dialog.description")}: {eventData.cancellationReason}
                       </p>
                     </div>
                   </div>
@@ -160,7 +162,7 @@ const EventDetail = () => {
               {!eventData.image && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
                   <Calendar className="h-16 w-16 mb-4 opacity-20" />
-                  <p>No event image provided</p>
+                  <p>{t("events.registration.noImage")}</p>
                 </div>
               )}
             </div>
@@ -172,7 +174,7 @@ const EventDetail = () => {
                   <div className="w-10 h-10 rounded-xl bg-[#FAF7F2] flex items-center justify-center text-[#B85C3C]">
                     <Sparkles size={20} />
                   </div>
-                  <CardTitle className="text-3xl font-bold text-[#2C1810] font-playfair">About the Event</CardTitle>
+                  <CardTitle className="text-3xl font-bold text-[#2C1810] font-playfair">{t("events.public.details.aboutHeader")}</CardTitle>
                 </div>
               </CardHeader>
               <CardContent className="p-10 pt-0">
@@ -191,7 +193,7 @@ const EventDetail = () => {
                     <div className="w-10 h-10 rounded-xl bg-[#FAF7F2] flex items-center justify-center text-[#B85C3C]">
                       <Gift size={20} />
                     </div>
-                    <CardTitle className="text-3xl font-bold text-[#2C1810] font-playfair">Event Highlights</CardTitle>
+                    <CardTitle className="text-3xl font-bold text-[#2C1810] font-playfair">{t("events.public.details.highlightsHeader")}</CardTitle>
                   </div>
                 </CardHeader>
                 <CardContent className="p-10 pt-4">
@@ -218,7 +220,7 @@ const EventDetail = () => {
                     <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-[#D4AF37]">
                       <Sparkles size={20} />
                     </div>
-                    <CardTitle className="text-3xl font-bold font-playfair">Special Privileges</CardTitle>
+                    <CardTitle className="text-3xl font-bold font-playfair">{t("events.public.details.privilegesHeader")}</CardTitle>
                   </div>
                 </CardHeader>
                 <CardContent className="p-10 pt-4 relative z-10">
@@ -242,8 +244,8 @@ const EventDetail = () => {
                 <CardHeader className="p-8 pb-4 border-b border-[#FAF7F2]">
                   <div className="flex justify-between items-center mb-6">
                     <div className="space-y-1">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#B85C3C]">Event Details</p>
-                      <h3 className="text-2xl font-bold text-[#2C1810] font-playfair">Live Registration</h3>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#B85C3C]">{t("common.info")}</p>
+                      <h3 className="text-2xl font-bold text-[#2C1810] font-playfair">{t("events.registration.title")}</h3>
                     </div>
                   </div>
                 </CardHeader>
@@ -252,22 +254,22 @@ const EventDetail = () => {
                   {/* Fee */}
                   {showRegistration && (
                     <div className="p-6 rounded-3xl bg-[#FAF7F2] border border-[#B85C3C]/10 flex flex-col items-center text-center">
-                      <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Pass Contribution</p>
+                      <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">{t("events.public.details.passContribution")}</p>
                       <p className="text-4xl font-black text-[#2C1810]">
-                        {isFree ? "Free Entry" : `₹${registrationAmount}`}
+                        {isFree ? t("events.public.details.entryFree") : `₹${registrationAmount}`}
                       </p>
                       {!isFree && (
                         <div className="mt-2 space-y-1">
                           <p className="text-[10px] text-[#B85C3C] font-bold uppercase tracking-tighter">
-                            Inclusive of all taxes
+                            {t("events.public.details.taxInclusive")}
                           </p>
                           <div className="flex flex-col text-[10px] text-muted-foreground/80 font-medium">
-                            <span>Base: ₹{eventData.basePrice || (registrationAmount / (1 + (eventData.gstRate || 0) / 100)).toFixed(2)}</span>
-                            <span>GST ({eventData.gstRate || 0}%): ₹{eventData.gstAmount || (registrationAmount - (registrationAmount / (1 + (eventData.gstRate || 0) / 100))).toFixed(2)}</span>
+                            <span>{t("events.registration.basePrice")}: ₹{eventData.basePrice || (registrationAmount / (1 + (eventData.gstRate || 0) / 100)).toFixed(2)}</span>
+                            <span>{t("events.registration.gst")} ({eventData.gstRate || 0}%): ₹{eventData.gstAmount || (registrationAmount - (registrationAmount / (1 + (eventData.gstRate || 0) / 100))).toFixed(2)}</span>
                           </div>
                         </div>
                       )}
-                      {isFree && <p className="text-[10px] text-[#B85C3C] mt-2 font-bold uppercase tracking-tighter">Limited Slots Available</p>}
+                      {isFree && <p className="text-[10px] text-[#B85C3C] mt-2 font-bold uppercase tracking-tighter">{t("events.public.details.limitedSlots")}</p>}
                     </div>
                   )}
 
@@ -278,11 +280,11 @@ const EventDetail = () => {
                         <Calendar size={20} />
                       </div>
                       <div className="space-y-1">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Date</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t("admin.blog.table.date")}</p>
                         <p className="text-sm font-bold text-[#2C1810]">
-                          {format(new Date(eventData.startDate), "MMMM d, yyyy")}
+                          {format(new Date(eventData.startDate), "MMMM d, yyyy", { locale: currentLocale })}
                           {eventData.endDate && eventData.endDate !== eventData.startDate && (
-                            <> - {format(new Date(eventData.endDate), "MMM d")}</>
+                            <> - {format(new Date(eventData.endDate), "MMM d", { locale: currentLocale })}</>
                           )}
                         </p>
                       </div>
@@ -293,12 +295,12 @@ const EventDetail = () => {
                         <Clock size={20} />
                       </div>
                       <div className="space-y-1">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Time</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t("admin.events.management.table.date")}</p>
                         <p className="text-sm font-bold text-[#2C1810]">
                           {eventData.startTime && eventData.endTime ? (
-                            <>Daily: {formatTime(eventData.startTime)} - {formatTime(eventData.endTime)}</>
+                            <>{t("events.public.details.checkDetails")}: {formatTime(eventData.startTime)} - {formatTime(eventData.endTime)}</>
                           ) : (
-                            <>{eventData.startTime || "Check Details"} {eventData.endTime && <>- {eventData.endTime}</>}</>
+                            <>{eventData.startTime ? formatTime(eventData.startTime) : t("events.public.details.checkDetails")} {eventData.endTime && <>- {formatTime(eventData.endTime)}</>}</>
                           )}
                         </p>
                       </div>
@@ -309,7 +311,7 @@ const EventDetail = () => {
                         <MapPin size={20} />
                       </div>
                       <div className="space-y-1">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Location</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t("admin.events.management.table.location")}</p>
                         <p className="text-sm font-bold text-[#2C1810] leading-snug">
                           {eventData.location?.address}
                         </p>
@@ -321,11 +323,11 @@ const EventDetail = () => {
                         <Clock size={20} />
                       </div>
                       <div className="space-y-1">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Registration Deadline</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t("events.public.details.deadline")}</p>
                         <p className="text-sm font-bold text-[#2C1810]">
                           {eventData.registrationDeadline
-                            ? format(new Date(eventData.registrationDeadline), "MMMM d, yyyy")
-                            : format(new Date(eventData.startDate), "MMMM d, yyyy")}
+                            ? format(new Date(eventData.registrationDeadline), "MMMM d, yyyy", { locale: currentLocale })
+                            : format(new Date(eventData.startDate), "MMMM d, yyyy", { locale: currentLocale })}
                         </p>
                       </div>
                     </div>
@@ -333,11 +335,11 @@ const EventDetail = () => {
                     <div className="p-4 rounded-2xl bg-blue-50 border border-blue-100/50 flex gap-3 items-start">
                       <Shield className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
                       <div className="space-y-1">
-                        <p className="text-blue-900 text-[10px] font-bold uppercase tracking-wider">Cancellation Policy</p>
+                        <p className="text-blue-900 text-[10px] font-bold uppercase tracking-wider">{t("events.public.details.policy")}</p>
                         <p className="text-blue-700 text-[10px] leading-relaxed font-medium">
                           {isFree
-                            ? "Free events can be cancelled at any time."
-                            : "Full refund if cancelled at least 48 hours before the event."}
+                            ? t("events.public.details.policyFree")
+                            : t("events.public.details.policyPaid")}
                         </p>
                       </div>
                     </div>
@@ -350,7 +352,7 @@ const EventDetail = () => {
                       className="w-full rounded-2xl py-8 text-lg font-bold bg-[#B85C3C] hover:bg-[#2C1810] transition-all duration-500 shadow-xl shadow-[#B85C3C]/20 hover:shadow-[#2C1810]/20 h-auto"
                     >
                       <Sparkles size={20} className="mr-2" />
-                      Register Now
+                      {t("events.public.details.registerNow")}
                     </Button>
                   )}
 
@@ -366,10 +368,9 @@ const EventDetail = () => {
                         <div className="p-4 rounded-2xl bg-blue-50 border border-blue-100 flex gap-3 items-start">
                           <Info className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
                           <div className="space-y-1">
-                            <p className="text-blue-900 text-xs font-bold uppercase">Refund Policy</p>
+                            <p className="text-blue-900 text-xs font-bold uppercase">{t("events.public.details.refundPolicy")}</p>
                             <p className="text-blue-700 text-[10px] leading-relaxed">
-                              All registered participants will receive a full refund.
-                              Refunds are processed within 5-7 business days to your original payment method.
+                              {t("events.public.details.refundDesc")}
                             </p>
                           </div>
                         </div>
@@ -380,8 +381,8 @@ const EventDetail = () => {
                   {eventData.status === "completed" && (
                     <div className="p-6 rounded-3xl bg-muted/30 border border-muted/50 text-center">
                       <CheckCircle2 className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-50" />
-                      <h4 className="text-muted-foreground font-bold">Event Completed</h4>
-                      <p className="text-muted-foreground/70 text-xs mt-2 font-medium">This gathering has concluded.</p>
+                      <h4 className="text-muted-foreground font-bold">{t("events.public.details.eventCompleted")}</h4>
+                      <p className="text-muted-foreground/70 text-xs mt-2 font-medium">{t("events.public.details.concludedDesc")}</p>
                     </div>
                   )}
                 </CardContent>
@@ -390,7 +391,7 @@ const EventDetail = () => {
               {/* Secure Booking Tip */}
               <div className="mt-6 flex items-center justify-center gap-2 text-muted-foreground/60">
                 <Shield size={14} className="text-green-500/50" />
-                <span className="text-[10px] uppercase font-bold tracking-widest">Secure Vedic Registration</span>
+                <span className="text-[10px] uppercase font-bold tracking-widest">{t("events.public.details.secureRegistration")}</span>
               </div>
             </div>
           </div>

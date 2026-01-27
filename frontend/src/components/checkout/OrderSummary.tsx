@@ -1,6 +1,7 @@
 import { CartItem } from "@/types";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Receipt, ShoppingBag, Truck } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 
@@ -9,15 +10,16 @@ interface OrderSummaryProps {
 }
 
 export function OrderSummary({ items }: OrderSummaryProps) {
+    const { t } = useTranslation();
     return (
         <div className="space-y-4">
             <div className="flex items-center gap-2 pb-2">
                 <div className="bg-primary/10 p-2 rounded-full">
                     <Receipt className="w-4 h-4 text-primary" />
                 </div>
-                <h3 className="font-semibold text-lg font-playfair">Order Summary</h3>
+                <h3 className="font-semibold text-lg font-playfair">{t("checkout.orderSummary")}</h3>
                 <span className="ml-auto text-xs font-medium bg-muted px-2 py-1 rounded-full text-muted-foreground">
-                    {items.length} Items
+                    {t("cart.shoppingBagCount", { count: items.length })}
                 </span>
             </div>
 
@@ -47,7 +49,7 @@ export function OrderSummary({ items }: OrderSummaryProps) {
                                 )}
                                 <div className="flex justify-between items-center text-xs mt-1">
                                     <p className="text-muted-foreground font-medium">
-                                        Qty: <span className="text-foreground font-bold">{item.quantity}</span>
+                                        {t("profile.qty")} <span className="text-foreground font-bold">{item.quantity}</span>
                                     </p>
                                     <div className="text-right">
                                         <p className="font-bold tabular-nums">
@@ -62,7 +64,7 @@ export function OrderSummary({ items }: OrderSummaryProps) {
                                         {(item.delivery_charge ?? 0) > 0 && (
                                             <div className="text-[10px] text-orange-600 font-bold flex items-center gap-1 mt-1 justify-end">
                                                 <Truck className="w-3 h-3" />
-                                                +₹{((item.delivery_charge ?? 0) + (item.delivery_gst ?? 0)).toFixed(2)} Delivery
+                                                +₹{((item.delivery_charge ?? 0) + (item.delivery_gst ?? 0)).toFixed(2)} {t("checkout.delivery")}
                                             </div>
                                         )}
 
@@ -74,7 +76,7 @@ export function OrderSummary({ items }: OrderSummaryProps) {
                                             const tax = price - (price / (1 + rate / 100));
                                             return (
                                                 <p className="text-[9px] text-muted-foreground/40 italic tabular-nums mt-0.5">
-                                                    incl. ₹{tax.toFixed(2)} Tax
+                                                    {t("profile.inclTaxAmount", { amount: `₹${tax.toFixed(2)}` })}
                                                 </p>
                                             );
                                         })()}

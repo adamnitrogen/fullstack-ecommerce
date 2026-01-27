@@ -124,7 +124,7 @@ export const ProductDetailView = ({
     });
 
     const sizeLabel = selectedVariant ? ` (${selectedVariant.size_label})` : "";
-    toast.success(`${product.title}${sizeLabel} added to cart`, {
+    toast.success(t("success.cart.added", { product: `${product.title}${sizeLabel}` }), {
       icon: <ShoppingCart size={16} className="text-primary" />,
     });
   };
@@ -132,10 +132,10 @@ export const ProductDetailView = ({
   const handleBuyNow = async () => {
     // 1. Check Authentication First
     if (!user) {
-      toast("Authentication Required", {
-        description: "Please login to continue with your purchase.",
+      toast(t("products.authRequired"), {
+        description: t("products.loginToContinue"),
         action: {
-          label: "Login",
+          label: t("nav.login"),
           onClick: () => navigate(`/auth?returnUrl=${encodeURIComponent(window.location.pathname)}`)
         }
       });
@@ -144,8 +144,8 @@ export const ProductDetailView = ({
 
     // 2. Check for Email (Required for Razorpay Invoice/Receipts)
     if (!user?.email || user.email.trim() === "") {
-      toast.error("Contact Email Needed", {
-        description: "We need an email address to send your receipt and order updates. Please add it in your profile settings.",
+      toast.error(t("products.emailNeeded"), {
+        description: t("products.emailNeededDesc"),
       });
       return;
     }
@@ -183,7 +183,7 @@ export const ProductDetailView = ({
           await updateQuantity(product.id, quantity - 1, selectedVariant?.id);
         } else {
           await removeItem(product.id, selectedVariant?.id);
-          toast.success(`${product.title} removed from cart`);
+          toast.success(t("success.cart.removed", { product: product.title }));
         }
       } catch (error) {
         // Handled by store
@@ -199,9 +199,9 @@ export const ProductDetailView = ({
   const getStockStatus = () => {
     const inventory = displayStock;
     if (inventory === 0) return { text: t("products.outOfStock"), color: "text-red-600" };
-    if (inventory < 5) return { text: "Only few left", color: "text-orange-600" };
-    if (inventory < 20) return { text: "Low stock", color: "text-orange-500" };
-    return { text: "In Stock", color: "text-green-600" };
+    if (inventory < 5) return { text: t("products.fewLeft"), color: "text-orange-600" };
+    if (inventory < 20) return { text: t("products.lowStock"), color: "text-orange-500" };
+    return { text: t("products.inStock"), color: "text-green-600" };
   };
 
   const stockStatus = getStockStatus();
@@ -227,7 +227,7 @@ export const ProductDetailView = ({
 
   return (
     <div className={`${className} animate-in fade-in slide-in-from-bottom-4 duration-700`}>
-      <LoadingOverlay isLoading={isBuying} message="Preparing your purchase..." />
+      <LoadingOverlay isLoading={isBuying} message={t("products.preparingPurchase")} />
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
         {/* Left Side: Product Image Gallery */}
         <div className="lg:col-span-5 space-y-4">
@@ -242,7 +242,7 @@ export const ProductDetailView = ({
             {product.isNew && (
               <div className="absolute top-6 left-6">
                 <Tag variant="new" size="sm" className="bg-[#B85C3C] text-white border-none px-4 py-1.5 shadow-lg font-bold uppercase tracking-wider text-[9px]">
-                  New
+                  {t("products.new")}
                 </Tag>
               </div>
             )}
@@ -250,7 +250,7 @@ export const ProductDetailView = ({
             {discount > 0 && (
               <div className="absolute top-6 right-6">
                 <Tag variant="discount" size="sm" className="bg-[#D4AF37] text-white border-none px-4 py-1.5 shadow-lg font-black text-[9px]">
-                  {discount}% OFF
+                  {t("products.off", { percent: discount })}
                 </Tag>
               </div>
             )}
@@ -309,7 +309,7 @@ export const ProductDetailView = ({
                   <span className="text-sm font-black text-[#2C1810]">{product.rating}</span>
                 </div>
                 <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
-                  {product.ratingCount} Ratings
+                  {product.ratingCount} {t("products.ratings")}
                 </span>
               </div>
             )}
@@ -334,7 +334,7 @@ export const ProductDetailView = ({
             </div>
             {taxApplicable && (
               <p className="text-[10px] text-muted-foreground font-medium tracking-wide">
-                {priceIncludesTax ? "Inclusive of all taxes" : "Price excludes taxes"}
+                {priceIncludesTax ? t("products.inclusiveTax") : t("products.exclusiveTax")}
               </p>
             )}
 
@@ -356,14 +356,14 @@ export const ProductDetailView = ({
                   <>
                     <RotateCcw className="h-4 w-4 text-green-600" />
                     <span className="text-xs font-medium text-green-600">
-                      {returnDays} days return available
+                      {t("products.daysReturnAvailable", { count: returnDays })}
                     </span>
                   </>
                 ) : (
                   <>
                     <X className="h-4 w-4 text-muted-foreground" />
                     <span className="text-xs text-muted-foreground">
-                      Non-returnable
+                      {t("products.nonReturnable")}
                     </span>
                   </>
                 )}
@@ -376,7 +376,7 @@ export const ProductDetailView = ({
                     <Truck className="h-2.5 w-2.5 text-orange-600" />
                   </div>
                   <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wide">
-                    Non-refundable Delivery
+                    {t("products.nonRefundableDelivery")}
                   </span>
                 </div>
               )}
@@ -391,10 +391,13 @@ export const ProductDetailView = ({
                     {(() => {
                       const config = selectedVariant?.delivery_config || product.delivery_config;
                       if (!config) return '';
-                      if (config.calculation_type === 'PER_ITEM') return `Delivery: ₹${config.base_delivery_charge} / item`;
-                      if (config.calculation_type === 'FLAT_PER_ORDER') return `Delivery: ₹${config.base_delivery_charge} / order (Flat)`;
-                      if (config.calculation_type === 'PER_PACKAGE') return `Delivery: ₹${config.base_delivery_charge} / package`;
-                      return `Delivery: ₹${config.base_delivery_charge} (Weight Based)`;
+                      let typeStr = '';
+                      if (config.calculation_type === 'PER_ITEM') typeStr = t("products.perItem");
+                      else if (config.calculation_type === 'FLAT_PER_ORDER') typeStr = t("products.perOrder");
+                      else if (config.calculation_type === 'PER_PACKAGE') typeStr = t("products.perPackage");
+                      else typeStr = t("products.weightBased");
+
+                      return t("products.deliveryCharge", { amount: `₹${config.base_delivery_charge} / ${typeStr}` });
                     })()}
                   </span>
                 </div>
@@ -408,7 +411,7 @@ export const ProductDetailView = ({
           <div className="space-y-3">
             {product.description && (
               <div className="space-y-1.5">
-                <h3 className="text-xs font-black uppercase tracking-widest text-[#2C1810]">Description</h3>
+                <h3 className="text-xs font-black uppercase tracking-widest text-[#2C1810]">{t("products.description")}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed font-light">
                   {product.description}
                 </p>
@@ -419,7 +422,9 @@ export const ProductDetailView = ({
             {selectedVariant?.description && (
               <div className="space-y-1.5 animate-in fade-in slide-in-from-left-1 duration-300">
                 <h3 className="text-xs font-black uppercase tracking-widest text-[#2C1810]">
-                  {product.variant_mode === 'SIZE' ? `${selectedVariant.size_label} Size Details` : 'Variant Details'}
+                  {product.variant_mode === 'SIZE'
+                    ? t("products.sizeDetails", { size: selectedVariant.size_label })
+                    : t("products.variantDetails")}
                 </h3>
                 <p className="text-sm text-muted-foreground leading-relaxed font-light whitespace-pre-line">
                   {selectedVariant.description}
@@ -429,7 +434,7 @@ export const ProductDetailView = ({
 
             {product.benefits && product.benefits.length > 0 && (
               <div className="space-y-2.5">
-                <h3 className="text-xs font-black uppercase tracking-widest text-[#2C1810]">Key Benefits</h3>
+                <h3 className="text-xs font-black uppercase tracking-widest text-[#2C1810]">{t("products.keyBenefits")}</h3>
                 <div className="grid grid-cols-1 gap-1.5">
                   {product.benefits.map((benefit, index) => (
                     <div key={index} className="flex items-center gap-3">
@@ -456,14 +461,14 @@ export const ProductDetailView = ({
                   className="w-full rounded-xl h-12 text-base font-bold bg-[#B85C3C] hover:bg-[#2C1810] transition-all duration-300 shadow-lg shadow-[#B85C3C]/10"
                 >
                   <Zap className="h-5 w-5 mr-3 fill-current" />
-                  Buy Now
+                  {t("products.buyNow")}
                 </Button>
 
                 {quantity > 0 ? (
                   <div className="space-y-2.5">
                     {/* Quantity Selector - Integrated with Buy Now context */}
                     <div className="flex items-center justify-between bg-[#FAF7F2] p-2 rounded-xl border border-[#B85C3C]/10 mb-1">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-2">Cart Quantity</span>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-2">{t("products.cartQuantity")}</span>
                       <div className="flex items-center gap-3">
                         <Button
                           variant="ghost"
@@ -488,7 +493,7 @@ export const ProductDetailView = ({
                     <Link to="/cart" className="block">
                       <Button variant="outline" size="lg" className="w-full rounded-xl h-12 text-base font-bold border-2 border-[#B85C3C]/20 text-[#B85C3C] hover:text-[#2C1810] hover:bg-[#FAF7F2] transition-colors">
                         <ShoppingCart className="h-5 w-5 mr-3" />
-                        Complete Your Order
+                        {t("products.completeOrder")}
                       </Button>
                     </Link>
                   </div>
@@ -501,7 +506,7 @@ export const ProductDetailView = ({
                     className="w-full rounded-xl h-12 text-base font-bold border-2 border-[#B85C3C]/20 text-[#B85C3C] hover:text-[#2C1810] hover:bg-[#FAF7F2] transition-colors"
                   >
                     <ShoppingCart className="h-5 w-5 mr-3" />
-                    Add to Cart
+                    {t("products.addToCart")}
                   </Button>
                 )}
               </div>

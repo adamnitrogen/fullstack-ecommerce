@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useTranslation } from "react-i18next";
+import { useTranslation, Trans } from "react-i18next";
 import { useAuthStore } from "@/store/authStore";
 import { donationService } from "@/services/donation.service";
 import { Button } from "@/components/ui/button";
@@ -81,8 +81,8 @@ export const DonationForm = () => {
         if (!finalAmount || finalAmount < 100) {
             setStatusDialog({
                 open: true,
-                title: "Minimum Donation",
-                message: "Minimum donation amount is ₹100. Please enter a valid amount.",
+                title: t("donation.minDonationTitle"),
+                message: t("donation.minDonationMsg"),
                 type: "error"
             });
             return;
@@ -91,8 +91,8 @@ export const DonationForm = () => {
         if (donationType === "monthly" && !recurringConsent) {
             setStatusDialog({
                 open: true,
-                title: "Consent Required",
-                message: "Please agree to the monthly recurring donation terms to proceed.",
+                title: t("donation.consentRequiredTitle"),
+                message: t("donation.consentRequiredMsg"),
                 type: "error"
             });
             return;
@@ -101,8 +101,8 @@ export const DonationForm = () => {
         if (!formData.fullName || !formData.email || !formData.phone) {
             setStatusDialog({
                 open: true,
-                title: "Missing Details",
-                message: "Please fill in all your details to proceed.",
+                title: t("donation.missingDetailsTitle"),
+                message: t("donation.missingDetailsMsg"),
                 type: "error"
             });
             return;
@@ -116,8 +116,8 @@ export const DonationForm = () => {
             if (!isLoaded) {
                 setStatusDialog({
                     open: true,
-                    title: "Connection Error",
-                    message: "Failed to load payment gateway. Please check your internet connection.",
+                    title: t("donation.connectionErrorTitle"),
+                    message: t("donation.connectionErrorMsg"),
                     type: "error"
                 });
                 setLoading(false);
@@ -139,14 +139,14 @@ export const DonationForm = () => {
                     amount: orderData.amount,
                     currency: orderData.currency,
                     name: "Meri Gau Mata",
-                    description: `Donation Ref: ${orderData.donation_ref}`,
+                    description: `${t("donation.refLabel")} ${orderData.donation_ref}`,
                     order_id: orderData.order_id,
                     handler: async (response: {
                         razorpay_order_id: string;
                         razorpay_payment_id: string;
                         razorpay_signature: string;
                     }) => {
-                        setLoadingMessage("Verifying your generous donation...");
+                        setLoadingMessage(t("donation.verifying"));
                         setLoading(true);
                         try {
                             await donationService.verifyPayment({
@@ -160,8 +160,8 @@ export const DonationForm = () => {
                             setLoadingMessage("");
                             setStatusDialog({
                                 open: true,
-                                title: "Thank You! 🙏",
-                                message: "Your donation has been received successfully. A receipt has been sent to your email.",
+                                title: t("donation.thankYouTitle"),
+                                message: t("donation.thankYouMsg"),
                                 type: "success"
                             });
                             setAmount("");
@@ -171,8 +171,8 @@ export const DonationForm = () => {
                             setLoadingMessage("");
                             setStatusDialog({
                                 open: true,
-                                title: "Verification Failed",
-                                message: "Payment was successful but verification failed. Please contact support.",
+                                title: t("donation.verificationFailedTitle"),
+                                message: t("donation.verificationFailedMsg"),
                                 type: "error"
                             });
                         }
@@ -193,8 +193,8 @@ export const DonationForm = () => {
                     setLoadingMessage("");
                     setStatusDialog({
                         open: true,
-                        title: "Payment Failed",
-                        message: "Your payment could not be processed. Please try again.",
+                        title: t("donation.paymentFailedTitle"),
+                        message: t("donation.paymentFailedMsg"),
                         type: "error"
                     });
                 });
@@ -214,12 +214,12 @@ export const DonationForm = () => {
                     key: subscriptionData.key_id,
                     subscription_id: subscriptionData.subscription_id,
                     name: "Meri Gau Mata - Monthly",
-                    description: `Monthly Support: ₹${finalAmount}`,
+                    description: `${t("donation.monthlySupportLabel")} ₹${finalAmount}`,
                     handler: async (_response: unknown) => {
                         setStatusDialog({
                             open: true,
-                            title: "🎉 Subscription Started!",
-                            message: "Your monthly donation has been set up successfully! Thank you for your sustained support.",
+                            title: t("donation.subscriptionStartedTitle"),
+                            message: t("donation.subscriptionStartedMsg"),
                             type: "success"
                         });
                         setAmount("");
@@ -239,8 +239,8 @@ export const DonationForm = () => {
                 rzp.on('payment.failed', () => {
                     setStatusDialog({
                         open: true,
-                        title: "Payment Failed",
-                        message: "Your payment could not be processed. Please try again.",
+                        title: t("donation.paymentFailedTitle"),
+                        message: t("donation.paymentFailedMsg"),
                         type: "error"
                     });
                 });
@@ -250,8 +250,8 @@ export const DonationForm = () => {
         } catch (error: unknown) {
             setStatusDialog({
                 open: true,
-                title: "Error",
-                message: getErrorMessage(error, "Failed to initiate donation."),
+                title: t("common.error"),
+                message: getErrorMessage(error, t("donation.initiateFailed", "Failed to initiate donation.")),
                 type: "error"
             });
             setLoading(false);
@@ -260,9 +260,9 @@ export const DonationForm = () => {
     };
 
     const amounts = [
-        { value: "500", label: "₹500", desc: "Feed a cow for a day" },
-        { value: "2100", label: "₹2,100", desc: "Medical care kit", popular: true },
-        { value: "5100", label: "₹5,100", desc: "Sponsor a week of fodder" }
+        { value: "500", label: "₹500", desc: t("donation.amounts.day") },
+        { value: "2100", label: "₹2,100", desc: t("donation.amounts.medical"), popular: true },
+        { value: "5100", label: "₹5,100", desc: t("donation.amounts.fodder") }
     ];
 
     return (
@@ -274,9 +274,9 @@ export const DonationForm = () => {
                     <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4 text-primary">
                         <Heart className="w-8 h-8 fill-current animate-pulse duration-[2000ms]" />
                     </div>
-                    <CardTitle className="text-3xl font-bold">Make a Donation</CardTitle>
+                    <CardTitle className="text-3xl font-bold">{t("donation.makeDonation")}</CardTitle>
                     <p className="text-muted-foreground max-w-sm mx-auto">
-                        Your small contribution can save a life today.
+                        {t("donation.smallContribution")}
                     </p>
                 </CardHeader>
 
@@ -288,23 +288,23 @@ export const DonationForm = () => {
                                 className="data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm h-10 rounded-lg transition-all"
                             >
                                 <Gift className="w-4 h-4 mr-2" />
-                                One-Time
+                                {t("donation.oneTime")}
                             </TabsTrigger>
                             <TabsTrigger
                                 value="monthly"
                                 className="data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm h-10 rounded-lg transition-all"
                             >
                                 <CalendarHeart className="w-4 h-4 mr-2" />
-                                Monthly
+                                {t("donation.monthly")}
                             </TabsTrigger>
                         </TabsList>
 
                         <div className="mt-6 space-y-4">
                             <div className="flex items-center justify-between">
-                                <Label className="text-base font-medium">Select Amount</Label>
+                                <Label className="text-base font-medium">{t("donation.selectAmount")}</Label>
                                 {donationType === "monthly" && (
                                     <span className="text-xs text-primary bg-primary/10 px-2 py-1 rounded-full font-medium">
-                                        Recurring monthly
+                                        {t("donation.recurringNotice")}
                                     </span>
                                 )}
                             </div>
@@ -323,7 +323,7 @@ export const DonationForm = () => {
                                     >
                                         {opt.popular && (
                                             <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-[10px] uppercase font-bold px-2 py-0.5 rounded-full shadow-sm">
-                                                Popular
+                                                {t("donation.popular")}
                                             </span>
                                         )}
                                         <span className="text-lg font-bold">{opt.label}</span>
@@ -333,13 +333,13 @@ export const DonationForm = () => {
                             </div>
 
                             <div className="relative mt-2">
-                                <Label htmlFor="custom-amount" className="sr-only">Custom Amount</Label>
+                                <Label htmlFor="custom-amount" className="sr-only">{t("donation.customAmount")}</Label>
                                 <div className="relative group">
                                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-semibold group-focus-within:text-primary transition-colors">₹</span>
                                     <Input
                                         id="custom-amount"
                                         name="customAmount"
-                                        placeholder="Enter custom amount"
+                                        placeholder={t("donation.customAmountPlaceholder")}
                                         className="pl-8 h-12 text-lg font-medium transition-all focus-visible:ring-offset-0 focus-visible:border-primary"
                                         value={customAmount}
                                         onChange={handleCustomAmountChange}
@@ -352,31 +352,31 @@ export const DonationForm = () => {
 
                     <div className="space-y-4 pt-6 border-t border-dashed">
                         <h3 className="font-semibold text-lg flex items-center gap-2">
-                            User Details
-                            <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Required for receipt</span>
+                            {t("donation.userDetails")}
+                            <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{t("donation.requiredForReceipt")}</span>
                         </h3>
 
                         <div className="grid gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="fullName">Full Name</Label>
+                                <Label htmlFor="fullName">{t("donation.fullName")}</Label>
                                 <Input
                                     id="fullName"
                                     name="fullName"
                                     value={formData.fullName}
                                     onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                                    placeholder="e.g. Rahul Sharma"
+                                    placeholder={t("donation.fullNamePlaceholder")}
                                     className="h-11"
                                     autoComplete="name"
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="email">Email Address</Label>
+                                <Label htmlFor="email">{t("donation.emailAddress")}</Label>
                                 <Input
                                     id="email"
                                     name="email"
                                     value={formData.email}
                                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                    placeholder="name@example.com"
+                                    placeholder={t("donation.emailPlaceholder")}
                                     type="email"
                                     className="h-11"
                                     autoComplete="email"
@@ -387,7 +387,7 @@ export const DonationForm = () => {
                                     id="phone"
                                     value={formData.phone}
                                     onChange={(val) => setFormData({ ...formData, phone: val })}
-                                    label="Phone Number"
+                                    label={t("donation.phone")}
                                     className="h-11 w-full"
                                 />
                             </div>
@@ -406,7 +406,9 @@ export const DonationForm = () => {
                                     onChange={(e) => setRecurringConsent(e.target.checked)}
                                 />
                                 <span className="text-sm leading-snug text-muted-foreground group-hover:text-foreground transition-colors">
-                                    I would like to automatically donate rupees <span className="font-bold text-primary">₹{amount || "0"}</span> once a month until I cancel or pause for monthly recurring payments.
+                                    <Trans i18nKey="donation.recurringConsent" values={{ amount: amount || "0" }}>
+                                        I would like to automatically donate rupees <span className="font-bold text-primary">₹{amount || "0"}</span> once a month until I cancel or pause for monthly recurring payments.
+                                    </Trans>
                                 </span>
                             </label>
                         </div>
@@ -419,18 +421,18 @@ export const DonationForm = () => {
                             onClick={handleDonate}
                             disabled={loading || (donationType === "monthly" && !recurringConsent)}
                         >
-                            {loading ? "Processing..." : `Donate ₹${amount || "0"} Now`}
+                            {loading ? t("donation.processing") : t("donation.donateNow", { amount: amount || "0" })}
                         </Button>
 
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-xs text-muted-foreground bg-muted/30 p-2 rounded-lg border border-border/40">
                             <div className="flex items-center gap-1.5">
                                 <ShieldCheck className="w-3.5 h-3.5 text-green-600" />
-                                <span>Secure Payment</span>
+                                <span>{t("donation.securePayment")}</span>
                             </div>
                             <span className="hidden sm:inline text-border">|</span>
                             <div className="flex items-center gap-1.5">
                                 <Lock className="w-3.5 h-3.5 text-blue-600" />
-                                <span>256-bit SSL Encrypted</span>
+                                <span>{t("donation.secureSSL")}</span>
                             </div>
                         </div>
                     </div>
@@ -450,7 +452,7 @@ export const DonationForm = () => {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogAction onClick={() => setStatusDialog(prev => ({ ...prev, open: false }))}>
-                            Close
+                            {t("donation.close")}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

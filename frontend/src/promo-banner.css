@@ -1,4 +1,0 @@
-/* Conditional spacing for navbar when promotional banner is visible */
-body.has-promo-banner nav {
-  margin-top: 60px;
-}

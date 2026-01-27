@@ -32,7 +32,7 @@ import { logger } from "@/lib/logger";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 
 export default function MyOrders() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const navigate = useNavigate();
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -286,7 +286,7 @@ export default function MyOrders() {
                                                     {(() => {
                                                         const dateStr = order.created_at || "";
                                                         const date = dateStr ? new Date(dateStr) : new Date();
-                                                        return !isNaN(date.getTime()) ? format(date, "MMM d, yyyy", { locale: t("language") === "hi" ? hi : enIN }) : "N/A";
+                                                        return !isNaN(date.getTime()) ? format(date, "MMM d, yyyy", { locale: i18n.language === "hi" ? hi : enIN }) : "N/A";
                                                     })()}
                                                 </span>
                                             </TableCell>

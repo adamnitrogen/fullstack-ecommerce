@@ -62,7 +62,7 @@ router.post('/sync', validate(z.object({ access_token: z.string(), refresh_token
             maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
         });
 
-        res.json({ success: true, message: 'Session synced', user });
+        res.json({ success: true, message: getI18nKey('SESSION_SYNCED'), user });
 
     } catch (error) {
         logger.error({ err: error }, 'Session sync error');
@@ -79,7 +79,8 @@ router.post('/validate-credentials', validate(loginSchema), async (req, res) => 
     const guestId = req.headers['x-guest-id'];
 
     try {
-        const otpResult = await AuthService.validateCredentials(email, password, guestId);
+        const lang = req.get('x-user-lang') || 'en';
+        const otpResult = await AuthService.validateCredentials(email, password, guestId, lang);
 
         if (!otpResult.success) {
             logger.warn({ email, guestId, otpResult }, '[AuthRoutes] Credentials validation failed');
@@ -121,9 +122,11 @@ router.post('/resend-confirmation', validate(z.object({ email: z.string().email(
  */
 router.post('/register', validate(registerSchema), async (req, res) => {
     try {
+        const lang = req.get('x-user-lang') || 'en';
         const user = await AuthService.registerUser({
             ...req.body,
-            isOtpVerified: req.body.otpVerified === true
+            isOtpVerified: req.body.otpVerified === true,
+            lang
         });
 
         logger.info({ userId: user.id }, '[AuthRoutes] User registered successfully');
@@ -242,7 +245,7 @@ router.post('/refresh', async (req, res) => {
         res.cookie('refresh_token', tokens.refresh_token, refreshOptions);
 
         // Return user data along with tokens for frontend state sync
-        res.json({ success: true, message: 'Token refreshed', user, tokens });
+        res.json({ success: true, message: getI18nKey('TOKEN_REFRESHED'), user, tokens });
 
     } catch (error) {
         logger.error({ err: error.message, stack: error.stack }, 'Refresh token error');
@@ -380,7 +383,8 @@ router.post('/reset-password-request', validate(z.object({ email: z.string().ema
     const { email } = req.body;
 
     try {
-        const result = await AuthService.requestPasswordReset(email);
+        const lang = req.get('x-user-lang') || 'en';
+        const result = await AuthService.requestPasswordReset(email, lang);
         res.json(result);
     } catch (error) {
         logger.error({ err: error }, 'Password reset request error');

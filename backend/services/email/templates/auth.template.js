@@ -1,12 +1,11 @@
-/**
- * Auth-related Email Templates (OTP, Password Reset)
- */
 const { wrapInTemplate, APP_NAME } = require('./base.template');
+const { getCommonStrings } = require('./i18n');
 
 /**
  * OTP verification email
  */
 function getOTPEmail({ otp, expiryMinutes, lang = 'en' }) {
+    const common = getCommonStrings(lang);
     const i18n = {
         en: {
             title: 'Your Verification Code',
@@ -49,6 +48,7 @@ function getOTPEmail({ otp, expiryMinutes, lang = 'en' }) {
  * Password reset email
  */
 function getPasswordResetEmail({ resetLink, lang = 'en' }) {
+    const common = getCommonStrings(lang);
     const i18n = {
         en: {
             title: 'Reset Your Password',

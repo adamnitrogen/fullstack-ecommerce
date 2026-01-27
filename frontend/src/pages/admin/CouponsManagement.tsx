@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
     Card,
@@ -48,6 +49,7 @@ import {
 } from "@/components/ui/select";
 
 const CouponsManagement = () => {
+    const { t } = useTranslation();
     const [coupons, setCoupons] = useState<Coupon[]>([]);
     const [loading, setLoading] = useState(true);
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -72,7 +74,7 @@ const CouponsManagement = () => {
             const data = await couponService.getAll(filters);
             setCoupons(data);
         } catch (error) {
-            toast.error(getErrorMessage(error, "Failed to load coupons"));
+            toast.error(getErrorMessage(error, t("admin.coupons.toasts.loadFailed")));
         } finally {
             setLoading(false);
         }
@@ -108,10 +110,10 @@ const CouponsManagement = () => {
 
         try {
             await couponService.delete(couponToDelete);
-            toast.success("Coupon deleted successfully");
+            toast.success(t("admin.coupons.toasts.deleteSuccess"));
             await fetchCoupons();
         } catch (error) {
-            toast.error(getErrorMessage(error, "Failed to delete coupon"));
+            toast.error(getErrorMessage(error, t("admin.coupons.toasts.deleteFailed")));
         } finally {
             setDeleteDialogOpen(false);
             setCouponToDelete(null);
@@ -135,7 +137,7 @@ const CouponsManagement = () => {
             <div className="flex justify-end">
                 <Button onClick={handleCreate}>
                     <Plus className="mr-2 h-4 w-4" />
-                    Create Coupon
+                    {t("admin.coupons.create")}
                 </Button>
             </div>
 
@@ -144,41 +146,31 @@ const CouponsManagement = () => {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <Filter className="h-5 w-5" />
-                        Filters
+                        {t("admin.coupons.filters.title")}
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="flex gap-4">
                         <div className="w-48">
-                            <label htmlFor="type-filter" className="text-sm font-medium mb-2 block">Type</label>
-                            <Select value={typeFilter} onValueChange={setTypeFilter}>
-                                <SelectTrigger id="type-filter">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Types</SelectItem>
-                                    <SelectItem value="cart">Cart-Level</SelectItem>
-                                    <SelectItem value="category">Category-Level</SelectItem>
-                                    <SelectItem value="product">Product-Level</SelectItem>
-                                    <SelectItem value="variant">Variant-Level</SelectItem>
-                                    <SelectItem value="free_delivery">Free Delivery</SelectItem>
-                                </SelectContent>
-                            </Select>
+                            <label htmlFor="type-filter" className="text-sm font-medium mb-2 block">{t("admin.coupons.filters.type")}</label>
+                            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} id="type-filter" className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                                <option value="all">{t("admin.coupons.filters.types.all")}</option>
+                                <option value="cart">{t("admin.coupons.filters.types.cart")}</option>
+                                <option value="category">{t("admin.coupons.filters.types.category")}</option>
+                                <option value="product">{t("admin.coupons.filters.types.product")}</option>
+                                <option value="variant">{t("admin.coupons.filters.types.variant")}</option>
+                                <option value="free_delivery">{t("admin.coupons.filters.types.free_delivery")}</option>
+                            </select>
                         </div>
 
                         <div className="w-48">
-                            <label htmlFor="status-filter" className="text-sm font-medium mb-2 block">Status</label>
-                            <Select value={statusFilter} onValueChange={setStatusFilter}>
-                                <SelectTrigger id="status-filter">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Status</SelectItem>
-                                    <SelectItem value="active">Active</SelectItem>
-                                    <SelectItem value="inactive">Inactive</SelectItem>
-                                    <SelectItem value="expired">Expired</SelectItem>
-                                </SelectContent>
-                            </Select>
+                            <label htmlFor="status-filter" className="text-sm font-medium mb-2 block">{t("admin.coupons.filters.status")}</label>
+                            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} id="status-filter" className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                                <option value="all">{t("admin.coupons.filters.statuses.all")}</option>
+                                <option value="active">{t("admin.coupons.filters.statuses.active")}</option>
+                                <option value="inactive">{t("admin.coupons.filters.statuses.inactive")}</option>
+                                <option value="expired">{t("admin.coupons.filters.statuses.expired")}</option>
+                            </select>
                         </div>
                     </div>
                 </CardContent>
@@ -187,9 +179,9 @@ const CouponsManagement = () => {
             {/* Coupons Table */}
             <Card>
                 <CardHeader>
-                    <CardTitle>All Coupons ({coupons.length})</CardTitle>
+                    <CardTitle>{t("admin.coupons.table.title", { count: coupons.length })}</CardTitle>
                     <CardDescription>
-                        View and manage all your discount coupons
+                        {t("admin.coupons.table.description")}
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -200,9 +192,9 @@ const CouponsManagement = () => {
                     ) : coupons.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground">
                             <TagIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                            <p>No coupons found</p>
+                            <p>{t("admin.coupons.table.noFound")}</p>
                             <Button variant="outline" className="mt-4" onClick={handleCreate}>
-                                Create your first coupon
+                                {t("admin.coupons.table.createFirst")}
                             </Button>
                         </div>
                     ) : (
@@ -210,13 +202,13 @@ const CouponsManagement = () => {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Code</TableHead>
-                                        <TableHead>Type</TableHead>
-                                        <TableHead>Discount</TableHead>
-                                        <TableHead>Valid Until</TableHead>
-                                        <TableHead>Usage</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
+                                        <TableHead>{t("admin.coupons.table.cols.code")}</TableHead>
+                                        <TableHead>{t("admin.coupons.table.cols.type")}</TableHead>
+                                        <TableHead>{t("admin.coupons.table.cols.discount")}</TableHead>
+                                        <TableHead>{t("admin.coupons.table.cols.validUntil")}</TableHead>
+                                        <TableHead>{t("admin.coupons.table.cols.usage")}</TableHead>
+                                        <TableHead>{t("admin.coupons.table.cols.status")}</TableHead>
+                                        <TableHead className="text-right">{t("admin.coupons.table.cols.actions")}</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -229,11 +221,11 @@ const CouponsManagement = () => {
                                             </TableCell>
                                             <TableCell>
                                                 <Badge variant="outline" className="capitalize">
-                                                    {coupon.type}
+                                                    {t(`admin.coupons.filters.types.${coupon.type}`)}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell>
-                                                {coupon.type === 'free_delivery' ? 'Free Shipping' : `${coupon.discount_percentage}%`}
+                                                {coupon.type === 'free_delivery' ? t("admin.coupons.common.freeShipping") : `${coupon.discount_percentage}%`}
                                             </TableCell>
                                             <TableCell>
                                                 <span
@@ -252,11 +244,11 @@ const CouponsManagement = () => {
                                             </TableCell>
                                             <TableCell>
                                                 {isExpired(coupon.valid_until) ? (
-                                                    <Badge variant="destructive">Expired</Badge>
+                                                    <Badge variant="destructive">{t("admin.coupons.status.expired")}</Badge>
                                                 ) : coupon.is_active ? (
-                                                    <Badge className="bg-green-500">Active</Badge>
+                                                    <Badge className="bg-green-500">{t("admin.coupons.status.active")}</Badge>
                                                 ) : (
-                                                    <Badge variant="secondary">Inactive</Badge>
+                                                    <Badge variant="secondary">{t("admin.coupons.status.inactive")}</Badge>
                                                 )}
                                             </TableCell>
                                             <TableCell className="text-right">
@@ -298,16 +290,15 @@ const CouponsManagement = () => {
             <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Coupon</AlertDialogTitle>
+                        <AlertDialogTitle>{t("admin.coupons.delete.title")}</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Are you sure you want to delete this coupon? This will deactivate
-                            it and users won't be able to use it anymore.
+                            {t("admin.coupons.delete.description")}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel>{t("admin.coupons.delete.cancel")}</AlertDialogCancel>
                         <AlertDialogAction onClick={handleDeleteConfirm}>
-                            Delete
+                            {t("admin.coupons.delete.confirm")}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

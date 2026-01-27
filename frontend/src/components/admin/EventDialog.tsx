@@ -1,6 +1,7 @@
 import { logger } from "@/lib/logger";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +29,7 @@ import {
 } from "@/components/ui/popover";
 import { CalendarIcon, Plus, Check, X, AlertCircle } from "lucide-react";
 import { format, isAfter, isBefore, isEqual } from "date-fns";
+import { hi, enUS } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +52,8 @@ export function EventDialog({
   event,
   onSave,
 }: EventDialogProps) {
+  const { t, i18n } = useTranslation();
+  const currentLocale = i18n.language === "hi" ? hi : enUS;
   const [formData, setFormData] = useState<Partial<Event> & { imageFile?: File }>({
     title: "",
     description: "",
@@ -161,8 +165,8 @@ export function EventDialog({
       !formData.location?.address?.trim()
     ) {
       toast({
-        title: "Check your info",
-        description: "Please fill in all required fields (Title, Description, Location)",
+        title: t("common.checkInfo"),
+        description: t("events.fillRequired"),
         variant: "destructive",
       });
       return;
@@ -170,8 +174,8 @@ export function EventDialog({
 
     if (!startDate) {
       toast({
-        title: "Date Required",
-        description: "Please select a start date for the event",
+        title: t("admin.events.dialogs.pickDate"),
+        description: t("admin.events.dialogs.pickDate"),
         variant: "destructive",
       });
       return;
@@ -180,8 +184,8 @@ export function EventDialog({
     // Check for either existing image URL or new image file
     if (!formData.image?.trim() && !formData.imageFile) {
       toast({
-        title: "Image Required",
-        description: "Please upload an event cover image",
+        title: t("common.error"),
+        description: t("events.registration.noImage"),
         variant: "destructive",
       });
       return;
@@ -277,17 +281,17 @@ export function EventDialog({
       <DialogContent className="sm:max-w-4xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="text-2xl font-semibold">
-            {event ? "Edit Event" : "Add New Event"}
+            {event ? t("admin.events.dialogs.editEvent") : t("admin.events.dialogs.addEvent")}
           </DialogTitle>
           <DialogDescription>
             {event
-              ? "Update event details and registration settings"
-              : "Create a new event for the community"}
+              ? t("admin.events.dialogs.editEventDesc")
+              : t("admin.events.dialogs.addEventDesc")}
           </DialogDescription>
           {event?.status === 'cancelled' && (
             <div className="mt-2 p-3 bg-orange-50 border border-orange-100 rounded-lg flex items-start gap-2 text-xs text-orange-800 font-medium">
               <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
-              <span>Note: Saving this cancelled event will restart it and open registrations again.</span>
+              <span>{t("admin.events.dialogs.restartNotice")}</span>
             </div>
           )}
         </DialogHeader>
@@ -296,7 +300,7 @@ export function EventDialog({
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Event Image */}
             <div className="space-y-2 border rounded-lg p-4 bg-muted/30">
-              <Label className="text-base font-semibold">Event Image</Label>
+              <Label className="text-base font-semibold">{t("admin.events.dialogs.imageLabel")}</Label>
               <ImageUpload
                 images={
                   formData.imageFile
@@ -323,12 +327,12 @@ export function EventDialog({
             {/* Basic Information */}
             <div className="space-y-4 border rounded-lg p-4">
               <h3 className="text-sm font-semibold text-gray-900 mb-3">
-                Basic Information
+                {t("admin.events.dialogs.basicInfo")}
               </h3>
 
               <div className="space-y-2">
                 <Label htmlFor="title">
-                  Event Title <span className="text-red-600">*</span>
+                  {t("admin.events.dialogs.eventTitle")} <span className="text-red-600">*</span>
                 </Label>
                 <Input
                   id="title"
@@ -336,14 +340,14 @@ export function EventDialog({
                   onChange={(e) =>
                     setFormData({ ...formData, title: e.target.value })
                   }
-                  placeholder="Enter event title"
+                  placeholder={t("admin.events.dialogs.titlePlaceholder")}
                   required
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="description">
-                  Description <span className="text-red-600">*</span>
+                  {t("admin.events.dialogs.description")} <span className="text-red-600">*</span>
                 </Label>
                 <Textarea
                   id="description"
@@ -351,7 +355,7 @@ export function EventDialog({
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
                   }
-                  placeholder="Enter detailed event description"
+                  placeholder={t("admin.events.dialogs.descPlaceholder")}
                   rows={5}
                   required
                   className="resize-none"
@@ -360,7 +364,7 @@ export function EventDialog({
 
               <div className="space-y-2">
                 <Label htmlFor="location">
-                  Location <span className="text-red-600">*</span>
+                  {t("admin.events.dialogs.location")} <span className="text-red-600">*</span>
                 </Label>
                 <Input
                   id="location"
@@ -371,13 +375,13 @@ export function EventDialog({
                       location: { address: e.target.value },
                     })
                   }
-                  placeholder="Enter event location address"
+                  placeholder={t("admin.events.dialogs.locationPlaceholder")}
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="category">Category (Internal Use Only)</Label>
+                <Label htmlFor="category">{t("admin.events.dialogs.category")}</Label>
                 <Select
                   value={formData.category || ""}
                   onValueChange={(value) =>
@@ -385,13 +389,13 @@ export function EventDialog({
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select category (optional)" />
+                    <SelectValue placeholder={t("admin.events.dialogs.selectCategory")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
+                    <SelectItem value="none">{t("common.none")}</SelectItem>
                     {eventCategories.length === 0 ? (
                       <SelectItem value="no-categories" disabled>
-                        No categories available
+                        {t("admin.events.dialogs.noCategories")}
                       </SelectItem>
                     ) : (
                       eventCategories.map((cat) => (
@@ -403,7 +407,7 @@ export function EventDialog({
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  For admin organization only - not visible to customers
+                  {t("admin.events.dialogs.adminOnly")}
                 </p>
               </div>
             </div>
@@ -411,13 +415,13 @@ export function EventDialog({
             {/* Event Dates & Status */}
             <div className="space-y-4 border rounded-lg p-4">
               <h3 className="text-sm font-semibold text-gray-900 mb-3">
-                Event Schedule
+                {t("admin.events.dialogs.schedule")}
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>
-                    Start Date <span className="text-red-600">*</span>
+                    {t("admin.events.dialogs.startDate")} <span className="text-red-600">*</span>
                   </Label>
                   <Popover>
                     <PopoverTrigger asChild>
@@ -430,9 +434,9 @@ export function EventDialog({
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {startDate ? (
-                          format(startDate, "PPP")
+                          format(startDate, "PPP", { locale: currentLocale })
                         ) : (
-                          <span>Pick start date</span>
+                          <span>{t("admin.events.dialogs.pickDate")}</span>
                         )}
                       </Button>
                     </PopoverTrigger>
@@ -449,7 +453,7 @@ export function EventDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label>End Date (Optional)</Label>
+                  <Label>{t("admin.events.dialogs.endDate")} ({t("common.optional")})</Label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -461,9 +465,9 @@ export function EventDialog({
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {endDate ? (
-                          format(endDate, "PPP")
+                          format(endDate, "PPP", { locale: currentLocale })
                         ) : (
-                          <span>Pick end date</span>
+                          <span>{t("admin.events.dialogs.pickDate")}</span>
                         )}
                       </Button>
                     </PopoverTrigger>
@@ -483,7 +487,7 @@ export function EventDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Start Time</Label>
+                  <Label>{t("admin.events.dialogs.startTime")}</Label>
                   <Input
                     type="time"
                     value={formData.startTime || ""}
@@ -494,7 +498,7 @@ export function EventDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label>End Time</Label>
+                  <Label>{t("admin.events.dialogs.endTime")}</Label>
                   <Input
                     type="time"
                     value={formData.endTime || ""}
@@ -508,7 +512,7 @@ export function EventDialog({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <Label>Registration Deadline (Optional)</Label>
+                    <Label>{t("admin.events.dialogs.deadline")} ({t("common.optional")})</Label>
                     {registrationDeadline && (
                       <Button
                         variant="ghost"
@@ -517,7 +521,7 @@ export function EventDialog({
                         onClick={() => setRegistrationDeadline(undefined)}
                         type="button"
                       >
-                        Clear
+                        {t("common.clear")}
                       </Button>
                     )}
                   </div>
@@ -532,9 +536,9 @@ export function EventDialog({
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {registrationDeadline ? (
-                          format(registrationDeadline, "PPP")
+                          format(registrationDeadline, "PPP", { locale: currentLocale })
                         ) : (
-                          <span>Pick deadline date</span>
+                          <span>{t("admin.events.dialogs.pickDate")}</span>
                         )}
                       </Button>
                     </PopoverTrigger>
@@ -552,12 +556,12 @@ export function EventDialog({
                     </PopoverContent>
                   </Popover>
                   <p className="text-[10px] text-muted-foreground italic">
-                    If set, registration closes at start of this day.
+                    {t("admin.events.dialogs.deadlineHelp")}
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Event Status (Auto-calculated)</Label>
+                  <Label>{t("admin.events.dialogs.statusLabel")}</Label>
                   <div className="flex items-center gap-2">
                     <Badge
                       variant={getStatusBadgeVariant(
@@ -565,11 +569,10 @@ export function EventDialog({
                       )}
                       className="capitalize"
                     >
-                      {formData.status || "upcoming"}
+                      {t(`events.${formData.status || "upcoming"}`)}
                     </Badge>
                     <span className="text-xs text-gray-500">
-                      Status is automatically determined based on start and end
-                      dates
+                      {t("admin.events.dialogs.statusDescription")}
                     </span>
                   </div>
                 </div>
@@ -579,12 +582,12 @@ export function EventDialog({
             {/* Capacity & Registration */}
             <div className="space-y-4 border rounded-lg p-4">
               <h3 className="text-sm font-semibold text-gray-900 mb-3">
-                Capacity & Registration
+                {t("admin.events.management.allEvents")}
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="capacity">Event Capacity (Optional)</Label>
+                  <Label htmlFor="capacity">{t("admin.events.dialogs.capacity")}</Label>
                   <Input
                     id="capacity"
                     type="number"
@@ -598,13 +601,13 @@ export function EventDialog({
                           : undefined,
                       })
                     }
-                    placeholder="Max participants (leave empty for unlimited)"
+                    placeholder={t("admin.events.dialogs.capacityPlaceholder")}
                   />
                 </div>
 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="registrationAmount">Registration Fee (GST Inclusive)</Label>
+                    <Label htmlFor="registrationAmount">{t("admin.events.dialogs.feeLabel")}</Label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
                         ₹
@@ -622,7 +625,7 @@ export function EventDialog({
                             registrationAmount: amount,
                           });
                         }}
-                        placeholder="0 for free"
+                        placeholder={t("common.none")}
                         className="pl-8"
                       />
                     </div>
@@ -631,7 +634,7 @@ export function EventDialog({
                   {formData.registrationAmount !== undefined && formData.registrationAmount > 0 && (
                     <div className="space-y-4 pt-2 border-t mt-4">
                       <div className="space-y-2">
-                        <Label htmlFor="gstRate">GST Slab (%)</Label>
+                        <Label htmlFor="gstRate">{t("events.registration.gst")}</Label>
                         <Select
                           value={String(formData.gstRate || 0)}
                           onValueChange={(value) =>
@@ -639,10 +642,10 @@ export function EventDialog({
                           }
                         >
                           <SelectTrigger id="gstRate">
-                            <SelectValue placeholder="Select GST rate" />
+                            <SelectValue placeholder={t("admin.events.dialogs.selectCategory")} />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="0">0% (Exempt)</SelectItem>
+                            <SelectItem value="0">0% ({t("common.none")})</SelectItem>
                             <SelectItem value="5">5%</SelectItem>
                             <SelectItem value="12">12%</SelectItem>
                             <SelectItem value="18">18%</SelectItem>
@@ -653,19 +656,19 @@ export function EventDialog({
 
                       <div className="bg-muted/50 p-3 rounded-md space-y-1 text-sm">
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Base Price:</span>
+                          <span className="text-muted-foreground">{t("events.registration.basePrice")}:</span>
                           <span className="font-medium">
                             ₹{(formData.registrationAmount / (1 + (formData.gstRate || 0) / 100)).toFixed(2)}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">GST Amount ({formData.gstRate || 0}%):</span>
+                          <span className="text-muted-foreground">{t("events.registration.gst")} ({formData.gstRate || 0}%):</span>
                           <span className="font-medium">
                             ₹{(formData.registrationAmount - (formData.registrationAmount / (1 + (formData.gstRate || 0) / 100))).toFixed(2)}
                           </span>
                         </div>
                         <div className="flex justify-between border-t border-muted-foreground/20 pt-1 mt-1">
-                          <span className="font-semibold text-primary">Final Price (Inclusive):</span>
+                          <span className="font-semibold text-primary">{t("events.registration.total")}:</span>
                           <span className="font-bold text-primary">₹{(formData.registrationAmount || 0).toFixed(2)}</span>
                         </div>
                       </div>
@@ -674,8 +677,8 @@ export function EventDialog({
 
                   <p className="text-xs text-gray-500">
                     {formData.registrationAmount === 0
-                      ? "Free event - No GST applicable"
-                      : `₹${formData.registrationAmount} registration fee (including GST)`}
+                      ? t("events.public.details.entryFree")
+                      : `₹${formData.registrationAmount} ${t("events.public.details.taxInclusive")}`}
                   </p>
                 </div>
               </div>
@@ -684,7 +687,7 @@ export function EventDialog({
             {/* Key Highlights */}
             <div className="space-y-4 border rounded-lg p-4">
               <h3 className="text-sm font-semibold text-gray-900 mb-3">
-                Key Highlights
+                {t("admin.events.dialogs.highlightsLabel")}
               </h3>
 
               <div className="space-y-3">
@@ -692,7 +695,7 @@ export function EventDialog({
                   <Input
                     value={highlightInput}
                     onChange={(e) => setHighlightInput(e.target.value)}
-                    placeholder="Add a key highlight"
+                    placeholder={t("admin.events.dialogs.highlightsLabel")}
                     onKeyPress={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -739,7 +742,7 @@ export function EventDialog({
             {/* Special Privileges */}
             <div className="space-y-4 border rounded-lg p-4">
               <h3 className="text-sm font-semibold text-gray-900 mb-3">
-                Special Privileges for Devotees
+                {t("admin.events.dialogs.privilegesLabel")}
               </h3>
 
               <div className="space-y-3">
@@ -747,7 +750,7 @@ export function EventDialog({
                   <Input
                     value={privilegeInput}
                     onChange={(e) => setPrivilegeInput(e.target.value)}
-                    placeholder="Add a special privilege"
+                    placeholder={t("admin.events.dialogs.privilegesLabel")}
                     onKeyPress={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -797,10 +800,10 @@ export function EventDialog({
                 variant="outline"
                 onClick={() => onOpenChange(false)}
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button type="submit">
-                {event ? "Update Event" : "Create Event"}
+                {event ? t("common.update") : t("common.create")}
               </Button>
             </DialogFooter>
           </form>

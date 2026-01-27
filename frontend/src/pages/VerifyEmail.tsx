@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle, XCircle, Mail } from 'lucide-react';
@@ -9,6 +10,7 @@ import { getErrorMessage } from '@/lib/errorUtils';
 export default function VerifyEmail() {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
+    const { t } = useTranslation();
     const token = searchParams.get('token');
 
     const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -17,7 +19,8 @@ export default function VerifyEmail() {
     useEffect(() => {
         if (!token) {
             setStatus('error');
-            setMessage('Invalid verification link. No token provided.');
+            setStatus('error');
+            setMessage(t('verifyEmail.invalidLink'));
             return;
         }
 
@@ -26,14 +29,14 @@ export default function VerifyEmail() {
                 const response = await apiClient.get(`/auth/verify-email?token=${token}`);
                 if (response.data.success) {
                     setStatus('success');
-                    setMessage(response.data.message || 'Email verified successfully!');
+                    setMessage(response.data.message || t('verifyEmail.successMsg'));
                 } else {
                     setStatus('error');
-                    setMessage(response.data.error || 'Verification failed.');
+                    setMessage(response.data.error || t('verifyEmail.failedMsg'));
                 }
             } catch (error: unknown) {
                 setStatus('error');
-                setMessage(getErrorMessage(error, 'Failed to verify email. The link may have expired.'));
+                setMessage(getErrorMessage(error, t('verifyEmail.errorMsg')));
             }
         };
 
@@ -66,9 +69,9 @@ export default function VerifyEmail() {
                         )}
                     </div>
                     <CardTitle className="text-2xl">
-                        {status === 'loading' && 'Verifying Email...'}
-                        {status === 'success' && 'Email Verified!'}
-                        {status === 'error' && 'Verification Failed'}
+                        {status === 'loading' && t('verifyEmail.loadingTitle')}
+                        {status === 'success' && t('verifyEmail.successTitle')}
+                        {status === 'error' && t('verifyEmail.errorTitle')}
                     </CardTitle>
                     <CardDescription className="text-base mt-2">
                         {message}
@@ -77,23 +80,23 @@ export default function VerifyEmail() {
                 <CardContent className="text-center">
                     {status === 'success' && (
                         <Button onClick={handleGoToLogin} className="w-full">
-                            Continue to Login
+                            {t('verifyEmail.continueLogin')}
                         </Button>
                     )}
                     {status === 'error' && (
                         <div className="space-y-3">
                             <Button onClick={handleGoToLogin} variant="outline" className="w-full">
-                                Go to Homepage
+                                {t('verifyEmail.goHome')}
                             </Button>
                             <p className="text-sm text-muted-foreground">
                                 <Mail className="inline-block w-4 h-4 mr-1" />
-                                Need help? Contact our support team.
+                                {t('verifyEmail.contactSupport')}
                             </p>
                         </div>
                     )}
                     {status === 'loading' && (
                         <p className="text-sm text-muted-foreground">
-                            Please wait while we verify your email address...
+                            {t('verifyEmail.loadingDesc')}
                         </p>
                     )}
                 </CardContent>

@@ -1,6 +1,7 @@
 import { logger } from "@/lib/logger";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { CONFIG, APP_NAME } from "@/config";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Calendar, MapPin, Clock, Banknote, ArrowLeft, Loader2, User, Mail, Phone, Ticket, CheckCircle2, XCircle } from "lucide-react";
@@ -95,7 +96,7 @@ const EventRegistration = () => {
 
   // Early return for loading state
   if (isLoading) {
-    return <LoadingOverlay isLoading={true} message="Getting event details..." />;
+    return <LoadingOverlay isLoading={true} />;
   }
 
   // Early return if event not found
@@ -103,8 +104,8 @@ const EventRegistration = () => {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Event not found</h2>
-          <Button onClick={() => navigate("/events")}>Back to Events</Button>
+          <h2 className="text-2xl font-bold mb-4">{t("events.registration.notFound")}</h2>
+          <Button onClick={() => navigate("/events")}>{t("events.registration.backToEvents")}</Button>
         </div>
       </div>
     );
@@ -119,21 +120,21 @@ const EventRegistration = () => {
     const newErrors: Record<string, string> = {};
 
     if (!formData.fullName.trim()) {
-      newErrors.fullName = "Full name is required";
+      newErrors.fullName = t("validation.required", { field: t("events.registration.fullName") });
     }
 
     if (!formData.email.trim()) {
-      newErrors.email = "Email is required";
+      newErrors.email = t("validation.required", { field: t("events.registration.email") });
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "Invalid email format";
+      newErrors.email = t("validation.invalidEmail");
     }
 
     if (!formData.phone || formData.phone.trim().length < 13) {
-      newErrors.phone = "Phone number is required and must be 10 digits";
+      newErrors.phone = t("validation.minLength", { field: t("events.registration.phone"), count: 10 });
     }
 
     if (!agreedToTerms) {
-      newErrors.terms = "You must agree to the terms and conditions";
+      newErrors.terms = t("validation.required", { field: t("events.registration.terms") });
     }
 
     setErrors(newErrors);
@@ -154,8 +155,7 @@ const EventRegistration = () => {
     if (!user?.email || user.email.trim() === "") {
       setErrors((prev) => ({
         ...prev,
-        email:
-          "Please add your email address in profile settings before registering for an event.",
+        email: t("events.registration.addEmailProfile"),
       }));
       return;
     }
@@ -190,20 +190,20 @@ const EventRegistration = () => {
       const data = response.data;
 
       if (!data.success) {
-        throw new Error(data.error || "Failed to create registration");
+        throw new Error(data.error || t("events.registration.genericError"));
       }
 
       // Handle free event registration
       if (data.isFree) {
         switchDialogs(() => setStatusDialog({
           open: true,
-          title: "Registration Successful!",
+          title: t("events.registration.successTitle"),
           message: "", // Message is now rendered via data
           type: "success",
           data: {
             registrationNumber: data.registration.registrationNumber,
             eventTitle: eventData.title,
-            amount: "Free",
+            amount: t("events.registration.free"),
             email: formData.email
           },
           onClose: () => navigate("/profile?tab=events"),
@@ -216,15 +216,15 @@ const EventRegistration = () => {
         key: data.key_id,
         amount: data.amount,
         currency: data.currency,
-        name: "MeriGauMata",
-        description: `Registration for ${eventData.title}`,
+        name: APP_NAME || t("common.brandName"),
+        description: t("events.registration.razorpayDesc", { title: eventData.title }),
         order_id: data.order_id,
         handler: async function (paymentResponse: Record<string, unknown>) {
           // Show verifying spinner
           setStatusDialog({
             open: true,
-            title: "Verifying Payment",
-            message: "Please wait while we confirm your registration...",
+            title: t("events.registration.verifying"),
+            message: t("events.registration.processing"),
             type: "loading"
           });
 
@@ -246,7 +246,7 @@ const EventRegistration = () => {
             if (verifyData.success) {
               setStatusDialog({
                 open: true,
-                title: "Payment Successful!",
+                title: t("events.registration.paymentSuccessTitle"),
                 message: "", // Message is now rendered via data
                 type: "success",
                 data: {
@@ -259,26 +259,26 @@ const EventRegistration = () => {
                 onClose: () => navigate("/profile?tab=events"),
               });
             } else {
-              throw new Error("Verification returned unsuccessful status");
+              throw new Error(t("errors.payment.generic_error"));
             }
           } catch (verifyError: unknown) {
             logger.error("Verification error:", verifyError);
             setIsProcessing(false); // Reset processing state so user can retry
 
             // Determine user-friendly error message
-            let userMessage = "We couldn't verify your payment instantly. Please contact support.";
+            let userMessage = t("events.registration.verificationIssue");
             const serverMsg = getErrorMessage(verifyError);
 
             // Handle specific refund cases
             if (serverMsg && (serverMsg.includes('refunded') || serverMsg.includes('Registration failed'))) {
-              userMessage = "Payment was successful but registration failed. \n\nYour payment has been automatically refunded. \nPlease try registering again.";
+              userMessage = t("events.registration.failedRefunded");
             } else if (serverMsg && serverMsg.includes('timeout')) {
-              userMessage = "Payment verification timed out. \n\nIf money was deducted, please do not pay again. \nContact support with your details.";
+              userMessage = t("events.registration.verifyTimeout");
             }
 
             setStatusDialog({
               open: true,
-              title: "Verification Issue",
+              title: t("events.registration.verificationIssue"),
               message: userMessage,
               type: "error",
             });
@@ -317,11 +317,11 @@ const EventRegistration = () => {
       const isLoaded = await loadRazorpay();
 
       if (!isLoaded) {
-        throw new Error('Failed to load payment gateway. Please check your internet connection and try again.');
+        throw new Error(t("errors.payment.gateway_error"));
       }
 
       if (!window.Razorpay) {
-        throw new Error('Razorpay SDK failed to initialize');
+        throw new Error(t("errors.payment.gateway_error"));
       }
 
       const razorpayInstance = new window.Razorpay(options);
@@ -360,12 +360,12 @@ const EventRegistration = () => {
 
     } catch (error: unknown) {
       logger.error("Registration error:", error);
-      const errorMessage = getErrorMessage(error, "Failed to process registration. Please try again.");
+      const errorMessage = getErrorMessage(error, t("events.registration.genericError"));
 
       setIsProcessing(false); // Reset processing state on error
       setStatusDialog({
         open: true,
-        title: "Registration Failed",
+        title: t("events.registration.failedTitle"),
         message: errorMessage,
         type: "error",
       });
@@ -388,7 +388,7 @@ const EventRegistration = () => {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl">
         {/* Title Section */}
         <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold mb-2">Registration</h1>
+          <h1 className="text-3xl font-bold mb-2">{t("events.registration.title")}</h1>
           <div className="w-20 h-1 bg-primary mx-auto"></div>
         </div>
 
@@ -397,18 +397,18 @@ const EventRegistration = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
             {/* Left Side - Form */}
             <div className="p-6 bg-background">
-              <h2 className="text-xl font-bold mb-5">Book Your Seat</h2>
+              <h2 className="text-xl font-bold mb-5">{t("events.registration.bookSeat")}</h2>
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Full Name */}
                 <div className="space-y-2">
-                  <Label htmlFor="fullName">Name</Label>
+                  <Label htmlFor="fullName">{t("events.registration.fullName")}</Label>
                   <Input
                     id="fullName"
                     name="fullName"
                     value={formData.fullName}
                     onChange={handleInputChange}
-                    placeholder="Enter your full name"
+                    placeholder={t("events.registration.fullNamePlaceholder")}
                     className={errors.fullName ? "border-destructive" : ""}
                   />
                   {errors.fullName && (
@@ -418,14 +418,14 @@ const EventRegistration = () => {
 
                 {/* Email */}
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email ID</Label>
+                  <Label htmlFor="email">{t("events.registration.email")}</Label>
                   <Input
                     id="email"
                     name="email"
                     type="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    placeholder="Enter your email address"
+                    placeholder={t("events.registration.emailPlaceholder")}
                     className={errors.email ? "border-destructive" : ""}
                   />
                   {errors.email && (
@@ -445,7 +445,7 @@ const EventRegistration = () => {
                       }
                     }}
                     error={errors.phone}
-                    label="Phone No."
+                    label={t("events.registration.phone")}
                     required={true}
                   />
                   {errors.phone && (
@@ -455,17 +455,17 @@ const EventRegistration = () => {
 
                 {/* Registration Amount Display */}
                 <div className="space-y-2">
-                  <Label>Registration Amount</Label>
+                  <Label>{t("events.registration.amount")}</Label>
                   <div className="bg-muted/50 p-4 rounded-lg border space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Base Price:</span>
+                      <span className="text-muted-foreground">{t("events.registration.basePrice")}:</span>
                       <span className="font-medium">
-                        {isFree ? "₹0.00" : `₹${(registrationAmount / (1 + (eventData.gstRate || 0) / 100)).toFixed(2)}`}
+                        {isFree ? `₹0.00 (${t("events.registration.free")})` : `₹${(registrationAmount / (1 + (eventData.gstRate || 0) / 100)).toFixed(2)}`}
                       </span>
                     </div>
                     {!isFree && (
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">GST ({eventData.gstRate || 0}%):</span>
+                        <span className="text-muted-foreground">{t("events.registration.gst")} ({eventData.gstRate || 0}%):</span>
                         <span className="font-medium">
                           ₹{(registrationAmount - (registrationAmount / (1 + (eventData.gstRate || 0) / 100))).toFixed(2)}
                         </span>
@@ -473,10 +473,10 @@ const EventRegistration = () => {
                     )}
                     <div className="flex items-center justify-between pt-2 border-t mt-2">
                       <span className="text-sm font-bold text-foreground">
-                        Total {!isFree && "(Inclusive of Tax)"}:
+                        {t("events.registration.total")} {!isFree && t("events.registration.inclusiveTax")}:
                       </span>
                       <span className="text-lg font-black text-primary">
-                        {isFree ? "Free" : `₹${registrationAmount}`}
+                        {isFree ? t("events.registration.free") : `₹${registrationAmount}`}
                       </span>
                     </div>
                   </div>
@@ -496,14 +496,14 @@ const EventRegistration = () => {
                     className={errors.terms ? "border-destructive" : ""}
                   />
                   <Label htmlFor="terms" className="text-sm cursor-pointer">
-                    I agree to the{" "}
+                    {t("events.registration.agreeTo")}{" "}
                     <a
                       href="/terms-and-conditions"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-primary hover:underline font-medium"
                     >
-                      terms & conditions
+                      {t("events.registration.terms")}
                     </a>
                   </Label>
                 </div>
@@ -513,7 +513,7 @@ const EventRegistration = () => {
 
                 {/* Submit Button */}
                 <Button type="submit" className="w-full" size="lg">
-                  Confirm Registration
+                  {t("events.registration.confirm")}
                 </Button>
               </form>
             </div>
@@ -532,7 +532,7 @@ const EventRegistration = () => {
                   <div className="text-center py-12">
                     <Calendar className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
                     <p className="text-muted-foreground">
-                      No event image available
+                      {t("events.registration.noImage")}
                     </p>
                   </div>
                 </div>
@@ -546,14 +546,14 @@ const EventRegistration = () => {
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Registration</AlertDialogTitle>
+            <AlertDialogTitle>{t("events.registration.confirm")}</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-6 pt-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
                     <User className="w-5 h-5 text-primary mt-0.5" />
                     <div>
-                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Name</p>
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{t("events.registration.fullName")}</p>
                       <p className="font-medium text-foreground">{formData.fullName}</p>
                     </div>
                   </div>
@@ -561,7 +561,7 @@ const EventRegistration = () => {
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
                     <Mail className="w-5 h-5 text-primary mt-0.5" />
                     <div>
-                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Email</p>
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{t("events.registration.email")}</p>
                       <p className="font-medium text-foreground break-all">{formData.email}</p>
                     </div>
                   </div>
@@ -569,7 +569,7 @@ const EventRegistration = () => {
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
                     <Phone className="w-5 h-5 text-primary mt-0.5" />
                     <div>
-                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Phone</p>
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{t("events.registration.phone")}</p>
                       <p className="font-medium text-foreground">{formData.phone}</p>
                     </div>
                   </div>
@@ -577,7 +577,7 @@ const EventRegistration = () => {
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
                     <Calendar className="w-5 h-5 text-primary mt-0.5" />
                     <div>
-                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Event</p>
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{t("events.registration.event")}</p>
                       <p className="font-medium text-foreground">{eventData.title}</p>
                     </div>
                   </div>
@@ -585,36 +585,36 @@ const EventRegistration = () => {
 
                 <div className="bg-primary/5 border border-primary/10 rounded-xl p-4 space-y-2">
                   <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">Base Price</span>
-                    <span>{isFree ? "₹0.00" : `₹${(registrationAmount / (1 + (eventData.gstRate || 0) / 100)).toFixed(2)}`}</span>
+                    <span className="text-muted-foreground">{t("events.registration.basePrice")}</span>
+                    <span>{isFree ? `₹0.00 (${t("events.registration.free")})` : `₹${(registrationAmount / (1 + (eventData.gstRate || 0) / 100)).toFixed(2)}`}</span>
                   </div>
                   {!isFree && (
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground">GST ({eventData.gstRate || 0}%)</span>
+                      <span className="text-muted-foreground">{t("events.registration.gst")} ({eventData.gstRate || 0}%)</span>
                       <span>₹{(registrationAmount - (registrationAmount / (1 + (eventData.gstRate || 0) / 100))).toFixed(2)}</span>
                     </div>
                   )}
                   <div className="flex justify-between items-center pt-2 border-t">
                     <div className="flex items-center gap-2">
                       <Ticket className="w-5 h-5 text-primary" />
-                      <span className="font-bold">Total Amount</span>
+                      <span className="font-bold">{t("events.registration.amountPaid")}</span>
                     </div>
                     <span className="text-2xl font-black text-primary">
-                      {isFree ? "Free" : `₹${registrationAmount}`}
+                      {isFree ? t("events.registration.free") : `₹${registrationAmount}`}
                     </span>
                   </div>
                 </div>
 
                 {!isFree && (
                   <p className="text-xs text-center text-muted-foreground">
-                    You will be redirected to the secure payment gateway to complete your registration.
+                    {t("events.registration.redirecting")}
                   </p>
                 )}
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("events.registration.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={(e) => {
               if (isProcessing) {
                 e.preventDefault(); // Prevent closing while processing
@@ -624,7 +624,7 @@ const EventRegistration = () => {
               handleConfirmRegistration();
             }} disabled={isProcessing}>
               {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isFree ? "Confirm Registration" : "Proceed to Payment"}
+              {isFree ? t("events.registration.confirm") : t("events.registration.proceedPayment")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -664,7 +664,7 @@ const EventRegistration = () => {
                     </div>
 
                     <div className="text-center space-y-2">
-                      <p className="text-lg font-semibold text-foreground">Registration Failed</p>
+                      <p className="text-lg font-semibold text-foreground">{t("events.registration.failedTitle")}</p>
                       <p className="whitespace-pre-line text-muted-foreground">{statusDialog.message}</p>
                     </div>
                   </div>
@@ -679,21 +679,21 @@ const EventRegistration = () => {
                     </div>
 
                     <div className="text-center space-y-2">
-                      <p className="text-muted-foreground">You have successfully registered for the event.</p>
-                      <p className="text-sm text-muted-foreground">A confirmation email has been sent to <span className="font-medium text-foreground">{statusDialog.data.email}</span></p>
+                      <p className="text-muted-foreground">{t("events.registration.successDesc")}</p>
+                      <p className="text-sm text-muted-foreground">{t("events.registration.emailSent", { email: statusDialog.data.email })}</p>
                     </div>
 
                     <div className="bg-muted/30 rounded-xl border p-4 space-y-3">
                       <div className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground">Registration ID</span>
+                        <span className="text-muted-foreground">{t("events.registration.registrationId")}</span>
                         <span className="font-mono font-medium">{statusDialog.data.registrationNumber}</span>
                       </div>
                       <div className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground">Event</span>
+                        <span className="text-muted-foreground">{t("events.registration.event")}</span>
                         <span className="font-medium text-right w-1/2">{statusDialog.data.eventTitle}</span>
                       </div>
                       <div className="border-t pt-3 flex justify-between items-center">
-                        <span className="font-medium text-primary">Amount Paid</span>
+                        <span className="font-medium text-primary">{t("events.registration.amountPaid")}</span>
                         <span className="font-bold text-lg text-primary">
                           {typeof statusDialog.data.amount === 'number' ? `₹${statusDialog.data.amount}` : statusDialog.data.amount}
                         </span>
@@ -712,7 +712,7 @@ const EventRegistration = () => {
                   if (statusDialog.onClose) statusDialog.onClose();
                 }}
               >
-                OK
+                {t("events.registration.ok")}
               </AlertDialogAction>
             </AlertDialogFooter>
           )}

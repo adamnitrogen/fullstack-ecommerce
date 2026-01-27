@@ -21,7 +21,7 @@ const Donate = () => {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-2">
               <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-[0.2em] mb-2">
-                <HandHeart className="h-3 w-3" /> Seva & Compassion
+                <HandHeart className="h-3 w-3" /> {t("donate.hero.badge")}
               </div>
               <h1 className="text-3xl md:text-5xl font-bold font-playfair">
                 {t("donate.title", "Support Our")} <span className="text-[#B85C3C] italic">{t("donate.cause", "Cause")}</span>
